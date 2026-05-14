@@ -9,6 +9,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { requireCan } from "@/lib/auth/can";
+import { recordEvent } from "@/lib/services/events";
 import type { FinanceTransaction } from "@/generated/prisma/client";
 import type { ParsedRow } from "@/lib/csv";
 
@@ -59,10 +60,26 @@ export async function importTransactions(
       raw: r.raw,
     })),
   });
+  await recordEvent({
+    userId,
+    tool: "finance",
+    type: "finance.imported",
+    meta: { count: rows.length },
+  });
   return { imported: rows.length };
 }
 
 export async function deleteAllTransactions(userId: string): Promise<void> {
   requireCan(userId, "finance", "write");
-  await prisma.financeTransaction.deleteMany({ where: { userId } });
+  const { count } = await prisma.financeTransaction.deleteMany({
+    where: { userId },
+  });
+  if (count > 0) {
+    await recordEvent({
+      userId,
+      tool: "finance",
+      type: "finance.cleared",
+      meta: { count },
+    });
+  }
 }

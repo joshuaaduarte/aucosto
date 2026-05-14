@@ -1,0 +1,24 @@
+// Canonical activity log. Every tool writes here on meaningful mutations
+// (start/stop/import/clear/etc). The log is the backbone of cross-tool
+// timelines ("what happened today"), summarization, and agent traces — far
+// cheaper to add now than to retrofit when 4+ tools each have a custom feed.
+//
+// Conventions:
+// - tool: lowercase tool id, matches Tool in src/lib/auth/can.ts
+// - type: "{tool}.{verb}" e.g. "time.started", "finance.imported"
+// - refId: optional row id in the originating tool (e.g. TimeEntry.id)
+// - meta: free-form JSON; small extras only (counts, labels), not full rows
+
+model Event {
+  id     String   @id @default(cuid())
+  userId String
+  tool   String
+  type   String
+  refId  String?
+  meta   Json?
+  at     DateTime @default(now())
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, at])
+  @@index([userId, tool, at])
+}

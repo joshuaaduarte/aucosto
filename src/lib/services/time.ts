@@ -8,6 +8,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { requireCan } from "@/lib/auth/can";
+import { recordEvent } from "@/lib/services/events";
 import type { TimeEntry } from "@/generated/prisma/client";
 
 export async function getRunningEntry(
@@ -51,7 +52,7 @@ export async function startEntry(
     where: { userId, endedAt: null },
     data: { endedAt: new Date() },
   });
-  return prisma.timeEntry.create({
+  const entry = await prisma.timeEntry.create({
     data: {
       userId,
       label: input.label,
@@ -59,17 +60,43 @@ export async function startEntry(
       startedAt: new Date(),
     },
   });
+  await recordEvent({
+    userId,
+    tool: "time",
+    type: "time.started",
+    refId: entry.id,
+    meta: { label: entry.label, category: entry.category },
+  });
+  return entry;
 }
 
 export async function stopRunning(userId: string): Promise<void> {
   requireCan(userId, "time", "write");
-  await prisma.timeEntry.updateMany({
+  const { count } = await prisma.timeEntry.updateMany({
     where: { userId, endedAt: null },
     data: { endedAt: new Date() },
   });
+  if (count > 0) {
+    await recordEvent({
+      userId,
+      tool: "time",
+      type: "time.stopped",
+      meta: { count },
+    });
+  }
 }
 
 export async function deleteEntry(userId: string, id: string): Promise<void> {
   requireCan(userId, "time", "write");
-  await prisma.timeEntry.deleteMany({ where: { id, userId } });
+  const { count } = await prisma.timeEntry.deleteMany({
+    where: { id, userId },
+  });
+  if (count > 0) {
+    await recordEvent({
+      userId,
+      tool: "time",
+      type: "time.deleted",
+      refId: id,
+    });
+  }
 }
