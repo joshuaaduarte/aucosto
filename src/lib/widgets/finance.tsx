@@ -1,5 +1,8 @@
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import {
+  countTransactions,
+  getSpendCentsSince,
+} from "@/lib/services/finance";
 import { WidgetCard } from "./widget-card";
 
 function startOfMonth(): Date {
@@ -24,12 +27,9 @@ export async function FinanceWidget() {
   const userId = session.user.id;
   const monthStart = startOfMonth();
 
-  const [count, monthAgg] = await Promise.all([
-    prisma.financeTransaction.count({ where: { userId } }),
-    prisma.financeTransaction.aggregate({
-      where: { userId, date: { gte: monthStart }, amount: { lt: 0 } },
-      _sum: { amount: true },
-    }),
+  const [count, spent] = await Promise.all([
+    countTransactions(userId),
+    getSpendCentsSince(userId, monthStart),
   ]);
 
   if (count === 0) {
@@ -42,8 +42,6 @@ export async function FinanceWidget() {
       </WidgetCard>
     );
   }
-
-  const spent = Math.abs(monthAgg._sum.amount ?? 0);
 
   return (
     <WidgetCard name="Finance" href="/app/finance">

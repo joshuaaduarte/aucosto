@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
 import { parseTransactionsCsv } from "@/lib/csv";
+import * as financeService from "@/lib/services/finance";
 
 export type UploadState =
   | { ok: true; imported: number; skipped: number }
@@ -36,29 +36,21 @@ export async function uploadCsv(
     };
   }
 
-  await prisma.financeTransaction.createMany({
-    data: rows.map((r) => ({
-      userId: session.user.id,
-      date: r.date,
-      amount: r.amount,
-      description: r.description,
-      account: r.account,
-      raw: r.raw,
-    })),
-  });
+  const { imported } = await financeService.importTransactions(
+    session.user.id,
+    rows,
+  );
 
   revalidatePath("/app");
   revalidatePath("/app/finance");
-  return { ok: true, imported: rows.length, skipped };
+  return { ok: true, imported, skipped };
 }
 
 export async function deleteAllTransactions() {
   const session = await auth();
   if (!session?.user?.id) return;
 
-  await prisma.financeTransaction.deleteMany({
-    where: { userId: session.user.id },
-  });
+  await financeService.deleteAllTransactions(session.user.id);
 
   revalidatePath("/app");
   revalidatePath("/app/finance");

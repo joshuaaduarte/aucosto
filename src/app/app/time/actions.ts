@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import * as timeService from "@/lib/services/time";
 
 const startSchema = z.object({
   label: z.string().trim().min(1, "Label is required").max(200),
@@ -27,18 +27,9 @@ export async function startEntry(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
 
-  await prisma.timeEntry.updateMany({
-    where: { userId: session.user.id, endedAt: null },
-    data: { endedAt: new Date() },
-  });
-
-  await prisma.timeEntry.create({
-    data: {
-      userId: session.user.id,
-      label: parsed.data.label,
-      category: parsed.data.category ?? null,
-      startedAt: new Date(),
-    },
+  await timeService.startEntry(session.user.id, {
+    label: parsed.data.label,
+    category: parsed.data.category ?? null,
   });
 
   revalidatePath("/app");
@@ -49,10 +40,7 @@ export async function stopEntry() {
   const session = await auth();
   if (!session?.user?.id) return;
 
-  await prisma.timeEntry.updateMany({
-    where: { userId: session.user.id, endedAt: null },
-    data: { endedAt: new Date() },
-  });
+  await timeService.stopRunning(session.user.id);
 
   revalidatePath("/app");
   revalidatePath("/app/time");
@@ -62,9 +50,7 @@ export async function deleteEntry(id: string) {
   const session = await auth();
   if (!session?.user?.id) return;
 
-  await prisma.timeEntry.deleteMany({
-    where: { id, userId: session.user.id },
-  });
+  await timeService.deleteEntry(session.user.id, id);
 
   revalidatePath("/app");
   revalidatePath("/app/time");

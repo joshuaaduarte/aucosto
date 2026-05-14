@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { getRunningEntry, listCompletedSince } from "@/lib/services/time";
 import { formatHM, startOfToday } from "@/lib/time";
 import { WidgetCard } from "./widget-card";
 
@@ -9,10 +9,7 @@ export async function TimeTrackerWidget() {
 
   const userId = session.user.id;
 
-  const running = await prisma.timeEntry.findFirst({
-    where: { userId, endedAt: null },
-    orderBy: { startedAt: "desc" },
-  });
+  const running = await getRunningEntry(userId);
 
   if (running) {
     return (
@@ -34,13 +31,7 @@ export async function TimeTrackerWidget() {
   }
 
   const todayStart = startOfToday();
-  const completedToday = await prisma.timeEntry.findMany({
-    where: {
-      userId,
-      startedAt: { gte: todayStart },
-      endedAt: { not: null },
-    },
-  });
+  const completedToday = await listCompletedSince(userId, todayStart);
 
   const totalMsToday = completedToday.reduce(
     (sum, e) => sum + (e.endedAt!.getTime() - e.startedAt.getTime()),

@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { getRunningEntry, listRecentEntries } from "@/lib/services/time";
 import { formatDuration } from "@/lib/time";
 import { StartForm } from "./start-form";
 import { RunningCard } from "./running-card";
@@ -12,15 +12,8 @@ export default async function TimePage() {
   const userId = session!.user.id;
 
   const [running, recent] = await Promise.all([
-    prisma.timeEntry.findFirst({
-      where: { userId, endedAt: null },
-      orderBy: { startedAt: "desc" },
-    }),
-    prisma.timeEntry.findMany({
-      where: { userId, endedAt: { not: null } },
-      orderBy: { startedAt: "desc" },
-      take: 30,
-    }),
+    getRunningEntry(userId),
+    listRecentEntries(userId, { limit: 30 }),
   ]);
 
   return (

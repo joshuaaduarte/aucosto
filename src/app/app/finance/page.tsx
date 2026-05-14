@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { countTransactions, listTransactions } from "@/lib/services/finance";
 import { UploadForm } from "./upload-form";
 import { ClearButton } from "./clear-button";
 
@@ -19,12 +19,8 @@ export default async function FinancePage() {
   const userId = session!.user.id;
 
   const [count, recent] = await Promise.all([
-    prisma.financeTransaction.count({ where: { userId } }),
-    prisma.financeTransaction.findMany({
-      where: { userId },
-      orderBy: { date: "desc" },
-      take: 100,
-    }),
+    countTransactions(userId),
+    listTransactions(userId, { limit: 100 }),
   ]);
 
   return (
