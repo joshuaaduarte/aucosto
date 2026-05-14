@@ -11,6 +11,7 @@
 
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 import type { Prisma } from "@/generated/prisma/client";
 import type { Tool } from "@/lib/auth/can";
 
@@ -32,4 +33,13 @@ export async function recordEvent(input: EventInput): Promise<void> {
       meta: input.meta ?? undefined,
     },
   });
+  logger.info(
+    {
+      userId: input.userId,
+      tool: input.tool,
+      type: input.type,
+      refId: input.refId ?? undefined,
+    },
+    "event recorded",
+  );
 }
