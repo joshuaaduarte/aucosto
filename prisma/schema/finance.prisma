@@ -1,0 +1,20 @@
+// Finance tool.
+//
+// Money is stored as integer minor units (cents for USD). The display layer
+// divides by 100. Never use Float for money. Sign convention: negative amount
+// = debit/outflow, positive = credit/inflow.
+
+model FinanceTransaction {
+  id          String   @id @default(cuid())
+  userId      String
+  date        DateTime
+  amount      Int
+  currency    String   @default("USD")
+  description String
+  account     String?
+  raw         String?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+}

@@ -5,8 +5,8 @@ import { ClearButton } from "./clear-button";
 
 export const dynamic = "force-dynamic";
 
-function formatUSD(n: number): string {
-  return n.toLocaleString("en-US", {
+function formatUSDFromCents(cents: number): string {
+  return (cents / 100).toLocaleString("en-US", {
     style: "currency",
     currency: "USD",
     minimumFractionDigits: 2,
@@ -19,8 +19,8 @@ export default async function FinancePage() {
   const userId = session!.user.id;
 
   const [count, recent] = await Promise.all([
-    prisma.transaction.count({ where: { userId } }),
-    prisma.transaction.findMany({
+    prisma.financeTransaction.count({ where: { userId } }),
+    prisma.financeTransaction.findMany({
       where: { userId },
       orderBy: { date: "desc" },
       take: 100,
@@ -77,7 +77,7 @@ export default async function FinancePage() {
                       : "text-emerald-600 dark:text-emerald-400"
                   }`}
                 >
-                  {formatUSD(t.amount)}
+                  {formatUSDFromCents(t.amount)}
                 </span>
               </li>
             ))}

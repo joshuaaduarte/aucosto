@@ -36,7 +36,7 @@ export async function uploadCsv(
     };
   }
 
-  await prisma.transaction.createMany({
+  await prisma.financeTransaction.createMany({
     data: rows.map((r) => ({
       userId: session.user.id,
       date: r.date,
@@ -56,7 +56,7 @@ export async function deleteAllTransactions() {
   const session = await auth();
   if (!session?.user?.id) return;
 
-  await prisma.transaction.deleteMany({
+  await prisma.financeTransaction.deleteMany({
     where: { userId: session.user.id },
   });
 

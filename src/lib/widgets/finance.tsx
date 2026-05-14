@@ -9,8 +9,8 @@ function startOfMonth(): Date {
   return d;
 }
 
-function formatUSD(n: number): string {
-  return n.toLocaleString("en-US", {
+function formatUSDFromCents(cents: number): string {
+  return (cents / 100).toLocaleString("en-US", {
     style: "currency",
     currency: "USD",
     maximumFractionDigits: 0,
@@ -25,8 +25,8 @@ export async function FinanceWidget() {
   const monthStart = startOfMonth();
 
   const [count, monthAgg] = await Promise.all([
-    prisma.transaction.count({ where: { userId } }),
-    prisma.transaction.aggregate({
+    prisma.financeTransaction.count({ where: { userId } }),
+    prisma.financeTransaction.aggregate({
       where: { userId, date: { gte: monthStart }, amount: { lt: 0 } },
       _sum: { amount: true },
     }),
@@ -49,7 +49,7 @@ export async function FinanceWidget() {
     <WidgetCard name="Finance" href="/app/finance">
       <div className="space-y-1">
         <p className="text-2xl font-semibold tracking-tight">
-          {formatUSD(spent)}
+          {formatUSDFromCents(spent)}
         </p>
         <p className="text-sm text-zinc-500">spent this month</p>
       </div>

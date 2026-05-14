@@ -38,9 +38,9 @@ async function main() {
     throw new Error(`Expected 1 skipped, got ${parsed.skipped}`);
   }
 
-  // ----- Wipe + insert transactions -----
-  await prisma.transaction.deleteMany({ where: { userId: user.id } });
-  await prisma.transaction.createMany({
+  // ----- Wipe + insert finance transactions -----
+  await prisma.financeTransaction.deleteMany({ where: { userId: user.id } });
+  await prisma.financeTransaction.createMany({
     data: parsed.rows.map((r) => ({
       userId: user.id,
       date: r.date,
@@ -50,10 +50,10 @@ async function main() {
       raw: r.raw,
     })),
   });
-  const txCount = await prisma.transaction.count({
+  const txCount = await prisma.financeTransaction.count({
     where: { userId: user.id },
   });
-  console.log(`Transactions table: ${txCount} rows`);
+  console.log(`FinanceTransaction table: ${txCount} rows`);
 
   // ----- Time tracker: insert a running entry -----
   await prisma.timeEntry.deleteMany({ where: { userId: user.id } });

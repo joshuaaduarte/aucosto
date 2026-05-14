@@ -1,0 +1,15 @@
+// Time tracking tool.
+
+model TimeEntry {
+  id        String    @id @default(cuid())
+  userId    String
+  label     String
+  category  String?
+  startedAt DateTime
+  endedAt   DateTime?
+  notes     String?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startedAt])
+}

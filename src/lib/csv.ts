@@ -2,7 +2,7 @@ import Papa from "papaparse";
 
 export type ParsedRow = {
   date: Date;
-  amount: number;
+  amount: number; // integer minor units (cents); negative = debit
   description: string;
   account: string | null;
   raw: string;
@@ -53,7 +53,8 @@ function parseAmount(s: string): number | null {
     .replace(/[$,\s]/g, "")
     .replace(/^\((.*)\)$/, "-$1");
   const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
+  if (!Number.isFinite(n)) return null;
+  return Math.round(n * 100);
 }
 
 function parseDate(s: string): Date | null {
