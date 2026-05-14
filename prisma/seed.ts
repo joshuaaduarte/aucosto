@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "../src/generated/prisma/client";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { PrismaPg } from "@prisma/adapter-pg";
 
 async function main() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -13,7 +13,7 @@ async function main() {
   if (!password) throw new Error("SEED_USER_PASSWORD not set");
 
   const prisma = new PrismaClient({
-    adapter: new PrismaBetterSqlite3({ url: databaseUrl }),
+    adapter: new PrismaPg({ connectionString: databaseUrl }),
   });
 
   const hashed = await bcrypt.hash(password, 10);

@@ -2,7 +2,7 @@
 // Not a permanent test; run with `tsx --env-file=.env scripts/smoke.ts`.
 
 import { PrismaClient } from "../src/generated/prisma/client";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { parseTransactionsCsv } from "../src/lib/csv";
 
 const sampleCsv = `Date,Description,Amount,Account
@@ -20,7 +20,7 @@ async function main() {
   if (!email) throw new Error("SEED_USER_EMAIL not set");
 
   const prisma = new PrismaClient({
-    adapter: new PrismaBetterSqlite3({ url }),
+    adapter: new PrismaPg({ connectionString: url }),
   });
 
   const user = await prisma.user.findUnique({ where: { email } });

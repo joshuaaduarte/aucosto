@@ -1,5 +1,6 @@
 // aucosto schema
-// Dev: SQLite (./prisma/dev.db). Prod will move to Supabase Postgres.
+// Supabase Postgres. DATABASE_URL is the transaction pooler; DIRECT_URL (used
+// only by `prisma migrate`) is the session pooler. Both live in prisma.config.ts.
 
 generator client {
   provider = "prisma-client"
@@ -7,7 +8,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 model User {
