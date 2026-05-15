@@ -35,12 +35,14 @@ function toMoneyInput(cents: number | null): string {
 }
 
 const initialState: AccountState = undefined;
+const fieldClassName = "block min-h-11 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900";
+const buttonClassName = "inline-flex min-h-11 items-center justify-center rounded-xl bg-zinc-900 px-4 text-sm font-medium text-zinc-50 transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300";
 
 function AccountRow({ account }: { account: AccountView }) {
   const [state, formAction, pending] = useActionState(saveFinanceAccount, initialState);
 
   return (
-    <form action={formAction} className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+    <form action={formAction} className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
       <input type="hidden" name="id" value={account.id} />
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -49,14 +51,14 @@ function AccountRow({ account }: { account: AccountView }) {
         </div>
         <p className="font-mono text-sm tabular-nums text-zinc-900 dark:text-zinc-100">{formatUSDFromCents(account.currentBalanceCents)}</p>
       </div>
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <label className="space-y-1 text-sm">
           <span className="text-zinc-500">Name</span>
-          <input name="name" defaultValue={account.name} required className="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
+          <input name="name" defaultValue={account.name} required className={fieldClassName} />
         </label>
         <label className="space-y-1 text-sm">
           <span className="text-zinc-500">Kind</span>
-          <select name="kind" defaultValue={account.kind} className="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900">
+          <select name="kind" defaultValue={account.kind} className={fieldClassName}>
             {FINANCE_ACCOUNT_KINDS.map((kind) => (
               <option key={kind} value={kind}>{formatAccountKind(kind)}</option>
             ))}
@@ -64,28 +66,28 @@ function AccountRow({ account }: { account: AccountView }) {
         </label>
         <label className="space-y-1 text-sm">
           <span className="text-zinc-500">Current balance</span>
-          <input name="currentBalance" defaultValue={toMoneyInput(account.currentBalanceCents)} required inputMode="decimal" className="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
+          <input name="currentBalance" defaultValue={toMoneyInput(account.currentBalanceCents)} required inputMode="decimal" className={fieldClassName} />
         </label>
         <label className="space-y-1 text-sm">
           <span className="text-zinc-500">Balance as of</span>
-          <input type="date" name="balanceUpdatedAt" defaultValue={toDateInput(account.balanceUpdatedAt)} required className="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
+          <input type="date" name="balanceUpdatedAt" defaultValue={toDateInput(account.balanceUpdatedAt)} required className={fieldClassName} />
         </label>
         <label className="space-y-1 text-sm">
           <span className="text-zinc-500">Statement balance</span>
-          <input name="statementBalance" defaultValue={toMoneyInput(account.statementBalanceCents)} inputMode="decimal" className="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
+          <input name="statementBalance" defaultValue={toMoneyInput(account.statementBalanceCents)} inputMode="decimal" className={fieldClassName} />
         </label>
         <label className="space-y-1 text-sm">
           <span className="text-zinc-500">Due date</span>
-          <input type="date" name="dueDate" defaultValue={toDateInput(account.dueDate)} className="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
+          <input type="date" name="dueDate" defaultValue={toDateInput(account.dueDate)} className={fieldClassName} />
         </label>
         <label className="space-y-1 text-sm">
           <span className="text-zinc-500">Credit limit</span>
-          <input name="creditLimit" defaultValue={toMoneyInput(account.creditLimitCents)} inputMode="decimal" className="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
+          <input name="creditLimit" defaultValue={toMoneyInput(account.creditLimitCents)} inputMode="decimal" className={fieldClassName} />
         </label>
       </div>
-      <div className="mt-4 flex items-center justify-between gap-3">
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {state && !state.ok ? <p className="text-sm text-red-600 dark:text-red-400">{state.error}</p> : <span />}
-        <button type="submit" disabled={pending} className="inline-flex h-10 items-center justify-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-zinc-50 transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300">
+        <button type="submit" disabled={pending} className={`${buttonClassName} w-full sm:w-auto`}>
           {pending ? "Saving…" : "Save account"}
         </button>
       </div>
@@ -102,19 +104,19 @@ export function AccountsPanel({ accounts }: { accounts: AccountView[] }) {
         <AccountRow key={account.id} account={account} />
       ))}
 
-      <form action={formAction} className="rounded-lg border border-dashed border-zinc-300 p-4 dark:border-zinc-700">
+      <form action={formAction} className="rounded-xl border border-dashed border-zinc-300 p-4 dark:border-zinc-700">
         <div>
           <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Add account</h3>
           <p className="mt-1 text-sm text-zinc-500">Manual-first for now: keep current balances fresh, then we can automate later.</p>
         </div>
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <label className="space-y-1 text-sm">
             <span className="text-zinc-500">Name</span>
-            <input name="name" placeholder="Chase Checking • 0637" required className="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
+            <input name="name" placeholder="Chase Checking • 0637" required className={fieldClassName} />
           </label>
           <label className="space-y-1 text-sm">
             <span className="text-zinc-500">Kind</span>
-            <select name="kind" defaultValue={"checking" as FinanceAccountKind} className="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900">
+            <select name="kind" defaultValue={"checking" as FinanceAccountKind} className={fieldClassName}>
               {FINANCE_ACCOUNT_KINDS.map((kind) => (
                 <option key={kind} value={kind}>{formatAccountKind(kind)}</option>
               ))}
@@ -122,28 +124,28 @@ export function AccountsPanel({ accounts }: { accounts: AccountView[] }) {
           </label>
           <label className="space-y-1 text-sm">
             <span className="text-zinc-500">Current balance</span>
-            <input name="currentBalance" required inputMode="decimal" placeholder="0.00" className="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
+            <input name="currentBalance" required inputMode="decimal" placeholder="0.00" className={fieldClassName} />
           </label>
           <label className="space-y-1 text-sm">
             <span className="text-zinc-500">Balance as of</span>
-            <input type="date" name="balanceUpdatedAt" required className="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
+            <input type="date" name="balanceUpdatedAt" required className={fieldClassName} />
           </label>
           <label className="space-y-1 text-sm">
             <span className="text-zinc-500">Statement balance</span>
-            <input name="statementBalance" inputMode="decimal" placeholder="optional" className="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
+            <input name="statementBalance" inputMode="decimal" placeholder="optional" className={fieldClassName} />
           </label>
           <label className="space-y-1 text-sm">
             <span className="text-zinc-500">Due date</span>
-            <input type="date" name="dueDate" className="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
+            <input type="date" name="dueDate" className={fieldClassName} />
           </label>
           <label className="space-y-1 text-sm">
             <span className="text-zinc-500">Credit limit</span>
-            <input name="creditLimit" inputMode="decimal" placeholder="optional" className="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
+            <input name="creditLimit" inputMode="decimal" placeholder="optional" className={fieldClassName} />
           </label>
         </div>
-        <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           {state && !state.ok ? <p className="text-sm text-red-600 dark:text-red-400">{state.error}</p> : <span />}
-          <button type="submit" disabled={pending} className="inline-flex h-10 items-center justify-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-zinc-50 transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300">
+          <button type="submit" disabled={pending} className={`${buttonClassName} w-full sm:w-auto`}>
             {pending ? "Adding…" : "Add account"}
           </button>
         </div>
