@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { auth } from "@/auth";
+import { formatAccountKind, summarizeBalances } from "@/lib/finance-accounts";
 import { resolveCategory } from "@/lib/finance-categories";
 import { calculateSpendProjection, projectCategories } from "@/lib/finance-pace";
 import { classifyTransaction, formatTransactionType } from "@/lib/finance-types";
@@ -10,10 +11,11 @@ import {
   topCategoriesBySpend,
   topMerchantsBySpend,
 } from "@/lib/finance-summary";
-import { countTransactions, listTransactions } from "@/lib/services/finance";
-import { UploadForm } from "./upload-form";
+import { countTransactions, listAccounts, listTransactions } from "@/lib/services/finance";
+import { AccountsPanel } from "./accounts-panel";
 import { CategorySelect } from "./category-select";
 import { ClearButton } from "./clear-button";
+import { UploadForm } from "./upload-form";
 
 export const dynamic = "force-dynamic";
 
@@ -95,13 +97,15 @@ export default async function FinancePage() {
   const userId = session!.user.id;
 
   const monthStart = startOfMonth();
-  const [count, recent, thisMonth, history] = await Promise.all([
+  const [accounts, count, recent, thisMonth, history] = await Promise.all([
+    listAccounts(userId),
     countTransactions(userId),
     listTransactions(userId, { limit: 100 }),
     listTransactions(userId, { since: monthStart, limit: 500 }),
     listTransactions(userId, { limit: 500 }),
   ]);
 
+  const snapshot = summarizeBalances(accounts);
   const thisMonthSummary = summarizeCashflow(thisMonth);
   const spendProjection = calculateSpendProjection(thisMonth);
   const topMerchants = topMerchantsBySpend(thisMonth, { limit: 5 });
@@ -109,6 +113,8 @@ export default async function FinancePage() {
   const categoryProjections = projectCategories(thisMonth, { limit: 3 });
   const typeSummary = summarizeTransactionTypes(thisMonth);
   const recurringCandidates = findRecurringCandidates(history, { limit: 5 });
+  const cashAccounts = accounts.filter((account) => account.kind !== "credit_card");
+  const cardAccounts = accounts.filter((account) => account.kind === "credit_card");
 
   return (
     <div className="space-y-8">
@@ -116,14 +122,38 @@ export default async function FinancePage() {
         <div className="max-w-2xl">
           <h1 className="text-3xl font-semibold tracking-tight">Finance</h1>
           <p className="mt-2 text-zinc-500">
-            Import your account activity, separate true spending from money movement,
-            and keep an eye on where the month is heading.
+            Import your account activity, track where your balances actually stand,
+            and keep an eye on how the month is moving.
           </p>
         </div>
         {count > 0 && <ClearButton />}
       </div>
 
       <UploadForm />
+
+      {accounts.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {summaryCard({
+            label: "Cash",
+            value: formatUSDFromCents(snapshot.cashCents),
+            hint: `${cashAccounts.length} tracked cash account${cashAccounts.length === 1 ? "" : "s"}`,
+          })}
+          {summaryCard({
+            label: "Cards owed",
+            value: formatUSDFromCents(snapshot.cardsOwedCents),
+            hint: `${cardAccounts.length} tracked card${cardAccounts.length === 1 ? "" : "s"}`,
+          })}
+          {summaryCard({
+            label: "Net position",
+            value: formatUSDFromCents(snapshot.netPositionCents),
+            hint: "cash minus card balances",
+            valueClassName:
+              snapshot.netPositionCents >= 0
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-zinc-950 dark:text-zinc-50",
+          })}
+        </div>
+      )}
 
       {count > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -139,7 +169,7 @@ export default async function FinancePage() {
             valueClassName: "text-emerald-600 dark:text-emerald-400",
           })}
           {summaryCard({
-            label: "Net",
+            label: "Net flow",
             value: formatUSDFromCents(thisMonthSummary.netCents),
             hint: "income minus true spend",
             valueClassName:
@@ -154,6 +184,93 @@ export default async function FinancePage() {
           })}
         </div>
       )}
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+        {sectionCard({
+          title: "Accounts",
+          subtitle:
+            accounts.length > 0
+              ? "Manual balances for now. Keep these fresh and the snapshot stays honest."
+              : "Add the balances you care about so finance can show where you actually stand.",
+          children: (
+            <div className="mt-5 space-y-4">
+              {accounts.length > 0 && (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {accounts.map((account) => (
+                    <div key={account.id} className="rounded-lg border border-zinc-200 px-3 py-3 dark:border-zinc-800">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-medium text-zinc-900 dark:text-zinc-100">{account.name}</p>
+                          <p className="text-xs text-zinc-500">
+                            {formatAccountKind(account.kind)} · updated {account.balanceUpdatedAt.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}
+                          </p>
+                        </div>
+                        <p className="font-mono text-sm tabular-nums text-zinc-900 dark:text-zinc-100">
+                          {formatUSDFromCents(account.currentBalanceCents)}
+                        </p>
+                      </div>
+                      {(account.dueDate || account.creditLimitCents != null) && (
+                        <div className="mt-2 text-xs text-zinc-500">
+                          {account.dueDate ? `due ${account.dueDate.toLocaleDateString([], { month: "short", day: "numeric" })}` : null}
+                          {account.dueDate && account.creditLimitCents != null ? " · " : null}
+                          {account.creditLimitCents != null ? `${formatUSDFromCents(account.creditLimitCents)} limit` : null}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <AccountsPanel
+                accounts={accounts.map((account) => ({
+                  id: account.id,
+                  name: account.name,
+                  kind: account.kind,
+                  currentBalanceCents: account.currentBalanceCents,
+                  statementBalanceCents: account.statementBalanceCents,
+                  balanceUpdatedAt: account.balanceUpdatedAt.toISOString(),
+                  dueDate: account.dueDate?.toISOString() ?? null,
+                  creditLimitCents: account.creditLimitCents,
+                }))}
+              />
+            </div>
+          ),
+        })}
+
+        {sectionCard({
+          title: "Position + pace",
+          subtitle: "Where you stand now, plus where this month is trending.",
+          children: count > 0 ? (
+            <div className="mt-5 space-y-4">
+              <div className="rounded-lg bg-zinc-50 px-4 py-4 dark:bg-zinc-800/70">
+                <p className="text-sm text-zinc-500">Projected true spend</p>
+                <p className="mt-1 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+                  {formatUSDFromCents(spendProjection.projectedCents)}
+                </p>
+                <p className="mt-1 text-sm text-zinc-500">
+                  {formatUSDFromCents(Math.round(spendProjection.burnRateCentsPerDay))} / day at the current pace
+                </p>
+              </div>
+              {categoryProjections.length > 0 && (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
+                  {categoryProjections.map((item) => (
+                    <div key={item.category} className="rounded-lg border border-zinc-200 px-3 py-3 dark:border-zinc-800">
+                      <p className="truncate text-sm font-medium text-zinc-700 dark:text-zinc-300">{item.category}</p>
+                      <p className="mt-1 font-mono text-sm tabular-nums text-zinc-900 dark:text-zinc-100">
+                        {formatUSDFromCents(item.projectedCents)}
+                      </p>
+                      <p className="text-xs text-zinc-500">projected</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="mt-5 rounded-lg border border-dashed border-zinc-300 px-4 py-8 text-sm text-zinc-500 dark:border-zinc-700">
+              Once you import transactions, this panel will show spend pacing and projections.
+            </div>
+          ),
+        })}
+      </div>
 
       {count > 0 && (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_0.8fr]">

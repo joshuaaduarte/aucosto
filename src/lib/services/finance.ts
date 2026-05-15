@@ -10,10 +10,30 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { requireCan } from "@/lib/auth/can";
 import { recordEvent } from "@/lib/services/events";
+import { parseCurrencyToCents, type FinanceAccountKind } from "@/lib/finance-accounts";
 import { inferCategory } from "@/lib/finance-categories";
 import { dedupeParsedRows } from "@/lib/finance-import";
-import type { FinanceTransaction } from "@/generated/prisma/client";
+import type { FinanceAccount, FinanceTransaction } from "@/generated/prisma/client";
 import type { ParsedRow } from "@/lib/csv";
+
+export type SaveFinanceAccountInput = {
+  id?: string;
+  name: string;
+  kind: FinanceAccountKind;
+  currentBalance: string;
+  balanceUpdatedAt: string;
+  statementBalance?: string;
+  dueDate?: string;
+  creditLimit?: string;
+};
+
+export async function listAccounts(userId: string): Promise<FinanceAccount[]> {
+  requireCan(userId, "finance", "read");
+  return prisma.financeAccount.findMany({
+    where: { userId },
+    orderBy: [{ kind: "asc" }, { name: "asc" }],
+  });
+}
 
 export async function listTransactions(
   userId: string,
@@ -33,6 +53,69 @@ export async function listTransactions(
 export async function countTransactions(userId: string): Promise<number> {
   requireCan(userId, "finance", "read");
   return prisma.financeTransaction.count({ where: { userId } });
+}
+
+export async function saveAccount(
+  userId: string,
+  input: SaveFinanceAccountInput,
+): Promise<void> {
+  requireCan(userId, "finance", "write");
+
+  const name = input.name.trim();
+  if (!name) throw new Error("Account name is required.");
+  if (!input.balanceUpdatedAt) throw new Error("Balance date is required.");
+
+  const currentBalanceCents = parseCurrencyToCents(input.currentBalance);
+  const statementBalanceCents = input.statementBalance?.trim()
+    ? parseCurrencyToCents(input.statementBalance)
+    : null;
+  const creditLimitCents = input.creditLimit?.trim()
+    ? parseCurrencyToCents(input.creditLimit)
+    : null;
+
+  const data = {
+    name,
+    kind: input.kind,
+    currentBalanceCents,
+    balanceUpdatedAt: new Date(`${input.balanceUpdatedAt}T12:00:00.000Z`),
+    statementBalanceCents,
+    dueDate: input.dueDate?.trim()
+      ? new Date(`${input.dueDate}T12:00:00.000Z`)
+      : null,
+    creditLimitCents,
+  };
+
+  if (input.id) {
+    const updated = await prisma.financeAccount.updateMany({
+      where: { id: input.id, userId },
+      data,
+    });
+    if (updated.count > 0) {
+      await recordEvent({
+        userId,
+        tool: "finance",
+        type: "finance.account_updated",
+        refId: input.id,
+        meta: { name, kind: input.kind },
+      });
+    }
+    return;
+  }
+
+  const created = await prisma.financeAccount.create({
+    data: {
+      userId,
+      ...data,
+    },
+  });
+
+  await recordEvent({
+    userId,
+    tool: "finance",
+    type: "finance.account_created",
+    refId: created.id,
+    meta: { name, kind: input.kind },
+  });
 }
 
 // Sum of debits (amount < 0) since the given instant, as a positive cents

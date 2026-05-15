@@ -23,6 +23,7 @@ model User {
   accounts            Account[]
   sessions            Session[]
   timeEntries         TimeEntry[]
+  financeAccounts     FinanceAccount[]
   financeTransactions FinanceTransaction[]
   events              Event[]
   createdAt           DateTime             @default(now())

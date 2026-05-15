@@ -3,11 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import type { FinanceCategory } from "@/lib/finance-categories";
+import type { FinanceAccountKind } from "@/lib/finance-accounts";
 import { parseTransactionsCsv } from "@/lib/csv";
 import * as financeService from "@/lib/services/finance";
 
 export type UploadState =
   | { ok: true; imported: number; skipped: number; deduped: number }
+  | { ok: false; error: string }
+  | undefined;
+
+export type AccountState =
+  | { ok: true }
   | { ok: false; error: string }
   | undefined;
 
@@ -68,4 +74,34 @@ export async function deleteAllTransactions() {
 
   revalidatePath("/app");
   revalidatePath("/app/finance");
+}
+
+export async function saveFinanceAccount(
+  _prev: AccountState,
+  formData: FormData,
+): Promise<AccountState> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Not signed in." };
+
+  try {
+    await financeService.saveAccount(session.user.id, {
+      id: String(formData.get("id") ?? "").trim() || undefined,
+      name: String(formData.get("name") ?? ""),
+      kind: String(formData.get("kind") ?? "checking") as FinanceAccountKind,
+      currentBalance: String(formData.get("currentBalance") ?? ""),
+      balanceUpdatedAt: String(formData.get("balanceUpdatedAt") ?? ""),
+      statementBalance: String(formData.get("statementBalance") ?? ""),
+      dueDate: String(formData.get("dueDate") ?? ""),
+      creditLimit: String(formData.get("creditLimit") ?? ""),
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Could not save account.",
+    };
+  }
+
+  revalidatePath("/app");
+  revalidatePath("/app/finance");
+  return { ok: true };
 }
