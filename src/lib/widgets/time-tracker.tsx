@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { getRunningEntry, listCompletedSince } from "@/lib/services/time";
-import { formatHM, startOfToday } from "@/lib/time";
+import { formatHM, startOfToday, startOfWeek } from "@/lib/time";
+import { sumDurations } from "@/lib/time-summary";
 import { WidgetCard } from "./widget-card";
 
 export async function TimeTrackerWidget() {
@@ -30,13 +31,13 @@ export async function TimeTrackerWidget() {
     );
   }
 
-  const todayStart = startOfToday();
-  const completedToday = await listCompletedSince(userId, todayStart);
+  const [completedToday, completedWeek] = await Promise.all([
+    listCompletedSince(userId, startOfToday()),
+    listCompletedSince(userId, startOfWeek()),
+  ]);
 
-  const totalMsToday = completedToday.reduce(
-    (sum, e) => sum + (e.endedAt!.getTime() - e.startedAt.getTime()),
-    0,
-  );
+  const totalMsToday = sumDurations(completedToday);
+  const totalMsWeek = sumDurations(completedWeek);
 
   return (
     <WidgetCard name="Time tracker" href="/app/time">
@@ -45,6 +46,7 @@ export async function TimeTrackerWidget() {
           {formatHM(totalMsToday)}
         </p>
         <p className="text-sm text-zinc-500">tracked today</p>
+        <p className="text-xs text-zinc-500">{formatHM(totalMsWeek)} this week</p>
       </div>
     </WidgetCard>
   );

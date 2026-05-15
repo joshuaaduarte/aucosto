@@ -24,3 +24,11 @@ export function startOfToday(): Date {
   d.setHours(0, 0, 0, 0);
   return d;
 }
+
+export function startOfWeek(): Date {
+  const d = startOfToday();
+  const day = d.getDay();
+  const diff = day === 0 ? 6 : day - 1;
+  d.setDate(d.getDate() - diff);
+  return d;
+}

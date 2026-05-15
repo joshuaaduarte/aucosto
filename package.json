@@ -12,7 +12,10 @@
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "db:seed": "tsx --env-file=.env prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:backfill-finance-categories": "tsx --env-file=.env scripts/backfill-finance-categories.ts",
+    "smoke": "tsx --env-file=.env scripts/smoke.ts",
+    "smoke:demo": "tsx --env-file=.env scripts/smoke.ts --write-demo"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",

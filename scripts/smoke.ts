@@ -1,5 +1,6 @@
 // Lightweight end-to-end exercise of the data layer + CSV parser.
-// Not a permanent test; run with `tsx --env-file=.env scripts/smoke.ts`.
+// Default mode is non-destructive. Pass `--write-demo` to explicitly replace
+// the seeded user's finance/time data with demo fixtures.
 
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
@@ -14,6 +15,7 @@ const sampleCsv = `Date,Description,Amount,Account
 `;
 
 async function main() {
+  const writeDemo = process.argv.includes("--write-demo");
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL not set");
   const email = process.env.SEED_USER_EMAIL;
@@ -25,8 +27,8 @@ async function main() {
 
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) throw new Error(`Seed user ${email} not found`);
+  console.log(`Seed user lookup: OK (${user.email})`);
 
-  // ----- CSV parser -----
   const parsed = parseTransactionsCsv(sampleCsv);
   console.log(
     `CSV parser: parsed ${parsed.rows.length}/${parsed.total}, skipped ${parsed.skipped}`,
@@ -38,7 +40,28 @@ async function main() {
     throw new Error(`Expected 1 skipped, got ${parsed.skipped}`);
   }
 
-  // ----- Wipe + insert finance transactions -----
+  const existingFinanceCount = await prisma.financeTransaction.count({
+    where: { userId: user.id },
+  });
+  const existingTimeCount = await prisma.timeEntry.count({
+    where: { userId: user.id },
+  });
+  console.log(`Existing finance rows: ${existingFinanceCount}`);
+  console.log(`Existing time rows: ${existingTimeCount}`);
+
+  if (!writeDemo) {
+    console.log(
+      "Non-destructive smoke only. Pass --write-demo to replace data with demo fixtures.",
+    );
+    await prisma.$disconnect();
+    console.log("OK");
+    return;
+  }
+
+  console.log(
+    "write-demo mode enabled: replacing seeded user finance/time data with demo fixtures",
+  );
+
   await prisma.financeTransaction.deleteMany({ where: { userId: user.id } });
   await prisma.financeTransaction.createMany({
     data: parsed.rows.map((r) => ({
@@ -55,7 +78,6 @@ async function main() {
   });
   console.log(`FinanceTransaction table: ${txCount} rows`);
 
-  // ----- Time tracker: insert a running entry -----
   await prisma.timeEntry.deleteMany({ where: { userId: user.id } });
   const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
   await prisma.timeEntry.create({
@@ -67,7 +89,6 @@ async function main() {
       endedAt: null,
     },
   });
-  // A completed entry earlier today
   const twoHrsAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
   const oneHrAgo = new Date(Date.now() - 1 * 60 * 60 * 1000);
   await prisma.timeEntry.create({

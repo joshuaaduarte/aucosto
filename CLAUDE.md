@@ -35,6 +35,8 @@ npm run db:migrate   # prisma migrate dev — creates/applies migrations
 npm run db:generate  # prisma generate — regenerates src/generated/prisma
 npm run db:seed      # tsx prisma/seed.ts — upserts the single user from SEED_USER_* env vars
 npm run db:studio    # prisma studio GUI
+npm run smoke        # non-destructive smoke verification
+npm run smoke:demo   # destructive demo-fixture load for seeded user
 ```
 
 `tsx` scripts (seed, scripts/smoke.ts) do **not** auto-load `.env` — they're run via `tsx --env-file=.env ...`.
@@ -150,7 +152,7 @@ Optional: `LOG_LEVEL` overrides the Pino level (defaults to `debug` in dev, `inf
 
 - `main` branch = the original CRA scaffold (rollback baseline).
 - `nextjs-rewrite` branch = current work.
-- `scripts/smoke.ts` is a one-shot dev fixture loader (CSV-parses sample data, inserts a running TimeEntry + completed entry, inserts transactions). Not part of any test suite — just run with `tsx --env-file=.env scripts/smoke.ts` to repopulate demo state.
+- `scripts/smoke.ts` now defaults to a non-destructive verification pass. Use `npm run smoke:demo` (or `tsx --env-file=.env scripts/smoke.ts --write-demo`) only when you explicitly want to replace the seeded user's finance/time data with demo fixtures.
 
 ## Doc lookup
 

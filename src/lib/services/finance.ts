@@ -10,16 +10,21 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { requireCan } from "@/lib/auth/can";
 import { recordEvent } from "@/lib/services/events";
+import { inferCategory } from "@/lib/finance-categories";
+import { dedupeParsedRows } from "@/lib/finance-import";
 import type { FinanceTransaction } from "@/generated/prisma/client";
 import type { ParsedRow } from "@/lib/csv";
 
 export async function listTransactions(
   userId: string,
-  options: { limit?: number } = {},
+  options: { limit?: number; since?: Date } = {},
 ): Promise<FinanceTransaction[]> {
   requireCan(userId, "finance", "read");
   return prisma.financeTransaction.findMany({
-    where: { userId },
+    where: {
+      userId,
+      ...(options.since ? { date: { gte: options.since } } : {}),
+    },
     orderBy: { date: "desc" },
     take: options.limit ?? 100,
   });
@@ -47,26 +52,65 @@ export async function getSpendCentsSince(
 export async function importTransactions(
   userId: string,
   rows: ParsedRow[],
-): Promise<{ imported: number }> {
+): Promise<{ imported: number; deduped: number }> {
   requireCan(userId, "finance", "write");
-  if (rows.length === 0) return { imported: 0 };
-  await prisma.financeTransaction.createMany({
-    data: rows.map((r) => ({
+  if (rows.length === 0) return { imported: 0, deduped: 0 };
+
+  const sortedDates = rows.map((row) => row.date.getTime()).sort((a, b) => a - b);
+  const existing = await prisma.financeTransaction.findMany({
+    where: {
       userId,
-      date: r.date,
-      amount: r.amount,
-      description: r.description,
-      account: r.account,
-      raw: r.raw,
-    })),
+      date: {
+        gte: new Date(sortedDates[0]),
+        lte: new Date(sortedDates[sortedDates.length - 1]),
+      },
+    },
   });
-  await recordEvent({
-    userId,
-    tool: "finance",
-    type: "finance.imported",
-    meta: { count: rows.length },
+
+  const { rowsToImport, deduped } = dedupeParsedRows(rows, existing);
+
+  if (rowsToImport.length > 0) {
+    await prisma.financeTransaction.createMany({
+      data: rowsToImport.map((r) => ({
+        userId,
+        date: r.date,
+        amount: r.amount,
+        description: r.description,
+        account: r.account,
+        category: inferCategory(r.description, r.amount),
+        raw: r.raw,
+      })),
+    });
+    await recordEvent({
+      userId,
+      tool: "finance",
+      type: "finance.imported",
+      meta: { count: rowsToImport.length, deduped },
+    });
+  }
+
+  return { imported: rowsToImport.length, deduped };
+}
+
+export async function updateTransactionCategory(
+  userId: string,
+  id: string,
+  category: string,
+): Promise<void> {
+  requireCan(userId, "finance", "write");
+  const updated = await prisma.financeTransaction.updateMany({
+    where: { id, userId },
+    data: { category },
   });
-  return { imported: rows.length };
+  if (updated.count > 0) {
+    await recordEvent({
+      userId,
+      tool: "finance",
+      type: "finance.category_updated",
+      refId: id,
+      meta: { category },
+    });
+  }
 }
 
 export async function deleteAllTransactions(userId: string): Promise<void> {

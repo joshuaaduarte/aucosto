@@ -35,7 +35,10 @@ export function UploadForm() {
       </div>
       {state && "ok" in state && state.ok && (
         <p className="text-sm text-emerald-600 dark:text-emerald-400">
-          Imported {state.imported} transactions
+          {state.imported > 0
+            ? `Imported ${state.imported} transactions`
+            : "No new transactions imported"}
+          {state.deduped > 0 ? ` · ${state.deduped} duplicates ignored` : ""}
           {state.skipped > 0 ? ` · ${state.skipped} skipped` : ""}.
         </p>
       )}

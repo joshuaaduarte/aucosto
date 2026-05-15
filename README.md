@@ -1,36 +1,240 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# aucosto
 
-## Getting Started
+aucosto is a personal daily dashboard: a hub for tools that help Joshua run day-to-day life with less friction.
 
-First, run the development server:
+Right now it is centered on two practical tools:
+- **time tracking**
+- **finance imports and review**
+
+Under the hood, it is being shaped to grow into a broader personal operations system with:
+- a shared event log
+- clear service boundaries between tools
+- a dashboard/home hub for daily use
+- a future agent/API surface built on top of the same service layer
+
+## Current product shape
+
+### Time tracker
+- one running timer at a time
+- recent completed entries
+- category support
+- server-action based mutations
+
+### Finance
+- CSV import for transactions
+- recent transaction list
+- money stored as integer cents
+- foundation for monthly summaries and safer import workflows
+
+### Hub
+- widget-based dashboard under `/app`
+- each tool registers a widget
+- intended to become the daily command center
+
+## Tech stack
+
+- **Next.js 16.2** (App Router)
+- **React 19**
+- **Prisma 7**
+- **Auth.js v5 beta**
+- **Tailwind 4**
+- **Supabase Postgres**
+- **Vitest**
+- **Pino**
+
+## Architecture notes
+
+A few repo rules matter a lot here:
+
+### 1. Service layer is the chokepoint
+Tool code should go through `src/lib/services/<tool>.ts`.
+
+App pages, widgets, server actions, and future API routes should **not** scatter direct `prisma.<model>` usage across the codebase. This keeps each tool easier to evolve.
+
+### 2. Event log is shared across tools
+Meaningful mutations write to the `Event` table.
+
+This is the backbone for:
+- recent activity feeds
+- cross-tool timelines
+- future summaries and agent-friendly traces
+
+### 3. Widgets are the dashboard contract
+The hub renders from `src/lib/widgets/index.tsx`.
+
+Each tool can expose a widget and become visible on the dashboard without hand-wiring the home page each time.
+
+### 4. Agent/API work is deferred on purpose
+The repo is being prepared for future external/agent access, but that surface should stay small and deliberate until the first tools feel solid.
+
+## Repo layout
+
+```text
+src/
+  app/
+    app/
+      finance/
+      time/
+    api/auth/[...nextauth]/
+    login/
+  lib/
+    auth/
+    services/
+    widgets/
+  auth.ts
+  auth.config.ts
+  proxy.ts
+
+prisma/
+  schema/
+    core.prisma
+    events.prisma
+    finance.prisma
+    time.prisma
+  migrations/
+  seed.ts
+
+scripts/
+  smoke.ts
+
+tests/
+  csv.test.ts
+```
+
+## Getting started
+
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure environment
+Copy `.env.example` to `.env` and fill in the values.
+
+Required variables:
+
+```bash
+DATABASE_URL=...
+DIRECT_URL=...
+AUTH_SECRET=...
+SEED_USER_EMAIL=...
+SEED_USER_PASSWORD=...
+SEED_USER_NAME=...
+```
+
+Notes:
+- `DATABASE_URL` is the **runtime** connection string used by the app and Prisma client
+- for Supabase, this should be the **transaction pooler / pooled runtime URL**
+- `DIRECT_URL` is used for **Prisma migrations**
+- for Supabase, this should be the **session pooler / direct migration URL**
+- `DIRECT_URL` falls back to `DATABASE_URL` if omitted, but explicit is safer
+- seed values are used by `prisma/seed.ts`
+- `AUTH_SECRET` should be a long random secret
+
+### 3. Generate client + run migrations
+
+```bash
+npm run db:generate
+npm run db:migrate
+```
+
+### 4. Seed the single user
+
+```bash
+npm run db:seed
+```
+
+### 5. Start the app
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then open <http://localhost:3000>.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Useful commands
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run dev          # start Next dev server
+npm run build        # prisma generate + production build
+npm run lint         # eslint
+npm test             # vitest once
+npm run test:watch   # vitest watch mode
+npm run db:migrate   # prisma migrate dev
+npm run db:generate  # regenerate Prisma client
+npm run db:seed      # seed the single local user
+npm run db:studio    # Prisma Studio
+npm run smoke        # non-destructive smoke verification
+npm run smoke:demo   # replace seeded-user finance/time data with demo fixtures
+```
 
-## Learn More
+## Smoke path
 
-To learn more about Next.js, take a look at the following resources:
+There is a lightweight dev smoke script at:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+scripts/smoke.ts
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Safe default
 
-## Deploy on Vercel
+```bash
+npm run smoke
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+This mode is **non-destructive**. It verifies:
+- seeded-user lookup
+- CSV parsing
+- current finance row count
+- current time row count
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Explicit demo-data mode
+
+```bash
+npm run smoke:demo
+```
+
+This mode is **destructive for the seeded user**. It replaces that user's finance/time data with demo fixtures so the app has known sample state.
+
+## Testing
+
+Current automated test coverage is light and centered on finance CSV parsing:
+
+```bash
+npm test
+```
+
+As aucosto grows, the next valuable areas for tests are:
+- time tracker behavior
+- finance import safety / duplicate handling
+- service-layer business rules
+
+## Product direction
+
+The near-term goal is simple:
+
+**make aucosto worth opening every morning.**
+
+That means:
+- dependable time tracking
+- useful finance visibility
+- a dashboard that tells you something meaningful at a glance
+- one or two more carefully chosen tools, not a pile of half-built ones
+
+See `ROADMAP.md` for the phased plan.
+
+## Working in this repo
+
+If you are building here, a few rules matter:
+- verify framework behavior instead of assuming older Next.js conventions
+- prefer extending the service layer over adding ad hoc data access
+- keep money values in integer minor units
+- keep the dashboard cohesive; don’t let it turn into a random widget junk drawer
+- don’t prematurely build the full agent/API layer
+
+## Status
+
+aucosto is already more than a scaffold, but it is still early.
+
+The foundation is promising. The next job is to turn it from a well-structured prototype into a tool that earns daily use.

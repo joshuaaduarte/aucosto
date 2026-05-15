@@ -12,7 +12,8 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
-import type { Prisma } from "@/generated/prisma/client";
+import { requireCan } from "@/lib/auth/can";
+import type { Event, Prisma } from "@/generated/prisma/client";
 import type { Tool } from "@/lib/auth/can";
 
 export type EventInput = {
@@ -22,6 +23,18 @@ export type EventInput = {
   refId?: string | null;
   meta?: Prisma.InputJsonValue | null;
 };
+
+export async function listRecentEvents(
+  userId: string,
+  options: { limit?: number } = {},
+): Promise<Event[]> {
+  requireCan(userId, "events", "read");
+  return prisma.event.findMany({
+    where: { userId },
+    orderBy: { at: "desc" },
+    take: options.limit ?? 5,
+  });
+}
 
 export async function recordEvent(input: EventInput): Promise<void> {
   await prisma.event.create({

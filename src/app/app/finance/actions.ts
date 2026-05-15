@@ -2,11 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
+import type { FinanceCategory } from "@/lib/finance-categories";
 import { parseTransactionsCsv } from "@/lib/csv";
 import * as financeService from "@/lib/services/finance";
 
 export type UploadState =
-  | { ok: true; imported: number; skipped: number }
+  | { ok: true; imported: number; skipped: number; deduped: number }
   | { ok: false; error: string }
   | undefined;
 
@@ -36,14 +37,27 @@ export async function uploadCsv(
     };
   }
 
-  const { imported } = await financeService.importTransactions(
+  const { imported, deduped } = await financeService.importTransactions(
     session.user.id,
     rows,
   );
 
   revalidatePath("/app");
   revalidatePath("/app/finance");
-  return { ok: true, imported, skipped };
+  return { ok: true, imported, skipped, deduped };
+}
+
+export async function updateTransactionCategory(
+  id: string,
+  category: FinanceCategory,
+) {
+  const session = await auth();
+  if (!session?.user?.id) return;
+
+  await financeService.updateTransactionCategory(session.user.id, id, category);
+
+  revalidatePath("/app");
+  revalidatePath("/app/finance");
 }
 
 export async function deleteAllTransactions() {

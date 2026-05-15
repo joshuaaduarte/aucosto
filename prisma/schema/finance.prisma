@@ -12,6 +12,7 @@ model FinanceTransaction {
   currency    String   @default("USD")
   description String
   account     String?
+  category    String?
   raw         String?
   createdAt   DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
