@@ -77,7 +77,7 @@ describe("finance-summary", () => {
     ]);
 
     expect(result).toEqual([
-      { category: "Other", spendCents: 300000, count: 1 },
+      { category: "Housing", spendCents: 300000, count: 1 },
       { category: "Groceries", spendCents: 12000, count: 2 },
       { category: "Food & Drink", spendCents: 2000, count: 1 },
       { category: "Subscriptions", spendCents: 999, count: 1 },

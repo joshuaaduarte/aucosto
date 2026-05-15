@@ -6,6 +6,10 @@ export const FINANCE_CATEGORIES = [
   "Shopping",
   "Bills & Utilities",
   "Health",
+  "Entertainment",
+  "Pets",
+  "Housing",
+  "Insurance",
   "Income",
   "Other",
 ] as const;
@@ -20,6 +24,10 @@ const CATEGORY_RULES: Array<{ category: FinanceCategory; keywords: string[] }> =
   { category: "Shopping", keywords: ["amazon", "target", "walmart", "best buy", "etsy", "ebay", "store"] },
   { category: "Bills & Utilities", keywords: ["pg&e", "utility", "internet", "xfinity", "comcast", "tmobile", "verizon", "att", "water"] },
   { category: "Health", keywords: ["pharmacy", "cvs", "walgreens", "doctor", "dental", "medical"] },
+  { category: "Entertainment", keywords: ["amc", "movie", "cinema", "concert", "rock n roll events", "event"] },
+  { category: "Pets", keywords: ["petsmart", "petsmart", "club k9", "pet"] },
+  { category: "Housing", keywords: ["rent", "rental", "essex portfolio", "apartment", "mortgage"] },
+  { category: "Insurance", keywords: ["insurance", "get covered"] },
   { category: "Income", keywords: ["payroll", "salary", "paycheck", "deposit", "refund"] },
 ];
 

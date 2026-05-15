@@ -552,7 +552,7 @@ export default async function FinancePage() {
         </h2>
         {recent.length === 0 ? (
           <div className="rounded-xl border border-dashed border-zinc-300 px-5 py-8 text-sm text-zinc-500 dark:border-zinc-700">
-            No transactions yet. Import a CSV above.
+            No transactions yet. Import a CSV or statement PDF above.
           </div>
         ) : (
           <ul className="divide-y divide-zinc-200 rounded-xl border border-zinc-200 bg-white shadow-sm shadow-zinc-950/5 dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none">

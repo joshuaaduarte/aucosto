@@ -13,6 +13,7 @@ import { recordEvent } from "@/lib/services/events";
 import { parseCurrencyToCents, type FinanceAccountKind } from "@/lib/finance-accounts";
 import { inferCategory } from "@/lib/finance-categories";
 import { dedupeParsedRows } from "@/lib/finance-import";
+import { parseStatementPdf, type StatementImportPreview } from "@/lib/statement-import";
 import type { FinanceAccount, FinanceGoal, FinanceTransaction } from "@/generated/prisma/client";
 import type { FinanceGoalCategory, FinanceGoalOwner, FinanceGoalStatus } from "@/lib/finance-goals";
 import type { ParsedRow } from "@/lib/csv";
@@ -39,6 +40,12 @@ export type SaveFinanceGoalInput = {
   monthlyContribution?: string;
   status: FinanceGoalStatus;
   notes?: string;
+};
+
+export type ImportStatementInput = {
+  fileName: string;
+  bytes: Uint8Array;
+  mimeType?: string;
 };
 
 export async function listAccounts(userId: string): Promise<FinanceAccount[]> {
@@ -259,6 +266,26 @@ export async function importTransactions(
   }
 
   return { imported: rowsToImport.length, deduped };
+}
+
+export async function importStatement(
+  userId: string,
+  input: ImportStatementInput,
+): Promise<StatementImportPreview & { imported: number; deduped: number }> {
+  requireCan(userId, "finance", "write");
+
+  const preview = parseStatementPdf(input);
+  if (preview.rows.length === 0) {
+    const warning = preview.warnings[0] ?? `No transactions found in ${preview.bankLabel} statement.`;
+    throw new Error(warning);
+  }
+
+  const { imported, deduped } = await importTransactions(userId, preview.rows);
+  return {
+    ...preview,
+    imported,
+    deduped,
+  };
 }
 
 export async function updateTransactionCategory(

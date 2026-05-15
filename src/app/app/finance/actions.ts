@@ -9,7 +9,7 @@ import { parseTransactionsCsv } from "@/lib/csv";
 import * as financeService from "@/lib/services/finance";
 
 export type UploadState =
-  | { ok: true; imported: number; skipped: number; deduped: number }
+  | { ok: true; source: "csv" | "statement"; imported: number; skipped: number; deduped: number; bankLabel?: string }
   | { ok: false; error: string }
   | undefined;
 
@@ -56,7 +56,47 @@ export async function uploadCsv(
 
   revalidatePath("/app");
   revalidatePath("/app/finance");
-  return { ok: true, imported, skipped, deduped };
+  return { ok: true, source: "csv", imported, skipped, deduped };
+}
+
+export async function uploadStatementPdf(
+  _prev: UploadState,
+  formData: FormData,
+): Promise<UploadState> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Not signed in." };
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "Pick a PDF statement first." };
+  }
+  if (file.size > 10_000_000) {
+    return { ok: false, error: "File is over 10MB; split it first." };
+  }
+
+  try {
+    const result = await financeService.importStatement(session.user.id, {
+      fileName: file.name,
+      mimeType: file.type,
+      bytes: new Uint8Array(await file.arrayBuffer()),
+    });
+
+    revalidatePath("/app");
+    revalidatePath("/app/finance");
+    return {
+      ok: true,
+      source: "statement",
+      imported: result.imported,
+      skipped: result.skipped,
+      deduped: result.deduped,
+      bankLabel: result.bankLabel,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Could not import statement PDF.",
+    };
+  }
 }
 
 export async function updateTransactionCategory(
