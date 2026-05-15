@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import type { FinanceCategory } from "@/lib/finance-categories";
 import type { FinanceAccountKind } from "@/lib/finance-accounts";
+import type { FinanceGoalCategory, FinanceGoalOwner, FinanceGoalStatus } from "@/lib/finance-goals";
 import { parseTransactionsCsv } from "@/lib/csv";
 import * as financeService from "@/lib/services/finance";
 
@@ -13,6 +14,11 @@ export type UploadState =
   | undefined;
 
 export type AccountState =
+  | { ok: true }
+  | { ok: false; error: string }
+  | undefined;
+
+export type GoalState =
   | { ok: true }
   | { ok: false; error: string }
   | undefined;
@@ -98,6 +104,38 @@ export async function saveFinanceAccount(
     return {
       ok: false,
       error: error instanceof Error ? error.message : "Could not save account.",
+    };
+  }
+
+  revalidatePath("/app");
+  revalidatePath("/app/finance");
+  return { ok: true };
+}
+
+export async function saveFinanceGoal(
+  _prev: GoalState,
+  formData: FormData,
+): Promise<GoalState> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Not signed in." };
+
+  try {
+    await financeService.saveGoal(session.user.id, {
+      id: String(formData.get("id") ?? "").trim() || undefined,
+      name: String(formData.get("name") ?? ""),
+      owner: String(formData.get("owner") ?? "shared") as FinanceGoalOwner,
+      category: String(formData.get("category") ?? "general") as FinanceGoalCategory,
+      targetAmount: String(formData.get("targetAmount") ?? ""),
+      currentAmount: String(formData.get("currentAmount") ?? "0"),
+      targetDate: String(formData.get("targetDate") ?? ""),
+      monthlyContribution: String(formData.get("monthlyContribution") ?? ""),
+      status: String(formData.get("status") ?? "active") as FinanceGoalStatus,
+      notes: String(formData.get("notes") ?? ""),
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Could not save goal.",
     };
   }
 

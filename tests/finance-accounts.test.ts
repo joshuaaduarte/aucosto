@@ -12,8 +12,12 @@ describe("finance-accounts", () => {
 
     expect(result).toEqual({
       cashCents: 6067172,
+      investmentCents: 0,
+      retirementCents: 0,
       cardsOwedCents: 128471,
+      loansOwedCents: 0,
       netPositionCents: 5938701,
+      netWorthCents: 5938701,
     });
   });
 

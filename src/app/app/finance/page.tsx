@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { auth } from "@/auth";
 import { formatAccountKind, summarizeBalances } from "@/lib/finance-accounts";
 import { resolveCategory } from "@/lib/finance-categories";
+import { formatGoalCategory, formatGoalOwner, summarizeGoal, summarizeGoals } from "@/lib/finance-goals";
 import { calculateSpendProjection, projectCategories } from "@/lib/finance-pace";
 import { classifyTransaction, formatTransactionType } from "@/lib/finance-types";
 import {
@@ -11,8 +12,9 @@ import {
   topCategoriesBySpend,
   topMerchantsBySpend,
 } from "@/lib/finance-summary";
-import { countTransactions, listAccounts, listTransactions } from "@/lib/services/finance";
+import { countTransactions, listAccounts, listGoals, listTransactions } from "@/lib/services/finance";
 import { AccountsPanel } from "./accounts-panel";
+import { GoalsPanel } from "./goals-panel";
 import { CategorySelect } from "./category-select";
 import { ClearButton } from "./clear-button";
 import { UploadForm } from "./upload-form";
@@ -97,8 +99,9 @@ export default async function FinancePage() {
   const userId = session!.user.id;
 
   const monthStart = startOfMonth();
-  const [accounts, count, recent, thisMonth, history] = await Promise.all([
+  const [accounts, goals, count, recent, thisMonth, history] = await Promise.all([
     listAccounts(userId),
+    listGoals(userId),
     countTransactions(userId),
     listTransactions(userId, { limit: 100 }),
     listTransactions(userId, { since: monthStart, limit: 500 }),
@@ -106,6 +109,7 @@ export default async function FinancePage() {
   ]);
 
   const snapshot = summarizeBalances(accounts);
+  const goalSnapshot = summarizeGoals(goals);
   const thisMonthSummary = summarizeCashflow(thisMonth);
   const spendProjection = calculateSpendProjection(thisMonth);
   const topMerchants = topMerchantsBySpend(thisMonth, { limit: 5 });
@@ -132,11 +136,16 @@ export default async function FinancePage() {
       <UploadForm />
 
       {accounts.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {summaryCard({
             label: "Cash",
             value: formatUSDFromCents(snapshot.cashCents),
             hint: `${cashAccounts.length} tracked cash account${cashAccounts.length === 1 ? "" : "s"}`,
+          })}
+          {summaryCard({
+            label: "Long-term",
+            value: formatUSDFromCents(snapshot.investmentCents + snapshot.retirementCents),
+            hint: "investments + retirement",
           })}
           {summaryCard({
             label: "Cards owed",
@@ -144,13 +153,38 @@ export default async function FinancePage() {
             hint: `${cardAccounts.length} tracked card${cardAccounts.length === 1 ? "" : "s"}`,
           })}
           {summaryCard({
-            label: "Net position",
-            value: formatUSDFromCents(snapshot.netPositionCents),
-            hint: "cash minus card balances",
+            label: "Net worth",
+            value: formatUSDFromCents(snapshot.netWorthCents),
+            hint: "cash + long-term minus debts",
             valueClassName:
-              snapshot.netPositionCents >= 0
+              snapshot.netWorthCents >= 0
                 ? "text-emerald-600 dark:text-emerald-400"
                 : "text-zinc-950 dark:text-zinc-50",
+          })}
+        </div>
+      )}
+
+      {goals.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {summaryCard({
+            label: "Goals funded",
+            value: formatUSDFromCents(goalSnapshot.fundedCents),
+            hint: `${goalSnapshot.activeCount} active bucket${goalSnapshot.activeCount === 1 ? "" : "s"}`,
+          })}
+          {summaryCard({
+            label: "Goals target",
+            value: formatUSDFromCents(goalSnapshot.targetCents),
+            hint: `${goalSnapshot.fundedPercent}% funded overall`,
+          })}
+          {summaryCard({
+            label: "Still needed",
+            value: formatUSDFromCents(goalSnapshot.remainingCents),
+            hint: "remaining across active goals",
+          })}
+          {summaryCard({
+            label: "Goal pace",
+            value: formatUSDFromCents(goalSnapshot.monthlyNeededCents),
+            hint: "monthly contribution needed",
           })}
         </div>
       )}
@@ -267,6 +301,80 @@ export default async function FinancePage() {
           ) : (
             <div className="mt-5 rounded-lg border border-dashed border-zinc-300 px-4 py-8 text-sm text-zinc-500 dark:border-zinc-700">
               Once you import transactions, this panel will show spend pacing and projections.
+            </div>
+          ),
+        })}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+        {sectionCard({
+          title: "Goal buckets",
+          subtitle:
+            goals.length > 0
+              ? "Forward-looking buckets for wedding, emergency fund, trips, and projects."
+              : "Add buckets so finance can start planning ahead instead of only reporting history.",
+          children: (
+            <div className="mt-5 space-y-4">
+              {goals.length > 0 && (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {goals.map((goal) => {
+                    const summary = summarizeGoal(goal);
+                    return (
+                      <div key={goal.id} className="rounded-lg border border-zinc-200 px-3 py-3 dark:border-zinc-800">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium text-zinc-900 dark:text-zinc-100">{goal.name}</p>
+                          <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{formatGoalCategory(goal.category)}</span>
+                          <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{formatGoalOwner(goal.owner)}</span>
+                        </div>
+                        <p className="mt-2 font-mono text-sm tabular-nums text-zinc-900 dark:text-zinc-100">
+                          {formatUSDFromCents(goal.currentAmountCents)} / {formatUSDFromCents(goal.targetAmountCents)}
+                        </p>
+                        <p className="mt-1 text-xs text-zinc-500">
+                          {summary.fundedPercent}% funded · {formatUSDFromCents(summary.remainingCents)} left{summary.targetDateLabel ? ` · ${summary.targetDateLabel}` : ""}
+                        </p>
+                        {summary.monthlyNeededCents > 0 && (
+                          <p className="mt-1 text-xs text-zinc-500">{formatUSDFromCents(summary.monthlyNeededCents)} / month needed</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <GoalsPanel
+                goals={goals.map((goal) => ({
+                  id: goal.id,
+                  name: goal.name,
+                  owner: goal.owner,
+                  category: goal.category,
+                  targetAmountCents: goal.targetAmountCents,
+                  currentAmountCents: goal.currentAmountCents,
+                  targetDate: goal.targetDate?.toISOString() ?? null,
+                  monthlyContributionCents: goal.monthlyContributionCents,
+                  status: goal.status,
+                  notes: goal.notes,
+                }))}
+              />
+            </div>
+          ),
+        })}
+
+        {sectionCard({
+          title: "Forward planning",
+          subtitle: "The part that will eventually feed groceries, trips, and project decisions.",
+          children: (
+            <div className="mt-5 space-y-3 text-sm text-zinc-600 dark:text-zinc-300">
+              <div className="rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-800">
+                <p className="font-medium text-zinc-900 dark:text-zinc-100">1. Capture where money lives</p>
+                <p className="mt-1 text-zinc-500">Checking, savings, investments, retirement, and debt all belong here now.</p>
+              </div>
+              <div className="rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-800">
+                <p className="font-medium text-zinc-900 dark:text-zinc-100">2. Fund buckets intentionally</p>
+                <p className="mt-1 text-zinc-500">Wedding, emergency fund, vacation, and project buckets can now track targets and monthly pace.</p>
+              </div>
+              <div className="rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-800">
+                <p className="font-medium text-zinc-900 dark:text-zinc-100">3. Unlock safe-to-spend later</p>
+                <p className="mt-1 text-zinc-500">Once balances, goals, and recurring obligations are stable, aucosto can estimate what is safe to spend without hurting long-term plans.</p>
+              </div>
             </div>
           ),
         })}

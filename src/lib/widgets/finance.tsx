@@ -39,10 +39,15 @@ export async function FinanceWidget() {
       <WidgetCard name="Finance" href="/app/finance">
         <div className="space-y-1">
           <p className="text-2xl font-semibold tracking-tight">
-            {formatUSDFromCents(snapshot.netPositionCents)}
+            {formatUSDFromCents(snapshot.netWorthCents)}
           </p>
-          <p className="text-sm text-zinc-500">net position</p>
+          <p className="text-sm text-zinc-500">net worth</p>
           <p className="text-xs text-zinc-500">{formatUSDFromCents(snapshot.cashCents)} cash</p>
+          {(snapshot.investmentCents > 0 || snapshot.retirementCents > 0) && (
+            <p className="text-xs text-zinc-500">
+              {formatUSDFromCents(snapshot.investmentCents + snapshot.retirementCents)} long-term
+            </p>
+          )}
           <p className="text-xs text-zinc-500">{formatUSDFromCents(snapshot.cardsOwedCents)} cards owed</p>
         </div>
       </WidgetCard>

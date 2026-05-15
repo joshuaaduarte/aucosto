@@ -24,6 +24,7 @@ model User {
   sessions            Session[]
   timeEntries         TimeEntry[]
   financeAccounts     FinanceAccount[]
+  financeGoals        FinanceGoal[]
   financeTransactions FinanceTransaction[]
   events              Event[]
   createdAt           DateTime             @default(now())

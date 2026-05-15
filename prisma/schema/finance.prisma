@@ -23,6 +23,26 @@ model FinanceAccount {
   @@unique([userId, name])
 }
 
+model FinanceGoal {
+  id                 String   @id @default(cuid())
+  userId             String
+  name               String
+  owner              String   @default("shared")
+  category           String   @default("general")
+  targetAmountCents  Int
+  currentAmountCents Int      @default(0)
+  targetDate         DateTime?
+  monthlyContributionCents Int?
+  status             String   @default("active")
+  notes              String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@unique([userId, name])
+}
+
 model FinanceTransaction {
   id          String   @id @default(cuid())
   userId      String
