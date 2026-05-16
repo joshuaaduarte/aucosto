@@ -1,149 +1,119 @@
 import Link from "next/link";
 
 const heroStats = [
+  { value: "4.5h", label: "Focused work", note: "protected before the day got noisy" },
+  { value: "$6.2k", label: "Cash position", note: "clear enough to act without guessing" },
+  { value: "82%", label: "Recovery", note: "strong enough to push, not enough to waste" },
+];
+
+const benefits = [
   {
-    value: "4.5h",
-    label: "Focused work",
-    note: "deep work protected before the day got noisy",
+    title: "See the real shape of the day faster",
+    body: "Time, money, energy, and planning stop living in separate tabs, so the important pattern shows up sooner.",
   },
   {
-    value: "$6.2k",
-    label: "Cash on hand",
-    note: "steady, with a couple transactions worth cleaning up",
+    title: "Reduce tiny decisions that quietly burn attention",
+    body: "What to eat, what to work on, what to defer, what to bring, what to buy, what to fix first — all easier when the context is already assembled.",
   },
   {
-    value: "82%",
-    label: "Recovery",
-    note: "good enough to push, not good enough to waste",
+    title: "Use one system instead of maintaining ten half-systems",
+    body: "The value is not another tracker. The value is one place where the trackers finally talk to each other.",
   },
 ];
 
-const trustStats = [
-  { value: "1", label: "daily home for the important signals" },
-  { value: "3", label: "domains read together" },
-  { value: "0", label: "interest in productivity theater" },
-];
-
-const features = [
+const decisionAreas = [
   {
-    step: "01",
-    eyebrow: "Daily overview",
-    title: "See time, money, and recovery in one pass.",
-    body:
-      "Aucosto puts the important signals next to each other so you can understand the shape of the day without rebuilding context in your head every time you check in.",
-    bullets: ["Running work blocks", "Cash and spend pressure", "Energy and recovery context"],
+    name: "Health + intake",
+    outcome: "Eat better, hydrate better, train better, and stop relying on vague memory.",
+    tools: ["calories", "protein", "water", "supplements", "weight", "recovery"],
+    insight: "Low recovery + low protein + late workout → adjust tomorrow instead of forcing it.",
   },
   {
-    step: "02",
-    eyebrow: "Private by default",
-    title: "Keep the useful parts visible without exposing your life.",
-    body:
-      "Finance can stay hidden until you explicitly turn it on. The app can lock behind a PIN. And demo mode gives you a safe fake workspace when you want to show the product without showing your real numbers.",
-    bullets: ["Finance hidden by default", "PIN-based app lock", "Isolated demo workspace"],
+    name: "Projects + focus",
+    outcome: "Know what deserves your best hours and stop letting the day get hijacked.",
+    tools: ["projects", "deep work", "tasks", "habits", "follow-ups", "weekly review"],
+    insight: "Your hardest project keeps slipping to low-energy windows → move it to morning blocks.",
   },
   {
-    step: "03",
-    eyebrow: "Actionable signal",
-    title: "The best output is a better next decision.",
-    body:
-      "This is not trying to impress you with dashboards. It is trying to tell you what is drifting, what deserves attention now, and what can wait until tomorrow.",
-    bullets: ["High-signal watchlists", "Cross-domain context", "Calmer daily steering"],
+    name: "Calendar + planning",
+    outcome: "Spend less time figuring out logistics and more time actually moving through the day.",
+    tools: ["calendar", "trip planning", "packing", "errands", "reminders", "agenda"],
+    insight: "Three errands are in the same area as tonight’s dinner reservation → group them into one trip.",
+  },
+  {
+    name: "Home + life ops",
+    outcome: "Keep the background systems of life from becoming recurring friction.",
+    tools: ["wish lists", "subscriptions", "home devices", "shopping", "maintenance", "IoT"],
+    insight: "Air filter, detergent, and dog food all need restocking this week → batch the purchase once.",
   },
 ];
 
-const flow = [
+const mockPanels = [
   {
-    title: "Capture",
-    body: "Track time, review spending, and keep recovery in view without creating another maintenance-heavy system.",
-  },
-  {
-    title: "Read",
-    body: "Let the important patterns sit together so the real story becomes obvious faster.",
-  },
-  {
-    title: "Adjust",
-    body: "Protect the work block, fix the misleading transaction, scale the day to your actual energy.",
-  },
-];
-
-const futureTools = [
-  {
-    title: "Health + intake",
-    summary: "Food, water, supplements, recovery, and training all stitched into one daily read instead of five separate apps.",
-    badge: "Body system",
-    metrics: [
-      { label: "Calories", value: "2,140 / 2,300" },
-      { label: "Protein", value: "168g" },
-      { label: "Water", value: "74 oz" },
+    title: "Today",
+    badge: "Live brief",
+    items: [
+      "Lunch should be higher protein if you still want to train tonight.",
+      "Move the strategy block before 1 PM — energy drops after that.",
+      "Reclassify the Costco payment before trusting month-end spend.",
     ],
-    items: ["meal logging", "macro targets", "weight trends", "hydration prompts"],
   },
   {
-    title: "Projects + focus",
-    summary: "Projects, next actions, and habits that understand your available time and stop every day from becoming reactive.",
-    badge: "Execution system",
-    metrics: [
-      { label: "Deep work", value: "3 blocks" },
-      { label: "Stuck items", value: "2" },
-      { label: "Habit score", value: "6 / 8" },
+    title: "Planning",
+    badge: "Calendar intelligence",
+    items: [
+      "Trip to San Diego in 4 days — packing list is 60% complete.",
+      "Leave by 5:40 PM to avoid the worst traffic.",
+      "Bring charger, laptop stand, and gym clothes.",
     ],
-    items: ["project tracking", "habit loops", "follow-ups", "weekly review"],
   },
   {
-    title: "Calendar + life planning",
-    summary: "A smarter calendar that helps with trips, errands, reminders, and the micro-decisions that usually eat mental energy.",
-    badge: "Planning system",
-    metrics: [
-      { label: "Conflicts", value: "1" },
-      { label: "Travel prep", value: "4 tasks" },
-      { label: "Errands", value: "Grouped by route" },
+    title: "Body",
+    badge: "Health system",
+    items: [
+      "2,140 / 2,300 calories",
+      "168g protein",
+      "74 oz water",
+      "Recovery trending up for 3 days",
     ],
-    items: ["trip planning", "intelligent agenda", "packing lists", "context-aware reminders"],
   },
   {
-    title: "Home + personal ops",
-    summary: "Wish lists, subscriptions, connected devices, and house routines managed in the same place as the rest of life.",
-    badge: "Life layer",
-    metrics: [
-      { label: "Home", value: "Doors locked" },
-      { label: "Subscriptions", value: "$74 / mo" },
-      { label: "Wishlist", value: "8 tracked" },
+    title: "Home",
+    badge: "Life ops",
+    items: [
+      "Front door locked",
+      "Subscriptions: $74 / mo",
+      "Wishlist: 8 tracked items",
+      "Restock paper towels this weekend",
     ],
-    items: ["home connectivity", "IoT controls", "wishlist tracking", "subscription cleanup"],
   },
 ];
 
-const quotes = [
-  {
-    quote:
-      "It feels less like opening a productivity app and more like checking a clean page that already knows what matters.",
-    source: "Designed for one person, not a team dashboard.",
-  },
-  {
-    quote:
-      "The useful part is seeing the categories collide. That is usually where the truth is.",
-    source: "Time, money, and recovery belong in the same conversation.",
-  },
+const proofNotes = [
+  "Time tracking that actually informs planning",
+  "Finance that helps with decisions, not just recordkeeping",
+  "Private-by-default design with lock and demo mode",
+  "A path to food, fitness, projects, travel, home, and more",
 ];
 
 export default function LandingPage() {
   return (
     <main className="bg-[#fbfbfa] text-zinc-950">
-      <section className="relative overflow-hidden border-b border-zinc-200/80 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.08),_transparent_34%),linear-gradient(180deg,#fbfbfa_0%,#f7f7f5_100%)]">
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(24,24,27,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(24,24,27,0.04)_1px,transparent_1px)] bg-[size:28px_28px] opacity-50" />
+      <section className="relative overflow-hidden border-b border-zinc-200/80 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.08),_transparent_34%),linear-gradient(180deg,#fbfbfa_0%,#f6f6f3_100%)]">
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(24,24,27,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(24,24,27,0.035)_1px,transparent_1px)] bg-[size:28px_28px] opacity-50" />
 
         <div className="relative mx-auto max-w-7xl px-6 pb-16 pt-6 sm:px-8 sm:pb-24 sm:pt-8">
-          <header className="sticky top-0 z-30 rounded-full border border-zinc-200/80 bg-white/85 px-4 py-3 backdrop-blur xl:px-6">
+          <header className="sticky top-0 z-30 rounded-full border border-zinc-200/80 bg-white/90 px-4 py-3 backdrop-blur xl:px-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="h-2.5 w-2.5 rounded-full bg-zinc-900" />
                 <span className="font-mono text-xs uppercase tracking-[0.34em] text-zinc-500">aucosto</span>
               </div>
               <nav className="hidden items-center gap-6 text-sm text-zinc-500 md:flex">
-                <a href="#features" className="transition-colors hover:text-zinc-950">Features</a>
-                <a href="#future-tools" className="transition-colors hover:text-zinc-950">Future tools</a>
-                <a href="#how-it-works" className="transition-colors hover:text-zinc-950">How it works</a>
-                <a href="#why" className="transition-colors hover:text-zinc-950">Why it works</a>
+                <a href="#why-it-lands" className="transition-colors hover:text-zinc-950">Why it lands</a>
+                <a href="#tool-surfaces" className="transition-colors hover:text-zinc-950">Tool surfaces</a>
+                <a href="#decision-engine" className="transition-colors hover:text-zinc-950">Decision engine</a>
+                <a href="#cta" className="transition-colors hover:text-zinc-950">Open it</a>
               </nav>
               <div className="flex items-center gap-3">
                 <span className="hidden rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-[11px] font-medium text-zinc-600 sm:inline-flex">
@@ -159,22 +129,22 @@ export default function LandingPage() {
             </div>
           </header>
 
-          <section className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,1.08fr)_minmax(380px,0.92fr)] lg:items-center">
+          <div className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(390px,0.92fr)] lg:items-center">
             <div className="max-w-4xl">
               <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-600 shadow-sm">
-                A cleaner read on your actual life
+                One system for the small decisions that run your life
               </div>
-              <h1 className="mt-6 text-5xl font-semibold leading-[0.94] tracking-[-0.055em] text-zinc-950 sm:text-6xl lg:text-[5.7rem]">
-                A better place to
+              <h1 className="mt-6 text-5xl font-semibold leading-[0.93] tracking-[-0.055em] text-zinc-950 sm:text-6xl lg:text-[5.8rem]">
+                The app that helps you
                 <br />
-                understand how
+                decide what to do,
                 <br />
-                your day, money,
+                what to ignore,
                 <br />
-                and energy are going.
+                and what needs care now.
               </h1>
               <p className="mt-6 max-w-2xl text-base leading-8 text-zinc-600 sm:text-lg">
-                Aucosto brings together time, spending, recovery, and the next thing that needs attention so you can make sharper decisions before the drift gets expensive.
+                Aucosto is not just a dashboard. It is where your time, money, health, planning, home, and follow-through can eventually live together — so you stop struggling through the same micro decisions with incomplete context.
               </p>
 
               <div className="mt-8 flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center">
@@ -185,12 +155,12 @@ export default function LandingPage() {
                   Open aucosto
                 </Link>
                 <a
-                  href="#features"
+                  href="#tool-surfaces"
                   className="inline-flex h-12 items-center justify-center rounded-full border border-zinc-200 bg-white px-6 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-50"
                 >
-                  Explore the system
+                  See the future system
                 </a>
-                <span className="text-sm text-zinc-500">Private, local-first, and built for daily use.</span>
+                <span className="text-sm text-zinc-500">Private, local-first, and meant for daily life.</span>
               </div>
             </div>
 
@@ -198,9 +168,9 @@ export default function LandingPage() {
               <div className="rounded-[1.7rem] border border-zinc-200 bg-[#fcfcfb] p-5">
                 <div className="flex items-start justify-between gap-4 border-b border-zinc-200 pb-4">
                   <div>
-                    <p className="text-sm font-medium text-zinc-950">Daily overview</p>
+                    <p className="text-sm font-medium text-zinc-950">Daily brief</p>
                     <p className="mt-1 text-sm text-zinc-500">
-                      A high-signal read on the day without pretending your life comes in separate apps.
+                      The point is to reduce friction before it compounds into a bad day.
                     </p>
                   </div>
                   <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
@@ -221,24 +191,24 @@ export default function LandingPage() {
 
                 <div className="mt-4 rounded-[1.4rem] border border-zinc-200 bg-zinc-50 p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-medium text-zinc-950">What needs attention</p>
+                    <p className="text-sm font-medium text-zinc-950">What aucosto would tell you</p>
                     <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Today</p>
                   </div>
                   <ul className="mt-4 space-y-3 text-sm leading-6 text-zinc-600">
-                    <li className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 rounded-full bg-zinc-900" /><span>That Costco payment is inflating spend. Fix the category before you trust the month.</span></li>
-                    <li className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 rounded-full bg-zinc-900" /><span>You still have enough energy for one serious block of work. Protect it now or lose it.</span></li>
-                    <li className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 rounded-full bg-zinc-900" /><span>Recovery is improving. Good moment to push a little harder without being reckless.</span></li>
+                    <li className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 rounded-full bg-zinc-900" /><span>Move the hard work block earlier. Your energy is already telling on you.</span></li>
+                    <li className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 rounded-full bg-zinc-900" /><span>Reclassify the warehouse payment before you trust the spending number.</span></li>
+                    <li className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 rounded-full bg-zinc-900" /><span>If you still want to train tonight, lunch should be higher protein and water needs to catch up.</span></li>
                   </ul>
                 </div>
               </div>
             </aside>
-          </section>
+          </div>
         </div>
       </section>
 
       <section className="border-b border-zinc-200/80 bg-[#f7f7f5] py-5">
         <div className="mx-auto grid max-w-7xl gap-4 px-6 sm:grid-cols-3 sm:px-8">
-          {trustStats.map((item) => (
+          {heroStats.map((item) => (
             <div key={item.label} className="rounded-2xl border border-zinc-200 bg-white px-4 py-4">
               <p className="text-3xl font-semibold tracking-tight text-zinc-950">{item.value}</p>
               <p className="mt-1 text-sm text-zinc-500">{item.label}</p>
@@ -247,92 +217,66 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="features" className="bg-[#fbfbfa] px-6 py-16 sm:px-8 sm:py-24">
+      <section id="why-it-lands" className="bg-[#fbfbfa] px-6 py-16 sm:px-8 sm:py-24">
         <div className="mx-auto max-w-7xl">
           <div className="max-w-3xl">
-            <p className="font-mono text-xs uppercase tracking-[0.28em] text-zinc-500">Features</p>
+            <p className="font-mono text-xs uppercase tracking-[0.28em] text-zinc-500">Why it lands</p>
             <h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-zinc-950 sm:text-5xl">
-              Built for reading the whole system,
+              Most people do not need more tools.
               <br />
-              not just collecting more numbers.
-            </h2>
-            <p className="mt-5 max-w-2xl text-base leading-8 text-zinc-600 sm:text-lg">
-              Most tools isolate a single category and leave you to interpret the rest. Aucosto is more useful when the categories are allowed to collide.
-            </p>
-          </div>
-
-          <div className="mt-10 space-y-4">
-            {features.map((feature) => (
-              <article
-                key={feature.title}
-                className="grid gap-6 rounded-[2rem] border border-zinc-200 bg-white p-6 shadow-[0_16px_50px_-40px_rgba(24,24,27,0.14)] sm:p-8 lg:grid-cols-[160px_minmax(0,1fr)_320px] lg:items-start"
-              >
-                <div>
-                  <p className="font-mono text-xs uppercase tracking-[0.24em] text-zinc-400">{feature.step}</p>
-                  <p className="mt-2 text-sm text-zinc-600">{feature.eyebrow}</p>
-                </div>
-                <div>
-                  <h3 className="text-2xl font-semibold tracking-tight text-zinc-950 sm:text-3xl">{feature.title}</h3>
-                  <p className="mt-3 max-w-2xl text-sm leading-7 text-zinc-600 sm:text-base">{feature.body}</p>
-                </div>
-                <ul className="space-y-3 rounded-[1.5rem] border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700">
-                  {feature.bullets.map((bullet) => (
-                    <li key={bullet} className="flex gap-2">
-                      <span className="mt-2 h-1.5 w-1.5 rounded-full bg-zinc-900" />
-                      <span>{bullet}</span>
-                    </li>
-                  ))}
-                </ul>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section id="how-it-works" className="border-y border-zinc-200/80 bg-[#f7f7f5] px-6 py-16 sm:px-8 sm:py-24">
-        <div className="mx-auto max-w-7xl">
-          <div className="max-w-3xl">
-            <p className="font-mono text-xs uppercase tracking-[0.28em] text-zinc-500">How it works</p>
-            <h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-zinc-950 sm:text-5xl">
-              Capture. Read. Adjust.
+              They need fewer blind spots.
             </h2>
           </div>
+
           <div className="mt-10 grid gap-4 lg:grid-cols-3">
-            {flow.map((item, index) => (
-              <article key={item.title} className="rounded-[2rem] border border-zinc-200 bg-white p-6 sm:p-8">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 text-sm font-medium text-zinc-500">
-                  0{index + 1}
-                </div>
-                <h3 className="mt-5 text-2xl font-semibold text-zinc-950">{item.title}</h3>
-                <p className="mt-3 text-sm leading-7 text-zinc-600 sm:text-base">{item.body}</p>
+            {benefits.map((benefit) => (
+              <article key={benefit.title} className="rounded-[2rem] border border-zinc-200 bg-white p-6 shadow-[0_16px_50px_-40px_rgba(24,24,27,0.14)] sm:p-8">
+                <h3 className="text-2xl font-semibold tracking-tight text-zinc-950">{benefit.title}</h3>
+                <p className="mt-3 text-sm leading-7 text-zinc-600 sm:text-base">{benefit.body}</p>
               </article>
             ))}
+          </div>
+
+          <div className="mt-10 rounded-[2rem] border border-zinc-200 bg-white p-6 shadow-[0_16px_50px_-40px_rgba(24,24,27,0.14)] sm:p-8">
+            <p className="font-mono text-xs uppercase tracking-[0.24em] text-zinc-500">Already true of the product direction</p>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {proofNotes.map((note) => (
+                <div key={note} className="flex gap-2 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-4 text-sm text-zinc-600">
+                  <span className="mt-2 h-1.5 w-1.5 rounded-full bg-zinc-900" />
+                  <span>{note}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
-      <section id="future-tools" className="border-y border-zinc-200/80 bg-[#f7f7f5] px-6 py-16 sm:px-8 sm:py-24">
+      <section id="tool-surfaces" className="border-y border-zinc-200/80 bg-[#f7f7f5] px-6 py-16 sm:px-8 sm:py-24">
         <div className="mx-auto max-w-7xl">
           <div className="max-w-3xl">
-            <p className="font-mono text-xs uppercase tracking-[0.28em] text-zinc-500">Future tools</p>
+            <p className="font-mono text-xs uppercase tracking-[0.28em] text-zinc-500">Tool surfaces</p>
             <h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-zinc-950 sm:text-5xl">
-              Meant to grow into a real personal operating system.
+              Not a wish list of features.
+              <br />
+              A growing system for real daily leverage.
             </h2>
             <p className="mt-5 max-w-2xl text-base leading-8 text-zinc-600 sm:text-lg">
-              Time and finance are just the start. The plan is to bring the rest of daily life into the same place so the tools can actually inform each other.
+              Each area below is valuable on its own. The bigger payoff is that they share context, so the app can start helping with the next decision instead of just storing another set of records.
             </p>
           </div>
 
           <div className="mt-10 grid gap-5 xl:grid-cols-2">
-            {futureTools.map((tool) => (
-              <article key={tool.title} className="rounded-[2rem] border border-zinc-200 bg-white p-5 shadow-[0_16px_50px_-40px_rgba(24,24,27,0.14)] sm:p-6">
+            {decisionAreas.map((area, index) => (
+              <article
+                key={area.name}
+                className={`rounded-[2rem] border border-zinc-200 bg-white p-5 shadow-[0_16px_50px_-40px_rgba(24,24,27,0.14)] sm:p-6 ${index % 2 === 1 ? "xl:translate-y-8" : ""}`}
+              >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="max-w-xl">
                     <span className="inline-flex rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-zinc-500">
-                      {tool.badge}
+                      {area.name}
                     </span>
-                    <h3 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-950">{tool.title}</h3>
-                    <p className="mt-2 text-sm leading-7 text-zinc-600 sm:text-base">{tool.summary}</p>
+                    <p className="mt-3 text-2xl font-semibold tracking-tight text-zinc-950">{area.outcome}</p>
                   </div>
                 </div>
 
@@ -340,46 +284,25 @@ export default function LandingPage() {
                   <div className="flex items-center justify-between gap-3 border-b border-zinc-200 pb-3">
                     <div>
                       <p className="text-sm font-medium text-zinc-950">Mock workspace</p>
-                      <p className="mt-1 text-xs text-zinc-500">How this tool could feel inside aucosto</p>
+                      <p className="mt-1 text-xs text-zinc-500">What this could feel like inside aucosto</p>
                     </div>
                     <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">Guided</span>
                   </div>
 
-                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                    {tool.metrics.map((metric) => (
-                      <div key={metric.label} className="rounded-2xl border border-zinc-200 bg-white p-3">
-                        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">{metric.label}</p>
-                        <p className="mt-2 text-lg font-semibold tracking-tight text-zinc-950">{metric.value}</p>
-                      </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {area.tools.map((tool) => (
+                      <span key={tool} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-600">
+                        {tool}
+                      </span>
                     ))}
                   </div>
 
-                  <div className="mt-4 grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-                    <div className="rounded-2xl border border-zinc-200 bg-white p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-medium text-zinc-950">What aucosto would suggest</p>
-                        <span className="text-xs uppercase tracking-[0.16em] text-zinc-500">Today</span>
-                      </div>
-                      <ul className="mt-3 space-y-3 text-sm leading-6 text-zinc-600">
-                        {tool.items.slice(0, 3).map((item) => (
-                          <li key={item} className="flex gap-2">
-                            <span className="mt-2 h-1.5 w-1.5 rounded-full bg-zinc-900" />
-                            <span>Use this system for {item} without needing another separate workflow.</span>
-                          </li>
-                        ))}
-                      </ul>
+                  <div className="mt-4 rounded-2xl border border-zinc-200 bg-white p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-medium text-zinc-950">What aucosto would notice</p>
+                      <span className="text-xs uppercase tracking-[0.16em] text-zinc-500">Insight</span>
                     </div>
-
-                    <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-                      <p className="text-sm font-medium text-zinc-950">Included capabilities</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {tool.items.map((item) => (
-                          <span key={item} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-600">
-                            {item}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
+                    <p className="mt-3 text-sm leading-7 text-zinc-600">{area.insight}</p>
                   </div>
                 </div>
               </article>
@@ -388,31 +311,86 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="why" className="bg-[#fbfbfa] px-6 py-16 sm:px-8 sm:py-24">
-        <div className="mx-auto max-w-7xl">
-          <div className="grid gap-6 lg:grid-cols-2">
-            {quotes.map((item) => (
-              <article key={item.quote} className="rounded-[2rem] border border-zinc-200 bg-white p-6 sm:p-8">
-                <p className="text-2xl font-medium leading-10 text-zinc-950 sm:text-3xl sm:leading-[1.45]">“{item.quote}”</p>
-                <p className="mt-6 text-sm uppercase tracking-[0.2em] text-zinc-400">{item.source}</p>
+      <section id="decision-engine" className="bg-[#fbfbfa] px-6 py-16 sm:px-8 sm:py-24">
+        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[420px_minmax(0,1fr)] lg:items-start">
+          <div className="lg:sticky lg:top-24">
+            <div className="rounded-[2rem] border border-zinc-200 bg-white p-5 shadow-[0_24px_80px_-42px_rgba(24,24,27,0.16)]">
+              <div className="rounded-[1.6rem] border border-zinc-200 bg-[#fcfcfb] p-4">
+                <div className="flex items-center justify-between gap-3 border-b border-zinc-200 pb-3">
+                  <div>
+                    <p className="text-sm font-medium text-zinc-950">The decision engine</p>
+                    <p className="mt-1 text-xs text-zinc-500">The more life lives here, the better the suggestions get.</p>
+                  </div>
+                  <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] font-medium text-zinc-600">Preview</span>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {mockPanels.map((panel) => (
+                    <div key={panel.title} className="rounded-2xl border border-zinc-200 bg-white p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-medium text-zinc-950">{panel.title}</p>
+                        <span className="rounded-full bg-zinc-50 px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-zinc-500">
+                          {panel.badge}
+                        </span>
+                      </div>
+                      <ul className="mt-3 space-y-2 text-sm leading-6 text-zinc-600">
+                        {panel.items.map((item) => (
+                          <li key={item} className="flex gap-2">
+                            <span className="mt-2 h-1.5 w-1.5 rounded-full bg-zinc-900" />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="max-w-2xl">
+              <p className="font-mono text-xs uppercase tracking-[0.28em] text-zinc-500">Decision engine</p>
+              <h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-zinc-950 sm:text-5xl">
+                The real benefit is not tracking more.
+                <br />
+                It is struggling less.
+              </h2>
+              <p className="mt-5 text-base leading-8 text-zinc-600 sm:text-lg">
+                When one app knows your calendar, your food, your workload, your cash pressure, your habits, your trip prep, and your home routines, it can start removing friction instead of just observing it.
+              </p>
+            </div>
+
+            {decisionAreas.map((area, index) => (
+              <article key={area.name} className="rounded-[2rem] border border-zinc-200 bg-white p-6 shadow-[0_16px_50px_-40px_rgba(24,24,27,0.14)] sm:p-8">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-mono text-xs uppercase tracking-[0.24em] text-zinc-400">0{index + 1}</p>
+                    <h3 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-950 sm:text-3xl">{area.name}</h3>
+                  </div>
+                </div>
+                <p className="mt-4 text-sm leading-7 text-zinc-600 sm:text-base">{area.outcome}</p>
+                <p className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-4 text-sm leading-7 text-zinc-700">
+                  <span className="font-medium text-zinc-950">Why it matters:</span> {area.insight}
+                </p>
               </article>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="border-t border-zinc-200/80 bg-[#f7f7f5] px-6 py-16 sm:px-8 sm:py-24">
+      <section id="cta" className="border-t border-zinc-200/80 bg-[#f7f7f5] px-6 py-16 sm:px-8 sm:py-24">
         <div className="mx-auto max-w-7xl rounded-[2.4rem] border border-zinc-200 bg-white p-6 shadow-[0_24px_80px_-42px_rgba(24,24,27,0.12)] sm:p-10">
           <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-end">
             <div>
               <p className="font-mono text-xs uppercase tracking-[0.28em] text-zinc-500">A different kind of personal tool</p>
               <h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-zinc-950 sm:text-5xl">
-                Premium signal,
+                One app to help run the parts of life
                 <br />
-                but with a calmer surface.
+                that should not require this much effort.
               </h2>
               <p className="mt-5 max-w-3xl text-base leading-8 text-zinc-600 sm:text-lg">
-                Strong opinionated design. Serious daily use. Privacy where it matters. Aucosto is trying to be useful in the same way premium performance tools are useful — just with a lighter, cleaner place to read the day.
+                The goal is simple: fewer tabs, fewer forgotten details, fewer repeated decisions, and a much clearer sense of what to do next.
               </p>
             </div>
             <div className="space-y-3">
@@ -429,10 +407,10 @@ export default function LandingPage() {
 
         <footer className="mx-auto mt-8 max-w-7xl px-1 text-sm text-zinc-500">
           <div className="flex flex-col gap-3 border-t border-zinc-200 pt-6 sm:flex-row sm:items-center sm:justify-between">
-            <p>aucosto — personal performance, but for your actual life.</p>
+            <p>aucosto — one home for the small decisions behind a well-run life.</p>
             <div className="flex gap-4">
-              <a href="#features" className="hover:text-zinc-950">Features</a>
-              <a href="#how-it-works" className="hover:text-zinc-950">How it works</a>
+              <a href="#why-it-lands" className="hover:text-zinc-950">Why it lands</a>
+              <a href="#tool-surfaces" className="hover:text-zinc-950">Tool surfaces</a>
               <Link href="/login" className="hover:text-zinc-950">Sign in</Link>
             </div>
           </div>
@@ -441,4 +419,3 @@ export default function LandingPage() {
     </main>
   );
 }
-
