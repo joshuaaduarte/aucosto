@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { defaultAccountInclusion, summarizeBalances } from "@/lib/finance-accounts";
+import {
+  defaultAccountInclusion,
+  findLikelyDuplicateManualAccountIds,
+  summarizeBalances,
+} from "@/lib/finance-accounts";
 
 describe("defaultAccountInclusion", () => {
   it("treats checking as cash but still part of net worth", () => {
@@ -14,6 +18,43 @@ describe("defaultAccountInclusion", () => {
       includeInCashPosition: false,
       includeInNetWorth: true,
     });
+  });
+});
+
+describe("findLikelyDuplicateManualAccountIds", () => {
+  it("flags manual accounts that look replaced by linked teller accounts", () => {
+    const duplicates = findLikelyDuplicateManualAccountIds([
+      {
+        id: "manual-checking",
+        name: "Chase Checking • 0637",
+        kind: "checking",
+        syncSource: "manual",
+        includeInNetWorth: true,
+        includeInCashPosition: true,
+        currentBalanceCents: 1,
+      },
+      {
+        id: "linked-checking",
+        name: "TOTAL CHECKING • 0637",
+        kind: "checking",
+        syncSource: "teller",
+        includeInNetWorth: true,
+        includeInCashPosition: true,
+        currentBalanceCents: 1,
+      },
+      {
+        id: "manual-apple",
+        name: "Apple Card",
+        kind: "credit_card",
+        syncSource: "manual",
+        includeInNetWorth: true,
+        includeInCashPosition: false,
+        currentBalanceCents: 1,
+      },
+    ]);
+
+    expect(duplicates.has("manual-checking")).toBe(true);
+    expect(duplicates.has("manual-apple")).toBe(false);
   });
 });
 

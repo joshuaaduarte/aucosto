@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { auth } from "@/auth";
-import { summarizeBalances } from "@/lib/finance-accounts";
+import { findLikelyDuplicateManualAccountIds, summarizeBalances } from "@/lib/finance-accounts";
 import { formatGoalCategory, summarizeGoal, summarizeGoals } from "@/lib/finance-goals";
 import { calculateSpendProjection, projectCategories } from "@/lib/finance-pace";
 import { formatTransactionType } from "@/lib/finance-types";
@@ -84,9 +84,9 @@ function summaryCard({
   className?: string;
 }) {
   return (
-    <div className={`rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-950/5 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none ${className ?? ""}`}>
+    <div className={`min-w-0 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-950/5 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none ${className ?? ""}`}>
       <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">{label}</p>
-      <p className={`mt-3 text-2xl font-semibold tracking-tight ${valueClassName ?? "text-zinc-950 dark:text-zinc-50"}`}>{value}</p>
+      <p className={`mt-3 min-w-0 overflow-hidden text-ellipsis break-words text-xl font-semibold tracking-tight sm:text-2xl ${valueClassName ?? "text-zinc-950 dark:text-zinc-50"}`}>{value}</p>
       <p className="mt-1 text-sm text-zinc-500">{hint}</p>
     </div>
   );
@@ -158,9 +158,9 @@ function actionPill({ href, label }: { href: string; label: string }) {
 
 function quickStat({ label, value, tone = "default" }: { label: string; value: string; tone?: "default" | "positive" }) {
   return (
-    <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 shadow-sm shadow-zinc-950/5 backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-900/80 dark:shadow-none">
+    <div className="min-w-0 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 shadow-sm shadow-zinc-950/5 backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-900/80 dark:shadow-none">
       <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">{label}</p>
-      <p className={`mt-2 text-lg font-semibold tracking-tight ${tone === "positive" ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-950 dark:text-zinc-50"}`}>{value}</p>
+      <p className={`mt-2 min-w-0 overflow-hidden text-ellipsis break-words text-base font-semibold tracking-tight sm:text-lg ${tone === "positive" ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-950 dark:text-zinc-50"}`}>{value}</p>
     </div>
   );
 }
@@ -179,6 +179,9 @@ export default async function FinancePage() {
     listTransactions(userId, { limit: 1000 }),
   ]);
   const tellerConfig = getTellerConnectConfig();
+  const duplicateManualAccountIds = findLikelyDuplicateManualAccountIds(accounts);
+  const duplicateManualAccounts = accounts.filter((account) => duplicateManualAccountIds.has(account.id));
+  const effectiveAccounts = accounts.filter((account) => !duplicateManualAccountIds.has(account.id));
 
   const thisMonth = history.filter((transaction) => transaction.date >= monthStart);
   const lastMonth = history.filter(
@@ -186,7 +189,7 @@ export default async function FinancePage() {
       transaction.date >= previousMonthStart && transaction.date < monthStart,
   );
 
-  const snapshot = summarizeBalances(accounts);
+  const snapshot = summarizeBalances(effectiveAccounts);
   const goalSnapshot = summarizeGoals(goals);
   const thisMonthSummary = summarizeCashflow(thisMonth);
   const lastMonthSummary = summarizeCashflow(lastMonth);
@@ -198,8 +201,8 @@ export default async function FinancePage() {
   const typeSummary = summarizeTransactionTypes(thisMonth);
   const recurringCandidates = findRecurringCandidates(history, { limit: 5 });
 
-  const cardAccounts = accounts.filter((account) => account.kind === "credit_card" && account.includeInNetWorth);
-  const loanAccounts = accounts.filter((account) => account.kind === "loan" && account.includeInNetWorth);
+  const cardAccounts = effectiveAccounts.filter((account) => account.kind === "credit_card" && account.includeInNetWorth);
+  const loanAccounts = effectiveAccounts.filter((account) => account.kind === "loan" && account.includeInNetWorth);
   const activeGoals = goals.filter((goal) => goal.status !== "done");
   const nextDueAccounts = [...cardAccounts]
     .filter((account) => account.dueDate)
@@ -313,7 +316,7 @@ export default async function FinancePage() {
             <div className="grid grid-cols-2 gap-3 sm:min-w-[320px] sm:grid-cols-2">
               {quickStat({ label: "Net worth", value: formatUSDFromCents(snapshot.netWorthCents), tone: snapshot.netWorthCents >= 0 ? "positive" : "default" })}
               {quickStat({ label: "This month", value: formatUSDFromCents(thisMonthSummary.netCents), tone: thisMonthSummary.netCents >= 0 ? "positive" : "default" })}
-              {quickStat({ label: "Tracked accounts", value: String(accounts.length) })}
+              {quickStat({ label: "Tracked accounts", value: String(effectiveAccounts.length) })}
               {quickStat({ label: "Transactions", value: String(count) })}
             </div>
           </div>
@@ -332,6 +335,15 @@ export default async function FinancePage() {
 
         <UploadForm />
       </section>
+
+      {duplicateManualAccounts.length > 0 ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-5 py-4 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-100">
+          <p className="font-medium">I found likely duplicate manual accounts and excluded them from totals.</p>
+          <p className="mt-1 text-amber-800 dark:text-amber-200">
+            {duplicateManualAccounts.map((account) => account.name).join(", ")}. They still appear below so you can rename, edit, or delete them.
+          </p>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.3fr_0.7fr]">
         {sectionCard({
@@ -378,15 +390,15 @@ export default async function FinancePage() {
                 <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
                   <div>
                     <p className="text-zinc-500">Available</p>
-                    <p className="mt-1 font-semibold text-zinc-900 dark:text-zinc-100">{formatUSDFromCents(snapshot.cashCents)}</p>
+                    <p className="mt-1 break-words font-semibold text-zinc-900 dark:text-zinc-100">{formatUSDFromCents(snapshot.cashCents)}</p>
                   </div>
                   <div>
                     <p className="text-zinc-500">Cards owed</p>
-                    <p className="mt-1 font-semibold text-zinc-900 dark:text-zinc-100">{formatUSDFromCents(snapshot.cardsOwedCents)}</p>
+                    <p className="mt-1 break-words font-semibold text-zinc-900 dark:text-zinc-100">{formatUSDFromCents(snapshot.cardsOwedCents)}</p>
                   </div>
                   <div>
                     <p className="text-zinc-500">Net worth</p>
-                    <p className={`mt-1 font-semibold ${snapshot.netWorthCents >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-900 dark:text-zinc-100"}`}>{formatUSDFromCents(snapshot.netWorthCents)}</p>
+                    <p className={`mt-1 break-words font-semibold ${snapshot.netWorthCents >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-900 dark:text-zinc-100"}`}>{formatUSDFromCents(snapshot.netWorthCents)}</p>
                   </div>
                 </div>
               </div>

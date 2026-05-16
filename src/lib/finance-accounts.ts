@@ -1,5 +1,16 @@
 import type { FinanceAccount } from "@/generated/prisma/client";
 
+export type FinanceAccountLike = Pick<
+  FinanceAccount,
+  | "id"
+  | "name"
+  | "kind"
+  | "syncSource"
+  | "includeInNetWorth"
+  | "includeInCashPosition"
+  | "currentBalanceCents"
+>;
+
 export const FINANCE_ACCOUNT_KINDS = [
   "checking",
   "savings",
@@ -54,6 +65,46 @@ export function defaultAccountInclusion(kind: string): {
     includeInNetWorth: true,
     includeInCashPosition: ["checking", "savings", "cash"].includes(kind),
   };
+}
+
+function normalizeAccountName(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[®•]/g, " ")
+    .replace(/\b(card|visa|mastercard|debit|bank|checking|savings|credit|cash|total|everyday|anywhere|active|by|fargo|wells|chase|citi|citibank)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function accountLastFour(value: string): string | null {
+  const matches = value.match(/(\d{4})(?!.*\d)/);
+  return matches?.[1] ?? null;
+}
+
+export function findLikelyDuplicateManualAccountIds(accounts: FinanceAccountLike[]): Set<string> {
+  const linkedFingerprints = new Set<string>();
+
+  for (const account of accounts) {
+    if (account.syncSource !== "teller") continue;
+    const lastFour = accountLastFour(account.name);
+    const normalized = normalizeAccountName(account.name);
+    linkedFingerprints.add(`${account.kind}|${lastFour ?? ""}|${normalized}`);
+    if (lastFour) linkedFingerprints.add(`${account.kind}|${lastFour}`);
+  }
+
+  const duplicates = new Set<string>();
+  for (const account of accounts) {
+    if (account.syncSource !== "manual") continue;
+    const lastFour = accountLastFour(account.name);
+    const normalized = normalizeAccountName(account.name);
+    const exactFingerprint = `${account.kind}|${lastFour ?? ""}|${normalized}`;
+    const looseFingerprint = lastFour ? `${account.kind}|${lastFour}` : null;
+    if (linkedFingerprints.has(exactFingerprint) || (looseFingerprint && linkedFingerprints.has(looseFingerprint))) {
+      duplicates.add(account.id);
+    }
+  }
+
+  return duplicates;
 }
 
 export function summarizeBalances(
