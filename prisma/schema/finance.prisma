@@ -34,6 +34,8 @@ model FinanceAccount {
   name                  String
   kind                  String
   currency              String   @default("USD")
+  includeInNetWorth     Boolean  @default(true)
+  includeInCashPosition Boolean  @default(false)
   currentBalanceCents   Int
   balanceUpdatedAt      DateTime
   statementBalanceCents Int?

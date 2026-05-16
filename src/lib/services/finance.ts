@@ -10,7 +10,11 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { requireCan } from "@/lib/auth/can";
 import { recordEvent } from "@/lib/services/events";
-import { parseCurrencyToCents, type FinanceAccountKind } from "@/lib/finance-accounts";
+import {
+  defaultAccountInclusion,
+  parseCurrencyToCents,
+  type FinanceAccountKind,
+} from "@/lib/finance-accounts";
 import { inferCategory } from "@/lib/finance-categories";
 import { dedupeParsedRows } from "@/lib/finance-import";
 import { parseStatementPdf, type StatementImportPreview } from "@/lib/statement-import";
@@ -35,6 +39,8 @@ export type SaveFinanceAccountInput = {
   id?: string;
   name: string;
   kind: FinanceAccountKind;
+  includeInNetWorth?: boolean;
+  includeInCashPosition?: boolean;
   currentBalance: string;
   balanceUpdatedAt: string;
   statementBalance?: string;
@@ -128,9 +134,12 @@ export async function saveAccount(
     ? parseCurrencyToCents(input.creditLimit)
     : null;
 
+  const defaultInclusion = defaultAccountInclusion(input.kind);
   const data = {
     name,
     kind: input.kind,
+    includeInNetWorth: input.includeInNetWorth ?? defaultInclusion.includeInNetWorth,
+    includeInCashPosition: input.includeInCashPosition ?? defaultInclusion.includeInCashPosition,
     currentBalanceCents,
     balanceUpdatedAt: new Date(`${input.balanceUpdatedAt}T12:00:00.000Z`),
     statementBalanceCents,
@@ -680,6 +689,8 @@ export async function syncFinanceConnection(
               name: accountName,
               kind: mapTellerAccountKind(tellerAccount),
               currency: tellerAccount.currency ?? "USD",
+              includeInNetWorth: existingAccount.includeInNetWorth,
+              includeInCashPosition: existingAccount.includeInCashPosition,
               currentBalanceCents,
               statementBalanceCents,
               balanceUpdatedAt: new Date(),
@@ -694,6 +705,7 @@ export async function syncFinanceConnection(
               name: accountName,
               kind: mapTellerAccountKind(tellerAccount),
               currency: tellerAccount.currency ?? "USD",
+              ...defaultAccountInclusion(mapTellerAccountKind(tellerAccount)),
               currentBalanceCents,
               statementBalanceCents,
               balanceUpdatedAt: new Date(),

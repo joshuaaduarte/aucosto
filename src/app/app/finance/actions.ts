@@ -163,6 +163,8 @@ export async function saveFinanceAccount(
       id: String(formData.get("id") ?? "").trim() || undefined,
       name: String(formData.get("name") ?? ""),
       kind: String(formData.get("kind") ?? "checking") as FinanceAccountKind,
+      includeInNetWorth: formData.get("includeInNetWorth") === "on",
+      includeInCashPosition: formData.get("includeInCashPosition") === "on",
       currentBalance: String(formData.get("currentBalance") ?? ""),
       balanceUpdatedAt: String(formData.get("balanceUpdatedAt") ?? ""),
       statementBalance: String(formData.get("statementBalance") ?? ""),

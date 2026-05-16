@@ -20,6 +20,9 @@ export type BalanceSnapshot = {
   loansOwedCents: number;
   netPositionCents: number;
   netWorthCents: number;
+  cashAccountCount: number;
+  netWorthAccountCount: number;
+  debtAccountCount: number;
 };
 
 export function formatAccountKind(kind: string): string {
@@ -43,23 +46,46 @@ export function formatAccountKind(kind: string): string {
   }
 }
 
+export function defaultAccountInclusion(kind: string): {
+  includeInNetWorth: boolean;
+  includeInCashPosition: boolean;
+} {
+  return {
+    includeInNetWorth: true,
+    includeInCashPosition: ["checking", "savings", "cash"].includes(kind),
+  };
+}
+
 export function summarizeBalances(
-  accounts: Pick<FinanceAccount, "kind" | "currentBalanceCents">[],
+  accounts: Pick<FinanceAccount, "kind" | "currentBalanceCents" | "includeInNetWorth" | "includeInCashPosition">[],
 ): BalanceSnapshot {
   let cashCents = 0;
   let investmentCents = 0;
   let retirementCents = 0;
   let cardsOwedCents = 0;
   let loansOwedCents = 0;
+  let cashAccountCount = 0;
+  let netWorthAccountCount = 0;
+  let debtAccountCount = 0;
 
   for (const account of accounts) {
+    if (account.includeInCashPosition && !["credit_card", "loan"].includes(account.kind)) {
+      cashCents += account.currentBalanceCents;
+      cashAccountCount += 1;
+    }
+
+    if (!account.includeInNetWorth) continue;
+    netWorthAccountCount += 1;
+
     if (account.kind === "credit_card") {
       cardsOwedCents += Math.max(0, account.currentBalanceCents);
+      debtAccountCount += 1;
       continue;
     }
 
     if (account.kind === "loan") {
       loansOwedCents += Math.max(0, account.currentBalanceCents);
+      debtAccountCount += 1;
       continue;
     }
 
@@ -72,8 +98,6 @@ export function summarizeBalances(
       retirementCents += account.currentBalanceCents;
       continue;
     }
-
-    cashCents += account.currentBalanceCents;
   }
 
   const netPositionCents = cashCents - cardsOwedCents - loansOwedCents;
@@ -84,7 +108,10 @@ export function summarizeBalances(
     cardsOwedCents,
     loansOwedCents,
     netPositionCents,
-    netWorthCents: netPositionCents + investmentCents + retirementCents,
+    netWorthCents: cashCents + investmentCents + retirementCents - cardsOwedCents - loansOwedCents,
+    cashAccountCount,
+    netWorthAccountCount,
+    debtAccountCount,
   };
 }
 

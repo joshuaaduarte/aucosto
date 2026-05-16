@@ -1,28 +1,37 @@
 import { describe, expect, it } from "vitest";
-import { parseCurrencyToCents, summarizeBalances } from "@/lib/finance-accounts";
+import { defaultAccountInclusion, summarizeBalances } from "@/lib/finance-accounts";
 
-describe("finance-accounts", () => {
-  it("summarizes cash, cards owed, and net position", () => {
-    const result = summarizeBalances([
-      { kind: "checking", currentBalanceCents: 6062172 },
-      { kind: "cash", currentBalanceCents: 5000 },
-      { kind: "credit_card", currentBalanceCents: 94290 },
-      { kind: "credit_card", currentBalanceCents: 34181 },
-    ]);
-
-    expect(result).toEqual({
-      cashCents: 6067172,
-      investmentCents: 0,
-      retirementCents: 0,
-      cardsOwedCents: 128471,
-      loansOwedCents: 0,
-      netPositionCents: 5938701,
-      netWorthCents: 5938701,
+describe("defaultAccountInclusion", () => {
+  it("treats checking as cash but still part of net worth", () => {
+    expect(defaultAccountInclusion("checking")).toEqual({
+      includeInCashPosition: true,
+      includeInNetWorth: true,
     });
   });
 
-  it("parses currency strings into cents", () => {
-    expect(parseCurrencyToCents("60,621.72")).toBe(6062172);
-    expect(parseCurrencyToCents("-15.00")).toBe(-1500);
+  it("keeps investments out of cash position by default", () => {
+    expect(defaultAccountInclusion("investment")).toEqual({
+      includeInCashPosition: false,
+      includeInNetWorth: true,
+    });
+  });
+});
+
+describe("summarizeBalances", () => {
+  it("respects cash and net worth inclusion flags", () => {
+    const snapshot = summarizeBalances([
+      { kind: "checking", currentBalanceCents: 125_00, includeInCashPosition: true, includeInNetWorth: true },
+      { kind: "investment", currentBalanceCents: 500_00, includeInCashPosition: false, includeInNetWorth: true },
+      { kind: "credit_card", currentBalanceCents: 75_00, includeInCashPosition: false, includeInNetWorth: true },
+      { kind: "savings", currentBalanceCents: 400_00, includeInCashPosition: false, includeInNetWorth: false },
+    ]);
+
+    expect(snapshot.cashCents).toBe(125_00);
+    expect(snapshot.investmentCents).toBe(500_00);
+    expect(snapshot.cardsOwedCents).toBe(75_00);
+    expect(snapshot.netWorthCents).toBe(550_00);
+    expect(snapshot.cashAccountCount).toBe(1);
+    expect(snapshot.netWorthAccountCount).toBe(3);
+    expect(snapshot.debtAccountCount).toBe(1);
   });
 });

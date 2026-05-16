@@ -198,9 +198,8 @@ export default async function FinancePage() {
   const typeSummary = summarizeTransactionTypes(thisMonth);
   const recurringCandidates = findRecurringCandidates(history, { limit: 5 });
 
-  const cashAccounts = accounts.filter((account) => !["credit_card", "loan"].includes(account.kind));
-  const cardAccounts = accounts.filter((account) => account.kind === "credit_card");
-  const loanAccounts = accounts.filter((account) => account.kind === "loan");
+  const cardAccounts = accounts.filter((account) => account.kind === "credit_card" && account.includeInNetWorth);
+  const loanAccounts = accounts.filter((account) => account.kind === "loan" && account.includeInNetWorth);
   const activeGoals = goals.filter((goal) => goal.status !== "done");
   const nextDueAccounts = [...cardAccounts]
     .filter((account) => account.dueDate)
@@ -343,7 +342,7 @@ export default async function FinancePage() {
               {summaryCard({
                 label: "Cash",
                 value: formatUSDFromCents(snapshot.cashCents),
-                hint: `${cashAccounts.length} liquid account${cashAccounts.length === 1 ? "" : "s"}`,
+                hint: `${snapshot.cashAccountCount} included account${snapshot.cashAccountCount === 1 ? "" : "s"}`,
                 className: "min-w-[240px] snap-start sm:min-w-0",
               })}
               {summaryCard({
@@ -361,7 +360,7 @@ export default async function FinancePage() {
               {summaryCard({
                 label: "Net worth",
                 value: formatUSDFromCents(snapshot.netWorthCents),
-                hint: "assets minus debts",
+                hint: `${snapshot.netWorthAccountCount} included account${snapshot.netWorthAccountCount === 1 ? "" : "s"}`,
                 valueClassName: snapshot.netWorthCents >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-950 dark:text-zinc-50",
                 className: "min-w-[240px] snap-start sm:min-w-0",
               })}
@@ -656,6 +655,9 @@ export default async function FinancePage() {
                     id: account.id,
                     name: account.name,
                     kind: account.kind,
+                    syncSource: account.syncSource,
+                    includeInNetWorth: account.includeInNetWorth,
+                    includeInCashPosition: account.includeInCashPosition,
                     currentBalanceCents: account.currentBalanceCents,
                     statementBalanceCents: account.statementBalanceCents,
                     balanceUpdatedAt: account.balanceUpdatedAt.toISOString(),
