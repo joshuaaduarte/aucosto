@@ -309,6 +309,41 @@ export async function updateTransactionCategory(
   }
 }
 
+export async function updateMatchingTransactionCategories(
+  userId: string,
+  input: { description: string; account?: string | null; category: string },
+): Promise<number> {
+  requireCan(userId, "finance", "write");
+
+  const description = input.description.trim();
+  if (!description) return 0;
+
+  const updated = await prisma.financeTransaction.updateMany({
+    where: {
+      userId,
+      description,
+      ...(input.account != null ? { account: input.account } : { account: null }),
+    },
+    data: { category: input.category },
+  });
+
+  if (updated.count > 0) {
+    await recordEvent({
+      userId,
+      tool: "finance",
+      type: "finance.category_bulk_updated",
+      meta: {
+        category: input.category,
+        description,
+        account: input.account ?? null,
+        count: updated.count,
+      },
+    });
+  }
+
+  return updated.count;
+}
+
 export async function deleteAllTransactions(userId: string): Promise<void> {
   requireCan(userId, "finance", "write");
   const { count } = await prisma.financeTransaction.deleteMany({

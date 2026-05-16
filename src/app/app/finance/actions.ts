@@ -112,6 +112,25 @@ export async function updateTransactionCategory(
   revalidatePath("/app/finance");
 }
 
+export async function updateMatchingTransactionCategories(
+  description: string,
+  account: string | null,
+  category: FinanceCategory,
+) {
+  const session = await auth();
+  if (!session?.user?.id) return 0;
+
+  const count = await financeService.updateMatchingTransactionCategories(session.user.id, {
+    description,
+    account,
+    category,
+  });
+
+  revalidatePath("/app");
+  revalidatePath("/app/finance");
+  return count;
+}
+
 export async function deleteAllTransactions() {
   const session = await auth();
   if (!session?.user?.id) return;

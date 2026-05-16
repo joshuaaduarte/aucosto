@@ -1,10 +1,9 @@
 import type { ReactNode } from "react";
 import { auth } from "@/auth";
 import { summarizeBalances } from "@/lib/finance-accounts";
-import { resolveCategory } from "@/lib/finance-categories";
 import { formatGoalCategory, summarizeGoal, summarizeGoals } from "@/lib/finance-goals";
 import { calculateSpendProjection, projectCategories } from "@/lib/finance-pace";
-import { classifyTransaction, formatTransactionType } from "@/lib/finance-types";
+import { formatTransactionType } from "@/lib/finance-types";
 import {
   findRecurringCandidates,
   summarizeCashflow,
@@ -14,9 +13,9 @@ import {
 } from "@/lib/finance-summary";
 import { countTransactions, listAccounts, listGoals, listTransactions } from "@/lib/services/finance";
 import { AccountsPanel } from "./accounts-panel";
-import { CategorySelect } from "./category-select";
 import { ClearButton } from "./clear-button";
 import { GoalsPanel } from "./goals-panel";
+import { TransactionsReview } from "./transactions-review";
 import { UploadForm } from "./upload-form";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +27,12 @@ function startOfMonth(): Date {
   return d;
 }
 
+function startOfPreviousMonth(): Date {
+  const d = startOfMonth();
+  d.setMonth(d.getMonth() - 1);
+  return d;
+}
+
 function formatUSDFromCents(cents: number): string {
   return (cents / 100).toLocaleString("en-US", {
     style: "currency",
@@ -35,6 +40,26 @@ function formatUSDFromCents(cents: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+function formatSignedUSDFromCents(cents: number): string {
+  const abs = formatUSDFromCents(Math.abs(cents));
+  if (cents === 0) return abs;
+  return `${cents > 0 ? "+" : "-"}${abs}`;
+}
+
+function formatPercentDelta(current: number, previous: number): string | null {
+  if (previous === 0) return null;
+  const delta = ((current - previous) / previous) * 100;
+  return `${delta > 0 ? "+" : ""}${Math.round(delta)}%`;
+}
+
+function daysUntil(date: Date): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
 }
 
 function summaryCard({
@@ -137,21 +162,28 @@ export default async function FinancePage() {
   const userId = session!.user.id;
 
   const monthStart = startOfMonth();
-  const [accounts, goals, count, recent, thisMonth, history] = await Promise.all([
+  const previousMonthStart = startOfPreviousMonth();
+  const [accounts, goals, count, history] = await Promise.all([
     listAccounts(userId),
     listGoals(userId),
     countTransactions(userId),
-    listTransactions(userId, { limit: 100 }),
-    listTransactions(userId, { since: monthStart, limit: 500 }),
-    listTransactions(userId, { limit: 500 }),
+    listTransactions(userId, { limit: 1000 }),
   ]);
+
+  const thisMonth = history.filter((transaction) => transaction.date >= monthStart);
+  const lastMonth = history.filter(
+    (transaction) =>
+      transaction.date >= previousMonthStart && transaction.date < monthStart,
+  );
 
   const snapshot = summarizeBalances(accounts);
   const goalSnapshot = summarizeGoals(goals);
   const thisMonthSummary = summarizeCashflow(thisMonth);
+  const lastMonthSummary = summarizeCashflow(lastMonth);
   const spendProjection = calculateSpendProjection(thisMonth);
   const topMerchants = topMerchantsBySpend(thisMonth, { limit: 5 });
   const topCategories = topCategoriesBySpend(thisMonth, { limit: 5 });
+  const lastMonthTopCategories = topCategoriesBySpend(lastMonth, { limit: 20 });
   const categoryProjections = projectCategories(thisMonth, { limit: 3 });
   const typeSummary = summarizeTransactionTypes(thisMonth);
   const recurringCandidates = findRecurringCandidates(history, { limit: 5 });
@@ -173,6 +205,81 @@ export default async function FinancePage() {
     })[0] ?? null;
   const topGoalSummary = topGoal ? summarizeGoal(topGoal) : null;
   const topProjectedCategory = categoryProjections[0] ?? null;
+  const spendDeltaCents = thisMonthSummary.spentCents - lastMonthSummary.spentCents;
+  const netDeltaCents = thisMonthSummary.netCents - lastMonthSummary.netCents;
+  const spendDeltaPercent = formatPercentDelta(
+    thisMonthSummary.spentCents,
+    lastMonthSummary.spentCents,
+  );
+  const netDeltaPercent = formatPercentDelta(
+    thisMonthSummary.netCents,
+    lastMonthSummary.netCents,
+  );
+  const topProjectedCategoryLastMonth = topProjectedCategory
+    ? lastMonthTopCategories.find(
+        (category) => category.category === topProjectedCategory.category,
+      )
+    : null;
+  const topProjectedCategoryDelta = topProjectedCategoryLastMonth
+    ? topProjectedCategory.projectedCents - topProjectedCategoryLastMonth.spendCents
+    : null;
+  const actionableAlerts = [
+    nextDueAccounts[0]
+      ? {
+          title: `${nextDueAccounts[0].name} due ${nextDueAccounts[0].dueDate?.toLocaleDateString([], {
+            month: "short",
+            day: "numeric",
+          })}`,
+          body: `${daysUntil(nextDueAccounts[0].dueDate!)} day${daysUntil(nextDueAccounts[0].dueDate!) === 1 ? "" : "s"} left. Keep the payoff visible before it becomes a fire drill.`,
+          tone: "amber",
+        }
+      : null,
+    spendDeltaCents > 0
+      ? {
+          title: `True spend is ${formatSignedUSDFromCents(spendDeltaCents)} vs last month`,
+          body: spendDeltaPercent
+            ? `${spendDeltaPercent} change month over month. Good moment to check where the drift is coming from.`
+            : "Month-over-month comparison just started, but spending is already above the last full baseline.",
+          tone: "amber",
+        }
+      : thisMonthSummary.spentCents > 0
+        ? {
+            title: `True spend is ${formatSignedUSDFromCents(spendDeltaCents)} vs last month`,
+            body: spendDeltaPercent
+              ? `${spendDeltaPercent} change month over month. The current pace is calmer than last month.`
+              : "Early signal only, but spending is trending lower than last month so far.",
+            tone: "emerald",
+          }
+        : null,
+    topProjectedCategory
+      ? {
+          title: `${topProjectedCategory.category} is leading projected spend`,
+          body: topProjectedCategoryDelta != null
+            ? `${formatUSDFromCents(topProjectedCategory.projectedCents)} projected this month, ${formatSignedUSDFromCents(topProjectedCategoryDelta)} vs last month.`
+            : `${formatUSDFromCents(topProjectedCategory.projectedCents)} projected this month.`,
+          tone: "sky",
+        }
+      : null,
+    recurringCandidates[0]
+      ? {
+          title: `${recurringCandidates[0].merchant} looks recurring`,
+          body: `${formatUSDFromCents(recurringCandidates[0].amountCents)} with the last charge on ${recurringCandidates[0].lastDate.toLocaleDateString([], {
+            month: "short",
+            day: "numeric",
+          })}. Worth deciding if it still earns its place.`,
+          tone: "zinc",
+        }
+      : null,
+    topGoal && topGoalSummary && topGoalSummary.monthlyNeededCents > 0
+      ? {
+          title: `${topGoal.name} needs ${formatUSDFromCents(topGoalSummary.monthlyNeededCents)} / month`,
+          body: topGoalSummary.targetDateLabel
+            ? `That pace is based on the ${topGoalSummary.targetDateLabel} target.`
+            : "Add a target date if you want the pressure to be more precise.",
+          tone: "zinc",
+        }
+      : null,
+  ].filter(Boolean) as Array<{ title: string; body: string; tone: "emerald" | "amber" | "sky" | "zinc" }>;
 
   return (
     <div className="space-y-6 pb-6 lg:space-y-8">
@@ -249,6 +356,23 @@ export default async function FinancePage() {
           subtitle: "Keep the next useful nudge visible.",
           children: (
             <div className="mt-5 space-y-3">
+              <div className="rounded-xl border border-zinc-200 px-4 py-4 dark:border-zinc-800">
+                <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">Cash position</p>
+                <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
+                  <div>
+                    <p className="text-zinc-500">Available</p>
+                    <p className="mt-1 font-semibold text-zinc-900 dark:text-zinc-100">{formatUSDFromCents(snapshot.cashCents)}</p>
+                  </div>
+                  <div>
+                    <p className="text-zinc-500">Cards owed</p>
+                    <p className="mt-1 font-semibold text-zinc-900 dark:text-zinc-100">{formatUSDFromCents(snapshot.cardsOwedCents)}</p>
+                  </div>
+                  <div>
+                    <p className="text-zinc-500">Net worth</p>
+                    <p className={`mt-1 font-semibold ${snapshot.netWorthCents >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-900 dark:text-zinc-100"}`}>{formatUSDFromCents(snapshot.netWorthCents)}</p>
+                  </div>
+                </div>
+              </div>
               <div className="rounded-xl border border-zinc-200 px-4 py-4 dark:border-zinc-800">
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -339,18 +463,24 @@ export default async function FinancePage() {
 
           {sectionCard({
             title: "Monthly planning",
-            subtitle: count > 0 ? "Projection first, category detail second." : "This gets smarter once transactions are imported.",
+            subtitle: count > 0 ? "Projection first, then compare against last month." : "This gets smarter once transactions are imported.",
             children: count > 0 ? (
               <div className="mt-5 space-y-4">
                 <div className="rounded-xl bg-zinc-50 px-4 py-4 dark:bg-zinc-800/70">
                   <p className="text-sm text-zinc-500">Projected true spend</p>
                   <p className="mt-1 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">{formatUSDFromCents(spendProjection.projectedCents)}</p>
                   <p className="mt-1 text-sm text-zinc-500">{formatUSDFromCents(Math.round(spendProjection.burnRateCentsPerDay))} / day at the current pace</p>
+                  {lastMonthSummary.spentCents > 0 ? (
+                    <p className="mt-2 text-sm text-zinc-500">
+                      vs last month true spend: <span className="font-medium text-zinc-700 dark:text-zinc-300">{formatSignedUSDFromCents(spendDeltaCents)}</span>
+                      {spendDeltaPercent ? ` (${spendDeltaPercent})` : ""}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  {summaryCard({ label: "Spent", value: formatUSDFromCents(thisMonthSummary.spentCents), hint: "true spend so far" })}
+                  {summaryCard({ label: "Spent", value: formatUSDFromCents(thisMonthSummary.spentCents), hint: lastMonthSummary.spentCents > 0 ? `vs last month ${formatSignedUSDFromCents(spendDeltaCents)}${spendDeltaPercent ? ` · ${spendDeltaPercent}` : ""}` : "true spend so far" })}
                   {summaryCard({ label: "Income", value: formatUSDFromCents(thisMonthSummary.incomeCents), hint: "income + reimbursements", valueClassName: "text-emerald-600 dark:text-emerald-400" })}
-                  {summaryCard({ label: "Net flow", value: formatUSDFromCents(thisMonthSummary.netCents), hint: "income minus true spend", valueClassName: thisMonthSummary.netCents >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-950 dark:text-zinc-50" })}
+                  {summaryCard({ label: "Net flow", value: formatUSDFromCents(thisMonthSummary.netCents), hint: lastMonth.length > 0 ? `vs last month ${formatSignedUSDFromCents(netDeltaCents)}${netDeltaPercent ? ` · ${netDeltaPercent}` : ""}` : "income minus true spend", valueClassName: thisMonthSummary.netCents >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-950 dark:text-zinc-50" })}
                 </div>
                 {categoryProjections.length > 0 && (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -358,7 +488,12 @@ export default async function FinancePage() {
                       <div key={item.category} className="rounded-xl border border-zinc-200 px-4 py-4 dark:border-zinc-800">
                         <p className="truncate text-sm font-medium text-zinc-700 dark:text-zinc-300">{item.category}</p>
                         <p className="mt-1 font-mono text-sm tabular-nums text-zinc-900 dark:text-zinc-100">{formatUSDFromCents(item.projectedCents)}</p>
-                        <p className="text-xs text-zinc-500">projected this month</p>
+                        <p className="text-xs text-zinc-500">
+                          projected this month
+                          {lastMonthTopCategories.find((category) => category.category === item.category)
+                            ? ` · ${formatSignedUSDFromCents(item.projectedCents - (lastMonthTopCategories.find((category) => category.category === item.category)?.spendCents ?? 0))} vs last month`
+                            : ""}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -399,42 +534,19 @@ export default async function FinancePage() {
 
         {sectionCard({
           title: "Watchlist",
-          subtitle: "A compact scan for category, merchant, and recurring pressure.",
+          subtitle: "Less summary, more next moves.",
           children: count > 0 ? (
             <div className="mt-5 space-y-3">
-              <div className="rounded-xl border border-zinc-200 px-4 py-4 dark:border-zinc-800">
-                <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">Top category</p>
-                {topCategories[0] ? (
-                  <>
-                    <p className="mt-2 text-sm font-medium text-zinc-900 dark:text-zinc-100">{topCategories[0].category}</p>
-                    <p className="mt-1 text-sm text-zinc-500">{formatUSDFromCents(topCategories[0].spendCents)} across {topCategories[0].count} transaction{topCategories[0].count === 1 ? "" : "s"}</p>
-                  </>
-                ) : (
-                  <p className="mt-2 text-sm text-zinc-500">No spend yet this month.</p>
-                )}
-              </div>
-              <div className="rounded-xl border border-zinc-200 px-4 py-4 dark:border-zinc-800">
-                <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">Top merchant</p>
-                {topMerchants[0] ? (
-                  <>
-                    <p className="mt-2 text-sm font-medium text-zinc-900 dark:text-zinc-100">{topMerchants[0].merchant}</p>
-                    <p className="mt-1 text-sm text-zinc-500">{formatUSDFromCents(topMerchants[0].spendCents)} across {topMerchants[0].count} charge{topMerchants[0].count === 1 ? "" : "s"}</p>
-                  </>
-                ) : (
-                  <p className="mt-2 text-sm text-zinc-500">No merchant signal yet.</p>
-                )}
-              </div>
-              <div className="rounded-xl border border-zinc-200 px-4 py-4 dark:border-zinc-800">
-                <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">Recurring</p>
-                {recurringCandidates[0] ? (
-                  <>
-                    <p className="mt-2 text-sm font-medium text-zinc-900 dark:text-zinc-100">{recurringCandidates[0].merchant}</p>
-                    <p className="mt-1 text-sm text-zinc-500">{formatUSDFromCents(recurringCandidates[0].amountCents)} · last {recurringCandidates[0].lastDate.toLocaleDateString([], { month: "short", day: "numeric" })}</p>
-                  </>
-                ) : (
-                  <p className="mt-2 text-sm text-zinc-500">No strong recurring patterns yet.</p>
-                )}
-              </div>
+              {actionableAlerts.length > 0 ? actionableAlerts.map((alert) => (
+                <div key={alert.title} className={`rounded-xl border px-4 py-4 dark:border-zinc-800 ${alert.tone === "amber" ? "border-amber-200 bg-amber-50/70 dark:bg-amber-950/20" : alert.tone === "emerald" ? "border-emerald-200 bg-emerald-50/70 dark:bg-emerald-950/20" : alert.tone === "sky" ? "border-sky-200 bg-sky-50/70 dark:bg-sky-950/20" : "border-zinc-200 bg-white dark:bg-zinc-900"}`}>
+                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{alert.title}</p>
+                  <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{alert.body}</p>
+                </div>
+              )) : (
+                <div className="rounded-xl border border-zinc-200 px-4 py-4 dark:border-zinc-800">
+                  <p className="text-sm text-zinc-500">Import more activity or add due dates and goals to surface sharper finance nudges.</p>
+                </div>
+              )}
             </div>
           ) : (
             <div className="mt-5 rounded-xl border border-dashed border-zinc-300 px-4 py-8 text-sm text-zinc-500 dark:border-zinc-700">
@@ -570,55 +682,25 @@ export default async function FinancePage() {
       <section id="transactions">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">
-            {count > 0 ? `Recent ${recent.length} of ${count}` : "Transactions"}
+            {count > 0 ? `Review ${Math.min(history.length, count)} of ${count}` : "Transactions"}
           </h2>
           {count > 0 ? <a href="#manage" className="text-sm text-zinc-500 underline-offset-4 hover:text-zinc-900 hover:underline dark:hover:text-zinc-100">Need to edit accounts or goals?</a> : null}
         </div>
-        {recent.length === 0 ? (
+        {history.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-zinc-300 px-5 py-8 text-sm text-zinc-500 dark:border-zinc-700">
             No transactions yet. Import a CSV or statement PDF above.
           </div>
         ) : (
-          <ul className="space-y-3">
-            {recent.map((t) => {
-              const transactionType = classifyTransaction(t);
-              return (
-                <li key={t.id} className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm shadow-zinc-950/5 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-start justify-between gap-3 sm:block">
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="max-w-full truncate text-sm font-medium text-zinc-900 dark:text-zinc-100 sm:text-base">{t.description}</p>
-                            <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${typeTone(transactionType)}`}>
-                              {formatTransactionType(transactionType)}
-                            </span>
-                          </div>
-                          <p className="mt-1 text-xs text-zinc-500">
-                            {t.date.toLocaleDateString([], {
-                              year: "numeric",
-                              month: "short",
-                              day: "numeric",
-                            })}
-                            {t.account ? ` · ${t.account}` : ""}
-                          </p>
-                        </div>
-                        <span className={`font-mono text-base tabular-nums sm:hidden ${t.amount < 0 ? "text-zinc-900 dark:text-zinc-100" : "text-emerald-600 dark:text-emerald-400"}`}>
-                          {formatUSDFromCents(t.amount)}
-                        </span>
-                      </div>
-                      <div className="mt-3 max-w-full sm:max-w-[240px]">
-                        <CategorySelect id={t.id} value={resolveCategory(t.category, t.description, t.amount)} />
-                      </div>
-                    </div>
-                    <span className={`hidden font-mono text-sm tabular-nums sm:block ${t.amount < 0 ? "text-zinc-900 dark:text-zinc-100" : "text-emerald-600 dark:text-emerald-400"}`}>
-                      {formatUSDFromCents(t.amount)}
-                    </span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          <TransactionsReview
+            transactions={history.map((transaction) => ({
+              id: transaction.id,
+              date: transaction.date.toISOString(),
+              amount: transaction.amount,
+              description: transaction.description,
+              account: transaction.account,
+              category: transaction.category,
+            }))}
+          />
         )}
       </section>
     </div>
