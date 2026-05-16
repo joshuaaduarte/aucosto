@@ -1,15 +1,26 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@/auth";
 import type { FinanceCategory } from "@/lib/finance-categories";
 import type { FinanceAccountKind } from "@/lib/finance-accounts";
-import type { FinanceGoalCategory, FinanceGoalOwner, FinanceGoalStatus } from "@/lib/finance-goals";
+import type {
+  FinanceGoalCategory,
+  FinanceGoalOwner,
+  FinanceGoalStatus,
+} from "@/lib/finance-goals";
 import { parseTransactionsCsv } from "@/lib/csv";
 import * as financeService from "@/lib/services/finance";
+import { assertFinanceVisible } from "@/lib/viewer-context";
 
 export type UploadState =
-  | { ok: true; source: "csv" | "statement"; imported: number; skipped: number; deduped: number; bankLabel?: string }
+  | {
+      ok: true;
+      source: "csv" | "statement";
+      imported: number;
+      skipped: number;
+      deduped: number;
+      bankLabel?: string;
+    }
   | { ok: false; error: string }
   | undefined;
 
@@ -33,12 +44,26 @@ export type LinkedConnectionState =
   | { ok: false; error: string }
   | undefined;
 
+function revalidateFinance() {
+  revalidatePath("/app");
+  revalidatePath("/app/finance");
+}
+
+async function getFinanceUserId(): Promise<string> {
+  const context = await assertFinanceVisible();
+  return context.effectiveUserId;
+}
+
 export async function uploadCsv(
   _prev: UploadState,
   formData: FormData,
 ): Promise<UploadState> {
-  const session = await auth();
-  if (!session?.user?.id) return { ok: false, error: "Not signed in." };
+  let userId: string;
+  try {
+    userId = await getFinanceUserId();
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Not signed in." };
+  }
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
@@ -59,13 +84,9 @@ export async function uploadCsv(
     };
   }
 
-  const { imported, deduped } = await financeService.importTransactions(
-    session.user.id,
-    rows,
-  );
+  const { imported, deduped } = await financeService.importTransactions(userId, rows);
 
-  revalidatePath("/app");
-  revalidatePath("/app/finance");
+  revalidateFinance();
   return { ok: true, source: "csv", imported, skipped, deduped };
 }
 
@@ -73,8 +94,12 @@ export async function uploadStatementPdf(
   _prev: UploadState,
   formData: FormData,
 ): Promise<UploadState> {
-  const session = await auth();
-  if (!session?.user?.id) return { ok: false, error: "Not signed in." };
+  let userId: string;
+  try {
+    userId = await getFinanceUserId();
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Not signed in." };
+  }
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
@@ -85,14 +110,13 @@ export async function uploadStatementPdf(
   }
 
   try {
-    const result = await financeService.importStatement(session.user.id, {
+    const result = await financeService.importStatement(userId, {
       fileName: file.name,
       mimeType: file.type,
       bytes: new Uint8Array(await file.arrayBuffer()),
     });
 
-    revalidatePath("/app");
-    revalidatePath("/app/finance");
+    revalidateFinance();
     return {
       ok: true,
       source: "statement",
@@ -104,7 +128,10 @@ export async function uploadStatementPdf(
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : "Could not import statement PDF.",
+      error:
+        error instanceof Error
+          ? error.message
+          : "Could not import statement PDF.",
     };
   }
 }
@@ -113,13 +140,9 @@ export async function updateTransactionCategory(
   id: string,
   category: FinanceCategory,
 ) {
-  const session = await auth();
-  if (!session?.user?.id) return;
-
-  await financeService.updateTransactionCategory(session.user.id, id, category);
-
-  revalidatePath("/app");
-  revalidatePath("/app/finance");
+  const userId = await getFinanceUserId();
+  await financeService.updateTransactionCategory(userId, id, category);
+  revalidateFinance();
 }
 
 export async function updateMatchingTransactionCategories(
@@ -127,39 +150,36 @@ export async function updateMatchingTransactionCategories(
   account: string | null,
   category: FinanceCategory,
 ) {
-  const session = await auth();
-  if (!session?.user?.id) return 0;
-
-  const count = await financeService.updateMatchingTransactionCategories(session.user.id, {
+  const userId = await getFinanceUserId();
+  const count = await financeService.updateMatchingTransactionCategories(userId, {
     description,
     account,
     category,
   });
 
-  revalidatePath("/app");
-  revalidatePath("/app/finance");
+  revalidateFinance();
   return count;
 }
 
 export async function deleteAllTransactions() {
-  const session = await auth();
-  if (!session?.user?.id) return;
-
-  await financeService.deleteAllTransactions(session.user.id);
-
-  revalidatePath("/app");
-  revalidatePath("/app/finance");
+  const userId = await getFinanceUserId();
+  await financeService.deleteAllTransactions(userId);
+  revalidateFinance();
 }
 
 export async function saveFinanceAccount(
   _prev: AccountState,
   formData: FormData,
 ): Promise<AccountState> {
-  const session = await auth();
-  if (!session?.user?.id) return { ok: false, error: "Not signed in." };
+  let userId: string;
+  try {
+    userId = await getFinanceUserId();
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Not signed in." };
+  }
 
   try {
-    await financeService.saveAccount(session.user.id, {
+    await financeService.saveAccount(userId, {
       id: String(formData.get("id") ?? "").trim() || undefined,
       name: String(formData.get("name") ?? ""),
       kind: String(formData.get("kind") ?? "checking") as FinanceAccountKind,
@@ -174,12 +194,12 @@ export async function saveFinanceAccount(
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : "Could not save account.",
+      error:
+        error instanceof Error ? error.message : "Could not save account.",
     };
   }
 
-  revalidatePath("/app");
-  revalidatePath("/app/finance");
+  revalidateFinance();
   return { ok: true };
 }
 
@@ -187,11 +207,15 @@ export async function saveFinanceGoal(
   _prev: GoalState,
   formData: FormData,
 ): Promise<GoalState> {
-  const session = await auth();
-  if (!session?.user?.id) return { ok: false, error: "Not signed in." };
+  let userId: string;
+  try {
+    userId = await getFinanceUserId();
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Not signed in." };
+  }
 
   try {
-    await financeService.saveGoal(session.user.id, {
+    await financeService.saveGoal(userId, {
       id: String(formData.get("id") ?? "").trim() || undefined,
       name: String(formData.get("name") ?? ""),
       owner: String(formData.get("owner") ?? "shared") as FinanceGoalOwner,
@@ -210,8 +234,7 @@ export async function saveFinanceGoal(
     };
   }
 
-  revalidatePath("/app");
-  revalidatePath("/app/finance");
+  revalidateFinance();
   return { ok: true };
 }
 
@@ -219,17 +242,20 @@ export async function linkTellerConnection(
   accessToken: string,
   enrollmentId?: string | null,
 ): Promise<LinkedConnectionState> {
-  const session = await auth();
-  if (!session?.user?.id) return { ok: false, error: "Not signed in." };
+  let userId: string;
+  try {
+    userId = await getFinanceUserId();
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Not signed in." };
+  }
 
   try {
-    const connection = await financeService.linkTellerConnection(session.user.id, {
+    const connection = await financeService.linkTellerConnection(userId, {
       accessToken,
       enrollmentId,
     });
 
-    revalidatePath("/app");
-    revalidatePath("/app/finance");
+    revalidateFinance();
     return {
       ok: true,
       message: `Linked ${connection.institutionName ?? "bank"} and synced ${connection.accountCount} account${connection.accountCount === 1 ? "" : "s"}.`,
@@ -237,7 +263,10 @@ export async function linkTellerConnection(
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : "Could not link Teller connection.",
+      error:
+        error instanceof Error
+          ? error.message
+          : "Could not link Teller connection.",
     };
   }
 }
@@ -245,13 +274,16 @@ export async function linkTellerConnection(
 export async function syncLinkedFinanceConnection(
   connectionId: string,
 ): Promise<LinkedConnectionState> {
-  const session = await auth();
-  if (!session?.user?.id) return { ok: false, error: "Not signed in." };
+  let userId: string;
+  try {
+    userId = await getFinanceUserId();
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Not signed in." };
+  }
 
   try {
-    const result = await financeService.syncFinanceConnection(session.user.id, connectionId);
-    revalidatePath("/app");
-    revalidatePath("/app/finance");
+    const result = await financeService.syncFinanceConnection(userId, connectionId);
+    revalidateFinance();
     return {
       ok: true,
       message: `Synced ${result.accountCount} account${result.accountCount === 1 ? "" : "s"}.`,
@@ -261,7 +293,10 @@ export async function syncLinkedFinanceConnection(
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : "Could not sync linked account.",
+      error:
+        error instanceof Error
+          ? error.message
+          : "Could not sync linked account.",
     };
   }
 }
@@ -269,13 +304,16 @@ export async function syncLinkedFinanceConnection(
 export async function disconnectLinkedFinanceConnection(
   connectionId: string,
 ): Promise<LinkedConnectionState> {
-  const session = await auth();
-  if (!session?.user?.id) return { ok: false, error: "Not signed in." };
+  let userId: string;
+  try {
+    userId = await getFinanceUserId();
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Not signed in." };
+  }
 
   try {
-    await financeService.disconnectFinanceConnection(session.user.id, connectionId);
-    revalidatePath("/app");
-    revalidatePath("/app/finance");
+    await financeService.disconnectFinanceConnection(userId, connectionId);
+    revalidateFinance();
     return {
       ok: true,
       message: "Disconnected linked bank sync. Imported data was left in place.",
@@ -283,7 +321,10 @@ export async function disconnectLinkedFinanceConnection(
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : "Could not disconnect linked account.",
+      error:
+        error instanceof Error
+          ? error.message
+          : "Could not disconnect linked account.",
     };
   }
 }

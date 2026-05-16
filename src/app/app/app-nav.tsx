@@ -4,17 +4,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const items = [
-  { href: "/app", label: "Hub", match: (pathname: string) => pathname === "/app" },
-  { href: "/app/time", label: "Time", match: (pathname: string) => pathname.startsWith("/app/time") },
-  { href: "/app/finance", label: "Finance", match: (pathname: string) => pathname.startsWith("/app/finance") },
+  { href: "/app", label: "Hub", match: (pathname: string) => pathname === "/app", finance: false },
+  { href: "/app/time", label: "Time", match: (pathname: string) => pathname.startsWith("/app/time"), finance: false },
+  { href: "/app/finance", label: "Finance", match: (pathname: string) => pathname.startsWith("/app/finance"), finance: true },
 ];
 
-export function AppNav() {
+export function AppNav({ showFinance }: { showFinance: boolean }) {
   const pathname = usePathname();
 
   return (
     <nav className="flex flex-wrap gap-2" aria-label="Primary">
-      {items.map((item) => {
+      {items.filter((item) => showFinance || !item.finance).map((item) => {
         const active = item.match(pathname);
         return (
           <Link

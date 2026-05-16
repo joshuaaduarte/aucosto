@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { auth } from "@/auth";
 import * as timeService from "@/lib/services/time";
+import { resolveActiveUserId } from "@/lib/viewer-context";
 
 const startSchema = z.object({
   label: z.string().trim().min(1, "Label is required").max(200),
@@ -16,8 +16,12 @@ export async function startEntry(
   _prev: StartState,
   formData: FormData,
 ): Promise<StartState> {
-  const session = await auth();
-  if (!session?.user?.id) return { error: "Not signed in." };
+  let userId: string;
+  try {
+    userId = await resolveActiveUserId();
+  } catch {
+    return { error: "Not signed in." };
+  }
 
   const parsed = startSchema.safeParse({
     label: formData.get("label") ?? "",
@@ -27,7 +31,7 @@ export async function startEntry(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
 
-  await timeService.startEntry(session.user.id, {
+  await timeService.startEntry(userId, {
     label: parsed.data.label,
     category: parsed.data.category ?? null,
   });
@@ -37,20 +41,16 @@ export async function startEntry(
 }
 
 export async function stopEntry() {
-  const session = await auth();
-  if (!session?.user?.id) return;
-
-  await timeService.stopRunning(session.user.id);
+  const userId = await resolveActiveUserId();
+  await timeService.stopRunning(userId);
 
   revalidatePath("/app");
   revalidatePath("/app/time");
 }
 
 export async function deleteEntry(id: string) {
-  const session = await auth();
-  if (!session?.user?.id) return;
-
-  await timeService.deleteEntry(session.user.id, id);
+  const userId = await resolveActiveUserId();
+  await timeService.deleteEntry(userId, id);
 
   revalidatePath("/app");
   revalidatePath("/app/time");

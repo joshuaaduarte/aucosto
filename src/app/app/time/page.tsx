@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { resolveActiveUserId } from "@/lib/viewer-context";
 import {
   getRunningEntry,
   listCompletedSince,
@@ -59,8 +59,7 @@ function formatDayLabel(date: Date) {
 }
 
 export default async function TimePage() {
-  const session = await auth();
-  const userId = session!.user.id;
+  const userId = await resolveActiveUserId();
 
   const todayStart = startOfToday();
   const weekStart = startOfWeek();

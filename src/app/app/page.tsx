@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { auth } from "@/auth";
-import { widgets } from "@/lib/widgets";
+import { getViewerContext } from "@/lib/viewer-context";
+import { ActivityWidget } from "@/lib/widgets/activity";
+import { FinanceWidget } from "@/lib/widgets/finance";
+import { TimeTrackerWidget } from "@/lib/widgets/time-tracker";
+import { PrivacyPanel } from "./privacy-panel";
 
 const prompts = [
   "Protect one block of deep work before the day fragments.",
@@ -10,8 +14,8 @@ const prompts = [
 
 export default async function HubPage() {
   const session = await auth();
+  const context = await getViewerContext();
   const firstName = session?.user?.name?.split(" ")[0];
-  const [timeWidget, financeWidget, activityWidget] = widgets;
 
   return (
     <div className="space-y-6 lg:space-y-8">
@@ -34,12 +38,14 @@ export default async function HubPage() {
             >
               Open time tracker
             </Link>
-            <Link
-              href="/app/finance#transactions"
-              className="inline-flex min-h-11 items-center justify-center rounded-full border border-zinc-200 bg-white/80 px-5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-100"
-            >
-              Review money flow
-            </Link>
+            {context?.financeVisible ? (
+              <Link
+                href="/app/finance#transactions"
+                className="inline-flex min-h-11 items-center justify-center rounded-full border border-zinc-200 bg-white/80 px-5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-100"
+              >
+                Review money flow
+              </Link>
+            ) : null}
           </div>
         </div>
 
@@ -59,14 +65,20 @@ export default async function HubPage() {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="grid gap-4 md:grid-cols-2">
-          <timeWidget.Widget />
-          <financeWidget.Widget />
+        <div className={`grid gap-4 ${context?.financeVisible ? "md:grid-cols-2" : "md:grid-cols-1"}`}>
+          <TimeTrackerWidget />
+          {context?.financeVisible ? <FinanceWidget /> : null}
         </div>
         <div>
-          <activityWidget.Widget />
+          <ActivityWidget />
         </div>
       </section>
+
+      <PrivacyPanel
+        financeVisible={context?.financeVisible ?? false}
+        appLockEnabled={context?.appLockEnabled ?? false}
+        isDemoMode={context?.isDemoMode ?? false}
+      />
     </div>
   );
 }

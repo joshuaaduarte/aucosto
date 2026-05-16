@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { auth } from "@/auth";
+import { redirect } from "next/navigation";
 import {
   findLikelyDuplicateManualAccountIds,
   summarizeBalances,
@@ -29,6 +29,7 @@ import {
   listLinkedConnections,
   listTransactions,
 } from "@/lib/services/finance";
+import { requireViewerContext } from "@/lib/viewer-context";
 import { AccountsPanel } from "./accounts-panel";
 import { ClearButton } from "./clear-button";
 import { GoalsPanel } from "./goals-panel";
@@ -206,8 +207,11 @@ function quickStat({
 }
 
 export default async function FinancePage() {
-  const session = await auth();
-  const userId = session!.user.id;
+  const context = await requireViewerContext();
+  if (!context.financeVisible) {
+    redirect("/app");
+  }
+  const userId = context.effectiveUserId;
 
   const monthStart = startOfMonth();
   const previousMonthStart = startOfPreviousMonth();

@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { getViewerContext } from "@/lib/viewer-context";
 import { AppNav } from "./app-nav";
+import { LockNowButton } from "./lock-now-button";
 import { SignOutButton } from "./sign-out-button";
+import { UnlockScreen } from "./unlock-screen";
 
 export default async function AppLayout({
   children,
@@ -14,7 +17,8 @@ export default async function AppLayout({
     redirect("/login");
   }
 
-  const displayName = session.user.name ?? session.user.email ?? "you";
+  const context = await getViewerContext();
+  const displayName = context?.displayName ?? session.user.name ?? session.user.email ?? "you";
 
   return (
     <div className="relative flex min-h-full flex-1 flex-col">
@@ -33,24 +37,30 @@ export default async function AppLayout({
                 Daily steering for time, money, and recovery.
               </p>
             </div>
-            <AppNav />
+            <AppNav showFinance={context?.financeVisible ?? false} />
           </div>
 
-          <div className="flex items-center justify-between gap-4 lg:justify-end">
+          <div className="flex items-center justify-between gap-3 lg:justify-end">
+            {context?.isDemoMode ? (
+              <span className="inline-flex rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
+                Demo mode
+              </span>
+            ) : null}
             <div className="text-right">
               <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                 {displayName}
               </p>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Personal workspace
+                {context?.isDemoMode ? "Showing demo workspace" : "Personal workspace"}
               </p>
             </div>
+            {context?.appLockEnabled ? <LockNowButton /> : null}
             <SignOutButton />
           </div>
         </div>
       </header>
       <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-8 sm:py-10">
-        {children}
+        {context?.appLockEnabled && !context.isUnlocked ? <UnlockScreen /> : children}
       </div>
     </div>
   );

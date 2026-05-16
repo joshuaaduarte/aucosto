@@ -1,5 +1,5 @@
-import { auth } from "@/auth";
 import { listRecentEvents } from "@/lib/services/events";
+import { resolveActiveUserId } from "@/lib/viewer-context";
 import { WidgetCard } from "./widget-card";
 
 function describeEvent(type: string): string {
@@ -29,10 +29,8 @@ function formatWhen(at: Date): string {
 }
 
 export async function ActivityWidget() {
-  const session = await auth();
-  if (!session?.user?.id) return null;
-
-  const events = await listRecentEvents(session.user.id, { limit: 5 });
+  const userId = await resolveActiveUserId();
+  const events = await listRecentEvents(userId, { limit: 5 });
 
   return (
     <WidgetCard name="Activity" href="/app">

@@ -20,6 +20,13 @@ model User {
   image               String?
   password            String?
   timezone            String               @default("UTC")
+  financeVisible      Boolean              @default(false)
+  appLockEnabled      Boolean              @default(false)
+  appLockPinHash      String?
+  isDemo              Boolean              @default(false)
+  demoOwnerId         String?              @unique
+  demoOwner           User?                @relation("UserDemoWorkspace", fields: [demoOwnerId], references: [id], onDelete: SetNull)
+  demoWorkspace       User?                @relation("UserDemoWorkspace")
   accounts            Account[]
   sessions            Session[]
   timeEntries         TimeEntry[]

@@ -1,14 +1,11 @@
-import { auth } from "@/auth";
 import { getRunningEntry, listCompletedSince } from "@/lib/services/time";
 import { formatHM, startOfToday, startOfWeek } from "@/lib/time";
 import { sumDurations } from "@/lib/time-summary";
+import { resolveActiveUserId } from "@/lib/viewer-context";
 import { WidgetCard } from "./widget-card";
 
 export async function TimeTrackerWidget() {
-  const session = await auth();
-  if (!session?.user?.id) return null;
-
-  const userId = session.user.id;
+  const userId = await resolveActiveUserId();
 
   const running = await getRunningEntry(userId);
 

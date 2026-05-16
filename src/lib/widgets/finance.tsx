@@ -1,8 +1,8 @@
-import { auth } from "@/auth";
 import { summarizeBalances } from "@/lib/finance-accounts";
 import { calculateSpendProjection } from "@/lib/finance-pace";
 import { summarizeCashflow, summarizeTransactionTypes, topCategoriesBySpend } from "@/lib/finance-summary";
 import { countTransactions, listAccounts, listTransactions } from "@/lib/services/finance";
+import { assertFinanceVisible } from "@/lib/viewer-context";
 import { WidgetCard } from "./widget-card";
 
 function startOfMonth(): Date {
@@ -21,10 +21,7 @@ function formatUSDFromCents(cents: number): string {
 }
 
 export async function FinanceWidget() {
-  const session = await auth();
-  if (!session?.user?.id) return null;
-
-  const userId = session.user.id;
+  const { effectiveUserId: userId } = await assertFinanceVisible();
   const monthStart = startOfMonth();
 
   const [accounts, count, thisMonth] = await Promise.all([
