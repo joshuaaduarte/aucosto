@@ -68,28 +68,48 @@ const flow = [
 
 const futureTools = [
   {
-    title: "Food + calorie tracking",
-    items: ["meals", "calories", "protein", "weight trends"],
+    title: "Health + intake",
+    summary: "Food, water, supplements, recovery, and training all stitched into one daily read instead of five separate apps.",
+    badge: "Body system",
+    metrics: [
+      { label: "Calories", value: "2,140 / 2,300" },
+      { label: "Protein", value: "168g" },
+      { label: "Water", value: "74 oz" },
+    ],
+    items: ["meal logging", "macro targets", "weight trends", "hydration prompts"],
   },
   {
-    title: "Fitness + health",
-    items: ["workouts", "training plans", "water", "recovery signals"],
+    title: "Projects + focus",
+    summary: "Projects, next actions, and habits that understand your available time and stop every day from becoming reactive.",
+    badge: "Execution system",
+    metrics: [
+      { label: "Deep work", value: "3 blocks" },
+      { label: "Stuck items", value: "2" },
+      { label: "Habit score", value: "6 / 8" },
+    ],
+    items: ["project tracking", "habit loops", "follow-ups", "weekly review"],
   },
   {
-    title: "Projects + habits",
-    items: ["project tracking", "follow-ups", "habit loops", "weekly review"],
+    title: "Calendar + life planning",
+    summary: "A smarter calendar that helps with trips, errands, reminders, and the micro-decisions that usually eat mental energy.",
+    badge: "Planning system",
+    metrics: [
+      { label: "Conflicts", value: "1" },
+      { label: "Travel prep", value: "4 tasks" },
+      { label: "Errands", value: "Grouped by route" },
+    ],
+    items: ["trip planning", "intelligent agenda", "packing lists", "context-aware reminders"],
   },
   {
-    title: "Calendar + planning",
-    items: ["intelligent calendar", "trip planning", "daily agenda", "reminders"],
-  },
-  {
-    title: "Home + life ops",
-    items: ["wish lists", "subscriptions", "home connectivity", "IoT controls"],
-  },
-  {
-    title: "Personal OS layer",
-    items: ["cross-tool insights", "automation", "agent help", "private memory"],
+    title: "Home + personal ops",
+    summary: "Wish lists, subscriptions, connected devices, and house routines managed in the same place as the rest of life.",
+    badge: "Life layer",
+    metrics: [
+      { label: "Home", value: "Doors locked" },
+      { label: "Subscriptions", value: "$74 / mo" },
+      { label: "Wishlist", value: "8 tracked" },
+    ],
+    items: ["home connectivity", "IoT controls", "wishlist tracking", "subscription cleanup"],
   },
 ];
 
@@ -303,18 +323,65 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-10 grid gap-5 xl:grid-cols-2">
             {futureTools.map((tool) => (
-              <article key={tool.title} className="rounded-[2rem] border border-zinc-200 bg-white p-6 shadow-[0_16px_50px_-40px_rgba(24,24,27,0.14)]">
-                <p className="text-xl font-semibold tracking-tight text-zinc-950">{tool.title}</p>
-                <ul className="mt-4 space-y-2 text-sm text-zinc-600">
-                  {tool.items.map((item) => (
-                    <li key={item} className="flex gap-2">
-                      <span className="mt-2 h-1.5 w-1.5 rounded-full bg-zinc-900" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
+              <article key={tool.title} className="rounded-[2rem] border border-zinc-200 bg-white p-5 shadow-[0_16px_50px_-40px_rgba(24,24,27,0.14)] sm:p-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="max-w-xl">
+                    <span className="inline-flex rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-zinc-500">
+                      {tool.badge}
+                    </span>
+                    <h3 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-950">{tool.title}</h3>
+                    <p className="mt-2 text-sm leading-7 text-zinc-600 sm:text-base">{tool.summary}</p>
+                  </div>
+                </div>
+
+                <div className="mt-5 rounded-[1.6rem] border border-zinc-200 bg-[#fcfcfb] p-4">
+                  <div className="flex items-center justify-between gap-3 border-b border-zinc-200 pb-3">
+                    <div>
+                      <p className="text-sm font-medium text-zinc-950">Mock workspace</p>
+                      <p className="mt-1 text-xs text-zinc-500">How this tool could feel inside aucosto</p>
+                    </div>
+                    <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">Guided</span>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    {tool.metrics.map((metric) => (
+                      <div key={metric.label} className="rounded-2xl border border-zinc-200 bg-white p-3">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">{metric.label}</p>
+                        <p className="mt-2 text-lg font-semibold tracking-tight text-zinc-950">{metric.value}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
+                    <div className="rounded-2xl border border-zinc-200 bg-white p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-medium text-zinc-950">What aucosto would suggest</p>
+                        <span className="text-xs uppercase tracking-[0.16em] text-zinc-500">Today</span>
+                      </div>
+                      <ul className="mt-3 space-y-3 text-sm leading-6 text-zinc-600">
+                        {tool.items.slice(0, 3).map((item) => (
+                          <li key={item} className="flex gap-2">
+                            <span className="mt-2 h-1.5 w-1.5 rounded-full bg-zinc-900" />
+                            <span>Use this system for {item} without needing another separate workflow.</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+                      <p className="text-sm font-medium text-zinc-950">Included capabilities</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {tool.items.map((item) => (
+                          <span key={item} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-600">
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </article>
             ))}
           </div>
