@@ -66,6 +66,33 @@ const flow = [
   },
 ];
 
+const futureTools = [
+  {
+    title: "Food + calorie tracking",
+    items: ["meals", "calories", "protein", "weight trends"],
+  },
+  {
+    title: "Fitness + health",
+    items: ["workouts", "training plans", "water", "recovery signals"],
+  },
+  {
+    title: "Projects + habits",
+    items: ["project tracking", "follow-ups", "habit loops", "weekly review"],
+  },
+  {
+    title: "Calendar + planning",
+    items: ["intelligent calendar", "trip planning", "daily agenda", "reminders"],
+  },
+  {
+    title: "Home + life ops",
+    items: ["wish lists", "subscriptions", "home connectivity", "IoT controls"],
+  },
+  {
+    title: "Personal OS layer",
+    items: ["cross-tool insights", "automation", "agent help", "private memory"],
+  },
+];
+
 const quotes = [
   {
     quote:
@@ -94,6 +121,7 @@ export default function LandingPage() {
               </div>
               <nav className="hidden items-center gap-6 text-sm text-zinc-500 md:flex">
                 <a href="#features" className="transition-colors hover:text-zinc-950">Features</a>
+                <a href="#future-tools" className="transition-colors hover:text-zinc-950">Future tools</a>
                 <a href="#how-it-works" className="transition-colors hover:text-zinc-950">How it works</a>
                 <a href="#why" className="transition-colors hover:text-zinc-950">Why it works</a>
               </nav>
@@ -257,6 +285,36 @@ export default function LandingPage() {
                 </div>
                 <h3 className="mt-5 text-2xl font-semibold text-zinc-950">{item.title}</h3>
                 <p className="mt-3 text-sm leading-7 text-zinc-600 sm:text-base">{item.body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="future-tools" className="border-y border-zinc-200/80 bg-[#f7f7f5] px-6 py-16 sm:px-8 sm:py-24">
+        <div className="mx-auto max-w-7xl">
+          <div className="max-w-3xl">
+            <p className="font-mono text-xs uppercase tracking-[0.28em] text-zinc-500">Future tools</p>
+            <h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-zinc-950 sm:text-5xl">
+              Meant to grow into a real personal operating system.
+            </h2>
+            <p className="mt-5 max-w-2xl text-base leading-8 text-zinc-600 sm:text-lg">
+              Time and finance are just the start. The plan is to bring the rest of daily life into the same place so the tools can actually inform each other.
+            </p>
+          </div>
+
+          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {futureTools.map((tool) => (
+              <article key={tool.title} className="rounded-[2rem] border border-zinc-200 bg-white p-6 shadow-[0_16px_50px_-40px_rgba(24,24,27,0.14)]">
+                <p className="text-xl font-semibold tracking-tight text-zinc-950">{tool.title}</p>
+                <ul className="mt-4 space-y-2 text-sm text-zinc-600">
+                  {tool.items.map((item) => (
+                    <li key={item} className="flex gap-2">
+                      <span className="mt-2 h-1.5 w-1.5 rounded-full bg-zinc-900" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
               </article>
             ))}
           </div>
