@@ -4,22 +4,50 @@
 // divides by 100. Never use Float for money. Sign convention: negative amount
 // = debit/outflow, positive = credit/inflow.
 
+model FinanceConnection {
+  id                String           @id @default(cuid())
+  userId            String
+  provider          String
+  enrollmentId      String
+  institutionId     String?
+  institutionName   String?
+  accessTokenEnc    String
+  status            String           @default("active")
+  lastSyncedAt      DateTime?
+  lastSyncError     String?
+  disconnectedReason String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accounts          FinanceAccount[]
+
+  @@unique([userId, provider, enrollmentId])
+  @@index([userId, status])
+}
+
 model FinanceAccount {
-  id                   String   @id @default(cuid())
-  userId               String
-  name                 String
-  kind                 String
-  currency             String   @default("USD")
-  currentBalanceCents  Int
-  balanceUpdatedAt     DateTime
+  id                    String   @id @default(cuid())
+  userId                String
+  connectionId          String?
+  externalId            String?
+  syncSource            String   @default("manual")
+  name                  String
+  kind                  String
+  currency              String   @default("USD")
+  currentBalanceCents   Int
+  balanceUpdatedAt      DateTime
   statementBalanceCents Int?
-  dueDate              DateTime?
-  creditLimitCents     Int?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dueDate               DateTime?
+  creditLimitCents      Int?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connection            FinanceConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  transactions          FinanceTransaction[]
 
   @@index([userId, kind])
+  @@index([connectionId])
+  @@unique([userId, externalId])
   @@unique([userId, name])
 }
 
@@ -44,17 +72,26 @@ model FinanceGoal {
 }
 
 model FinanceTransaction {
-  id          String   @id @default(cuid())
-  userId      String
-  date        DateTime
-  amount      Int
-  currency    String   @default("USD")
-  description String
-  account     String?
-  category    String?
-  raw         String?
-  createdAt   DateTime @default(now())
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                    String   @id @default(cuid())
+  userId                String
+  financeAccountId      String?
+  externalId            String?
+  syncSource            String   @default("manual")
+  postedStatus          String?
+  providerCategory      String?
+  date                  DateTime
+  amount                Int
+  currency              String   @default("USD")
+  description           String
+  account               String?
+  category              String?
+  raw                   String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  financeAccount        FinanceAccount? @relation(fields: [financeAccountId], references: [id], onDelete: SetNull)
 
   @@index([userId, date])
+  @@index([financeAccountId, date])
+  @@unique([userId, externalId])
 }

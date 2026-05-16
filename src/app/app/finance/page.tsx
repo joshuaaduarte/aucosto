@@ -4,6 +4,7 @@ import { summarizeBalances } from "@/lib/finance-accounts";
 import { formatGoalCategory, summarizeGoal, summarizeGoals } from "@/lib/finance-goals";
 import { calculateSpendProjection, projectCategories } from "@/lib/finance-pace";
 import { formatTransactionType } from "@/lib/finance-types";
+import { getTellerConnectConfig } from "@/lib/teller";
 import {
   findRecurringCandidates,
   summarizeCashflow,
@@ -11,10 +12,17 @@ import {
   topCategoriesBySpend,
   topMerchantsBySpend,
 } from "@/lib/finance-summary";
-import { countTransactions, listAccounts, listGoals, listTransactions } from "@/lib/services/finance";
+import {
+  countTransactions,
+  listAccounts,
+  listGoals,
+  listLinkedConnections,
+  listTransactions,
+} from "@/lib/services/finance";
 import { AccountsPanel } from "./accounts-panel";
 import { ClearButton } from "./clear-button";
 import { GoalsPanel } from "./goals-panel";
+import { LinkedConnectionsPanel } from "./linked-connections-panel";
 import { TransactionsReview } from "./transactions-review";
 import { UploadForm } from "./upload-form";
 
@@ -163,12 +171,14 @@ export default async function FinancePage() {
 
   const monthStart = startOfMonth();
   const previousMonthStart = startOfPreviousMonth();
-  const [accounts, goals, count, history] = await Promise.all([
+  const [accounts, goals, linkedConnections, count, history] = await Promise.all([
     listAccounts(userId),
     listGoals(userId),
+    listLinkedConnections(userId),
     countTransactions(userId),
     listTransactions(userId, { limit: 1000 }),
   ]);
+  const tellerConfig = getTellerConnectConfig();
 
   const thisMonth = history.filter((transaction) => transaction.date >= monthStart);
   const lastMonth = history.filter(
@@ -284,6 +294,14 @@ export default async function FinancePage() {
   return (
     <div className="space-y-6 pb-6 lg:space-y-8">
       <section id="overview" className="space-y-4">
+        <LinkedConnectionsPanel
+          enabled={tellerConfig.enabled}
+          applicationId={tellerConfig.applicationId}
+          environment={tellerConfig.environment}
+          reason={tellerConfig.reason}
+          connections={linkedConnections}
+        />
+
         <div className="rounded-[28px] border border-zinc-200 bg-gradient-to-br from-white via-zinc-50 to-emerald-50/70 p-5 shadow-sm shadow-zinc-950/5 dark:border-zinc-800 dark:from-zinc-950 dark:via-zinc-950 dark:to-emerald-950/20 dark:shadow-none lg:p-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-3xl">

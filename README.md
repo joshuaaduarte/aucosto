@@ -22,6 +22,7 @@ Under the hood, it is being shaped to grow into a broader personal operations sy
 
 ### Finance
 - CSV import for transactions
+- Teller-based read-only bank linking for balances + transactions
 - recent transaction list
 - money stored as integer cents
 - foundation for monthly summaries and safer import workflows
@@ -121,6 +122,10 @@ AUTH_SECRET=...
 SEED_USER_EMAIL=...
 SEED_USER_PASSWORD=...
 SEED_USER_NAME=...
+TELLER_ENV=development
+TELLER_APPLICATION_ID=...
+TELLER_CERT_PEM=...
+TELLER_PRIVATE_KEY_PEM=...
 ```
 
 Notes:
@@ -131,6 +136,8 @@ Notes:
 - `DIRECT_URL` falls back to `DATABASE_URL` if omitted, but explicit is safer
 - seed values are used by `prisma/seed.ts`
 - `AUTH_SECRET` should be a long random secret
+- Teller linking is optional; when enabled, linked-account access tokens are encrypted at rest using `AUTH_SECRET`
+- Teller development/production requests require the client certificate + private key from the Teller dashboard
 
 ### 3. Generate client + run migrations
 

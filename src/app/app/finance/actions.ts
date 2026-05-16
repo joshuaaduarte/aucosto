@@ -23,6 +23,16 @@ export type GoalState =
   | { ok: false; error: string }
   | undefined;
 
+export type LinkedConnectionState =
+  | {
+      ok: true;
+      message: string;
+      accountCount?: number;
+      transactionCount?: number;
+    }
+  | { ok: false; error: string }
+  | undefined;
+
 export async function uploadCsv(
   _prev: UploadState,
   formData: FormData,
@@ -201,4 +211,77 @@ export async function saveFinanceGoal(
   revalidatePath("/app");
   revalidatePath("/app/finance");
   return { ok: true };
+}
+
+export async function linkTellerConnection(
+  accessToken: string,
+  enrollmentId?: string | null,
+): Promise<LinkedConnectionState> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Not signed in." };
+
+  try {
+    const connection = await financeService.linkTellerConnection(session.user.id, {
+      accessToken,
+      enrollmentId,
+    });
+
+    revalidatePath("/app");
+    revalidatePath("/app/finance");
+    return {
+      ok: true,
+      message: `Linked ${connection.institutionName ?? "bank"} and synced ${connection.accountCount} account${connection.accountCount === 1 ? "" : "s"}.`,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Could not link Teller connection.",
+    };
+  }
+}
+
+export async function syncLinkedFinanceConnection(
+  connectionId: string,
+): Promise<LinkedConnectionState> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Not signed in." };
+
+  try {
+    const result = await financeService.syncFinanceConnection(session.user.id, connectionId);
+    revalidatePath("/app");
+    revalidatePath("/app/finance");
+    return {
+      ok: true,
+      message: `Synced ${result.accountCount} account${result.accountCount === 1 ? "" : "s"}.`,
+      accountCount: result.accountCount,
+      transactionCount: result.transactionCount,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Could not sync linked account.",
+    };
+  }
+}
+
+export async function disconnectLinkedFinanceConnection(
+  connectionId: string,
+): Promise<LinkedConnectionState> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Not signed in." };
+
+  try {
+    await financeService.disconnectFinanceConnection(session.user.id, connectionId);
+    revalidatePath("/app");
+    revalidatePath("/app/finance");
+    return {
+      ok: true,
+      message: "Disconnected linked bank sync. Imported data was left in place.",
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Could not disconnect linked account.",
+    };
+  }
 }
