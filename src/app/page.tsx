@@ -49,6 +49,12 @@ const watchlist = [
   "Refill the low-energy weekend plan",
 ];
 
+const audience = [
+  "People who already track some things, but still feel fuzzy about what matters now.",
+  "Anyone whose time, money, and energy all affect each other more than separate apps admit.",
+  "A person who wants a calmer daily system, not another dashboard to maintain.",
+];
+
 export default function LandingPage() {
   return (
     <main className="relative overflow-hidden">
@@ -189,6 +195,29 @@ export default function LandingPage() {
               </div>
             </div>
           </aside>
+        </div>
+      </section>
+
+      <section className="px-6 pb-6 sm:px-8 sm:pb-8">
+        <div className="mx-auto grid max-w-6xl gap-4 rounded-[2rem] border border-zinc-200/80 bg-white/70 p-6 shadow-[0_24px_80px_-50px_rgba(24,24,27,0.28)] backdrop-blur sm:p-8 lg:grid-cols-[0.95fr_1.05fr] dark:border-zinc-800/80 dark:bg-zinc-900/60 dark:shadow-[0_24px_80px_-55px_rgba(0,0,0,0.7)]">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-[0.24em] text-zinc-500">
+              Built for
+            </p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl dark:text-zinc-50">
+              One real person trying to steer life better.
+            </h2>
+            <p className="mt-4 text-base leading-7 text-zinc-600 dark:text-zinc-300">
+              Not a team dashboard. Not a habit-performance feed. Just a private system for noticing drift sooner and acting with less friction.
+            </p>
+          </div>
+          <div className="grid gap-3">
+            {audience.map((item) => (
+              <div key={item} className="rounded-2xl border border-zinc-200/80 bg-white/85 px-4 py-4 text-sm leading-6 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950/70 dark:text-zinc-300">
+                {item}
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 

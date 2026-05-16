@@ -42,7 +42,7 @@ export function UploadForm() {
       <form
         ref={csvFormRef}
         action={csvAction}
-        className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm shadow-zinc-950/5 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none"
+        className="rounded-[1.5rem] border border-zinc-200/80 bg-white/90 p-5 shadow-[0_20px_60px_-45px_rgba(24,24,27,0.32)] dark:border-zinc-800/80 dark:bg-zinc-900/90 dark:shadow-none"
       >
         <div className="flex flex-col gap-4">
           <div className="max-w-xl">
@@ -74,7 +74,7 @@ export function UploadForm() {
       <form
         ref={pdfFormRef}
         action={pdfAction}
-        className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm shadow-zinc-950/5 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none"
+        className="rounded-[1.5rem] border border-zinc-200/80 bg-white/90 p-5 shadow-[0_20px_60px_-45px_rgba(24,24,27,0.32)] dark:border-zinc-800/80 dark:bg-zinc-900/90 dark:shadow-none"
       >
         <div className="flex flex-col gap-4">
           <div className="max-w-xl">
