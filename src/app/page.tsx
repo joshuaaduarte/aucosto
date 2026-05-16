@@ -65,11 +65,11 @@ export default function LandingPage() {
     <main className="overflow-hidden bg-[#fbfbfa] text-zinc-950">
       <section className="relative border-b border-zinc-200/80 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.1),_transparent_34%),linear-gradient(180deg,#fbfbfa_0%,#f6f6f3_100%)]">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(24,24,27,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(24,24,27,0.035)_1px,transparent_1px)] bg-[size:28px_28px] opacity-50" />
-        <Parallax speed={0.05} className="pointer-events-none absolute -left-16 top-20 h-56 w-56 rounded-full bg-sky-200/40 blur-3xl" />
-        <Parallax speed={0.08} className="pointer-events-none absolute right-0 top-10 h-64 w-64 rounded-full bg-violet-200/30 blur-3xl" />
+        <Parallax speed={0.05} className="pointer-events-none absolute -left-16 top-20 hidden h-56 w-56 rounded-full bg-sky-200/40 blur-3xl lg:block" />
+        <Parallax speed={0.08} className="pointer-events-none absolute right-0 top-10 hidden h-64 w-64 rounded-full bg-violet-200/30 blur-3xl lg:block" />
 
         <div className="relative mx-auto max-w-7xl px-6 pb-16 pt-6 sm:px-8 sm:pb-24 sm:pt-8">
-          <header className="sticky top-0 z-30 rounded-full border border-zinc-200/80 bg-white/90 px-4 py-3 backdrop-blur xl:px-6">
+          <header className="z-30 rounded-2xl border border-zinc-200/80 bg-white/92 px-4 py-3 shadow-sm backdrop-blur sm:sticky sm:top-3 sm:rounded-full xl:px-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="h-2.5 w-2.5 rounded-full bg-zinc-900" />
@@ -89,12 +89,12 @@ export default function LandingPage() {
             </div>
           </header>
 
-          <div className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,1fr)_460px] lg:items-center">
+          <div className="mt-10 grid gap-8 lg:mt-12 lg:grid-cols-[minmax(0,1fr)_460px] lg:items-center">
             <div className="max-w-4xl">
               <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-600 shadow-sm">
                 One home for daily life
               </div>
-              <h1 className="mt-6 text-5xl font-semibold leading-[0.93] tracking-[-0.055em] text-zinc-950 sm:text-6xl lg:text-[5.8rem]">
+              <h1 className="mt-6 text-4xl font-semibold leading-[0.96] tracking-[-0.05em] text-zinc-950 sm:text-6xl lg:text-[5.8rem]">
                 The app that helps
                 <br />
                 you run your life
@@ -105,22 +105,22 @@ export default function LandingPage() {
                 Time, money, health, planning, home, and the next decision — together.
               </p>
 
-              <div className="mt-8 flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                 <Link
                   href="/login"
-                  className="inline-flex h-12 items-center justify-center rounded-full bg-zinc-950 px-6 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+                  className="inline-flex h-12 w-full items-center justify-center rounded-full bg-zinc-950 px-6 text-sm font-medium text-white transition-colors hover:bg-zinc-800 sm:w-auto"
                 >
                   Open aucosto
                 </Link>
                 <a
                   href="#tools"
-                  className="inline-flex h-12 items-center justify-center rounded-full border border-zinc-200 bg-white px-6 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-50"
+                  className="inline-flex h-12 w-full items-center justify-center rounded-full border border-zinc-200 bg-white px-6 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-50 sm:w-auto"
                 >
                   See the toolset
                 </a>
               </div>
 
-              <div className="mt-8 flex flex-wrap gap-2">
+              <div className="mt-8 flex flex-wrap gap-2.5">
                 {reasons.map((reason) => (
                   <span key={reason} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-600">
                     {reason}
@@ -129,7 +129,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <Parallax speed={-0.04}>
+            <Parallax speed={-0.04} minWidth={1200}>
               <aside className="rounded-[2rem] border border-zinc-200/80 bg-white/95 p-4 shadow-[0_24px_80px_-42px_rgba(24,24,27,0.18)] backdrop-blur">
                 <div className="rounded-[1.7rem] border border-zinc-200 bg-[#fcfcfb] p-5">
                   <div className="flex items-start justify-between gap-4 border-b border-zinc-200 pb-4">
@@ -183,8 +183,8 @@ export default function LandingPage() {
 
           <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {surfaces.map((surface, index) => (
-              <Parallax key={surface.title} speed={index % 2 === 0 ? 0.03 : 0.06}>
-                <article className={`rounded-[2rem] border border-zinc-200 bg-white p-5 shadow-[0_16px_50px_-40px_rgba(24,24,27,0.14)] transition-transform duration-300 hover:-translate-y-1`}>
+              <Parallax key={surface.title} speed={index % 2 === 0 ? 0.03 : 0.06} minWidth={1200}>
+                <article className={`rounded-[2rem] border border-zinc-200 bg-white p-5 shadow-[0_16px_50px_-40px_rgba(24,24,27,0.14)] transition-transform duration-300 md:hover:-translate-y-1`}>
                   <div className={`rounded-[1.4rem] border border-zinc-200 p-4 ${surface.tone}`}>
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-sm font-medium text-zinc-950">{surface.title}</p>
@@ -221,8 +221,8 @@ export default function LandingPage() {
 
           <div className="mt-10 grid gap-5 xl:grid-cols-2">
             {tools.map((tool, index) => (
-              <Parallax key={tool.title} speed={index % 2 === 0 ? -0.025 : -0.045}>
-                <article className="rounded-[2rem] border border-zinc-200 bg-white p-6 shadow-[0_16px_50px_-40px_rgba(24,24,27,0.14)] transition-transform duration-300 hover:-translate-y-1">
+              <Parallax key={tool.title} speed={index % 2 === 0 ? -0.025 : -0.045} minWidth={1200}>
+                <article className="rounded-[2rem] border border-zinc-200 bg-white p-5 shadow-[0_16px_50px_-40px_rgba(24,24,27,0.14)] transition-transform duration-300 md:hover:-translate-y-1 sm:p-6">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="text-2xl font-semibold tracking-tight text-zinc-950">{tool.title}</p>
@@ -236,7 +236,7 @@ export default function LandingPage() {
                     <div className="grid grid-cols-4 gap-2">
                       {tool.visual.map((height, i) => (
                         <div key={i} className="rounded-2xl border border-zinc-200 bg-white p-2">
-                          <div className="flex h-24 items-end rounded-xl bg-zinc-50 p-1">
+                          <div className="flex h-16 items-end rounded-xl bg-zinc-50 p-1 sm:h-24">
                             <div className="w-full rounded-lg bg-gradient-to-t from-zinc-900 via-zinc-700 to-zinc-400" style={{ height: `${height}%` }} />
                           </div>
                         </div>
