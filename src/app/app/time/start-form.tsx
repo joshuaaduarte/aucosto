@@ -30,7 +30,7 @@ export function StartForm({
           <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">
             Start tracking
           </p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+          <h2 className="mt-2 text-xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-2xl">
             Capture the next block before the day drifts.
           </h2>
         </div>
@@ -87,7 +87,7 @@ export function StartForm({
         </div>
 
         {suggestedCategories.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
             {suggestedCategories.map((suggestion) => (
               <button
                 key={suggestion}

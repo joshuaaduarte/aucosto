@@ -99,11 +99,11 @@ export default async function TimePage() {
   return (
     <div className="space-y-6 lg:space-y-8">
       <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="rounded-[2rem] border border-zinc-200/80 bg-gradient-to-br from-white via-zinc-50 to-violet-50/70 p-6 shadow-[0_24px_80px_-45px_rgba(24,24,27,0.28)] dark:border-zinc-800/80 dark:from-zinc-950 dark:via-zinc-950 dark:to-violet-950/20 dark:shadow-none sm:p-7">
+        <div className="rounded-[2rem] border border-zinc-200/80 bg-gradient-to-br from-white via-zinc-50 to-violet-50/70 p-5 shadow-[0_24px_80px_-45px_rgba(24,24,27,0.28)] dark:border-zinc-800/80 dark:from-zinc-950 dark:via-zinc-950 dark:to-violet-950/20 dark:shadow-none sm:p-7">
           <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-zinc-500">
             Time tracker
           </p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-4xl">
+          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-4xl">
             Protect focus before the day gets noisy.
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-zinc-600 dark:text-zinc-300 sm:text-base">
@@ -111,7 +111,7 @@ export default async function TimePage() {
           </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+        <div className="grid grid-cols-2 gap-4 xl:grid-cols-1">
           {statCard({
             label: "Today",
             value: formatHM(todayTotalMs),
@@ -204,7 +204,7 @@ export default async function TimePage() {
                       return (
                         <li
                           key={entry.id}
-                          className="flex items-center gap-4 rounded-2xl border border-zinc-200/80 bg-zinc-50/80 px-4 py-4 dark:border-zinc-800 dark:bg-zinc-950/60"
+                          className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-2xl border border-zinc-200/80 bg-zinc-50/80 px-4 py-4 dark:border-zinc-800 dark:bg-zinc-950/60"
                         >
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
@@ -226,10 +226,12 @@ export default async function TimePage() {
                               })}
                             </p>
                           </div>
-                          <span className="font-mono text-sm tabular-nums text-zinc-700 dark:text-zinc-300 sm:text-base">
-                            {formatDuration(duration)}
-                          </span>
-                          <EntryDeleteButton id={entry.id} />
+                          <div className="flex items-center gap-3 justify-self-end">
+                            <span className="font-mono text-sm tabular-nums text-zinc-700 dark:text-zinc-300 sm:text-base">
+                              {formatDuration(duration)}
+                            </span>
+                            <EntryDeleteButton id={entry.id} />
+                          </div>
                         </li>
                       );
                     })}

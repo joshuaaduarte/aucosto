@@ -139,7 +139,7 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
                 Filter by time, account, category, or money movement type, then review in cards or a tighter desktop table.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
               {RANGE_OPTIONS.map((option) => (
                 <button
                   key={option.key}
@@ -189,14 +189,16 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
                 >
                   Cards
                 </button>
-                <span className="text-zinc-300">/</span>
-                <button
-                  type="button"
-                  onClick={() => setView("compact")}
-                  className={view === "compact" ? "font-medium text-zinc-950 dark:text-zinc-50" : "text-zinc-500 dark:text-zinc-400"}
-                >
-                  Compact
-                </button>
+                <div className="hidden items-center gap-2 md:flex">
+                  <span className="text-zinc-300">/</span>
+                  <button
+                    type="button"
+                    onClick={() => setView("compact")}
+                    className={view === "compact" ? "font-medium text-zinc-950 dark:text-zinc-50" : "text-zinc-500 dark:text-zinc-400"}
+                  >
+                    Compact
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -243,36 +245,33 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
           No transactions match these filters.
         </div>
       ) : view === "compact" ? (
-        <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm shadow-zinc-950/5 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none">
-          <div className="hidden grid-cols-[120px_minmax(220px,1.6fr)_150px_160px_180px_120px] gap-3 border-b border-zinc-200 px-4 py-3 text-[11px] uppercase tracking-[0.2em] text-zinc-500 md:grid dark:border-zinc-800">
-            <span>Date</span>
-            <span>Description</span>
-            <span>Account</span>
-            <span>Type</span>
-            <span>Category</span>
-            <span className="text-right">Amount</span>
-          </div>
-          <ul>
+        <>
+          <ul className="space-y-3 md:hidden">
             {filtered.map((transaction) => {
               const transactionType = classifyTransaction(transaction);
               const resolvedCategory = (transaction.category ?? "Other") as FinanceCategory;
               return (
-                <li key={transaction.id} className="border-t border-zinc-200 first:border-t-0 dark:border-zinc-800">
-                  <div className="grid gap-3 px-4 py-4 md:grid-cols-[120px_minmax(220px,1.6fr)_150px_160px_180px_120px] md:items-center">
-                    <span className="text-sm text-zinc-500">
-                      {new Date(transaction.date).toLocaleDateString([], {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{transaction.description}</p>
-                    </div>
-                    <span className="truncate text-sm text-zinc-500">{transaction.account ?? "—"}</span>
-                    <div>
-                      <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${typeTone(transactionType)}`}>
-                        {formatTransactionType(transactionType)}
+                <li key={transaction.id} className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm shadow-zinc-950/5 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{transaction.description}</p>
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${typeTone(transactionType)}`}>
+                            {formatTransactionType(transactionType)}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs text-zinc-500">
+                          {new Date(transaction.date).toLocaleDateString([], {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          })}
+                          {transaction.account ? ` · ${transaction.account}` : ""}
+                        </p>
+                      </div>
+                      <span className={`font-mono text-sm tabular-nums ${transaction.amount < 0 ? "text-zinc-900 dark:text-zinc-100" : "text-emerald-600 dark:text-emerald-400"}`}>
+                        {formatUSDFromCents(transaction.amount)}
                       </span>
                     </div>
                     <CategorySelect
@@ -281,15 +280,59 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
                       description={transaction.description}
                       account={transaction.account}
                     />
-                    <span className={`text-right font-mono text-sm tabular-nums ${transaction.amount < 0 ? "text-zinc-900 dark:text-zinc-100" : "text-emerald-600 dark:text-emerald-400"}`}>
-                      {formatUSDFromCents(transaction.amount)}
-                    </span>
                   </div>
                 </li>
               );
             })}
           </ul>
-        </div>
+          <div className="hidden overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm shadow-zinc-950/5 md:block dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none">
+            <div className="hidden grid-cols-[120px_minmax(220px,1.6fr)_150px_160px_180px_120px] gap-3 border-b border-zinc-200 px-4 py-3 text-[11px] uppercase tracking-[0.2em] text-zinc-500 md:grid dark:border-zinc-800">
+              <span>Date</span>
+              <span>Description</span>
+              <span>Account</span>
+              <span>Type</span>
+              <span>Category</span>
+              <span className="text-right">Amount</span>
+            </div>
+            <ul>
+              {filtered.map((transaction) => {
+                const transactionType = classifyTransaction(transaction);
+                const resolvedCategory = (transaction.category ?? "Other") as FinanceCategory;
+                return (
+                  <li key={transaction.id} className="border-t border-zinc-200 first:border-t-0 dark:border-zinc-800">
+                    <div className="grid gap-3 px-4 py-4 md:grid-cols-[120px_minmax(220px,1.6fr)_150px_160px_180px_120px] md:items-center">
+                      <span className="text-sm text-zinc-500">
+                        {new Date(transaction.date).toLocaleDateString([], {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{transaction.description}</p>
+                      </div>
+                      <span className="truncate text-sm text-zinc-500">{transaction.account ?? "—"}</span>
+                      <div>
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${typeTone(transactionType)}`}>
+                          {formatTransactionType(transactionType)}
+                        </span>
+                      </div>
+                      <CategorySelect
+                        id={transaction.id}
+                        value={resolvedCategory}
+                        description={transaction.description}
+                        account={transaction.account}
+                      />
+                      <span className={`text-right font-mono text-sm tabular-nums ${transaction.amount < 0 ? "text-zinc-900 dark:text-zinc-100" : "text-emerald-600 dark:text-emerald-400"}`}>
+                        {formatUSDFromCents(transaction.amount)}
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </>
       ) : (
         <ul className="space-y-3">
           {filtered.map((transaction) => {
