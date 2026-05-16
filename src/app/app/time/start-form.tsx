@@ -87,7 +87,7 @@ export function StartForm({
         </div>
 
         {suggestedCategories.length > 0 ? (
-          <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
+          <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
             {suggestedCategories.map((suggestion) => (
               <button
                 key={suggestion}
@@ -95,7 +95,7 @@ export function StartForm({
                 onClick={() => {
                   if (categoryRef.current) categoryRef.current.value = suggestion;
                 }}
-                className="inline-flex min-h-10 items-center rounded-full border border-zinc-200 bg-zinc-50 px-3.5 text-sm text-zinc-600 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-100"
+                className="inline-flex min-h-11 shrink-0 items-center rounded-full border border-zinc-200 bg-zinc-50 px-3.5 text-sm text-zinc-600 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-100"
               >
                 {suggestion}
               </button>

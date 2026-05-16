@@ -178,7 +178,7 @@ function actionPill({ href, label }: { href: string; label: string }) {
   return (
     <a
       href={href}
-      className="inline-flex min-h-10 items-center justify-center rounded-full border border-zinc-200 bg-white px-3.5 py-2 text-sm text-zinc-700 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-100"
+      className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-white px-3.5 py-2 text-sm text-zinc-700 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-100"
     >
       {label}
     </a>
@@ -391,7 +391,7 @@ export default async function FinancePage() {
         </div>
 
         <div className="sticky top-[72px] z-20 -mx-4 border-y border-zinc-200 bg-white/90 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:border-zinc-800 dark:bg-zinc-950/90 dark:supports-[backdrop-filter]:bg-zinc-950/80 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-0">
-          <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:pb-0">
+          <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:pb-0">
             {actionPill({ href: "#overview", label: "Overview" })}
             {actionPill({ href: "#transactions", label: "Review" })}
             {actionPill({ href: "#planning", label: "Planning" })}

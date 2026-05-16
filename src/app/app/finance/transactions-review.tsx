@@ -139,13 +139,13 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
                 Filter by time, account, category, or money movement type, then review in cards or a tighter desktop table.
               </p>
             </div>
-            <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
+            <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
               {RANGE_OPTIONS.map((option) => (
                 <button
                   key={option.key}
                   type="button"
                   onClick={() => setRange(option.key)}
-                  className={`inline-flex min-h-10 items-center rounded-full px-3.5 text-sm transition-colors ${
+                  className={`inline-flex min-h-11 shrink-0 items-center rounded-full px-3.5 text-sm transition-colors ${
                     range === option.key
                       ? "bg-zinc-900 text-zinc-50 dark:bg-zinc-100 dark:text-zinc-900"
                       : "border border-zinc-200 bg-zinc-50 text-zinc-700 hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-100"

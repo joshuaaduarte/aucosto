@@ -9,7 +9,7 @@ export function UnlockScreen() {
   const [state, formAction, pending] = useActionState(unlockApp, initialState);
 
   return (
-    <div className="mx-auto flex min-h-[70vh] w-full max-w-md items-center justify-center px-4">
+    <div className="mx-auto flex min-h-[calc(70vh+var(--safe-area-bottom))] w-full max-w-md items-center justify-center px-1 py-2 sm:px-4">
       <form
         action={formAction}
         className="w-full rounded-[2rem] border border-zinc-200/80 bg-white/95 p-6 shadow-[0_24px_80px_-45px_rgba(24,24,27,0.35)] dark:border-zinc-800/80 dark:bg-zinc-900/95 dark:shadow-none sm:p-7"
@@ -17,7 +17,7 @@ export function UnlockScreen() {
         <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-zinc-500">
           aucosto locked
         </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+        <h1 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-3xl">
           Enter your PIN to continue.
         </h1>
         <p className="mt-3 text-sm leading-7 text-zinc-500 dark:text-zinc-400">

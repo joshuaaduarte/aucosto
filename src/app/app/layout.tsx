@@ -40,26 +40,30 @@ export default async function AppLayout({
             <AppNav showFinance={context?.financeVisible ?? false} />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3 lg:justify-end">
-            {context?.isDemoMode ? (
-              <span className="inline-flex rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
-                Demo mode
-              </span>
-            ) : null}
-            <div className="min-w-0 flex-1 text-left sm:text-right lg:flex-none">
-              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                {displayName}
-              </p>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                {context?.isDemoMode ? "Showing demo workspace" : "Personal workspace"}
-              </p>
+          <div className="flex w-full flex-col gap-2 lg:w-auto lg:items-end">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 lg:justify-end">
+              {context?.isDemoMode ? (
+                <span className="inline-flex rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
+                  Demo mode
+                </span>
+              ) : null}
+              <div className="min-w-0 flex-1 text-left sm:text-right lg:flex-none">
+                <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                  {displayName}
+                </p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {context?.isDemoMode ? "Showing demo workspace" : "Personal workspace"}
+                </p>
+              </div>
             </div>
-            {context?.appLockEnabled ? <LockNowButton /> : null}
-            <SignOutButton />
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end sm:gap-3">
+              {context?.appLockEnabled ? <LockNowButton /> : null}
+              <SignOutButton />
+            </div>
           </div>
         </div>
       </header>
-      <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-10">
+      <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 pb-safe sm:px-6 sm:py-10">
         {context?.appLockEnabled && !context.isUnlocked ? <UnlockScreen /> : children}
       </div>
     </div>

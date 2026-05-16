@@ -34,7 +34,7 @@ export function PrivacyPanel({
           <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">
             Privacy + demos
           </p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+          <h2 className="mt-2 text-xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-2xl">
             Keep finance private and switch into a safe demo workspace when you need it.
           </h2>
         </div>
@@ -80,7 +80,7 @@ export function PrivacyPanel({
               </span>
             </span>
           </label>
-          <div className="mt-4 max-w-xs space-y-1.5">
+          <div className="mt-4 w-full max-w-xs space-y-1.5">
             <label htmlFor="pin" className="block text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
               New PIN
             </label>
@@ -108,7 +108,7 @@ export function PrivacyPanel({
           <button
             type="submit"
             disabled={settingsPending}
-            className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-zinc-900 px-5 text-sm font-medium text-zinc-50 transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-zinc-900 px-5 text-sm font-medium text-zinc-50 transition-colors hover:bg-zinc-700 disabled:opacity-50 sm:w-auto dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
           >
             {settingsPending ? "Saving…" : "Save privacy settings"}
           </button>
@@ -124,7 +124,7 @@ export function PrivacyPanel({
             </p>
           </div>
         </div>
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           {isDemoMode ? (
             <>
               <button
@@ -135,7 +135,7 @@ export function PrivacyPanel({
                     setDemoMessage(await disableDemoMode());
                   })
                 }
-                className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 hover:border-zinc-300 hover:text-zinc-900 disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-100"
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 hover:border-zinc-300 hover:text-zinc-900 disabled:opacity-50 sm:w-auto dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-100"
               >
                 Back to personal data
               </button>
@@ -147,7 +147,7 @@ export function PrivacyPanel({
                     setDemoMessage(await resetDemoMode());
                   })
                 }
-                className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-zinc-900 px-4 text-sm font-medium text-zinc-50 hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-zinc-900 px-4 text-sm font-medium text-zinc-50 hover:bg-zinc-700 disabled:opacity-50 sm:w-auto dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
               >
                 Reset demo data
               </button>
@@ -161,7 +161,7 @@ export function PrivacyPanel({
                   setDemoMessage(await enableDemoMode());
                 })
               }
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-zinc-900 px-4 text-sm font-medium text-zinc-50 hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-zinc-900 px-4 text-sm font-medium text-zinc-50 hover:bg-zinc-700 disabled:opacity-50 sm:w-auto dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
             >
               Enter demo mode
             </button>
