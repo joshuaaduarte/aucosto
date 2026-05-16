@@ -1,215 +1,176 @@
 import Link from "next/link";
 
-const pillars = [
-  "Time",
-  "Money",
-  "Recovery",
-  "What needs attention next",
-];
-
-const differentiators = [
+const signals = [
   {
-    title: "Made for one person",
-    description:
-      "This is closer to a personal operating panel than a productivity platform. No social layer, no team language, no growth-dashboard energy.",
+    label: "TIME",
+    value: "4.5h focused",
+    note: "enough to make real progress, but only if the afternoon stays protected",
   },
   {
-    title: "Different parts of life in one place",
-    description:
-      "Time, spending, and recovery affect each other. Aucosto puts them side by side so you can actually notice the overlap.",
+    label: "MONEY",
+    value: "$6,240 cash",
+    note: "rent and cards are covered, but two transactions still need a second look",
   },
   {
-    title: "Useful before impressive",
-    description:
-      "The point is to help with ordinary decisions: what needs attention, what is slipping, and what can wait until tomorrow.",
-  },
-];
-
-const previewStats = [
-  {
-    label: "Focus",
-    value: "4.5h",
-    note: "+1.2h vs last Friday",
-  },
-  {
-    label: "Cash",
-    value: "$6,240",
-    note: "Bills covered, cards steady",
-  },
-  {
-    label: "Recovery",
+    label: "RECOVERY",
     value: "82%",
-    note: "Sleep trending up",
+    note: "sleep is improving, which makes the whole week feel less brittle",
   },
 ];
 
-const watchlist = [
-  "That Costco payment should probably be recategorized",
-  "Block 90 minutes for the thing you keep avoiding",
-  "Weekend energy looks low — make a lighter plan",
+const dayNotes = [
+  "Costco payment is inflating spend again. Fix the category before you trust the monthly total.",
+  "You keep avoiding one important block of work. Put it on the calendar before lunch disappears.",
+  "Weekend energy looks thinner than usual. Plan something lighter instead of pretending you'll rally.",
 ];
 
-const audience = [
-  "Someone who already has notes, trackers, spreadsheets, or half-built systems — but still has to mentally stitch them together.",
-  "Someone whose time, money, and energy all mess with each other, and is tired of pretending they are separate categories.",
-  "Someone who wants a private daily tool that helps them decide what to do, not just admire their data.",
+const principles = [
+  {
+    title: "It reads like a personal tool, not a product demo.",
+    body: "Aucosto is meant to feel like something you return to for an honest check-in, not something trying to impress you with polish.",
+  },
+  {
+    title: "The categories are allowed to collide.",
+    body: "Time, money, and recovery affect each other constantly. Keeping them apart makes the story harder to read.",
+  },
+  {
+    title: "It is built for ordinary decisions.",
+    body: "Not annual planning. Not optimizing your whole existence. Just noticing what is off, what matters today, and what can wait.",
+  },
+];
+
+const notForEveryone = [
+  "If you want a team dashboard, this is the wrong shape.",
+  "If you enjoy maintaining complicated systems for their own sake, this will probably feel too plain.",
+  "If you want one quiet place to understand the state of your day, this might be your thing.",
 ];
 
 export default function LandingPage() {
   return (
-    <main className="relative overflow-hidden">
-      <div className="absolute inset-0 -z-20 bg-zinc-50 dark:bg-zinc-950" />
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.08),_transparent_28%),linear-gradient(to_bottom,_transparent,_rgba(24,24,27,0.03))] dark:bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.1),_transparent_24%),linear-gradient(to_bottom,_transparent,_rgba(255,255,255,0.03))]" />
+    <main className="relative overflow-hidden bg-[#f5f1e8] text-zinc-950 dark:bg-[#0f1115] dark:text-zinc-50">
+      <div className="absolute inset-0 -z-10 bg-[linear-gradient(rgba(24,24,27,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(24,24,27,0.035)_1px,transparent_1px)] bg-[size:24px_24px] dark:bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)]" />
+      <div className="absolute inset-x-0 top-0 -z-10 h-56 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.12),_transparent_45%)] dark:bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.16),_transparent_40%)]" />
 
-      <section className="px-6 pb-14 pt-18 sm:px-8 sm:pb-20 sm:pt-24">
-        <div className="mx-auto grid w-full max-w-6xl gap-10 lg:grid-cols-[minmax(0,1.02fr)_minmax(360px,0.98fr)] lg:items-center">
-          <div className="space-y-8">
-            <div className="space-y-5">
-              <div className="flex flex-wrap items-center gap-3">
-                <p className="font-mono text-xs uppercase tracking-[0.28em] text-zinc-500">
-                  aucosto
-                </p>
-                <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-100/80 px-3 py-1 text-[11px] font-medium text-sky-700 dark:border-sky-900 dark:bg-sky-950/70 dark:text-sky-300">
-                  Private beta
-                </span>
-              </div>
-
-              <div className="space-y-4">
-                <h1 className="max-w-3xl text-5xl font-semibold tracking-tight text-zinc-950 sm:text-6xl lg:text-[4.4rem] dark:text-white">
-                  A quieter way to keep track of your actual life.
-                </h1>
-                <p className="max-w-2xl text-base leading-8 text-zinc-600 sm:text-lg dark:text-zinc-300">
-                  Aucosto brings together your time, spending, and recovery so you can check in once, notice what is off, and decide what needs attention.
-                </p>
-              </div>
+      <section className="px-6 pb-12 pt-12 sm:px-8 sm:pb-16 sm:pt-16">
+        <div className="mx-auto max-w-6xl">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-900/10 pb-5 dark:border-white/10">
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-xs uppercase tracking-[0.32em] text-zinc-500">aucosto</span>
+              <span className="inline-flex rounded-full border border-zinc-900/10 bg-white/70 px-3 py-1 text-[11px] font-medium text-zinc-700 dark:border-white/10 dark:bg-white/5 dark:text-zinc-300">
+                private beta
+              </span>
             </div>
-
-            <div className="flex flex-wrap gap-2.5">
-              {pillars.map((pillar) => (
-                <span
-                  key={pillar}
-                  className="inline-flex items-center rounded-full border border-white/70 bg-white/80 px-3.5 py-1.5 text-sm text-zinc-700 shadow-sm shadow-zinc-200/60 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/85 dark:text-zinc-300 dark:shadow-black/10"
-                >
-                  {pillar}
-                </span>
-              ))}
-            </div>
-
-            <div className="flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-              <Link
-                href="/login"
-                className="inline-flex h-12 items-center justify-center rounded-full bg-zinc-950 px-6 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
-              >
-                Sign in
-              </Link>
-              <Link
-                href="#why"
-                className="inline-flex h-12 items-center justify-center rounded-full border border-zinc-300 bg-white/75 px-6 text-sm font-medium text-zinc-800 transition-colors hover:bg-white dark:border-zinc-700 dark:bg-zinc-900/75 dark:text-zinc-200 dark:hover:bg-zinc-900"
-              >
-                Why aucosto works
-              </Link>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
-Private, personal, and still pretty early.
-              </p>
-            </div>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">A personal operating panel for one real life.</p>
           </div>
 
-          <aside className="relative rounded-[2rem] border border-zinc-200/80 bg-white/92 p-4 shadow-[0_24px_80px_-46px_rgba(24,24,27,0.28)] dark:border-zinc-800/80 dark:bg-zinc-900/88 dark:shadow-[0_24px_80px_-55px_rgba(0,0,0,0.7)]">
-            <div className="rounded-[1.6rem] border border-zinc-200/80 bg-zinc-50/70 p-5 dark:border-zinc-800 dark:bg-zinc-950/80">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium text-zinc-950 dark:text-zinc-100">
-                    Daily overview
-                  </p>
-                  <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                    The kind of check-in you do before the day gets away from you.
-                  </p>
-                </div>
-                <span className="rounded-full bg-emerald-500/12 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
-                  Live
-                </span>
+          <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_360px] lg:items-start">
+            <div className="space-y-8">
+              <div className="max-w-4xl space-y-5">
+                <p className="font-mono text-xs uppercase tracking-[0.26em] text-zinc-500">field notes</p>
+                <h1 className="max-w-4xl text-5xl font-semibold leading-[0.96] tracking-[-0.05em] sm:text-6xl lg:text-[5.4rem] dark:text-white">
+                  Not a dashboard.
+                  <br />
+                  A daily read on
+                  <br />
+                  how your life is actually going.
+                </h1>
+                <p className="max-w-2xl text-base leading-8 text-zinc-700 sm:text-lg dark:text-zinc-300">
+                  Aucosto puts time, spending, and recovery in the same place so you can stop mentally stitching together half a dozen systems just to answer a basic question: what needs attention today?
+                </p>
               </div>
 
-              <div className="mt-5 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-                {previewStats.map((stat) => (
-                  <div
-                    key={stat.label}
-                    className="rounded-2xl border border-zinc-200/80 bg-white/90 p-4 dark:border-zinc-800 dark:bg-zinc-900/90"
+              <div className="flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                <Link
+                  href="/login"
+                  className="inline-flex h-12 items-center justify-center rounded-full bg-zinc-950 px-6 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
+                >
+                  Sign in
+                </Link>
+                <Link
+                  href="#principles"
+                  className="inline-flex h-12 items-center justify-center rounded-full border border-zinc-900/15 bg-white/80 px-6 text-sm font-medium text-zinc-800 transition-colors hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-zinc-200 dark:hover:bg-white/10"
+                >
+                  See the idea
+                </Link>
+                <span className="text-sm text-zinc-500 dark:text-zinc-400">Private, quiet, still early.</span>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                {signals.map((signal) => (
+                  <article
+                    key={signal.label}
+                    className="rounded-[1.75rem] border border-zinc-900/10 bg-white/80 p-4 shadow-[0_14px_40px_-28px_rgba(24,24,27,0.35)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none"
                   >
-                    <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">
-                      {stat.label}
-                    </p>
-                    <p className="mt-3 text-2xl font-semibold text-zinc-950 dark:text-zinc-50">
-                      {stat.value}
-                    </p>
-                    <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                      {stat.note}
-                    </p>
-                  </div>
+                    <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-zinc-500">{signal.label}</p>
+                    <p className="mt-3 text-2xl font-semibold tracking-tight dark:text-zinc-50">{signal.value}</p>
+                    <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">{signal.note}</p>
+                  </article>
                 ))}
               </div>
+            </div>
 
-              <div className="mt-4 grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-                <div className="rounded-2xl border border-zinc-200/80 bg-white/90 p-4 dark:border-zinc-800 dark:bg-zinc-900/90">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      This week
-                    </p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                      Better than last week
-                    </p>
+            <aside className="relative lg:pt-6">
+              <div className="rotate-[-1.4deg] rounded-[1.8rem] border border-zinc-900/10 bg-[#fffdf8] p-5 shadow-[0_28px_80px_-40px_rgba(24,24,27,0.45)] dark:border-white/10 dark:bg-[#171a20] dark:shadow-[0_24px_80px_-45px_rgba(0,0,0,0.75)]">
+                <div className="rotate-[1.1deg] rounded-[1.35rem] border border-dashed border-zinc-900/15 bg-white/70 p-5 dark:border-white/10 dark:bg-black/20">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">today’s read</p>
+                      <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">The part that matters is the note, not the chart.</p>
+                    </div>
+                    <span className="rounded-full bg-emerald-500/12 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                      live
+                    </span>
                   </div>
-                  <div className="mt-4 flex h-28 items-end gap-2">
-                    {[38, 56, 44, 72, 64, 82, 58].map((height, index) => (
-                      <div key={index} className="flex h-full flex-1 items-end">
-                        <div
-                          className="w-full rounded-t-2xl bg-gradient-to-t from-sky-500 via-cyan-400 to-violet-400"
-                          style={{ height: `${height}%` }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-3 flex justify-between text-xs text-zinc-500 dark:text-zinc-400">
-                    <span>Mon</span>
-                    <span>Sun</span>
-                  </div>
-                </div>
 
-                <div className="rounded-2xl border border-zinc-200/80 bg-zinc-950 p-4 text-zinc-50 dark:border-zinc-800 dark:bg-black">
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-400">
-                    Right now
-                  </p>
-                  <ul className="mt-3 space-y-3 text-sm leading-6 text-zinc-300">
-                    {watchlist.map((item) => (
-                      <li key={item} className="flex gap-2">
-                        <span className="mt-1 h-1.5 w-1.5 rounded-full bg-sky-400" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="mt-5 rounded-2xl bg-zinc-950 p-4 text-zinc-50 dark:bg-black">
+                    <p className="text-sm font-medium">What the day seems to be saying</p>
+                    <ul className="mt-3 space-y-3 text-sm leading-6 text-zinc-300">
+                      {dayNotes.map((note) => (
+                        <li key={note} className="flex gap-2">
+                          <span className="mt-2 h-1.5 w-1.5 rounded-full bg-sky-400" />
+                          <span>{note}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm text-zinc-600 dark:text-zinc-400">
+                    <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-zinc-500">Focus</span>
+                    <span>Strong start, but only if the afternoon stays protected.</span>
+                    <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-zinc-500">Spend</span>
+                    <span>Mostly fine. One or two misleading transactions need cleanup.</span>
+                    <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-zinc-500">Energy</span>
+                    <span>Better than last week. Don’t waste it on low-value noise.</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          </aside>
+            </aside>
+          </div>
         </div>
       </section>
 
       <section className="px-6 pb-6 sm:px-8 sm:pb-8">
-        <div className="mx-auto grid max-w-6xl gap-4 rounded-[2rem] border border-zinc-200/80 bg-white/70 p-6 shadow-[0_24px_80px_-50px_rgba(24,24,27,0.28)] backdrop-blur sm:p-8 lg:grid-cols-[0.95fr_1.05fr] dark:border-zinc-800/80 dark:bg-zinc-900/60 dark:shadow-[0_24px_80px_-55px_rgba(0,0,0,0.7)]">
-          <div>
-            <p className="font-mono text-xs uppercase tracking-[0.24em] text-zinc-500">
-              Built for
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl dark:text-zinc-50">
-              Built for someone trying to get a little more honest about their days.
+        <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+          <div className="rounded-[2rem] border border-zinc-900/10 bg-white/75 p-6 dark:border-white/10 dark:bg-white/[0.04]">
+            <p className="font-mono text-xs uppercase tracking-[0.24em] text-zinc-500">why it exists</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl dark:text-zinc-50">
+              Because most personal systems get fragmented fast.
             </h2>
-            <p className="mt-4 text-base leading-7 text-zinc-600 dark:text-zinc-300">
-              Not a team product. Not a social habit app. Just a private place to see the patterns that usually stay scattered.
+            <p className="mt-4 text-base leading-7 text-zinc-700 dark:text-zinc-300">
+              You end up with notes in one place, budgets in another, sleep data somewhere else, and a vague sense that all of it is connected. Aucosto is an attempt to stop losing that connection.
             </p>
           </div>
+
           <div className="grid gap-3">
-            {audience.map((item) => (
-              <div key={item} className="rounded-2xl border border-zinc-200/80 bg-white/85 px-4 py-4 text-sm leading-6 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950/70 dark:text-zinc-300">
+            {notForEveryone.map((item, index) => (
+              <div
+                key={item}
+                className={`rounded-[1.6rem] border p-4 text-sm leading-6 ${
+                  index === 2
+                    ? "border-sky-200 bg-sky-50/85 text-sky-950 dark:border-sky-900/40 dark:bg-sky-950/20 dark:text-sky-100"
+                    : "border-zinc-900/10 bg-white/75 text-zinc-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-300"
+                }`}
+              >
                 {item}
               </div>
             ))}
@@ -217,34 +178,35 @@ Private, personal, and still pretty early.
         </div>
       </section>
 
-      <section id="why" className="px-6 pb-20 sm:px-8 sm:pb-24">
-        <div className="mx-auto max-w-6xl rounded-[2rem] border border-zinc-200/80 bg-white/70 p-6 shadow-[0_24px_80px_-50px_rgba(24,24,27,0.28)] backdrop-blur sm:p-8 dark:border-zinc-800/80 dark:bg-zinc-900/60 dark:shadow-[0_24px_80px_-55px_rgba(0,0,0,0.7)]">
-          <div className="max-w-2xl">
-            <p className="font-mono text-xs uppercase tracking-[0.24em] text-zinc-500">
-              Why it feels different
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl dark:text-zinc-50">
-              Less polish for the sake of polish. More signal.
-            </h2>
-            <p className="mt-4 text-base leading-7 text-zinc-600 dark:text-zinc-300">
-              Most tools are good at collecting numbers. Aucosto is trying to be good at helping one person read those numbers in context.
-            </p>
-          </div>
+      <section id="principles" className="px-6 pb-20 sm:px-8 sm:pb-24">
+        <div className="mx-auto max-w-6xl rounded-[2.2rem] border border-zinc-900/10 bg-white/72 p-6 dark:border-white/10 dark:bg-white/[0.04] sm:p-8">
+          <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
+            <div>
+              <p className="font-mono text-xs uppercase tracking-[0.24em] text-zinc-500">principles</p>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl dark:text-zinc-50">
+                It should feel more like a notebook with signal than a polished performance machine.
+              </h2>
+              <p className="mt-4 text-base leading-7 text-zinc-700 dark:text-zinc-300">
+                The best version of this page does not sound like a startup trying to dominate a category. It sounds like a useful tool that knows exactly what it is for.
+              </p>
+            </div>
 
-          <div className="mt-8 grid gap-4 md:grid-cols-3">
-            {differentiators.map((item) => (
-              <article
-                key={item.title}
-                className="rounded-2xl border border-zinc-200/80 bg-white/85 p-5 dark:border-zinc-800 dark:bg-zinc-950/70"
-              >
-                <p className="text-lg font-medium text-zinc-950 dark:text-zinc-50">
-                  {item.title}
-                </p>
-                <p className="mt-3 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-                  {item.description}
-                </p>
-              </article>
-            ))}
+            <div className="space-y-4">
+              {principles.map((principle, index) => (
+                <article
+                  key={principle.title}
+                  className="grid gap-3 rounded-[1.6rem] border border-zinc-900/10 bg-[#fffdf8] p-5 dark:border-white/10 dark:bg-black/20 sm:grid-cols-[auto_1fr]"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-900/10 font-mono text-xs text-zinc-500 dark:border-white/10 dark:text-zinc-400">
+                    0{index + 1}
+                  </div>
+                  <div>
+                    <p className="text-lg font-medium text-zinc-950 dark:text-zinc-50">{principle.title}</p>
+                    <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">{principle.body}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
         </div>
       </section>
