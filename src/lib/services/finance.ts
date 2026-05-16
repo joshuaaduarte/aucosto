@@ -22,6 +22,7 @@ import {
   type TellerAccount,
   type TellerTransaction,
 } from "@/lib/teller";
+import type { TellerWebhookEvent } from "@/lib/teller-webhooks";
 import type {
   FinanceAccount,
   FinanceGoal,
@@ -763,4 +764,149 @@ export async function disconnectFinanceConnection(
     refId: connection.id,
     meta: { provider: connection.provider, institutionName: connection.institutionName },
   });
+}
+
+export async function markFinanceConnectionDisconnected(input: {
+  provider: string;
+  enrollmentId: string;
+  reason?: string | null;
+}): Promise<void> {
+  const connection = await prisma.financeConnection.findFirst({
+    where: {
+      provider: input.provider,
+      enrollmentId: input.enrollmentId,
+    },
+  });
+  if (!connection) return;
+
+  await prisma.financeConnection.update({
+    where: { id: connection.id },
+    data: {
+      status: "disconnected",
+      disconnectedReason: input.reason ?? "disconnected",
+      lastSyncError: null,
+    },
+  });
+
+  await recordEvent({
+    userId: connection.userId,
+    tool: "finance",
+    type: "finance.connection_disconnected",
+    refId: connection.id,
+    meta: {
+      provider: connection.provider,
+      institutionName: connection.institutionName,
+      reason: input.reason ?? null,
+    },
+  });
+}
+
+async function upsertWebhookTransactions(transactions: NonNullable<TellerWebhookEvent["payload"]["transactions"]>): Promise<number> {
+  let changed = 0;
+
+  for (const transaction of transactions) {
+    const account = await prisma.financeAccount.findFirst({
+      where: { externalId: transaction.account_id },
+      include: { connection: true },
+    });
+    if (!account?.connection) continue;
+
+    const nextCategory =
+      tellerCategoryToFinanceCategory(transaction.category ?? transaction.details?.category) ??
+      inferCategory(transaction.description, tellerMoneyToCents(transaction.amount));
+
+    const existing = await prisma.financeTransaction.findFirst({
+      where: {
+        userId: account.userId,
+        externalId: transaction.id,
+      },
+    });
+
+    const data = {
+      financeAccountId: account.id,
+      syncSource: "teller",
+      postedStatus: transaction.status ?? null,
+      providerCategory: transaction.category ?? transaction.details?.category ?? null,
+      date: tellerDateToMidday(transaction.date),
+      amount: tellerMoneyToCents(transaction.amount),
+      currency: account.currency,
+      description: transaction.description,
+      account: account.name,
+      category: existing?.category ?? nextCategory,
+      raw: JSON.stringify(transaction),
+      updatedAt: new Date(),
+    };
+
+    if (existing) {
+      await prisma.financeTransaction.update({
+        where: { id: existing.id },
+        data,
+      });
+    } else {
+      await prisma.financeTransaction.create({
+        data: {
+          userId: account.userId,
+          externalId: transaction.id,
+          ...data,
+        },
+      });
+    }
+
+    await prisma.financeConnection.update({
+      where: { id: account.connection.id },
+      data: {
+        status: "active",
+        lastSyncedAt: new Date(),
+        lastSyncError: null,
+        disconnectedReason: null,
+      },
+    });
+
+    changed += 1;
+  }
+
+  return changed;
+}
+
+export async function handleTellerWebhookEvent(event: TellerWebhookEvent): Promise<void> {
+  switch (event.type) {
+    case "webhook.test":
+      return;
+    case "enrollment.disconnected": {
+      if (!event.payload.enrollment_id) return;
+      await markFinanceConnectionDisconnected({
+        provider: "teller",
+        enrollmentId: event.payload.enrollment_id,
+        reason: event.payload.reason ?? null,
+      });
+      return;
+    }
+    case "transactions.processed": {
+      const transactions = event.payload.transactions ?? [];
+      const changed = await upsertWebhookTransactions(transactions);
+
+      const userIds = new Set<string>();
+      for (const transaction of transactions) {
+        const account = await prisma.financeAccount.findFirst({
+          where: { externalId: transaction.account_id },
+          select: { userId: true },
+        });
+        if (account) userIds.add(account.userId);
+      }
+
+      await Promise.all(
+        [...userIds].map((userId) =>
+          recordEvent({
+            userId,
+            tool: "finance",
+            type: "finance.webhook_transactions_processed",
+            meta: { count: changed },
+          }),
+        ),
+      );
+      return;
+    }
+    default:
+      return;
+  }
 }
