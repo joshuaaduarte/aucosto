@@ -23,27 +23,32 @@ export async function FinanceWidget() {
   if (accounts.length > 0) {
     const snapshot = summarizeBalances(accounts);
     return (
-      <WidgetCard name="Finance" href="/app/finance">
-        <div className="space-y-4">
+      <WidgetCard name="The Ledger" href="/app/finance" folio="II.">
+        <div className="space-y-6">
           <div>
-            <p className="text-3xl font-semibold tracking-tight text-zinc-950">
+            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade">
+              Net worth
+            </p>
+            <p className="mt-2 font-display text-[2.6rem] font-medium leading-none tracking-[-0.035em] tabular text-ink">
               {formatUSDFromCents(snapshot.netWorthCents)}
             </p>
-            <p className="mt-1 text-sm text-zinc-500">net worth</p>
           </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50/90 px-4 py-3">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Cash</p>
-              <p className="mt-1 text-sm font-medium text-zinc-900">{formatUSDFromCents(snapshot.cashCents)}</p>
+          <dl className="rule-soft-t border-rule pt-3 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+            <div className="flex items-baseline justify-between">
+              <dt className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-ink-fade">Cash</dt>
+              <dd className="font-mono tabular text-ink">{formatUSDFromCents(snapshot.cashCents)}</dd>
             </div>
-            <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50/90 px-4 py-3">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Cards owed</p>
-              <p className="mt-1 text-sm font-medium text-zinc-900">{formatUSDFromCents(snapshot.cardsOwedCents)}</p>
+            <div className="flex items-baseline justify-between">
+              <dt className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-ink-fade">Owed</dt>
+              <dd className="font-mono tabular text-oxblood">{formatUSDFromCents(snapshot.cardsOwedCents)}</dd>
             </div>
-          </div>
+          </dl>
           {(snapshot.investmentCents > 0 || snapshot.retirementCents > 0) && (
-            <p className="text-xs text-zinc-500">
-              {formatUSDFromCents(snapshot.investmentCents + snapshot.retirementCents)} in long-term accounts
+            <p className="font-serif text-sm italic leading-relaxed text-ink-fade">
+              <span className="not-italic font-mono tabular text-ink-soft">
+                {formatUSDFromCents(snapshot.investmentCents + snapshot.retirementCents)}
+              </span>{" "}
+              held in long-term positions.
             </p>
           )}
         </div>
@@ -53,10 +58,14 @@ export async function FinanceWidget() {
 
   if (count === 0) {
     return (
-      <WidgetCard name="Finance" href="/app/finance">
+      <WidgetCard name="The Ledger" href="/app/finance" folio="II.">
         <div className="space-y-3">
-          <p className="text-2xl font-semibold tracking-tight text-zinc-950">No data yet</p>
-          <p className="text-sm text-zinc-500">Upload a CSV, import a statement PDF, or add an account.</p>
+          <p className="font-display text-[1.5rem] leading-tight tracking-[-0.02em] text-ink">
+            No entries on record.
+          </p>
+          <p className="font-serif text-sm italic leading-relaxed text-ink-fade">
+            Import a statement, upload a CSV, or post the first account by hand.
+          </p>
         </div>
       </WidgetCard>
     );
@@ -70,30 +79,42 @@ export async function FinanceWidget() {
   const topCategory = topCategoriesBySpend(thisMonth, { limit: 1 })[0] ?? null;
 
   return (
-    <WidgetCard name="Finance" href="/app/finance">
-      <div className="space-y-4">
+    <WidgetCard name="The Ledger" href="/app/finance" folio="II.">
+      <div className="space-y-6">
         <div>
-          <p className="text-3xl font-semibold tracking-tight text-zinc-950">
+          <p className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade">
+            True spend, month to date
+          </p>
+          <p className="mt-2 font-display text-[2.6rem] font-medium leading-none tracking-[-0.035em] tabular text-oxblood">
             {formatUSDFromCents(spentCents)}
           </p>
-          <p className="mt-1 text-sm text-zinc-500">true spend this month</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${netCents >= 0 ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
-            {formatUSDFromCents(netCents)} net
-          </span>
-          <span className="inline-flex rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700">
-            {formatUSDFromCents(projection.projectedCents)} projected
-          </span>
-        </div>
+        <dl className="rule-soft-t border-rule pt-3 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          <div className="flex items-baseline justify-between">
+            <dt className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-ink-fade">Net</dt>
+            <dd className={`font-mono tabular ${netCents >= 0 ? "text-verdigris" : "text-oxblood"}`}>
+              {formatUSDFromCents(netCents)}
+            </dd>
+          </div>
+          <div className="flex items-baseline justify-between">
+            <dt className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-ink-fade">Pace</dt>
+            <dd className="font-mono tabular text-ink">{formatUSDFromCents(projection.projectedCents)}</dd>
+          </div>
+        </dl>
         {topCategory && (
-          <p className="text-sm text-zinc-500">
-            Top category: <span className="font-medium text-zinc-900">{topCategory.category}</span>
-          </p>
-        )}
-        {cardPayments && (
-          <p className="text-xs text-zinc-500">
-            {formatUSDFromCents(cardPayments.amountCents)} in card payments this month
+          <p className="font-serif text-sm italic leading-relaxed text-ink-fade">
+            Heaviest line item:{" "}
+            <span className="not-italic font-medium text-ink">{topCategory.category}</span>
+            {cardPayments ? (
+              <>
+                {" · "}
+                <span className="not-italic font-mono tabular text-ink-soft">
+                  {formatUSDFromCents(cardPayments.amountCents)}
+                </span>{" "}
+                cleared on cards
+              </>
+            ) : null}
+            .
           </p>
         )}
       </div>

@@ -39,7 +39,7 @@ type ConnectionView = {
 
 function formatSyncLabel(value: string | null): string {
   if (!value) return "Never synced";
-  return `Last synced ${new Date(value).toLocaleString([], {
+  return `Last sync ${new Date(value).toLocaleString([], {
     month: "short",
     day: "numeric",
     hour: "numeric",
@@ -101,22 +101,25 @@ export function LinkedConnectionsPanel({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <Script
         src="https://cdn.teller.io/connect/connect.js"
         strategy="afterInteractive"
         onLoad={() => setScriptReady(true)}
       />
 
-      <div className="rounded-[1.7rem] border border-zinc-200 bg-white/92 p-5 shadow-[0_18px_50px_-38px_rgba(24,24,27,0.16)]">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <header className="rule-t border-ink/40 pt-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-baseline sm:justify-between">
           <div className="max-w-2xl">
-            <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">Linked banks</p>
-            <h2 className="mt-2 text-xl font-semibold tracking-tight text-zinc-950">
-              Read-only live balances and transactions.
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-zinc-500">
-              Teller handles the bank login flow. Aucosto stores an encrypted access token so it can refresh balances and pull new transactions later.
+            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.24em] text-ink-fade">
+              The Press Wire · Linked Banks
+            </p>
+            <h3 className="mt-2 font-display text-2xl font-medium italic tracking-[-0.02em] text-ink">
+              Live balances and entries, read directly from the institution.
+            </h3>
+            <p className="mt-2 font-serif text-sm italic leading-relaxed text-ink-fade">
+              Teller handles the login flow. Aucosto holds an encrypted token to
+              refresh balances and pull new entries.
             </p>
           </div>
 
@@ -124,56 +127,74 @@ export function LinkedConnectionsPanel({
             type="button"
             disabled={!enabled || pending || !scriptReady}
             onClick={() => launchConnect()}
-            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-zinc-900 px-4 text-sm font-medium text-zinc-50 transition-colors hover:bg-zinc-800 disabled:opacity-50"
+            className="btn-ink shrink-0"
           >
-            {pending ? "Working…" : "Connect bank"}
+            {pending ? "Connecting…" : "Connect bank  →"}
           </button>
         </div>
 
         {!enabled ? (
-          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <p className="mt-4 rule-t rule-b border-aged-gold/50 bg-aged-gold/10 px-4 py-3 font-serif text-sm italic text-ink-soft">
             {reason ?? "Teller is not configured yet."}
-          </div>
+          </p>
         ) : null}
         {enabled && !scriptReady ? (
-          <p className="mt-4 text-sm text-zinc-500">Loading Teller Connect…</p>
+          <p className="mt-4 font-serif text-sm italic text-ink-fade">
+            Loading Teller Connect…
+          </p>
         ) : null}
-        {statusMessage ? <p className="mt-4 text-sm text-zinc-500">{statusMessage}</p> : null}
-      </div>
+        {statusMessage ? (
+          <p className="mt-4 font-serif text-sm italic text-ink-soft">{statusMessage}</p>
+        ) : null}
+      </header>
 
       {sortedConnections.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-zinc-300 px-5 py-8 text-sm text-zinc-500">
-          No linked bank connections yet.
-        </div>
+        <p className="rule-t rule-b border-rule px-2 py-10 text-center font-serif italic text-ink-fade">
+          ❦ No banks are wired in yet. ❦
+        </p>
       ) : (
-        <div className="space-y-3">
+        <ul>
           {sortedConnections.map((connection) => (
-            <div key={connection.id} className="rounded-[1.5rem] border border-zinc-200 bg-white p-4 shadow-sm shadow-zinc-950/5">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <li key={connection.id} className="rule-t border-ink/30 py-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-baseline lg:justify-between">
                 <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-base font-medium text-zinc-900">
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <p className="font-display text-lg text-ink">
                       {connection.institutionName ?? "Linked institution"}
                     </p>
-                    <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] uppercase tracking-[0.16em] text-zinc-600">
-                      {connection.provider}
+                    <span className="font-mono text-[0.625rem] uppercase tracking-[0.2em] text-ink-fade">
+                      — {connection.provider}
                     </span>
-                    <span className={`rounded-full px-2.5 py-1 text-[11px] ${connection.status === "active" ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-700"}`}>
-                      {connection.status}
+                    <span
+                      className={`font-mono text-[0.625rem] uppercase tracking-[0.2em] ${
+                        connection.status === "active" ? "text-verdigris" : "text-ink-fade"
+                      }`}
+                    >
+                      · {connection.status}
                     </span>
                   </div>
-                  <p className="mt-2 text-sm text-zinc-500">
-                    {connection.accountCount} linked account{connection.accountCount === 1 ? "" : "s"} · {formatSyncLabel(connection.lastSyncedAt)}
+                  <p className="mt-1.5 font-serif text-sm italic text-ink-fade">
+                    <span className="not-italic font-mono tabular text-ink-soft">
+                      {connection.accountCount}
+                    </span>{" "}
+                    linked account{connection.accountCount === 1 ? "" : "s"} ·{" "}
+                    <span className="not-italic font-mono tabular text-ink-fade">
+                      {formatSyncLabel(connection.lastSyncedAt)}
+                    </span>
                   </p>
                   {connection.lastSyncError ? (
-                    <p className="mt-2 text-sm text-red-600">{connection.lastSyncError}</p>
+                    <p className="mt-1.5 font-serif text-sm italic text-oxblood">
+                      {connection.lastSyncError}
+                    </p>
                   ) : null}
                   {connection.disconnectedReason ? (
-                    <p className="mt-2 text-sm text-amber-700">Disconnected: {connection.disconnectedReason}</p>
+                    <p className="mt-1.5 font-serif text-sm italic text-aged-gold">
+                      Disconnected: {connection.disconnectedReason}
+                    </p>
                   ) : null}
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2">
                   <button
                     type="button"
                     disabled={pending}
@@ -181,20 +202,24 @@ export function LinkedConnectionsPanel({
                       setStatusMessage("Syncing linked bank data…");
                       startTransition(async () => {
                         const result = await syncLinkedFinanceConnection(connection.id);
-                        setStatusMessage(result?.ok ? `${result.message}${result.transactionCount != null ? ` Pulled ${result.transactionCount} transaction updates.` : ""}` : result?.error ?? "Could not sync linked account.");
+                        setStatusMessage(
+                          result?.ok
+                            ? `${result.message}${result.transactionCount != null ? ` Pulled ${result.transactionCount} entries.` : ""}`
+                            : result?.error ?? "Could not sync linked account.",
+                        );
                       });
                     }}
-                    className="inline-flex min-h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3.5 text-sm text-zinc-700 hover:border-zinc-300 hover:text-zinc-900 disabled:opacity-50"
+                    className="font-serif text-sm italic text-ink-fade transition-colors hover:text-ink disabled:opacity-50"
                   >
-                    Sync now
+                    Sync now ↻
                   </button>
                   <button
                     type="button"
                     disabled={!enabled || pending || !scriptReady}
                     onClick={() => launchConnect(connection.enrollmentId)}
-                    className="inline-flex min-h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3.5 text-sm text-zinc-700 hover:border-zinc-300 hover:text-zinc-900 disabled:opacity-50"
+                    className="font-serif text-sm italic text-ink-fade transition-colors hover:text-ink disabled:opacity-50"
                   >
-                    Repair connection
+                    Repair ⚒
                   </button>
                   <button
                     type="button"
@@ -206,15 +231,15 @@ export function LinkedConnectionsPanel({
                         setStatusMessage(result?.ok ? result.message : result?.error ?? "Could not disconnect linked account.");
                       });
                     }}
-                    className="inline-flex min-h-10 items-center justify-center rounded-xl border border-red-200 bg-red-50 px-3.5 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50"
+                    className="font-serif text-sm italic text-oxblood transition-colors hover:underline disabled:opacity-50"
                   >
-                    Disconnect
+                    Disconnect ✕
                   </button>
                 </div>
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );

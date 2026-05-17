@@ -24,10 +24,10 @@ type SortKey = "newest" | "oldest" | "largest" | "smallest";
 type ViewKey = "cards" | "compact";
 
 const RANGE_OPTIONS: Array<{ key: RangeKey; label: string; days: number | null }> = [
-  { key: "30d", label: "30d", days: 30 },
-  { key: "90d", label: "90d", days: 90 },
-  { key: "365d", label: "1y", days: 365 },
-  { key: "all", label: "All", days: null },
+  { key: "30d", label: "30 days", days: 30 },
+  { key: "90d", label: "90 days", days: 90 },
+  { key: "365d", label: "One year", days: 365 },
+  { key: "all", label: "All time", days: null },
 ];
 
 function formatUSDFromCents(cents: number): string {
@@ -43,16 +43,16 @@ function typeTone(type: string): string {
   switch (type) {
     case "income":
     case "reimbursement":
-      return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200";
+      return "text-verdigris border-verdigris/30 bg-verdigris-soft";
     case "credit_card_payment":
     case "transfer":
-      return "bg-sky-50 text-sky-700 ring-1 ring-sky-200";
+      return "text-ink border-rule bg-paper-deep/60";
     case "housing":
-      return "bg-violet-50 text-violet-700 ring-1 ring-violet-200";
+      return "text-ink-soft border-rule bg-paper-deep/40";
     case "fee":
-      return "bg-amber-50 text-amber-700 ring-1 ring-amber-200";
+      return "text-oxblood border-oxblood/30 bg-oxblood-soft";
     default:
-      return "bg-zinc-100 text-zinc-700 ring-1 ring-zinc-200";
+      return "text-ink-soft border-rule bg-paper-deep/30";
   }
 }
 
@@ -123,157 +123,209 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
     setCategory("all");
     setType("all");
     setSort("newest");
-    setView("cards");
+    setView("compact");
   };
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-[1.9rem] border border-zinc-200 bg-white/92 p-4 shadow-[0_18px_50px_-38px_rgba(24,24,27,0.16)]">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div className="space-y-3">
-            <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">
-                Review transactions
-              </p>
-              <p className="mt-1 text-sm text-zinc-500">
-                Filter fast, then review the cleanest possible read of the ledger.
-              </p>
-            </div>
-            <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
-              {RANGE_OPTIONS.map((option) => (
+    <div className="space-y-6">
+      <div className="rule-t rule-b border-ink/40 py-5 space-y-6">
+        {/* Range pills as proper tabs with hairline underline */}
+        <div className="flex flex-wrap items-baseline justify-between gap-4">
+          <div className="flex flex-wrap items-baseline gap-x-7 gap-y-2">
+            <span className="font-mono text-[0.625rem] uppercase tracking-[0.24em] text-ink-fade">
+              Window:
+            </span>
+            {RANGE_OPTIONS.map((option) => {
+              const active = range === option.key;
+              return (
                 <button
                   key={option.key}
                   type="button"
                   onClick={() => setRange(option.key)}
-                  className={`inline-flex min-h-11 shrink-0 items-center rounded-full px-3.5 text-sm transition-colors ${
-                    range === option.key
-                      ? "bg-zinc-900 text-zinc-50"
-                      : "border border-zinc-200 bg-zinc-50 text-zinc-700 hover:border-zinc-300 hover:text-zinc-900"
+                  className={`relative font-display text-base italic transition-colors ${
+                    active ? "text-ink" : "text-ink-fade hover:text-ink"
                   }`}
                 >
                   {option.label}
+                  {active && (
+                    <span
+                      aria-hidden
+                      className="absolute -bottom-1.5 left-0 right-0 h-px bg-ink"
+                    />
+                  )}
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-[1.2rem] border border-zinc-200 bg-zinc-50/90 px-3 py-3 shadow-sm shadow-zinc-950/5">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Showing</p>
-              <p className="mt-1 text-lg font-semibold text-zinc-950">{filtered.length}</p>
-            </div>
-            <div className="rounded-[1.2rem] border border-zinc-200 bg-zinc-50/90 px-3 py-3 shadow-sm shadow-zinc-950/5">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Spend</p>
-              <p className="mt-1 text-lg font-semibold text-zinc-950">{formatUSDFromCents(filteredSpend)}</p>
-            </div>
-            <div className="rounded-[1.2rem] border border-zinc-200 bg-zinc-50/90 px-3 py-3 shadow-sm shadow-zinc-950/5">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Sort</p>
-              <select
-                value={sort}
-                onChange={(event) => setSort(event.target.value as SortKey)}
-                className="mt-1 w-full bg-transparent text-sm text-zinc-700 outline-none"
-              >
-                <option value="newest">Newest first</option>
-                <option value="oldest">Oldest first</option>
-                <option value="largest">Largest first</option>
-                <option value="smallest">Smallest first</option>
-              </select>
-            </div>
-            <div className="rounded-[1.2rem] border border-zinc-200 bg-zinc-50/90 px-3 py-3 shadow-sm shadow-zinc-950/5">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">View</p>
-              <div className="mt-1 flex gap-2 text-sm">
-                <button
-                  type="button"
-                  onClick={() => setView("cards")}
-                  className={view === "cards" ? "font-medium text-zinc-950" : "text-zinc-500"}
-                >
-                  Cards
-                </button>
-                <div className="hidden items-center gap-2 md:flex">
-                  <span className="text-zinc-300">/</span>
-                  <button
-                    type="button"
-                    onClick={() => setView("compact")}
-                    className={view === "compact" ? "font-medium text-zinc-950" : "text-zinc-500"}
-                  >
-                    Compact
-                  </button>
-                </div>
-              </div>
-            </div>
+          <div className="flex items-baseline gap-x-7 font-mono text-[0.625rem] uppercase tracking-[0.22em] text-ink-fade">
+            <span>
+              View:
+            </span>
+            <button
+              type="button"
+              onClick={() => setView("compact")}
+              className={`font-display normal-case text-base italic tracking-normal transition-colors ${
+                view === "compact" ? "text-ink underline underline-offset-4 decoration-rule" : "text-ink-fade hover:text-ink"
+              }`}
+            >
+              Compact
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("cards")}
+              className={`font-display normal-case text-base italic tracking-normal transition-colors ${
+                view === "cards" ? "text-ink underline underline-offset-4 decoration-rule" : "text-ink-fade hover:text-ink"
+              }`}
+            >
+              Cards
+            </button>
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
-          <label className="space-y-1 text-sm">
-            <span className="text-zinc-500">Account</span>
-            <select value={account} onChange={(event) => setAccount(event.target.value)} className="block min-h-11 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm">
+        {/* Tally row */}
+        <div className="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-4">
+          <div className="rule-l border-rule pl-4">
+            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-ink-fade">
+              Showing
+            </p>
+            <p className="mt-1 font-display text-xl font-medium tabular tracking-[-0.02em] text-ink">
+              {filtered.length}
+            </p>
+          </div>
+          <div className="rule-l border-rule pl-4">
+            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-ink-fade">
+              Outflow
+            </p>
+            <p className="mt-1 font-display text-xl font-medium tabular tracking-[-0.02em] text-oxblood">
+              {formatUSDFromCents(filteredSpend)}
+            </p>
+          </div>
+          <label className="rule-l border-rule pl-4">
+            <span className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-ink-fade">
+              Sort
+            </span>
+            <select
+              value={sort}
+              onChange={(event) => setSort(event.target.value as SortKey)}
+              className="mt-1 block w-full bg-transparent font-serif text-base italic text-ink outline-none"
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="largest">Largest first</option>
+              <option value="smallest">Smallest first</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="rule-l border-rule pl-4 text-left"
+          >
+            <span className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-ink-fade">
+              Filters
+            </span>
+            <span className="mt-1 block font-display text-base italic text-ink-fade hover:text-ink">
+              Reset all ↺
+            </span>
+          </button>
+        </div>
+
+        {/* Filters */}
+        <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-3">
+          <label className="space-y-1">
+            <span className="font-mono text-[0.625rem] uppercase tracking-[0.22em] text-ink-fade">
+              Account
+            </span>
+            <select
+              value={account}
+              onChange={(event) => setAccount(event.target.value)}
+              className="field font-display text-base italic"
+            >
               <option value="all">All accounts</option>
               {accountOptions.map((option) => (
-                <option key={option} value={option ?? ""}>{option}</option>
+                <option key={option} value={option ?? ""}>
+                  {option}
+                </option>
               ))}
             </select>
           </label>
-          <label className="space-y-1 text-sm">
-            <span className="text-zinc-500">Category</span>
-            <select value={category} onChange={(event) => setCategory(event.target.value)} className="block min-h-11 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm">
+          <label className="space-y-1">
+            <span className="font-mono text-[0.625rem] uppercase tracking-[0.22em] text-ink-fade">
+              Category
+            </span>
+            <select
+              value={category}
+              onChange={(event) => setCategory(event.target.value)}
+              className="field font-display text-base italic"
+            >
               <option value="all">All categories</option>
               {FINANCE_CATEGORIES.map((option) => (
-                <option key={option} value={option}>{option}</option>
+                <option key={option} value={option}>
+                  {option}
+                </option>
               ))}
             </select>
           </label>
-          <label className="space-y-1 text-sm">
-            <span className="text-zinc-500">Type</span>
-            <select value={type} onChange={(event) => setType(event.target.value as FinanceTransactionType | "all")} className="block min-h-11 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm">
+          <label className="space-y-1">
+            <span className="font-mono text-[0.625rem] uppercase tracking-[0.22em] text-ink-fade">
+              Movement
+            </span>
+            <select
+              value={type}
+              onChange={(event) =>
+                setType(event.target.value as FinanceTransactionType | "all")
+              }
+              className="field font-display text-base italic"
+            >
               <option value="all">All movement</option>
               {FINANCE_TRANSACTION_TYPES.map((option) => (
-                <option key={option} value={option}>{formatTransactionType(option)}</option>
+                <option key={option} value={option}>
+                  {formatTransactionType(option)}
+                </option>
               ))}
             </select>
           </label>
-          <div className="flex items-end">
-            <button type="button" onClick={resetFilters} className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 text-sm text-zinc-700 hover:border-zinc-300 hover:text-zinc-900">
-              Reset filters
-            </button>
-          </div>
         </div>
       </div>
 
       {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-zinc-300 px-5 py-8 text-sm text-zinc-500">
-          No transactions match these filters.
-        </div>
+        <p className="rule-t rule-b border-rule px-2 py-10 text-center font-serif italic text-ink-fade">
+          ❦ No entries match these filters. ❦
+        </p>
       ) : view === "compact" ? (
         <>
-          <ul className="space-y-3 md:hidden">
+          {/* Mobile cards */}
+          <ul className="md:hidden">
             {filtered.map((transaction) => {
               const transactionType = classifyTransaction(transaction);
               const resolvedCategory = (transaction.category ?? "Other") as FinanceCategory;
               return (
-                <li key={transaction.id} className="rounded-[1.5rem] border border-zinc-200 bg-white p-4 shadow-sm shadow-zinc-950/5">
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="truncate text-sm font-medium text-zinc-900">{transaction.description}</p>
-                          <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${typeTone(transactionType)}`}>
-                            {formatTransactionType(transactionType)}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs text-zinc-500">
-                          {new Date(transaction.date).toLocaleDateString([], {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          })}
-                          {transaction.account ? ` · ${transaction.account}` : ""}
-                        </p>
-                      </div>
-                      <span className={`font-mono text-sm tabular-nums ${transaction.amount < 0 ? "text-zinc-900" : "text-emerald-600"}`}>
-                        {formatUSDFromCents(transaction.amount)}
-                      </span>
+                <li key={transaction.id} className="rule-soft-b border-rule py-4">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-display text-base text-ink">
+                        {transaction.description}
+                      </p>
+                      <p className="mt-1 font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-ink-fade">
+                        {new Date(transaction.date).toLocaleDateString([], {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                        {transaction.account ? ` · ${transaction.account}` : ""}
+                      </p>
                     </div>
+                    <span
+                      className={`shrink-0 font-mono text-sm tabular ${transaction.amount < 0 ? "text-oxblood" : "text-verdigris"}`}
+                    >
+                      {formatUSDFromCents(transaction.amount)}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex items-baseline justify-between gap-3">
+                    <span
+                      className={`inline-flex border px-2 py-0.5 font-mono text-[0.625rem] uppercase tracking-[0.18em] ${typeTone(transactionType)}`}
+                    >
+                      {formatTransactionType(transactionType)}
+                    </span>
                     <CategorySelect
                       id={transaction.id}
                       value={resolvedCategory}
@@ -285,12 +337,14 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
               );
             })}
           </ul>
-          <div className="hidden overflow-hidden rounded-[1.6rem] border border-zinc-200 bg-white shadow-sm shadow-zinc-950/5 md:block">
-            <div className="hidden grid-cols-[120px_minmax(220px,1.6fr)_150px_160px_180px_120px] gap-3 border-b border-zinc-200 px-4 py-3 text-[11px] uppercase tracking-[0.2em] text-zinc-500 md:grid">
+
+          {/* Desktop ledger table */}
+          <div className="hidden md:block">
+            <div className="rule-b border-ink/60 grid grid-cols-[110px_minmax(220px,1.6fr)_150px_140px_180px_120px] gap-4 py-2 font-mono text-[0.625rem] uppercase tracking-[0.22em] text-ink-fade">
               <span>Date</span>
               <span>Description</span>
               <span>Account</span>
-              <span>Type</span>
+              <span>Movement</span>
               <span>Category</span>
               <span className="text-right">Amount</span>
             </div>
@@ -299,34 +353,39 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
                 const transactionType = classifyTransaction(transaction);
                 const resolvedCategory = (transaction.category ?? "Other") as FinanceCategory;
                 return (
-                  <li key={transaction.id} className="border-t border-zinc-200 first:border-t-0">
-                    <div className="grid gap-3 px-4 py-4 md:grid-cols-[120px_minmax(220px,1.6fr)_150px_160px_180px_120px] md:items-center">
-                      <span className="text-sm text-zinc-500">
-                        {new Date(transaction.date).toLocaleDateString([], {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-zinc-900">{transaction.description}</p>
-                      </div>
-                      <span className="truncate text-sm text-zinc-500">{transaction.account ?? "—"}</span>
-                      <div>
-                        <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${typeTone(transactionType)}`}>
-                          {formatTransactionType(transactionType)}
-                        </span>
-                      </div>
-                      <CategorySelect
-                        id={transaction.id}
-                        value={resolvedCategory}
-                        description={transaction.description}
-                        account={transaction.account}
-                      />
-                      <span className={`text-right font-mono text-sm tabular-nums ${transaction.amount < 0 ? "text-zinc-900" : "text-emerald-600"}`}>
-                        {formatUSDFromCents(transaction.amount)}
-                      </span>
-                    </div>
+                  <li
+                    key={transaction.id}
+                    className="rule-soft-b border-rule grid grid-cols-[110px_minmax(220px,1.6fr)_150px_140px_180px_120px] items-baseline gap-4 py-3"
+                  >
+                    <span className="font-mono text-xs tabular text-ink-fade">
+                      {new Date(transaction.date).toLocaleDateString([], {
+                        year: "2-digit",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </span>
+                    <p className="truncate font-display text-base text-ink">
+                      {transaction.description}
+                    </p>
+                    <span className="truncate font-serif text-sm italic text-ink-fade">
+                      {transaction.account ?? "—"}
+                    </span>
+                    <span
+                      className={`inline-flex w-fit border px-2 py-0.5 font-mono text-[0.625rem] uppercase tracking-[0.18em] ${typeTone(transactionType)}`}
+                    >
+                      {formatTransactionType(transactionType)}
+                    </span>
+                    <CategorySelect
+                      id={transaction.id}
+                      value={resolvedCategory}
+                      description={transaction.description}
+                      account={transaction.account}
+                    />
+                    <span
+                      className={`text-right font-mono text-sm tabular ${transaction.amount < 0 ? "text-oxblood" : "text-verdigris"}`}
+                    >
+                      {formatUSDFromCents(transaction.amount)}
+                    </span>
                   </li>
                 );
               })}
@@ -334,47 +393,45 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
           </div>
         </>
       ) : (
-        <ul className="space-y-3">
+        <ul className="grid gap-6 md:grid-cols-2">
           {filtered.map((transaction) => {
             const transactionType = classifyTransaction(transaction);
             const resolvedCategory = (transaction.category ?? "Other") as FinanceCategory;
             return (
-              <li key={transaction.id} className="rounded-[1.5rem] border border-zinc-200 bg-white p-4 shadow-sm shadow-zinc-950/5">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-start justify-between gap-3 sm:block">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="max-w-full truncate text-sm font-medium text-zinc-900 sm:text-base">{transaction.description}</p>
-                          <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${typeTone(transactionType)}`}>
-                            {formatTransactionType(transactionType)}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs text-zinc-500">
-                          {new Date(transaction.date).toLocaleDateString([], {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          })}
-                          {transaction.account ? ` · ${transaction.account}` : ""}
-                        </p>
-                      </div>
-                      <span className={`font-mono text-base tabular-nums sm:hidden ${transaction.amount < 0 ? "text-zinc-900" : "text-emerald-600"}`}>
-                        {formatUSDFromCents(transaction.amount)}
-                      </span>
-                    </div>
-                    <div className="mt-3 max-w-full sm:max-w-[340px]">
-                      <CategorySelect
-                        id={transaction.id}
-                        value={resolvedCategory}
-                        description={transaction.description}
-                        account={transaction.account}
-                      />
-                    </div>
-                  </div>
-                  <span className={`hidden font-mono text-sm tabular-nums sm:block ${transaction.amount < 0 ? "text-zinc-900" : "text-emerald-600"}`}>
+              <li
+                key={transaction.id}
+                className="rule-t border-ink/30 pt-4"
+              >
+                <div className="flex items-baseline justify-between gap-3">
+                  <span
+                    className={`inline-flex border px-2 py-0.5 font-mono text-[0.625rem] uppercase tracking-[0.18em] ${typeTone(transactionType)}`}
+                  >
+                    {formatTransactionType(transactionType)}
+                  </span>
+                  <span
+                    className={`font-mono text-sm tabular ${transaction.amount < 0 ? "text-oxblood" : "text-verdigris"}`}
+                  >
                     {formatUSDFromCents(transaction.amount)}
                   </span>
+                </div>
+                <p className="mt-3 font-display text-lg text-ink">
+                  {transaction.description}
+                </p>
+                <p className="mt-1 font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-ink-fade">
+                  {new Date(transaction.date).toLocaleDateString([], {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                  {transaction.account ? ` · ${transaction.account}` : ""}
+                </p>
+                <div className="mt-3">
+                  <CategorySelect
+                    id={transaction.id}
+                    value={resolvedCategory}
+                    description={transaction.description}
+                    account={transaction.account}
+                  />
                 </div>
               </li>
             );

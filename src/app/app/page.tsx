@@ -58,75 +58,117 @@ export default async function HubPage() {
   });
 
   return (
-    <div className="space-y-6 lg:space-y-8">
-      <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="rounded-[2.1rem] border border-zinc-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(250,250,248,0.96)),radial-gradient(circle_at_top_right,rgba(56,189,248,0.12),transparent_30%)] p-5 shadow-[0_28px_90px_-52px_rgba(24,24,27,0.22)] sm:p-7">
-          <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-zinc-500">
-            Daily overview
+    <div className="space-y-12 lg:space-y-16">
+      {/* Lead article */}
+      <section className="fade-in grid gap-10 lg:grid-cols-[1.55fr_1fr] lg:gap-14">
+        <article className="lg:rule-r lg:border-rule lg:pr-14">
+          <p className="font-mono text-[0.6875rem] uppercase tracking-[0.28em] text-ink-fade">
+            From the editor’s desk
           </p>
-          <h1 className="mt-3 max-w-3xl text-2xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
-            {firstName ? `Hey, ${firstName}.` : "Welcome back."} Steer the day from one calm place.
+          <h1 className="mt-5 font-display font-medium leading-[0.92] tracking-[-0.045em] text-ink text-[2.6rem] sm:text-[3.6rem] lg:text-[4.5rem]">
+            {firstName ? (
+              <>
+                Good morning,{" "}
+                <span className="italic text-oxblood">{firstName}</span>.
+              </>
+            ) : (
+              <>Welcome back, dear reader.</>
+            )}
           </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-zinc-600 sm:text-base">
-            Start with the highest-signal view, then drop into time or finance only when the numbers tell you to.
-          </p>
 
-          <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
+          <div className="mt-8 max-w-2xl lg:columns-2 lg:gap-10">
+            <p className="drop-cap font-serif text-[1.05rem] leading-[1.75] text-ink-soft first-letter:text-oxblood">
+              The day arrives, as it always does, with more to consider than to
+              answer. This edition gathers the figures that matter — the hours
+              spent in earnest, the coin coming and going, the small notes from
+              yesterday — and sets them in one quiet page so the morning can
+              begin with clarity rather than search.
+            </p>
+          </div>
+
+          <div className="mt-9 flex flex-wrap items-center gap-x-7 gap-y-3">
             <Link
               href="/app/time"
-              className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-zinc-950 px-5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 sm:w-auto"
+              className="group inline-flex items-baseline gap-2 font-display text-lg italic text-ink transition-colors hover:text-oxblood"
             >
-              Open time tracker
+              <span aria-hidden className="font-mono text-xs not-italic tracking-[0.22em] uppercase text-ink-fade group-hover:text-oxblood">
+                §
+              </span>
+              Open the Dispatch
+              <span aria-hidden className="transition-transform group-hover:translate-x-1">→</span>
             </Link>
             {financeVisible ? (
               <Link
                 href="/app/finance#transactions"
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-zinc-200 bg-white/88 px-5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-300 hover:text-zinc-900 sm:w-auto"
+                className="group inline-flex items-baseline gap-2 font-display text-lg italic text-ink transition-colors hover:text-oxblood"
               >
-                Review money flow
+                <span aria-hidden className="font-mono text-xs not-italic tracking-[0.22em] uppercase text-ink-fade group-hover:text-oxblood">
+                  §
+                </span>
+                Review the Ledger
+                <span aria-hidden className="transition-transform group-hover:translate-x-1">→</span>
               </Link>
             ) : null}
           </div>
-        </div>
+        </article>
 
-        <aside className="rounded-[2rem] border border-zinc-200/80 bg-white/92 p-5 shadow-[0_24px_80px_-50px_rgba(24,24,27,0.18)] sm:p-7">
-          <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">
-            Right now
-          </p>
-          <ul className="mt-4 space-y-3">
-            {prompts.map((prompt) => (
+        <aside className="fade-in-delay-1">
+          <header className="rule-b border-ink pb-3">
+            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.28em] text-oxblood">
+              ❦ Day Briefing ❦
+            </p>
+            <h2 className="mt-2 font-display text-2xl font-medium tracking-[-0.02em] text-ink italic">
+              What the figures say.
+            </h2>
+          </header>
+          <ol className="divide-y divide-rule-soft">
+            {prompts.map((prompt, i) => (
               <li
                 key={prompt.text}
-                className="flex gap-3 rounded-2xl border border-zinc-200/80 bg-zinc-50/90 px-4 py-3 text-sm text-zinc-600"
+                className="grid grid-cols-[auto_1fr] items-baseline gap-4 py-4"
               >
-                <span
-                  className={`mt-1 h-2 w-2 rounded-full ${
-                    prompt.tone === "amber"
-                      ? "bg-amber-500"
-                      : prompt.tone === "emerald"
-                        ? "bg-emerald-500"
-                        : prompt.tone === "zinc"
-                          ? "bg-zinc-400"
-                          : "bg-sky-500"
-                  }`}
-                />
-                <span>{prompt.text}</span>
+                <span className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-ghost tabular">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <p className="font-serif text-[0.95rem] leading-[1.55] text-ink-soft">
+                  <span
+                    aria-hidden
+                    className={`mr-2 inline-block h-1.5 w-1.5 rounded-full align-middle ${
+                      prompt.tone === "amber"
+                        ? "bg-aged-gold"
+                        : prompt.tone === "emerald"
+                          ? "bg-verdigris"
+                          : prompt.tone === "zinc"
+                            ? "bg-ink-ghost"
+                            : "bg-oxblood"
+                    }`}
+                  />
+                  {prompt.text}
+                </p>
               </li>
             ))}
-          </ul>
+          </ol>
         </aside>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className={`grid gap-4 ${financeVisible ? "md:grid-cols-2" : "md:grid-cols-1"}`}>
-          <TimeTrackerWidget />
-          {financeVisible ? <FinanceWidget /> : null}
-        </div>
-        <div>
-          <ActivityWidget />
-        </div>
+      <div className="fleuron text-ink-fade">
+        <span aria-hidden>❦ ❧ ❦</span>
+      </div>
+
+      {/* The sections — three columns of widget panels */}
+      <section
+        className={`fade-in-delay-2 grid gap-8 ${financeVisible ? "lg:grid-cols-3" : "lg:grid-cols-2"} lg:gap-10`}
+      >
+        <TimeTrackerWidget />
+        {financeVisible ? <FinanceWidget /> : null}
+        <ActivityWidget />
       </section>
 
+      <div className="fleuron text-ink-fade">
+        <span aria-hidden>✣</span>
+      </div>
+
+      {/* Privacy / colophon section */}
       <PrivacyPanel
         financeVisible={financeVisible}
         appLockEnabled={context?.appLockEnabled ?? false}

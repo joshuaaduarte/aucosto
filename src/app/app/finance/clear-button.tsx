@@ -9,13 +9,14 @@ export function ClearButton() {
     <button
       type="button"
       onClick={() => {
-        if (!confirm("Delete all transactions? This can't be undone.")) return;
+        if (!confirm("Strike all entries from the record? This cannot be undone."))
+          return;
         startTransition(() => deleteAllTransactions());
       }}
       disabled={pending}
-      className="text-sm text-zinc-500 transition-colors hover:text-red-600 disabled:opacity-50 dark:hover:text-red-400"
+      className="font-serif text-sm italic text-ink-fade transition-colors hover:text-oxblood disabled:opacity-50"
     >
-      {pending ? "Clearing…" : "Clear all"}
+      {pending ? "Striking…" : "Strike all entries  ✕"}
     </button>
   );
 }

@@ -24,15 +24,18 @@ export function ManageSection({
   const { accounts, goals } = data;
 
   return (
-    <section id="manage" className="space-y-4">
-      <div>
-        <h2 className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">
-          Manage
-        </h2>
-        <p className="mt-2 text-sm text-zinc-500">
-          Keep editing available, but secondary to the daily read above.
+    <section id="manage" className="space-y-10">
+      <header className="rule-t border-ink pt-4">
+        <p className="font-mono text-[0.6875rem] uppercase tracking-[0.26em] text-ink-fade">
+          Section V · Editorial Office
         </p>
-      </div>
+        <h2 className="mt-2 font-display text-3xl font-medium italic tracking-[-0.02em] text-ink">
+          Accounts, goals, and the press connections.
+        </h2>
+        <p className="mt-2 font-serif text-sm italic text-ink-fade">
+          Kept out of the way of the daily read, available when needed.
+        </p>
+      </header>
 
       <LinkedConnectionsPanel
         enabled={tellerConfig.enabled}
@@ -42,18 +45,15 @@ export function ManageSection({
         connections={linkedConnections}
       />
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1fr]">
-        <SectionCard
-          title="Accounts"
-          subtitle="Manual and linked accounts, tucked behind a single edit surface."
-        >
-          <details className="mt-5 rounded-2xl border border-zinc-200 px-4 py-3 dark:border-zinc-800">
-            <summary className="cursor-pointer list-none text-sm font-medium text-zinc-900 dark:text-zinc-100">
+      <div className="grid grid-cols-1 gap-12 xl:grid-cols-[1fr_1fr] xl:gap-14">
+        <SectionCard title="Accounts" subtitle="Manual and linked accounts in one place.">
+          <details className="mt-4 rule-t rule-b border-rule">
+            <summary className="cursor-pointer list-none py-4 font-display text-lg italic text-ink hover:text-oxblood">
               {accounts.length > 0
-                ? `Edit ${accounts.length} account${accounts.length === 1 ? "" : "s"} or add another`
-                : "Add your first account"}
+                ? `Edit ${accounts.length} account${accounts.length === 1 ? "" : "s"}, or add another  →`
+                : "Add the first account  →"}
             </summary>
-            <div className="mt-4">
+            <div className="py-4">
               <AccountsPanel
                 accounts={accounts.map((account) => ({
                   id: account.id,
@@ -73,17 +73,14 @@ export function ManageSection({
           </details>
         </SectionCard>
 
-        <SectionCard
-          title="Goals"
-          subtitle="Keep wedding, vacations, and projects out of your head and in a bucket."
-        >
-          <details className="mt-5 rounded-2xl border border-zinc-200 px-4 py-3 dark:border-zinc-800">
-            <summary className="cursor-pointer list-none text-sm font-medium text-zinc-900 dark:text-zinc-100">
+        <SectionCard title="Goals" subtitle="Wedding, vacations, projects — kept in their bucket.">
+          <details className="mt-4 rule-t rule-b border-rule">
+            <summary className="cursor-pointer list-none py-4 font-display text-lg italic text-ink hover:text-oxblood">
               {goals.length > 0
-                ? `Edit ${goals.length} goal bucket${goals.length === 1 ? "" : "s"} or add another`
-                : "Add your first goal bucket"}
+                ? `Edit ${goals.length} bucket${goals.length === 1 ? "" : "s"}, or add another  →`
+                : "Add the first bucket  →"}
             </summary>
-            <div className="mt-4">
+            <div className="py-4">
               <GoalsPanel
                 goals={goals.map((goal) => ({
                   id: goal.id,

@@ -11,21 +11,26 @@ export async function TimeTrackerWidget() {
 
   if (running) {
     return (
-      <WidgetCard name="Time tracker" href="/app/time">
-        <div className="space-y-3">
-          <div className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-            Running now
+      <WidgetCard name="The Dispatch" href="/app/time" folio="I.">
+        <div className="space-y-5">
+          <div className="flex items-center gap-3">
+            <span className="ink-pulse h-1.5 w-1.5 rounded-full bg-oxblood" aria-hidden />
+            <span className="font-mono text-[0.6875rem] uppercase tracking-[0.24em] text-oxblood">
+              Filed in progress
+            </span>
           </div>
-          <div className="space-y-1">
-            <p className="text-2xl font-semibold tracking-tight text-zinc-950">
+          <div className="space-y-2">
+            <p className="font-display text-[1.65rem] leading-[1.05] tracking-[-0.02em] text-ink">
               {running.label}
             </p>
-            <p className="text-sm text-zinc-500">
-              running since{" "}
-              {running.startedAt.toLocaleTimeString([], {
-                hour: "numeric",
-                minute: "2-digit",
-              })}
+            <p className="font-serif text-sm italic text-ink-fade">
+              opened at{" "}
+              <span className="not-italic font-mono tabular text-ink-soft">
+                {running.startedAt.toLocaleTimeString([], {
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </span>
             </p>
           </div>
         </div>
@@ -42,17 +47,21 @@ export async function TimeTrackerWidget() {
   const totalMsWeek = sumDurations(completedWeek);
 
   return (
-    <WidgetCard name="Time tracker" href="/app/time">
-      <div className="space-y-4">
+    <WidgetCard name="The Dispatch" href="/app/time" folio="I.">
+      <div className="space-y-6">
         <div>
-          <p className="text-3xl font-semibold tracking-tight text-zinc-950">
+          <p className="font-display text-[3rem] font-medium leading-none tracking-[-0.035em] tabular text-ink">
             {formatHM(totalMsToday)}
           </p>
-          <p className="mt-1 text-sm text-zinc-500">tracked today</p>
+          <p className="mt-2 font-serif text-sm italic text-ink-fade">
+            filed today
+          </p>
         </div>
-        <div className="flex items-center justify-between rounded-2xl border border-zinc-200/80 bg-zinc-50/90 px-4 py-3 text-sm">
-          <span className="text-zinc-500">This week</span>
-          <span className="font-medium text-zinc-900">{formatHM(totalMsWeek)}</span>
+        <div className="flex items-baseline justify-between rule-soft-t border-rule pt-3">
+          <span className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade">
+            Week to date
+          </span>
+          <span className="font-mono text-sm tabular text-ink">{formatHM(totalMsWeek)}</span>
         </div>
       </div>
     </WidgetCard>

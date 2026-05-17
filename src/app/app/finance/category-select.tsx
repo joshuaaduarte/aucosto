@@ -23,7 +23,7 @@ export function CategorySelect({
   const [bulkMessage, setBulkMessage] = useState<string | null>(null);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
       <select
         value={selected}
         disabled={pending}
@@ -33,7 +33,7 @@ export function CategorySelect({
           setBulkMessage(null);
           startTransition(() => updateTransactionCategory(id, nextValue));
         }}
-        className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+        className="border-b border-rule bg-transparent px-1 py-0.5 font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-ink-soft focus:border-oxblood focus:outline-none"
       >
         {FINANCE_CATEGORIES.map((category) => (
           <option key={category} value={category}>
@@ -43,7 +43,7 @@ export function CategorySelect({
       </select>
 
       {description ? (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-baseline gap-2">
           <button
             type="button"
             disabled={pending}
@@ -56,15 +56,23 @@ export function CategorySelect({
                   selected,
                 );
                 setBulkMessage(
-                  count > 1 ? `Applied to ${count} similar transactions` : count === 1 ? "Only this match found" : "No similar matches found",
+                  count > 1
+                    ? `applied to ${count} like entries`
+                    : count === 1
+                      ? "only this match"
+                      : "no like entries",
                 );
               });
             }}
-            className="text-[11px] font-medium text-zinc-500 underline-offset-4 hover:text-zinc-900 hover:underline disabled:opacity-50 dark:text-zinc-400 dark:hover:text-zinc-100"
+            className="font-serif text-[0.7rem] italic text-ink-fade underline-offset-4 hover:text-ink hover:underline disabled:opacity-50"
           >
-            Apply to similar
+            apply to similar
           </button>
-          {bulkMessage ? <span className="text-[11px] text-zinc-500 dark:text-zinc-400">{bulkMessage}</span> : null}
+          {bulkMessage ? (
+            <span className="font-serif text-[0.7rem] italic text-ink-fade">
+              — {bulkMessage}
+            </span>
+          ) : null}
         </div>
       ) : null}
     </div>

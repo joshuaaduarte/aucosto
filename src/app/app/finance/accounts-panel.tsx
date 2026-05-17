@@ -38,82 +38,94 @@ function toMoneyInput(cents: number | null): string {
 }
 
 const initialState: AccountState = undefined;
-const fieldClassName = "block min-h-11 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm";
-const buttonClassName = "inline-flex min-h-11 items-center justify-center rounded-xl bg-zinc-900 px-4 text-sm font-medium text-zinc-50 transition-colors hover:bg-zinc-800 disabled:opacity-50";
-const checkboxClassName = "h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500";
+
+function Label({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="block font-mono text-[0.625rem] uppercase tracking-[0.22em] text-ink-fade">
+      {children}
+    </span>
+  );
+}
 
 function AccountRow({ account }: { account: AccountView }) {
   const [state, formAction, pending] = useActionState(saveFinanceAccount, initialState);
 
   return (
-    <form action={formAction} className="rounded-[1.4rem] border border-zinc-200 bg-zinc-50/60 p-4 shadow-sm shadow-zinc-950/5">
+    <form action={formAction} className="rule-t border-ink/40 pt-5 pb-6">
       <input type="hidden" name="id" value={account.id} />
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+      <header className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
         <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="font-medium text-zinc-900">{account.name}</p>
+          <div className="flex flex-wrap items-baseline gap-2">
+            <p className="font-display text-xl text-ink">{account.name}</p>
             {account.syncSource === "teller" ? (
-              <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] uppercase tracking-[0.16em] text-sky-700">
-                linked
+              <span className="font-mono text-[0.625rem] uppercase tracking-[0.2em] text-verdigris">
+                · linked
               </span>
             ) : null}
           </div>
-          <p className="text-xs text-zinc-500">{formatAccountKind(account.kind)} · updated {new Date(account.balanceUpdatedAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}</p>
+          <p className="mt-0.5 font-serif text-sm italic text-ink-fade">
+            {formatAccountKind(account.kind)} ·{" "}
+            <span className="not-italic font-mono tabular text-ink-fade">
+              updated {new Date(account.balanceUpdatedAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}
+            </span>
+          </p>
         </div>
-        <p className="font-mono text-sm tabular-nums text-zinc-900">{formatUSDFromCents(account.currentBalanceCents)}</p>
-      </div>
-      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <label className="space-y-1 text-sm">
-          <span className="text-zinc-500">Name</span>
-          <input name="name" defaultValue={account.name} required className={fieldClassName} />
+        <p className="font-mono text-lg tabular text-ink">
+          {formatUSDFromCents(account.currentBalanceCents)}
+        </p>
+      </header>
+      <div className="mt-5 grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2 xl:grid-cols-4">
+        <label className="space-y-1">
+          <Label>Name</Label>
+          <input name="name" defaultValue={account.name} required className="field" />
         </label>
-        <label className="space-y-1 text-sm">
-          <span className="text-zinc-500">Kind</span>
-          <select name="kind" defaultValue={account.kind} className={fieldClassName}>
+        <label className="space-y-1">
+          <Label>Kind</Label>
+          <select name="kind" defaultValue={account.kind} className="field">
             {FINANCE_ACCOUNT_KINDS.map((kind) => (
               <option key={kind} value={kind}>{formatAccountKind(kind)}</option>
             ))}
           </select>
         </label>
-        <label className="space-y-1 text-sm">
-          <span className="text-zinc-500">Current balance</span>
-          <input name="currentBalance" defaultValue={toMoneyInput(account.currentBalanceCents)} required inputMode="decimal" className={fieldClassName} />
+        <label className="space-y-1">
+          <Label>Current balance</Label>
+          <input name="currentBalance" defaultValue={toMoneyInput(account.currentBalanceCents)} required inputMode="decimal" className="field font-mono tabular" />
         </label>
-        <label className="space-y-1 text-sm">
-          <span className="text-zinc-500">Balance as of</span>
-          <input type="date" name="balanceUpdatedAt" defaultValue={toDateInput(account.balanceUpdatedAt)} required className={fieldClassName} />
+        <label className="space-y-1">
+          <Label>Balance as of</Label>
+          <input type="date" name="balanceUpdatedAt" defaultValue={toDateInput(account.balanceUpdatedAt)} required className="field font-mono tabular" />
         </label>
-        <label className="space-y-1 text-sm">
-          <span className="text-zinc-500">Statement balance</span>
-          <input name="statementBalance" defaultValue={toMoneyInput(account.statementBalanceCents)} inputMode="decimal" className={fieldClassName} />
+        <label className="space-y-1">
+          <Label>Statement balance</Label>
+          <input name="statementBalance" defaultValue={toMoneyInput(account.statementBalanceCents)} inputMode="decimal" className="field font-mono tabular" />
         </label>
-        <label className="space-y-1 text-sm">
-          <span className="text-zinc-500">Due date</span>
-          <input type="date" name="dueDate" defaultValue={toDateInput(account.dueDate)} className={fieldClassName} />
+        <label className="space-y-1">
+          <Label>Due date</Label>
+          <input type="date" name="dueDate" defaultValue={toDateInput(account.dueDate)} className="field font-mono tabular" />
         </label>
-        <label className="space-y-1 text-sm">
-          <span className="text-zinc-500">Credit limit</span>
-          <input name="creditLimit" defaultValue={toMoneyInput(account.creditLimitCents)} inputMode="decimal" className={fieldClassName} />
+        <label className="space-y-1">
+          <Label>Credit limit</Label>
+          <input name="creditLimit" defaultValue={toMoneyInput(account.creditLimitCents)} inputMode="decimal" className="field font-mono tabular" />
         </label>
-        <label className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-3 text-sm">
-          <input type="checkbox" name="includeInCashPosition" defaultChecked={account.includeInCashPosition} className={checkboxClassName} />
+        <label className="flex items-baseline gap-3">
+          <input type="checkbox" name="includeInCashPosition" defaultChecked={account.includeInCashPosition} className="mt-1 accent-oxblood" />
           <span>
-            <span className="block font-medium text-zinc-900">Include in cash position</span>
-            <span className="block text-xs text-zinc-500">Count this toward available cash.</span>
+            <span className="block font-display text-sm italic text-ink">Include in cash position</span>
+            <span className="block font-serif text-xs italic text-ink-fade">Count toward available cash.</span>
           </span>
         </label>
-        <label className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-3 text-sm">
-          <input type="checkbox" name="includeInNetWorth" defaultChecked={account.includeInNetWorth} className={checkboxClassName} />
+        <label className="flex items-baseline gap-3">
+          <input type="checkbox" name="includeInNetWorth" defaultChecked={account.includeInNetWorth} className="mt-1 accent-oxblood" />
           <span>
-            <span className="block font-medium text-zinc-900">Include in net worth</span>
-            <span className="block text-xs text-zinc-500">Count this as an asset or debt in totals.</span>
+            <span className="block font-display text-sm italic text-ink">Include in net worth</span>
+            <span className="block font-serif text-xs italic text-ink-fade">Count as an asset or debt in totals.</span>
           </span>
         </label>
       </div>
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        {state && !state.ok ? <p className="text-sm text-red-600">{state.error}</p> : <span />}
-        <button type="submit" disabled={pending} className={`${buttonClassName} w-full sm:w-auto`}>
-          {pending ? "Saving…" : "Save account"}
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {state && !state.ok ? <p className="font-serif text-sm italic text-oxblood">{state.error}</p> : <span />}
+        <button type="submit" disabled={pending} className="btn-ink w-full sm:w-auto">
+          {pending ? "Saving…" : "Save changes  ✎"}
         </button>
       </div>
     </form>
@@ -124,68 +136,75 @@ export function AccountsPanel({ accounts }: { accounts: AccountView[] }) {
   const [state, formAction, pending] = useActionState(saveFinanceAccount, initialState);
 
   return (
-    <div className="space-y-4">
+    <div>
       {accounts.map((account) => (
         <AccountRow key={account.id} account={account} />
       ))}
 
-      <form action={formAction} className="rounded-[1.4rem] border border-dashed border-zinc-300 bg-white/70 p-4">
+      <form action={formAction} className="rule-t rule-b border-dashed border-rule mt-2 py-6">
         <div>
-          <h3 className="text-sm font-medium text-zinc-900">Add account</h3>
-          <p className="mt-1 text-sm text-zinc-500">Manual-first for now: keep current balances fresh, then we can automate later.</p>
+          <p className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade">
+            Open a new account
+          </p>
+          <h3 className="mt-1 font-display text-xl italic text-ink">
+            Add a new line to the register.
+          </h3>
+          <p className="mt-1 font-serif text-sm italic text-ink-fade">
+            Manual-first; balances kept current by hand for now.
+          </p>
         </div>
-        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <label className="space-y-1 text-sm">
-            <span className="text-zinc-500">Name</span>
-            <input name="name" placeholder="Chase Checking • 0637" required className={fieldClassName} />
+        <div className="mt-5 grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2 xl:grid-cols-4">
+          <label className="space-y-1">
+            <Label>Name</Label>
+            <input name="name" placeholder="Chase Checking • 0637" required className="field" />
           </label>
-          <label className="space-y-1 text-sm">
-            <span className="text-zinc-500">Kind</span>
-            <select name="kind" defaultValue={"checking" as FinanceAccountKind} className={fieldClassName}>
+          <label className="space-y-1">
+            <Label>Kind</Label>
+            <select name="kind" defaultValue={"checking" as FinanceAccountKind} className="field">
               {FINANCE_ACCOUNT_KINDS.map((kind) => (
                 <option key={kind} value={kind}>{formatAccountKind(kind)}</option>
               ))}
             </select>
           </label>
-          <label className="space-y-1 text-sm">
-            <span className="text-zinc-500">Current balance</span>
-            <input name="currentBalance" required inputMode="decimal" placeholder="0.00" className={fieldClassName} />
+          <label className="space-y-1">
+            <Label>Current balance</Label>
+            <input name="currentBalance" required inputMode="decimal" placeholder="0.00" className="field font-mono tabular" />
           </label>
-          <label className="space-y-1 text-sm">
-            <span className="text-zinc-500">Balance as of</span>
-            <input type="date" name="balanceUpdatedAt" required className={fieldClassName} />
+          <label className="space-y-1">
+            <Label>Balance as of</Label>
+            <input type="date" name="balanceUpdatedAt" required className="field font-mono tabular" />
           </label>
-          <label className="space-y-1 text-sm">
-            <span className="text-zinc-500">Statement balance</span>
-            <input name="statementBalance" inputMode="decimal" placeholder="optional" className={fieldClassName} />
+          <label className="space-y-1">
+            <Label>Statement balance</Label>
+            <input name="statementBalance" inputMode="decimal" placeholder="optional" className="field font-mono tabular" />
           </label>
-          <label className="space-y-1 text-sm">
-            <span className="text-zinc-500">Due date</span>
-            <input type="date" name="dueDate" className={fieldClassName} />
+          <label className="space-y-1">
+            <Label>Due date</Label>
+            <input type="date" name="dueDate" className="field font-mono tabular" />
           </label>
-          <label className="space-y-1 text-sm">
-            <span className="text-zinc-500">Credit limit</span>
-            <input name="creditLimit" inputMode="decimal" placeholder="optional" className={fieldClassName} />
+          <label className="space-y-1">
+            <Label>Credit limit</Label>
+            <input name="creditLimit" inputMode="decimal" placeholder="optional" className="field font-mono tabular" />
           </label>
-          <label className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-3 text-sm">
-            <input type="checkbox" name="includeInCashPosition" defaultChecked className={checkboxClassName} />
+          <label className="flex items-baseline gap-3">
+            <input type="checkbox" name="includeInCashPosition" defaultChecked className="mt-1 accent-oxblood" />
             <span>
-              <span className="block font-medium text-zinc-900">Include in cash position</span>
-              <span className="block text-xs text-zinc-500">Best for checking, savings, and cash.</span>
+              <span className="block font-display text-sm italic text-ink">In cash position</span>
+              <span className="block font-serif text-xs italic text-ink-fade">For checking, savings, cash.</span>
             </span>
           </label>
-          <label className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-3 text-sm">
-            <input type="checkbox" name="includeInNetWorth" defaultChecked className={checkboxClassName} />
+          <label className="flex items-baseline gap-3">
+            <input type="checkbox" name="includeInNetWorth" defaultChecked className="mt-1 accent-oxblood" />
             <span>
-              <span className="block font-medium text-zinc-900">Include in net worth</span>
-              <span className="block text-xs text-zinc-500">Turn this off for excluded or duplicated accounts.</span>
+              <span className="block font-display text-sm italic text-ink">In net worth</span>
+              <span className="block font-serif text-xs italic text-ink-fade">Turn off for excluded or duplicate accounts.</span>
             </span>
           </label>
         </div>
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          {state && !state.ok ? <p className="text-sm text-red-600">{state.error}</p> : <span />}
-          <button type="submit" disabled={pending} className={`${buttonClassName} w-full sm:w-auto`}>
-            {pending ? "Adding…" : "Add account"}
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          {state && !state.ok ? <p className="font-serif text-sm italic text-oxblood">{state.error}</p> : <span />}
+          <button type="submit" disabled={pending} className="btn-ink w-full sm:w-auto">
+            {pending ? "Opening account…" : "Open the account  +"}
           </button>
         </div>
       </form>

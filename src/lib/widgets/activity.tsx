@@ -17,27 +17,42 @@ export async function ActivityWidget() {
   const events = await listRecentEvents(userId, { limit: 5 });
 
   return (
-    <WidgetCard name="Activity" href="/app">
+    <WidgetCard name="Marginalia" href="/app" folio="III.">
       {events.length === 0 ? (
         <div className="space-y-3">
-          <p className="text-2xl font-semibold tracking-tight text-zinc-950">Quiet start</p>
-          <p className="text-sm text-zinc-500">Recent actions will collect here once you start tracking or importing.</p>
+          <p className="font-display text-[1.5rem] leading-tight tracking-[-0.02em] text-ink">
+            A quiet morning.
+          </p>
+          <p className="font-serif text-sm italic leading-relaxed text-ink-fade">
+            Notes from the day will be set in the margin once you begin filing.
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
-          <p className="text-sm text-zinc-500">Recent activity across the workspace.</p>
-          <ul className="space-y-3">
-            {events.map((event) => (
-              <li key={event.id} className="rounded-2xl border border-zinc-200/80 bg-zinc-50/90 px-4 py-3">
-                <p className="text-sm font-medium text-zinc-900">
+          <p className="font-serif text-sm italic text-ink-fade">
+            Notes filed in the margin, most recent first.
+          </p>
+          <ol className="rule-soft-t border-rule">
+            {events.map((event, i) => (
+              <li
+                key={event.id}
+                className="grid grid-cols-[auto_1fr_auto] items-baseline gap-3 rule-soft-b border-rule py-3 last:border-b-0"
+              >
+                <span className="font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-ink-ghost tabular">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <span className="font-serif text-sm leading-snug text-ink">
                   {describeEventType(event.type)}
-                </p>
-                <p className="mt-1 text-xs text-zinc-500">
-                  {event.tool} · {formatWhen(event.at)}
-                </p>
+                  <span className="ml-1.5 font-serif italic text-ink-fade">
+                    in {event.tool}
+                  </span>
+                </span>
+                <span className="font-mono text-[0.6875rem] tabular text-ink-fade">
+                  {formatWhen(event.at)}
+                </span>
               </li>
             ))}
-          </ul>
+          </ol>
         </div>
       )}
     </WidgetCard>

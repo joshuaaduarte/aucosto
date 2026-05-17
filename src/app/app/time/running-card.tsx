@@ -23,28 +23,45 @@ export function RunningCard({
   }, []);
 
   return (
-    <div className="rounded-[1.9rem] border border-emerald-200/80 bg-[linear-gradient(180deg,rgba(236,253,245,0.9),rgba(255,255,255,0.96)),radial-gradient(circle_at_top_right,rgba(56,189,248,0.14),transparent_32%)] p-5 shadow-[0_24px_70px_-50px_rgba(24,24,27,0.22)] sm:p-7">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-        <div className="space-y-3">
-          <div className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-            Running now{category ? ` · ${category}` : ""}
+    <article className="rule-t rule-b border-ink relative bg-paper-deep/40 py-8 sm:py-12">
+      {/* corner folio */}
+      <span
+        aria-hidden
+        className="absolute left-0 top-2 font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-oxblood"
+      >
+        ❦ In progress
+      </span>
+      <span
+        aria-hidden
+        className="absolute right-0 top-2 font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade"
+      >
+        Dispatch open
+      </span>
+
+      <div className="flex flex-col gap-8 px-2 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:gap-12">
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <span className="ink-pulse h-2 w-2 rounded-full bg-oxblood" aria-hidden />
+            <span className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-oxblood">
+              Filed live{category ? ` · ${category}` : ""}
+            </span>
           </div>
-          <div>
-            <p className="text-2xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">{label}</p>
-            <p className="mt-3 font-mono text-[2.4rem] tabular-nums tracking-tight text-zinc-950 sm:text-5xl">
-              {formatDuration(now - startedAt)}
-            </p>
-          </div>
+          <h2 className="font-display text-[2rem] font-medium leading-[1.05] tracking-[-0.03em] text-ink sm:text-[2.8rem]">
+            {label}
+          </h2>
+          <p className="font-display font-medium leading-none tracking-[-0.04em] tabular text-ink text-[3rem] sm:text-[5rem]">
+            {formatDuration(now - startedAt)}
+          </p>
         </div>
         <button
           type="button"
           onClick={() => startTransition(() => stopEntry())}
           disabled={pending}
-          className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-zinc-300 bg-white px-6 text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-50 disabled:opacity-50 sm:w-auto"
+          className="btn-ghost shrink-0 self-start lg:self-end"
         >
-          {pending ? "Stopping…" : "Stop timer"}
+          {pending ? "Closing dispatch…" : "Close this dispatch"}
         </button>
       </div>
-    </div>
+    </article>
   );
 }

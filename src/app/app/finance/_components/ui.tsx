@@ -15,17 +15,17 @@ export function SummaryCard({
 }) {
   return (
     <div
-      className={`min-w-0 rounded-[1.65rem] border border-zinc-200/80 bg-white/92 p-5 shadow-[0_20px_60px_-45px_rgba(24,24,27,0.16)] ${className ?? ""}`}
+      className={`min-w-0 rule-t border-ink/30 pt-4 pb-1 pr-4 ${className ?? ""}`}
     >
-      <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">
+      <p className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade">
         {label}
       </p>
       <p
-        className={`mt-3 min-w-0 overflow-hidden text-ellipsis break-words text-xl font-semibold tracking-tight sm:text-2xl ${valueClassName ?? "text-zinc-950"}`}
+        className={`mt-3 min-w-0 overflow-hidden text-ellipsis break-words font-display text-[1.8rem] font-medium leading-none tracking-[-0.025em] tabular sm:text-[2.1rem] ${valueClassName ?? "text-ink"}`}
       >
         {value}
       </p>
-      <p className="mt-1 text-sm text-zinc-500">{hint}</p>
+      <p className="mt-2 font-serif text-sm italic text-ink-fade">{hint}</p>
     </div>
   );
 }
@@ -42,14 +42,16 @@ export function SectionCard({
   className?: string;
 }) {
   return (
-    <div
-      className={`rounded-[1.9rem] border border-zinc-200/80 bg-white/92 p-5 shadow-[0_20px_60px_-45px_rgba(24,24,27,0.16)] sm:p-6 ${className ?? ""}`}
-    >
-      <div className="flex flex-col gap-1">
-        <h2 className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">
-          {title}
-        </h2>
-        {subtitle ? <p className="text-sm text-zinc-500">{subtitle}</p> : null}
+    <div className={`relative ${className ?? ""}`}>
+      <div className="rule-t border-ink/80 pt-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="font-mono text-[0.6875rem] uppercase tracking-[0.26em] text-ink-fade">
+            {title}
+          </h2>
+          {subtitle ? (
+            <p className="font-serif text-sm italic text-ink-fade">{subtitle}</p>
+          ) : null}
+        </div>
       </div>
       {children}
     </div>
@@ -65,11 +67,15 @@ export function QuickStat({
   value: string;
   tone?: "default" | "positive";
 }) {
+  const valueTone =
+    tone === "positive" ? "text-verdigris" : "text-ink";
   return (
-    <div className="min-w-0 rounded-[1.4rem] border border-white/70 bg-white/88 px-4 py-3 shadow-sm shadow-zinc-950/5 backdrop-blur">
-      <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">{label}</p>
+    <div className="min-w-0 rule-l border-rule pl-4 py-2">
+      <p className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-ink-fade">
+        {label}
+      </p>
       <p
-        className={`mt-2 min-w-0 overflow-hidden text-ellipsis break-words text-base font-semibold tracking-tight sm:text-lg ${tone === "positive" ? "text-emerald-600" : "text-zinc-950"}`}
+        className={`mt-1.5 min-w-0 overflow-hidden text-ellipsis break-words font-display text-lg font-medium tracking-[-0.02em] tabular sm:text-xl ${valueTone}`}
       >
         {value}
       </p>
@@ -81,7 +87,7 @@ export function ActionPill({ href, label }: { href: string; label: string }) {
   return (
     <a
       href={href}
-      className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-white px-3.5 py-2 text-sm text-zinc-700 shadow-sm shadow-zinc-950/5 transition-all hover:-translate-y-0.5 hover:border-zinc-300 hover:text-zinc-900"
+      className="inline-flex min-h-11 shrink-0 items-center justify-center border border-rule bg-paper px-4 font-serif text-sm text-ink-soft transition-colors hover:border-ink hover:bg-paper-deep hover:text-ink"
     >
       {label}
     </a>
@@ -95,16 +101,17 @@ export function ProgressBar({
   percent: number;
   tone?: "emerald" | "sky" | "amber";
 }) {
-  const toneClass = {
-    emerald: "bg-emerald-500",
-    sky: "bg-sky-500",
-    amber: "bg-amber-500",
+  const trackBg = "bg-rule-faint";
+  const fillBg = {
+    emerald: "bg-verdigris",
+    sky: "bg-ink",
+    amber: "bg-aged-gold",
   }[tone];
 
   return (
-    <div className="mt-3 h-2 rounded-full bg-zinc-100">
+    <div className={`mt-3 h-[3px] ${trackBg}`}>
       <div
-        className={`${toneClass} h-2 rounded-full transition-all`}
+        className={`${fillBg} h-[3px] transition-all`}
         style={{ width: `${Math.max(4, Math.min(100, percent))}%` }}
       />
     </div>
@@ -115,15 +122,15 @@ export function typeTone(type: string): string {
   switch (type) {
     case "income":
     case "reimbursement":
-      return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200";
+      return "text-verdigris border-verdigris/30 bg-verdigris-soft";
     case "credit_card_payment":
     case "transfer":
-      return "bg-sky-50 text-sky-700 ring-1 ring-sky-200";
+      return "text-ink border-rule bg-paper-deep/60";
     case "housing":
-      return "bg-violet-50 text-violet-700 ring-1 ring-violet-200";
+      return "text-ink-soft border-rule bg-paper-deep/40";
     case "fee":
-      return "bg-amber-50 text-amber-700 ring-1 ring-amber-200";
+      return "text-oxblood border-oxblood/30 bg-oxblood-soft";
     default:
-      return "bg-zinc-100 text-zinc-700 ring-1 ring-zinc-200";
+      return "text-ink-soft border-rule bg-paper-deep/30";
   }
 }

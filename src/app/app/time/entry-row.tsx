@@ -10,10 +10,10 @@ export function EntryDeleteButton({ id }: { id: string }) {
       type="button"
       onClick={() => startTransition(() => deleteEntry(id))}
       disabled={pending}
-      aria-label="Delete entry"
-      className="text-zinc-400 transition-colors hover:text-red-600 disabled:opacity-50 dark:hover:text-red-400"
+      aria-label="Strike from the record"
+      className="font-mono text-base text-ink-ghost transition-colors hover:text-oxblood disabled:opacity-40"
     >
-      &times;
+      ✕
     </button>
   );
 }

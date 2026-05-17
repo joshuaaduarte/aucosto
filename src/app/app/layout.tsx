@@ -7,6 +7,40 @@ import { LockNowButton } from "./lock-now-button";
 import { SignOutButton } from "./sign-out-button";
 import { UnlockScreen } from "./unlock-screen";
 
+const EPOCH = Date.UTC(2025, 0, 1);
+
+function dateline(d: Date) {
+  const issue = Math.max(
+    1,
+    Math.floor((d.getTime() - EPOCH) / (24 * 60 * 60 * 1000)) + 1,
+  );
+  const roman = toRoman(issue);
+  const human = d.toLocaleDateString([], {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+  return { issue, roman, human };
+}
+
+function toRoman(num: number): string {
+  const pairs: [number, string][] = [
+    [1000, "M"], [900, "CM"], [500, "D"], [400, "CD"],
+    [100, "C"], [90, "XC"], [50, "L"], [40, "XL"],
+    [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"],
+  ];
+  let n = num;
+  let out = "";
+  for (const [v, s] of pairs) {
+    while (n >= v) {
+      out += s;
+      n -= v;
+    }
+  }
+  return out;
+}
+
 export default async function AppLayout({
   children,
 }: {
@@ -18,55 +52,91 @@ export default async function AppLayout({
   }
 
   const context = await getViewerContext();
-  const displayName = context?.displayName ?? session.user.name ?? session.user.email ?? "you";
+  const displayName =
+    context?.displayName ?? session.user.name ?? session.user.email ?? "you";
+
+  const { issue, roman, human } = dateline(new Date());
 
   return (
-    <div className="relative flex min-h-full flex-1 flex-col overflow-hidden">
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-80 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.12),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(168,85,247,0.08),_transparent_24%)]" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-full bg-[linear-gradient(rgba(24,24,27,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(24,24,27,0.03)_1px,transparent_1px)] bg-[size:28px_28px] opacity-40" />
-      <header className="sticky top-0 z-30 px-4 pt-4 sm:px-6 sm:pt-5">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 rounded-[1.75rem] border border-zinc-200/80 bg-white/88 px-4 py-4 shadow-[0_20px_60px_-42px_rgba(24,24,27,0.18)] backdrop-blur sm:px-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-6">
-            <div>
+    <div className="relative flex min-h-full flex-1 flex-col">
+      <header className="relative">
+        <div className="mx-auto w-full max-w-[1280px] px-5 pt-5 sm:px-10 sm:pt-8">
+          {/* top metadata strip — issue / weather / reader */}
+          <div className="flex items-center justify-between gap-4 pb-3 font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade">
+            <span className="hidden sm:inline">
+              Vol. I · No.&nbsp;<span className="tabular text-ink">{roman}</span>
+            </span>
+            <span className="sm:hidden">
+              No.&nbsp;<span className="tabular text-ink">{issue}</span>
+            </span>
+            <span className="text-center text-ink-fade">
+              {context?.isDemoMode ? (
+                <span className="text-oxblood">
+                  ❦ Demonstration Edition ❦
+                </span>
+              ) : (
+                <>An edition of one</>
+              )}
+            </span>
+            <span className="hidden text-right sm:inline">
+              For{" "}
+              <span className="not-italic text-ink">{displayName}</span>
+            </span>
+            <span className="text-right sm:hidden">
+              <span className="not-italic text-ink truncate max-w-[8rem] inline-block align-bottom">{displayName}</span>
+            </span>
+          </div>
+
+          {/* masthead */}
+          <div className="double-rule-t double-rule-b border-ink py-4 sm:py-6">
+            <div className="flex flex-col items-center text-center">
               <Link
                 href="/app"
-                className="font-mono text-xs uppercase tracking-[0.24em] text-zinc-500 hover:text-zinc-900"
+                className="font-display font-medium italic leading-[0.85] tracking-[-0.05em] text-ink text-[3.4rem] sm:text-[6rem] lg:text-[8rem]"
+                style={{ fontVariationSettings: '"SOFT" 100, "WONK" 1, "opsz" 144' }}
               >
                 aucosto
               </Link>
-              <p className="mt-1 text-sm text-zinc-500">
-                Daily steering for time, money, and recovery.
+              <p className="mt-2 font-serif text-sm italic text-ink-fade sm:text-base">
+                A daily edition, set in print for a single reader.
               </p>
+            </div>
+          </div>
+
+          {/* dateline + section nav */}
+          <div className="flex flex-col gap-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4 font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade">
+              <span aria-hidden className="hidden h-px w-8 bg-rule sm:block" />
+              <span className="tabular text-ink">{human}</span>
             </div>
             <AppNav showFinance={context?.financeVisible ?? false} />
           </div>
 
-          <div className="flex w-full flex-col gap-2 lg:w-auto lg:items-end">
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3 lg:justify-end">
-              {context?.isDemoMode ? (
-                <span className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">
-                  Demo mode
-                </span>
-              ) : null}
-              <div className="min-w-0 flex-1 text-left sm:text-right lg:flex-none">
-                <p className="truncate text-sm font-medium text-zinc-900">
-                  {displayName}
-                </p>
-                <p className="text-xs text-zinc-500">
-                  {context?.isDemoMode ? "Showing demo workspace" : "Personal workspace"}
-                </p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end sm:gap-3">
+          <div className="rule-b border-ink" />
+        </div>
+      </header>
+
+      <main className="mx-auto w-full max-w-[1280px] flex-1 px-5 py-8 pb-safe sm:px-10 sm:py-12">
+        {context?.appLockEnabled && !context.isUnlocked ? (
+          <UnlockScreen />
+        ) : (
+          children
+        )}
+      </main>
+
+      <footer className="border-rule mt-auto">
+        <div className="mx-auto w-full max-w-[1280px] px-5 sm:px-10">
+          <div className="rule-t border-ink/50 flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade">
+              Aucosto · The Daily Edition · Printed in one copy
+            </p>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               {context?.appLockEnabled ? <LockNowButton /> : null}
               <SignOutButton />
             </div>
           </div>
         </div>
-      </header>
-      <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 pb-safe sm:px-6 sm:py-8 lg:py-10">
-        {context?.appLockEnabled && !context.isUnlocked ? <UnlockScreen /> : children}
-      </div>
+      </footer>
     </div>
   );
 }

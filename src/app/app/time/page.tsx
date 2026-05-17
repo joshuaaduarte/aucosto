@@ -17,24 +17,16 @@ import { StartForm } from "./start-form";
 
 export const dynamic = "force-dynamic";
 
-function statCard({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-}) {
+function statLine({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="rounded-[1.65rem] border border-zinc-200/80 bg-white/92 p-5 shadow-[0_20px_60px_-45px_rgba(24,24,27,0.18)]">
-      <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">
+    <div className="rule-t border-ink/30 py-4">
+      <p className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade">
         {label}
       </p>
-      <p className="mt-3 text-3xl font-semibold tracking-tight text-zinc-950">
+      <p className="mt-3 font-display text-[2.4rem] font-medium leading-none tracking-[-0.03em] tabular text-ink">
         {value}
       </p>
-      <p className="mt-1 text-sm text-zinc-500">{hint}</p>
+      <p className="mt-1.5 font-serif text-sm italic text-ink-fade">{hint}</p>
     </div>
   );
 }
@@ -42,20 +34,12 @@ function statCard({
 function formatDayLabel(date: Date) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-
   const target = new Date(date);
   target.setHours(0, 0, 0, 0);
-
   const diffDays = Math.round((today.getTime() - target.getTime()) / (24 * 60 * 60 * 1000));
-
   if (diffDays === 0) return "Today";
   if (diffDays === 1) return "Yesterday";
-
-  return target.toLocaleDateString([], {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-  });
+  return target.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
 }
 
 export default async function TimePage() {
@@ -79,51 +63,56 @@ export default async function TimePage() {
     .filter((category) => category && category.toLowerCase() !== "uncategorized");
 
   const groupedEntries = recent.reduce<
-    Array<{
-      label: string;
-      items: typeof recent;
-    }>
+    Array<{ label: string; items: typeof recent }>
   >((groups, entry) => {
     const label = formatDayLabel(entry.startedAt);
     const existing = groups.find((group) => group.label === label);
-
     if (existing) {
       existing.items.push(entry);
       return groups;
     }
-
     groups.push({ label, items: [entry] });
     return groups;
   }, []);
 
   return (
-    <div className="space-y-6 lg:space-y-8">
-      <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="rounded-[2.1rem] border border-zinc-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(250,250,248,0.96)),radial-gradient(circle_at_top_right,rgba(168,85,247,0.10),transparent_34%)] p-5 shadow-[0_28px_90px_-52px_rgba(24,24,27,0.22)] sm:p-7">
-          <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-zinc-500">
-            Time tracker
+    <div className="space-y-12 lg:space-y-16">
+      {/* Section header */}
+      <header className="fade-in grid gap-10 lg:grid-cols-[1.6fr_1fr] lg:gap-14">
+        <div className="lg:rule-r lg:border-rule lg:pr-14">
+          <p className="font-mono text-[0.6875rem] uppercase tracking-[0.28em] text-ink-fade">
+            Section II · The Dispatch
           </p>
-          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
-            Protect focus before the day gets noisy.
+          <h1 className="mt-5 font-display font-medium leading-[0.9] tracking-[-0.045em] text-ink text-[2.6rem] sm:text-[3.6rem] lg:text-[4.4rem]">
+            Hours,{" "}
+            <span className="italic text-oxblood">filed in order</span>
+            <br />
+            of their occurrence.
           </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-zinc-600 sm:text-base">
-            Keep one timer running, make the important blocks visible, and review the last few sessions without digging.
+          <p className="mt-6 max-w-xl font-serif text-[1.05rem] leading-[1.75] italic text-ink-soft">
+            One press at a time. Open the day’s record, set the column for what
+            you intend to work on, and the clock will keep faithful count until
+            you close it.
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 xl:grid-cols-1">
-          {statCard({
-            label: "Today",
+        <div className="space-y-0">
+          {statLine({
+            label: "Filed today",
             value: formatHM(todayTotalMs),
-            hint: "tracked today",
+            hint: "completed in this column",
           })}
-          {statCard({
-            label: "This week",
+          {statLine({
+            label: "Week to date",
             value: formatHM(weekTotalMs),
-            hint: "completed since Monday",
+            hint: "from Monday's first dispatch",
           })}
         </div>
-      </section>
+      </header>
+
+      <div className="fleuron text-ink-fade">
+        <span aria-hidden>❧</span>
+      </div>
 
       {running ? (
         <RunningCard
@@ -135,38 +124,39 @@ export default async function TimePage() {
         <StartForm suggestedCategories={suggestedCategories} />
       )}
 
-      <section className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-        <div className="rounded-[1.9rem] border border-zinc-200/80 bg-white/92 p-5 shadow-[0_20px_60px_-45px_rgba(24,24,27,0.18)] sm:p-6">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">
-                Weekly split
-              </p>
-              <p className="mt-2 text-sm text-zinc-500">
-                The categories taking most of the week so far.
-              </p>
-            </div>
-          </div>
+      <section className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:gap-14">
+        {/* Weekly split */}
+        <div>
+          <header className="rule-b border-ink pb-3">
+            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.26em] text-ink-fade">
+              The Week in Columns
+            </p>
+            <h2 className="mt-1.5 font-display text-2xl font-medium italic tracking-[-0.02em] text-ink">
+              Where the hours went.
+            </h2>
+          </header>
 
           {topCategories.length === 0 ? (
-            <p className="mt-5 text-sm text-zinc-500">No completed entries yet.</p>
+            <p className="mt-6 font-serif italic text-ink-fade">
+              Nothing filed yet this week.
+            </p>
           ) : (
-            <ul className="mt-5 space-y-3">
+            <ul className="mt-2">
               {topCategories.map((item) => {
                 const share = weekTotalMs > 0 ? Math.max(6, Math.round((item.totalMs / weekTotalMs) * 100)) : 0;
                 return (
-                  <li key={item.category} className="rounded-2xl border border-zinc-200/80 bg-zinc-50/90 px-4 py-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="truncate text-sm font-medium text-zinc-900">
+                  <li key={item.category} className="rule-soft-b border-rule py-5">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="truncate font-display text-lg italic text-ink">
                         {item.category}
                       </span>
-                      <span className="font-mono text-sm tabular-nums text-zinc-500">
+                      <span className="font-mono text-sm tabular text-ink-fade">
                         {formatHM(item.totalMs)}
                       </span>
                     </div>
-                    <div className="mt-3 h-2 rounded-full bg-zinc-200">
+                    <div className="mt-3 h-[3px] bg-rule-faint">
                       <div
-                        className="h-2 rounded-full bg-gradient-to-r from-sky-500 to-violet-500"
+                        className="h-[3px] bg-ink"
                         style={{ width: `${share}%` }}
                       />
                     </div>
@@ -177,47 +167,48 @@ export default async function TimePage() {
           )}
         </div>
 
-        <div className="rounded-[1.9rem] border border-zinc-200/80 bg-white/92 p-5 shadow-[0_20px_60px_-45px_rgba(24,24,27,0.18)] sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">
-                Recent entries
-              </p>
-              <p className="mt-2 text-sm text-zinc-500">
-                The last tracked blocks, grouped so the timeline is easier to scan.
-              </p>
-            </div>
-          </div>
+        {/* Recent entries — the daily archive */}
+        <div>
+          <header className="rule-b border-ink pb-3">
+            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.26em] text-ink-fade">
+              The Archive
+            </p>
+            <h2 className="mt-1.5 font-display text-2xl font-medium italic tracking-[-0.02em] text-ink">
+              Recently filed dispatches.
+            </h2>
+          </header>
 
           {recent.length === 0 ? (
-            <p className="mt-5 text-sm text-zinc-500">Nothing yet. Start a timer above.</p>
+            <p className="mt-6 font-serif italic text-ink-fade">
+              The archive is empty. Open a dispatch above.
+            </p>
           ) : (
-            <div className="mt-5 space-y-5">
+            <div className="mt-2 space-y-6">
               {groupedEntries.map((group) => (
                 <div key={group.label}>
-                  <h2 className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">
+                  <h3 className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-oxblood py-2 rule-soft-b border-rule">
                     {group.label}
-                  </h2>
-                  <ul className="mt-3 space-y-3">
+                  </h3>
+                  <ul>
                     {group.items.map((entry) => {
                       const duration = (entry.endedAt!.getTime() - entry.startedAt.getTime()) | 0;
                       return (
                         <li
                           key={entry.id}
-                          className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-2xl border border-zinc-200/80 bg-zinc-50/90 px-4 py-4"
+                          className="grid grid-cols-[1fr_auto] items-baseline gap-4 rule-soft-b border-rule py-3.5"
                         >
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="truncate text-sm font-medium text-zinc-900 sm:text-base">
+                          <div className="min-w-0">
+                            <div className="flex items-baseline gap-2 flex-wrap">
+                              <p className="truncate font-display text-[1.05rem] text-ink">
                                 {entry.label}
                               </p>
                               {entry.category ? (
-                                <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-600 ring-1 ring-zinc-200">
-                                  {entry.category}
+                                <span className="font-mono text-[0.625rem] uppercase tracking-[0.2em] text-ink-fade">
+                                  — {entry.category}
                                 </span>
                               ) : null}
                             </div>
-                            <p className="mt-1 text-xs text-zinc-500">
+                            <p className="mt-1 font-serif text-xs italic text-ink-fade">
                               {entry.startedAt.toLocaleString([], {
                                 month: "short",
                                 day: "numeric",
@@ -226,8 +217,8 @@ export default async function TimePage() {
                               })}
                             </p>
                           </div>
-                          <div className="flex items-center gap-3 justify-self-end">
-                            <span className="font-mono text-sm tabular-nums text-zinc-700 sm:text-base">
+                          <div className="flex items-baseline gap-4">
+                            <span className="font-mono text-sm tabular text-ink-soft">
                               {formatDuration(duration)}
                             </span>
                             <EntryDeleteButton id={entry.id} />

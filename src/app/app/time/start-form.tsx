@@ -24,91 +24,92 @@ export function StartForm({
   }, [pending, state]);
 
   return (
-    <div className="rounded-[1.9rem] border border-zinc-200/80 bg-white/92 p-5 shadow-[0_24px_70px_-50px_rgba(24,24,27,0.18)] sm:p-6">
-      <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+    <article className="rule-t rule-b border-ink py-8 sm:py-10">
+      <header className="mb-7 flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">
-            Start tracking
+          <p className="font-mono text-[0.6875rem] uppercase tracking-[0.26em] text-ink-fade">
+            Open a fresh dispatch
           </p>
-          <h2 className="mt-2 text-xl font-semibold tracking-tight text-zinc-950 sm:text-2xl">
-            Capture the next block before the day drifts.
+          <h2 className="mt-1.5 font-display text-3xl font-medium italic tracking-[-0.02em] text-ink sm:text-4xl">
+            Set the column.
           </h2>
         </div>
-        <p className="max-w-sm text-sm text-zinc-500">
-          One timer at a time. Starting a new one stops the previous session automatically.
+        <p className="max-w-sm font-serif text-sm italic text-ink-fade">
+          One press at a time. Opening a new column closes any prior dispatch in
+          progress.
         </p>
-      </div>
+      </header>
 
-      <form
-        ref={formRef}
-        action={formAction}
-        className="flex flex-col gap-4"
-      >
-        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-end">
-          <div className="space-y-1.5">
+      <form ref={formRef} action={formAction} className="space-y-6">
+        <div className="grid gap-x-10 gap-y-6 md:grid-cols-[1.6fr_1fr]">
+          <div>
             <label
               htmlFor="label"
-              className="block text-xs font-medium uppercase tracking-[0.16em] text-zinc-500"
+              className="block font-mono text-[0.625rem] uppercase tracking-[0.22em] text-ink-fade"
             >
-              What are you doing?
+              The matter at hand
             </label>
             <input
               id="label"
               name="label"
               type="text"
               required
-              placeholder="e.g. deep work on aucosto"
-              className="block min-h-12 w-full rounded-2xl border border-zinc-300 bg-zinc-50/75 px-4 py-3 text-sm placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+              placeholder="What is being worked on?"
+              className="field font-display text-xl"
             />
           </div>
-          <div className="space-y-1.5">
+          <div>
             <label
               htmlFor="category"
-              className="block text-xs font-medium uppercase tracking-[0.16em] text-zinc-500"
+              className="block font-mono text-[0.625rem] uppercase tracking-[0.22em] text-ink-fade"
             >
-              Category
+              Column (optional)
             </label>
             <input
               ref={categoryRef}
               id="category"
               name="category"
               type="text"
-              placeholder="optional"
-              className="block min-h-12 w-full rounded-2xl border border-zinc-300 bg-zinc-50/75 px-4 py-3 text-sm placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+              placeholder="e.g. deep work, errands…"
+              className="field font-display text-xl italic"
             />
           </div>
-          <button
-            type="submit"
-            disabled={pending}
-            className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-zinc-900 px-6 text-sm font-medium text-zinc-50 transition-colors hover:bg-zinc-800 disabled:opacity-50"
-          >
-            {pending ? "Starting…" : "Start timer"}
-          </button>
         </div>
 
         {suggestedCategories.length > 0 ? (
-          <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
-            {suggestedCategories.map((suggestion) => (
-              <button
-                key={suggestion}
-                type="button"
-                onClick={() => {
-                  if (categoryRef.current) categoryRef.current.value = suggestion;
-                }}
-                className="inline-flex min-h-11 shrink-0 items-center rounded-full border border-zinc-200 bg-zinc-50 px-3.5 text-sm text-zinc-600 transition-colors hover:border-zinc-300 hover:text-zinc-900"
-              >
-                {suggestion}
-              </button>
-            ))}
+          <div className="rule-soft-t border-rule pt-4">
+            <p className="mb-3 font-mono text-[0.625rem] uppercase tracking-[0.22em] text-ink-fade">
+              Recently used columns
+            </p>
+            <div className="no-scrollbar flex flex-wrap gap-x-5 gap-y-2">
+              {suggestedCategories.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() => {
+                    if (categoryRef.current) categoryRef.current.value = suggestion;
+                  }}
+                  className="font-serif text-sm italic text-ink-fade transition-colors hover:text-ink hover:underline underline-offset-4 decoration-rule"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
           </div>
         ) : null}
 
         {state?.error && (
-          <p className="text-sm text-red-600">
+          <p className="font-serif text-sm italic text-oxblood">
             {state.error}
           </p>
         )}
+
+        <div className="rule-soft-t border-rule pt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+          <button type="submit" disabled={pending} className="btn-ink">
+            {pending ? "Opening dispatch…" : "Open the dispatch  →"}
+          </button>
+        </div>
       </form>
-    </div>
+    </article>
   );
 }

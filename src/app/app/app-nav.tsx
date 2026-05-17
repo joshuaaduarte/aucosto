@@ -4,33 +4,51 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const items = [
-  { href: "/app", label: "Hub", match: (pathname: string) => pathname === "/app", finance: false },
-  { href: "/app/time", label: "Time", match: (pathname: string) => pathname.startsWith("/app/time"), finance: false },
-  { href: "/app/finance", label: "Finance", match: (pathname: string) => pathname.startsWith("/app/finance"), finance: true },
+  { href: "/app", label: "The Hub", folio: "I", match: (pathname: string) => pathname === "/app", finance: false },
+  { href: "/app/time", label: "Dispatch", folio: "II", match: (pathname: string) => pathname.startsWith("/app/time"), finance: false },
+  { href: "/app/finance", label: "Ledger", folio: "III", match: (pathname: string) => pathname.startsWith("/app/finance"), finance: true },
 ];
 
 export function AppNav({ showFinance }: { showFinance: boolean }) {
   const pathname = usePathname();
 
   return (
-    <nav className="no-scrollbar flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0" aria-label="Primary">
-      {items.filter((item) => showFinance || !item.finance).map((item) => {
-        const active = item.match(pathname);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`inline-flex min-h-11 shrink-0 items-center justify-center rounded-full px-4 text-sm font-medium transition-all ${
-              active
-                ? "bg-zinc-950 text-white shadow-sm"
-                : "border border-zinc-200 bg-white/88 text-zinc-600 shadow-sm shadow-zinc-950/5 hover:-translate-y-0.5 hover:border-zinc-300 hover:text-zinc-950"
-            }`}
-            aria-current={active ? "page" : undefined}
-          >
-            {item.label}
-          </Link>
-        );
-      })}
+    <nav
+      className="no-scrollbar -mx-5 flex gap-7 overflow-x-auto px-5 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0"
+      aria-label="Sections"
+    >
+      {items
+        .filter((item) => showFinance || !item.finance)
+        .map((item) => {
+          const active = item.match(pathname);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={active ? "page" : undefined}
+              className={`group relative inline-flex shrink-0 items-baseline gap-2 py-1 font-serif text-[0.95rem] transition-colors ${
+                active
+                  ? "text-ink"
+                  : "text-ink-fade hover:text-ink"
+              }`}
+            >
+              <span
+                className={`font-mono text-[0.625rem] uppercase tracking-[0.22em] tabular ${
+                  active ? "text-oxblood" : "text-ink-ghost group-hover:text-ink-fade"
+                }`}
+              >
+                {item.folio}
+              </span>
+              <span className={active ? "italic" : ""}>{item.label}</span>
+              <span
+                aria-hidden
+                className={`absolute -bottom-[5px] left-0 right-0 h-px origin-left bg-ink transition-transform duration-300 ${
+                  active ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
+                }`}
+              />
+            </Link>
+          );
+        })}
     </nav>
   );
 }

@@ -28,103 +28,121 @@ export function PrivacyPanel({
   const [demoMessage, setDemoMessage] = useState<PrivacyState>(initialState);
 
   return (
-    <section className="rounded-[1.9rem] border border-zinc-200/80 bg-white/92 p-5 shadow-[0_20px_60px_-45px_rgba(24,24,27,0.18)] sm:p-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+    <section className="rule-t rule-b border-ink py-8">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-baseline sm:justify-between">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">
-            Privacy + demos
+          <p className="font-mono text-[0.6875rem] uppercase tracking-[0.28em] text-ink-fade">
+            ❦ The Editorial Office ❦
           </p>
-          <h2 className="mt-2 text-xl font-semibold tracking-tight text-zinc-950 sm:text-2xl">
-            Keep finance private and switch into a safe demo workspace when you need it.
+          <h2 className="mt-2 font-display text-3xl font-medium italic tracking-[-0.02em] text-ink">
+            Privacy, locks, and the demonstration edition.
           </h2>
         </div>
         {isDemoMode ? (
-          <span className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">
-            Demo mode on
+          <span className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-oxblood">
+            ❦ Demonstration mode is on ❦
           </span>
         ) : null}
-      </div>
+      </header>
 
-      <form action={settingsAction} className="mt-5 space-y-4">
-        <label className="flex items-start gap-3 rounded-2xl border border-zinc-200 bg-zinc-50/65 px-4 py-4">
-          <input
-            type="checkbox"
-            name="financeVisible"
-            defaultChecked={financeVisible}
-            className="mt-1 h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
-          />
-          <span>
-            <span className="block text-sm font-medium text-zinc-900">
-              Show finance in the app
+      <form action={settingsAction} className="mt-8 space-y-7">
+        <div className="rule-t border-ink/30 pt-5">
+          <label className="flex items-baseline gap-4">
+            <input
+              type="checkbox"
+              name="financeVisible"
+              defaultChecked={financeVisible}
+              className="mt-1 accent-oxblood"
+            />
+            <span>
+              <span className="block font-display text-lg italic text-ink">
+                Print the Ledger in the daily edition
+              </span>
+              <span className="mt-1 block font-serif text-sm italic leading-relaxed text-ink-fade">
+                With this off, finance is removed from the navigation, the
+                hub, and any direct route, until you reinstate it.
+              </span>
             </span>
-            <span className="mt-1 block text-sm text-zinc-500">
-              Hides finance from the nav, hub, and direct route access until you turn it back on.
-            </span>
-          </span>
-        </label>
+          </label>
+        </div>
 
-        <div className="rounded-2xl border border-zinc-200 bg-zinc-50/65 px-4 py-4">
-          <label className="flex items-start gap-3">
+        <div className="rule-t border-ink/30 pt-5">
+          <label className="flex items-baseline gap-4">
             <input
               type="checkbox"
               name="appLockEnabled"
               defaultChecked={appLockEnabled}
-              className="mt-1 h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+              className="mt-1 accent-oxblood"
             />
             <span>
-              <span className="block text-sm font-medium text-zinc-900">
-                Require a PIN to open the app
+              <span className="block font-display text-lg italic text-ink">
+                Require a cipher to release the edition
               </span>
-              <span className="mt-1 block text-sm text-zinc-500">
-                Good for leaving aucosto open without exposing the app to whoever walks by.
+              <span className="mt-1 block font-serif text-sm italic leading-relaxed text-ink-fade">
+                Useful if aucosto is left open in a public place — the press
+                will be locked until the cipher is presented.
               </span>
             </span>
           </label>
-          <div className="mt-4 w-full max-w-xs space-y-1.5">
-            <label htmlFor="pin" className="block text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
-              New PIN
+          <div className="ml-7 mt-4 max-w-xs">
+            <label
+              htmlFor="pin"
+              className="block font-mono text-[0.625rem] uppercase tracking-[0.22em] text-ink-fade"
+            >
+              New cipher
             </label>
             <input
               id="pin"
               name="pin"
               type="password"
               inputMode="numeric"
-              placeholder={appLockEnabled ? "Leave blank to keep current PIN" : "4 to 8 digits"}
-              className="block min-h-11 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+              placeholder={
+                appLockEnabled
+                  ? "leave blank to keep current"
+                  : "4 to 8 digits"
+              }
+              className="field font-mono text-lg tracking-[0.3em] tabular"
             />
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-sm">
+        <div className="rule-t border-ink/30 pt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="font-serif text-sm italic text-ink-fade">
             {settingsState?.ok === true ? (
-              <p className="text-emerald-600">{settingsState.message}</p>
+              <span className="text-verdigris">{settingsState.message}</span>
             ) : settingsState?.ok === false ? (
-              <p className="text-red-600">{settingsState.error}</p>
+              <span className="text-oxblood">{settingsState.error}</span>
             ) : (
-              <p className="text-zinc-500">Privacy settings apply immediately.</p>
+              "Changes take effect upon saving."
             )}
-          </div>
+          </p>
           <button
             type="submit"
             disabled={settingsPending}
-            className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-zinc-900 px-5 text-sm font-medium text-zinc-50 transition-colors hover:bg-zinc-800 disabled:opacity-50 sm:w-auto"
+            className="btn-ink w-full sm:w-auto"
           >
-            {settingsPending ? "Saving…" : "Save privacy settings"}
+            {settingsPending ? "Setting…" : "Set privacy preferences  ✎"}
           </button>
         </div>
       </form>
 
-      <div className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-50/65 px-4 py-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+      <div className="rule-t border-ink/30 mt-10 pt-5">
+        <header className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
           <div>
-            <h3 className="text-sm font-medium text-zinc-900">Demo workspace</h3>
-            <p className="mt-1 text-sm text-zinc-500">
-              Switch into seeded fake data so you can show time + finance without exposing the real thing.
+            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade">
+              The Demonstration Edition
+            </p>
+            <h3 className="mt-1 font-display text-xl italic text-ink">
+              A safe workspace, set in fixtures.
+            </h3>
+            <p className="mt-1 max-w-2xl font-serif text-sm italic leading-relaxed text-ink-fade">
+              Switch into seeded fixtures so the columns can be shown without
+              exposing your true figures.
             </p>
           </div>
-        </div>
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        </header>
+
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           {isDemoMode ? (
             <>
               <button
@@ -135,9 +153,9 @@ export function PrivacyPanel({
                     setDemoMessage(await disableDemoMode());
                   })
                 }
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 hover:border-zinc-300 hover:text-zinc-900 disabled:opacity-50 sm:w-auto"
+                className="btn-ghost w-full sm:w-auto"
               >
-                Back to personal data
+                Return to true figures
               </button>
               <button
                 type="button"
@@ -147,9 +165,9 @@ export function PrivacyPanel({
                     setDemoMessage(await resetDemoMode());
                   })
                 }
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-zinc-900 px-4 text-sm font-medium text-zinc-50 hover:bg-zinc-800 disabled:opacity-50 sm:w-auto"
+                className="btn-ink w-full sm:w-auto"
               >
-                Reset demo data
+                Reset the fixtures  ↺
               </button>
             </>
           ) : (
@@ -161,21 +179,21 @@ export function PrivacyPanel({
                   setDemoMessage(await enableDemoMode());
                 })
               }
-              className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-zinc-900 px-4 text-sm font-medium text-zinc-50 hover:bg-zinc-800 disabled:opacity-50 sm:w-auto"
+              className="btn-ink w-full sm:w-auto"
             >
-              Enter demo mode
+              Enter the demonstration edition  →
             </button>
           )}
         </div>
-        <div className="mt-3 text-sm">
+        <p className="mt-4 font-serif text-sm italic text-ink-fade">
           {demoMessage?.ok === true ? (
-            <p className="text-emerald-600">{demoMessage.message}</p>
+            <span className="text-verdigris">{demoMessage.message}</span>
           ) : demoMessage?.ok === false ? (
-            <p className="text-red-600">{demoMessage.error}</p>
+            <span className="text-oxblood">{demoMessage.error}</span>
           ) : (
-            <p className="text-zinc-500">The demo workspace is isolated from your real time and finance data.</p>
+            "The demonstration workspace is isolated from your true time and finance data."
           )}
-        </div>
+        </p>
       </div>
     </section>
   );

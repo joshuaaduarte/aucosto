@@ -1,8 +1,33 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fbfbfa;
-  --foreground: #18181b;
+  /* paper */
+  --paper: #f1ead9;
+  --paper-deep: #e6dec8;
+  --paper-well: #d9cfb5;
+
+  /* ink */
+  --ink: #1b1610;
+  --ink-soft: #3a302a;
+  --ink-fade: #6e5f50;
+  --ink-ghost: #978674;
+
+  /* hairline rules */
+  --rule: #8b7355;
+  --rule-soft: rgba(139, 115, 85, 0.32);
+  --rule-faint: rgba(139, 115, 85, 0.16);
+
+  /* semantic accent */
+  --oxblood: #7a1f24;
+  --oxblood-soft: rgba(122, 31, 36, 0.12);
+  --verdigris: #3b5a3a;
+  --verdigris-soft: rgba(59, 90, 58, 0.12);
+  --aged-gold: #a88433;
+
+  /* danger / system colors */
+  --background: var(--paper);
+  --foreground: var(--ink);
+
   --safe-area-top: env(safe-area-inset-top, 0px);
   --safe-area-right: env(safe-area-inset-right, 0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
@@ -12,27 +37,81 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
 
-body {
-  min-height: 100vh;
-  background: var(--background);
-  background-image:
-    radial-gradient(circle at top, rgba(56, 189, 248, 0.08), transparent 30%),
-    linear-gradient(180deg, #fbfbfa 0%, #f7f7f5 100%);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
-}
+  --color-paper: var(--paper);
+  --color-paper-deep: var(--paper-deep);
+  --color-paper-well: var(--paper-well);
 
-::selection {
-  background: rgba(14, 165, 233, 0.18);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-fade: var(--ink-fade);
+  --color-ink-ghost: var(--ink-ghost);
+
+  --color-rule: var(--rule);
+  --color-rule-soft: var(--rule-soft);
+  --color-rule-faint: var(--rule-faint);
+
+  --color-oxblood: var(--oxblood);
+  --color-oxblood-soft: var(--oxblood-soft);
+  --color-verdigris: var(--verdigris);
+  --color-verdigris-soft: var(--verdigris-soft);
+  --color-aged-gold: var(--aged-gold);
+
+  --font-display: var(--font-fraunces);
+  --font-serif: var(--font-newsreader);
+  --font-mono: var(--font-jetbrains);
+  --font-sans: var(--font-newsreader);
 }
 
 html {
   scroll-behavior: smooth;
 }
+
+body {
+  min-height: 100vh;
+  background-color: var(--paper);
+  background-image:
+    /* warm vignette in the corners */
+    radial-gradient(ellipse at top, rgba(168, 132, 51, 0.06), transparent 55%),
+    radial-gradient(ellipse at bottom right, rgba(122, 31, 36, 0.04), transparent 60%),
+    /* paper tone shift */
+    linear-gradient(180deg, #f3ecdc 0%, #ede5d2 100%);
+  color: var(--ink);
+  font-family: var(--font-newsreader), Iowan Old Style, Charter, Georgia, serif;
+  font-feature-settings: "kern", "liga", "calt";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* paper grain — a subtle SVG noise tile applied on top of everything */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.55;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.10  0 0 0 0 0.08  0 0 0 0 0.05  0 0 0 0.045 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  background-size: 220px 220px;
+}
+
+/* anything above the grain (the app shell) sits on z-index >= 10 */
+body > * {
+  position: relative;
+  z-index: 10;
+}
+
+::selection {
+  background: var(--oxblood);
+  color: var(--paper);
+}
+
+/* selectable links pick up the body font weight, not the system blue */
+a {
+  color: inherit;
+}
+
+/* utilities ----------------------------------------------------------- */
 
 @utility no-scrollbar {
   -ms-overflow-style: none;
@@ -45,4 +124,223 @@ html {
 
 @utility pb-safe {
   padding-bottom: calc(var(--safe-area-bottom) + 1rem);
+}
+
+/* font-feature-settings helpers */
+@utility tabular {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1, "ss01" 1;
+}
+
+@utility oldstyle {
+  font-variant-numeric: oldstyle-nums proportional-nums;
+  font-feature-settings: "onum" 1, "pnum" 1;
+}
+
+@utility smallcaps {
+  font-variant-caps: all-small-caps;
+  font-feature-settings: "smcp" 1, "c2sc" 1;
+  letter-spacing: 0.14em;
+  text-transform: lowercase;
+}
+
+@utility eyebrow {
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-fade);
+  font-weight: 500;
+}
+
+/* hairline rules — the spine of the design */
+@utility rule-t {
+  border-top: 1px solid var(--rule);
+}
+@utility rule-b {
+  border-bottom: 1px solid var(--rule);
+}
+@utility rule-l {
+  border-left: 1px solid var(--rule);
+}
+@utility rule-r {
+  border-right: 1px solid var(--rule);
+}
+@utility rule-soft-t {
+  border-top: 1px solid var(--rule-soft);
+}
+@utility rule-soft-b {
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+/* hairline-thin double rule, for mastheads */
+@utility double-rule-b {
+  border-bottom: 3px double var(--ink);
+}
+@utility double-rule-t {
+  border-top: 3px double var(--ink);
+}
+
+/* drop cap on the first letter of a paragraph */
+@utility drop-cap {
+  &::first-letter {
+    font-family: var(--font-fraunces), serif;
+    font-weight: 500;
+    font-style: normal;
+    float: left;
+    font-size: 4.6em;
+    line-height: 0.82;
+    padding: 0.05em 0.12em 0 0;
+    color: var(--ink);
+    font-feature-settings: "ss01" 1;
+  }
+}
+
+/* fleuron divider — a centered ornament between sections */
+@utility fleuron {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  color: var(--rule);
+  font-size: 1.1rem;
+  font-family: var(--font-fraunces), serif;
+
+  &::before,
+  &::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--rule-soft);
+  }
+}
+
+/* a ledger row — alternating paper tone for tables */
+@utility ledger-row {
+  background-image: linear-gradient(180deg, transparent 50%, rgba(139, 115, 85, 0.05) 50%);
+  background-size: 100% 3.6rem;
+}
+
+/* the "ink button" — flat, ink-on-paper, rule frame */
+@utility btn-ink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding-inline: 1.25rem;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-newsreader), serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  border: 1px solid var(--ink);
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--oxblood);
+    border-color: var(--oxblood);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+@utility btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding-inline: 1.25rem;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-newsreader), serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1px solid var(--rule);
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--paper-deep);
+    border-color: var(--ink);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+/* form inputs in the almanac style */
+@utility field {
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--rule);
+  padding: 0.5rem 0 0.5rem 0;
+  color: var(--ink);
+  font-family: var(--font-newsreader), serif;
+  font-size: 1rem;
+  transition: border-color 0.18s ease;
+
+  &::placeholder {
+    color: var(--ink-ghost);
+    font-style: italic;
+  }
+
+  &:focus {
+    outline: none;
+    border-bottom-color: var(--oxblood);
+    border-bottom-width: 2px;
+  }
+}
+
+/* animated underline for the active nav item */
+@keyframes ruleDraw {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@utility rule-draw {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -6px;
+    height: 1px;
+    background: var(--ink);
+    transform-origin: left;
+    animation: ruleDraw 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+}
+
+/* gentle paper fade-in for the body of a section */
+@keyframes paperFade {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@utility fade-in {
+  animation: paperFade 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@utility fade-in-delay-1 { animation: paperFade 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) 0.08s both; }
+@utility fade-in-delay-2 { animation: paperFade 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) 0.16s both; }
+@utility fade-in-delay-3 { animation: paperFade 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) 0.24s both; }
+@utility fade-in-delay-4 { animation: paperFade 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) 0.32s both; }
+
+/* a slow blink for the "dispatch in progress" indicator */
+@keyframes inkPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+@utility ink-pulse {
+  animation: inkPulse 2.4s ease-in-out infinite;
 }

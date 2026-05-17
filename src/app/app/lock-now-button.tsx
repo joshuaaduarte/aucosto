@@ -11,9 +11,15 @@ export function LockNowButton() {
       type="button"
       onClick={() => startTransition(() => lockAppNow())}
       disabled={pending}
-      className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-zinc-200 bg-white/88 px-4 text-sm font-medium text-zinc-600 transition-colors hover:border-zinc-300 hover:text-zinc-900 disabled:opacity-50 sm:w-auto"
+      className="group inline-flex items-baseline gap-1.5 font-serif text-sm italic text-ink-fade transition-colors hover:text-ink disabled:opacity-50"
     >
-      {pending ? "Locking…" : "Lock now"}
+      <span
+        aria-hidden
+        className="font-mono text-[0.625rem] not-italic uppercase tracking-[0.22em] text-ink-ghost group-hover:text-oxblood"
+      >
+        ⌧
+      </span>
+      {pending ? "locking…" : "lock the press"}
     </button>
   );
 }
