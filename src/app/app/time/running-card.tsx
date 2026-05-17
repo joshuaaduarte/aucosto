@@ -23,15 +23,15 @@ export function RunningCard({
   }, []);
 
   return (
-    <div className="rounded-[1.75rem] border border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-white to-sky-50/60 p-5 shadow-[0_24px_70px_-50px_rgba(16,185,129,0.55)] dark:border-emerald-900/30 dark:from-emerald-950/30 dark:via-zinc-900 dark:to-sky-950/20 dark:shadow-none sm:p-7">
+    <div className="rounded-[1.9rem] border border-emerald-200/80 bg-[linear-gradient(180deg,rgba(236,253,245,0.9),rgba(255,255,255,0.96)),radial-gradient(circle_at_top_right,rgba(56,189,248,0.14),transparent_32%)] p-5 shadow-[0_24px_70px_-50px_rgba(24,24,27,0.22)] sm:p-7">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-3">
-          <div className="inline-flex rounded-full bg-emerald-500/12 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+          <div className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
             Running now{category ? ` · ${category}` : ""}
           </div>
           <div>
-            <p className="text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-4xl">{label}</p>
-            <p className="mt-3 font-mono text-[2.4rem] tabular-nums tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-5xl">
+            <p className="text-2xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">{label}</p>
+            <p className="mt-3 font-mono text-[2.4rem] tabular-nums tracking-tight text-zinc-950 sm:text-5xl">
               {formatDuration(now - startedAt)}
             </p>
           </div>
@@ -40,7 +40,7 @@ export function RunningCard({
           type="button"
           onClick={() => startTransition(() => stopEntry())}
           disabled={pending}
-          className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-zinc-300 bg-white px-6 text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-100 disabled:opacity-50 sm:w-auto dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+          className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-zinc-300 bg-white px-6 text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-50 disabled:opacity-50 sm:w-auto"
         >
           {pending ? "Stopping…" : "Stop timer"}
         </button>

@@ -353,16 +353,16 @@ export default async function FinancePage() {
   return (
     <div className="space-y-6 pb-6 lg:space-y-8">
       <section id="overview" className="space-y-4">
-        <div className="rounded-[2rem] border border-zinc-200/80 bg-gradient-to-br from-white via-zinc-50 to-emerald-50/70 p-5 shadow-[0_24px_80px_-45px_rgba(24,24,27,0.28)] dark:border-zinc-800/80 dark:from-zinc-950 dark:via-zinc-950 dark:to-emerald-950/20 dark:shadow-none lg:p-7">
+        <div className="rounded-[2.1rem] border border-zinc-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(250,250,248,0.96)),radial-gradient(circle_at_top_right,rgba(16,185,129,0.12),transparent_32%)] p-5 shadow-[0_28px_90px_-52px_rgba(24,24,27,0.22)] lg:p-7">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-3xl">
               <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-zinc-500">
                 Finance
               </p>
-              <h1 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-4xl">
+              <h1 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
                 Start with the money read that actually changes decisions.
               </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-zinc-600 dark:text-zinc-300 sm:text-base">
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-zinc-600 sm:text-base">
                 See cash, spend pressure, and next actions first. Review transactions quickly. Tuck deeper account management out of the way until you need it.
               </p>
             </div>
@@ -390,7 +390,7 @@ export default async function FinancePage() {
           </div>
         </div>
 
-        <div className="sticky top-[72px] z-20 -mx-4 border-y border-zinc-200 bg-white/90 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:border-zinc-800 dark:bg-zinc-950/90 dark:supports-[backdrop-filter]:bg-zinc-950/80 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-0">
+        <div className="sticky top-[88px] z-20 -mx-4 border-y border-zinc-200 bg-white/90 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/80 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-0">
           <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:pb-0">
             {actionPill({ href: "#overview", label: "Overview" })}
             {actionPill({ href: "#transactions", label: "Review" })}

@@ -27,11 +27,11 @@ function statCard({
   hint: string;
 }) {
   return (
-    <div className="rounded-[1.5rem] border border-zinc-200/80 bg-white/90 p-5 shadow-[0_20px_60px_-45px_rgba(24,24,27,0.32)] dark:border-zinc-800/80 dark:bg-zinc-900/90 dark:shadow-none">
+    <div className="rounded-[1.65rem] border border-zinc-200/80 bg-white/92 p-5 shadow-[0_20px_60px_-45px_rgba(24,24,27,0.18)]">
       <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">
         {label}
       </p>
-      <p className="mt-3 text-3xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+      <p className="mt-3 text-3xl font-semibold tracking-tight text-zinc-950">
         {value}
       </p>
       <p className="mt-1 text-sm text-zinc-500">{hint}</p>
@@ -99,14 +99,14 @@ export default async function TimePage() {
   return (
     <div className="space-y-6 lg:space-y-8">
       <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="rounded-[2rem] border border-zinc-200/80 bg-gradient-to-br from-white via-zinc-50 to-violet-50/70 p-5 shadow-[0_24px_80px_-45px_rgba(24,24,27,0.28)] dark:border-zinc-800/80 dark:from-zinc-950 dark:via-zinc-950 dark:to-violet-950/20 dark:shadow-none sm:p-7">
+        <div className="rounded-[2.1rem] border border-zinc-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(250,250,248,0.96)),radial-gradient(circle_at_top_right,rgba(168,85,247,0.10),transparent_34%)] p-5 shadow-[0_28px_90px_-52px_rgba(24,24,27,0.22)] sm:p-7">
           <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-zinc-500">
             Time tracker
           </p>
-          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-4xl">
+          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
             Protect focus before the day gets noisy.
           </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-zinc-600 dark:text-zinc-300 sm:text-base">
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-zinc-600 sm:text-base">
             Keep one timer running, make the important blocks visible, and review the last few sessions without digging.
           </p>
         </div>
@@ -136,7 +136,7 @@ export default async function TimePage() {
       )}
 
       <section className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-        <div className="rounded-[1.75rem] border border-zinc-200/80 bg-white/90 p-5 shadow-[0_20px_60px_-45px_rgba(24,24,27,0.32)] dark:border-zinc-800/80 dark:bg-zinc-900/90 dark:shadow-none sm:p-6">
+        <div className="rounded-[1.9rem] border border-zinc-200/80 bg-white/92 p-5 shadow-[0_20px_60px_-45px_rgba(24,24,27,0.18)] sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">
@@ -155,16 +155,16 @@ export default async function TimePage() {
               {topCategories.map((item) => {
                 const share = weekTotalMs > 0 ? Math.max(6, Math.round((item.totalMs / weekTotalMs) * 100)) : 0;
                 return (
-                  <li key={item.category} className="rounded-2xl border border-zinc-200/80 bg-zinc-50/80 px-4 py-4 dark:border-zinc-800 dark:bg-zinc-950/60">
+                  <li key={item.category} className="rounded-2xl border border-zinc-200/80 bg-zinc-50/90 px-4 py-4">
                     <div className="flex items-center justify-between gap-3">
-                      <span className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                      <span className="truncate text-sm font-medium text-zinc-900">
                         {item.category}
                       </span>
                       <span className="font-mono text-sm tabular-nums text-zinc-500">
                         {formatHM(item.totalMs)}
                       </span>
                     </div>
-                    <div className="mt-3 h-2 rounded-full bg-zinc-200 dark:bg-zinc-800">
+                    <div className="mt-3 h-2 rounded-full bg-zinc-200">
                       <div
                         className="h-2 rounded-full bg-gradient-to-r from-sky-500 to-violet-500"
                         style={{ width: `${share}%` }}
@@ -177,7 +177,7 @@ export default async function TimePage() {
           )}
         </div>
 
-        <div className="rounded-[1.75rem] border border-zinc-200/80 bg-white/90 p-5 shadow-[0_20px_60px_-45px_rgba(24,24,27,0.32)] dark:border-zinc-800/80 dark:bg-zinc-900/90 dark:shadow-none sm:p-6">
+        <div className="rounded-[1.9rem] border border-zinc-200/80 bg-white/92 p-5 shadow-[0_20px_60px_-45px_rgba(24,24,27,0.18)] sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">
@@ -204,15 +204,15 @@ export default async function TimePage() {
                       return (
                         <li
                           key={entry.id}
-                          className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-2xl border border-zinc-200/80 bg-zinc-50/80 px-4 py-4 dark:border-zinc-800 dark:bg-zinc-950/60"
+                          className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-2xl border border-zinc-200/80 bg-zinc-50/90 px-4 py-4"
                         >
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100 sm:text-base">
+                              <p className="truncate text-sm font-medium text-zinc-900 sm:text-base">
                                 {entry.label}
                               </p>
                               {entry.category ? (
-                                <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-600 ring-1 ring-zinc-200 dark:bg-zinc-900 dark:text-zinc-300 dark:ring-zinc-700">
+                                <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-600 ring-1 ring-zinc-200">
                                   {entry.category}
                                 </span>
                               ) : null}
@@ -227,7 +227,7 @@ export default async function TimePage() {
                             </p>
                           </div>
                           <div className="flex items-center gap-3 justify-self-end">
-                            <span className="font-mono text-sm tabular-nums text-zinc-700 dark:text-zinc-300 sm:text-base">
+                            <span className="font-mono text-sm tabular-nums text-zinc-700 sm:text-base">
                               {formatDuration(duration)}
                             </span>
                             <EntryDeleteButton id={entry.id} />

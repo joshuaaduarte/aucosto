@@ -20,28 +20,28 @@ export default async function HubPage() {
   return (
     <div className="space-y-6 lg:space-y-8">
       <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="rounded-[2rem] border border-zinc-200/80 bg-gradient-to-br from-white via-zinc-50 to-sky-50/70 p-5 shadow-[0_24px_80px_-45px_rgba(24,24,27,0.28)] dark:border-zinc-800/80 dark:from-zinc-950 dark:via-zinc-950 dark:to-sky-950/20 dark:shadow-none sm:p-7">
+        <div className="rounded-[2.1rem] border border-zinc-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(250,250,248,0.96)),radial-gradient(circle_at_top_right,rgba(56,189,248,0.12),transparent_30%)] p-5 shadow-[0_28px_90px_-52px_rgba(24,24,27,0.22)] sm:p-7">
           <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-zinc-500">
             Daily overview
           </p>
-          <h1 className="mt-3 max-w-3xl text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-4xl">
+          <h1 className="mt-3 max-w-3xl text-2xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
             {firstName ? `Hey, ${firstName}.` : "Welcome back."} Steer the day from one calm place.
           </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-zinc-600 dark:text-zinc-300 sm:text-base">
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-zinc-600 sm:text-base">
             Start with the highest-signal view, then drop into time or finance only when the numbers tell you to.
           </p>
 
           <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
             <Link
               href="/app/time"
-              className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-zinc-950 px-5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 sm:w-auto dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-zinc-950 px-5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 sm:w-auto"
             >
               Open time tracker
             </Link>
             {context?.financeVisible ? (
               <Link
                 href="/app/finance#transactions"
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-zinc-200 bg-white/80 px-5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-300 hover:text-zinc-900 sm:w-auto dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-100"
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-zinc-200 bg-white/88 px-5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-300 hover:text-zinc-900 sm:w-auto"
               >
                 Review money flow
               </Link>
@@ -49,13 +49,13 @@ export default async function HubPage() {
           </div>
         </div>
 
-        <aside className="rounded-[2rem] border border-zinc-200/80 bg-white/90 p-5 shadow-[0_24px_80px_-50px_rgba(24,24,27,0.24)] dark:border-zinc-800/80 dark:bg-zinc-900/90 dark:shadow-none sm:p-7">
+        <aside className="rounded-[2rem] border border-zinc-200/80 bg-white/92 p-5 shadow-[0_24px_80px_-50px_rgba(24,24,27,0.18)] sm:p-7">
           <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">
             Right now
           </p>
           <ul className="mt-4 space-y-3">
             {prompts.map((prompt) => (
-              <li key={prompt} className="flex gap-3 rounded-2xl border border-zinc-200/80 bg-zinc-50/80 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950/60 dark:text-zinc-300">
+              <li key={prompt} className="flex gap-3 rounded-2xl border border-zinc-200/80 bg-zinc-50/90 px-4 py-3 text-sm text-zinc-600">
                 <span className="mt-1 h-2 w-2 rounded-full bg-sky-500" />
                 <span>{prompt}</span>
               </li>
