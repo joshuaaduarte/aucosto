@@ -12,8 +12,8 @@ describe("parseTransactionsCsv", () => {
     expect(r.total).toBe(3);
     expect(r.skipped).toBe(0);
     expect(r.rows.map((row) => row.amount)).toEqual([-4532, 150000, -450]);
-    expect(r.rows[0].description).toBe("Grocery store");
-    expect(r.rows[0].date.toISOString().slice(0, 10)).toBe("2026-05-01");
+    expect(r.rows[0]!.description).toBe("Grocery store");
+    expect(r.rows[0]!.date.toISOString().slice(0, 10)).toBe("2026-05-01");
   });
 
   it("derives amount from Debit/Credit columns when Amount is absent", () => {
@@ -41,8 +41,8 @@ describe("parseTransactionsCsv", () => {
 `;
     const r = parseTransactionsCsv(csv);
     expect(r.rows.length).toBe(2);
-    expect(r.rows[0].date.getFullYear()).toBe(2026);
-    expect(r.rows[1].date.getFullYear()).toBe(2026);
+    expect(r.rows[0]!.date.getFullYear()).toBe(2026);
+    expect(r.rows[1]!.date.getFullYear()).toBe(2026);
   });
 
   it("matches headers case-insensitively", () => {
@@ -51,7 +51,7 @@ describe("parseTransactionsCsv", () => {
 `;
     const r = parseTransactionsCsv(csv);
     expect(r.rows.length).toBe(1);
-    expect(r.rows[0].amount).toBe(-999);
+    expect(r.rows[0]!.amount).toBe(-999);
   });
 
   it("skips rows missing required fields", () => {

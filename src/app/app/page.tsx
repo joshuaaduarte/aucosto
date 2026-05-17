@@ -1,21 +1,61 @@
 import Link from "next/link";
 import { auth } from "@/auth";
+import { startOfMonth, startOfPreviousMonth } from "@/lib/money";
+import { listAccounts, listTransactions } from "@/lib/services/finance";
+import { getRunningEntry, listCompletedSince } from "@/lib/services/time";
+import { startOfWeek } from "@/lib/time";
+import { sumDurations } from "@/lib/time-summary";
 import { getViewerContext } from "@/lib/viewer-context";
 import { ActivityWidget } from "@/lib/widgets/activity";
 import { FinanceWidget } from "@/lib/widgets/finance";
 import { TimeTrackerWidget } from "@/lib/widgets/time-tracker";
+import { deriveHubPrompts } from "./_lib/hub-prompts";
 import { PrivacyPanel } from "./privacy-panel";
-
-const prompts = [
-  "Protect one block of deep work before the day fragments.",
-  "Check spend drift before it becomes stress later in the month.",
-  "Use the hub to notice pressure early, not after the fact.",
-];
 
 export default async function HubPage() {
   const session = await auth();
   const context = await getViewerContext();
   const firstName = session?.user?.name?.split(" ")[0];
+
+  const userId = context?.effectiveUserId;
+  const financeVisible = context?.financeVisible ?? false;
+
+  const [runningEntry, weekEntries, accounts, thisMonthTx, lastMonthTx] =
+    userId
+      ? await Promise.all([
+          getRunningEntry(userId),
+          listCompletedSince(userId, startOfWeek()),
+          financeVisible ? listAccounts(userId) : Promise.resolve([]),
+          financeVisible
+            ? listTransactions(userId, { since: startOfMonth(), limit: 1000 })
+            : Promise.resolve([]),
+          financeVisible
+            ? listTransactions(userId, {
+                since: startOfPreviousMonth(),
+                limit: 1000,
+              })
+            : Promise.resolve([]),
+        ])
+      : [null, [], [], [], []];
+
+  const monthStart = startOfMonth();
+  const previousMonthStart = startOfPreviousMonth();
+  const thisMonthSpentCents = sumSpend(
+    thisMonthTx.filter((t) => t.date >= monthStart),
+  );
+  const lastMonthSpentCents = sumSpend(
+    lastMonthTx.filter(
+      (t) => t.date >= previousMonthStart && t.date < monthStart,
+    ),
+  );
+
+  const prompts = deriveHubPrompts({
+    runningEntry,
+    weekTotalMs: sumDurations(weekEntries),
+    accounts: financeVisible ? accounts : undefined,
+    thisMonthSpentCents: financeVisible ? thisMonthSpentCents : undefined,
+    lastMonthSpentCents: financeVisible ? lastMonthSpentCents : undefined,
+  });
 
   return (
     <div className="space-y-6 lg:space-y-8">
@@ -38,7 +78,7 @@ export default async function HubPage() {
             >
               Open time tracker
             </Link>
-            {context?.financeVisible ? (
+            {financeVisible ? (
               <Link
                 href="/app/finance#transactions"
                 className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-zinc-200 bg-white/88 px-5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-300 hover:text-zinc-900 sm:w-auto"
@@ -55,9 +95,22 @@ export default async function HubPage() {
           </p>
           <ul className="mt-4 space-y-3">
             {prompts.map((prompt) => (
-              <li key={prompt} className="flex gap-3 rounded-2xl border border-zinc-200/80 bg-zinc-50/90 px-4 py-3 text-sm text-zinc-600">
-                <span className="mt-1 h-2 w-2 rounded-full bg-sky-500" />
-                <span>{prompt}</span>
+              <li
+                key={prompt.text}
+                className="flex gap-3 rounded-2xl border border-zinc-200/80 bg-zinc-50/90 px-4 py-3 text-sm text-zinc-600"
+              >
+                <span
+                  className={`mt-1 h-2 w-2 rounded-full ${
+                    prompt.tone === "amber"
+                      ? "bg-amber-500"
+                      : prompt.tone === "emerald"
+                        ? "bg-emerald-500"
+                        : prompt.tone === "zinc"
+                          ? "bg-zinc-400"
+                          : "bg-sky-500"
+                  }`}
+                />
+                <span>{prompt.text}</span>
               </li>
             ))}
           </ul>
@@ -65,9 +118,9 @@ export default async function HubPage() {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className={`grid gap-4 ${context?.financeVisible ? "md:grid-cols-2" : "md:grid-cols-1"}`}>
+        <div className={`grid gap-4 ${financeVisible ? "md:grid-cols-2" : "md:grid-cols-1"}`}>
           <TimeTrackerWidget />
-          {context?.financeVisible ? <FinanceWidget /> : null}
+          {financeVisible ? <FinanceWidget /> : null}
         </div>
         <div>
           <ActivityWidget />
@@ -75,10 +128,17 @@ export default async function HubPage() {
       </section>
 
       <PrivacyPanel
-        financeVisible={context?.financeVisible ?? false}
+        financeVisible={financeVisible}
         appLockEnabled={context?.appLockEnabled ?? false}
         isDemoMode={context?.isDemoMode ?? false}
       />
     </div>
+  );
+}
+
+function sumSpend(transactions: { amount: number }[]): number {
+  return transactions.reduce(
+    (acc, t) => (t.amount < 0 ? acc + Math.abs(t.amount) : acc),
+    0,
   );
 }

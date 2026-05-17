@@ -18,64 +18,27 @@ Long-term goal:
 
 ---
 
-## Phase 0 — foundation cleanup
+## Phase 0 — foundation cleanup ✅
 
-**Goal:** make the repo stable, understandable, and safe to build on.
-
-### Outcomes
-- branch strategy is clarified (`main` vs `nextjs-rewrite`)
-- README reflects the real product instead of default Next.js scaffold text
-- local setup is reproducible end-to-end
-- build/lint/test/smoke path is reliable
-- docs match reality
-
-### Tasks
-- [ ] Decide canonical branch strategy and update docs
-- [ ] Replace scaffold README with real project overview
-- [ ] Verify `npm run build`, `npm run lint`, and `npm test`
-- [ ] Verify DB setup, seed, and `scripts/smoke.ts`
-- [ ] Review `CLAUDE.md` / repo docs for drift and fix mismatches
-- [ ] Add a short "how to work in this repo" contributor section if needed
-
-### Definition of done
-- a new session can clone, install, seed, run, and understand the project without guesswork
+Mostly done as of 2026-05-16. Remaining: real env-backed `build / migrate /
+seed / smoke` pass (blocked on production secrets, not work).
 
 ---
 
-## Phase 1 — make the first two tools genuinely usable
-
-**Goal:** turn time + finance from promising scaffolds into tools worth using regularly.
+## Phase 1 — make the first two tools genuinely usable ✅
 
 ### Time tracker
-
-#### Outcomes
-- starting/stopping time feels solid
-- recent history is easy to scan
-- basic summaries make the data useful
-
-#### Tasks
-- [ ] Improve start/stop/delete UX and empty states
-- [ ] Add validation and edge-case handling around overlapping/running entries
-- [ ] Add category-level summaries
-- [ ] Add “today” and “this week” rollups
-- [ ] Add tests for key time calculations and behavior
+- [x] Today + this-week rollups
+- [x] Category-level summaries (weekly split)
+- [ ] Overlapping/running-entry edge cases still informal — revisit if a real
+      bug appears
+- [ ] Time-tracker tests beyond what summarization already exercises
 
 ### Finance
-
-#### Outcomes
-- importing transactions is safe and repeatable
-- the transaction list is useful after import
-- basic spending summaries exist
-
-#### Tasks
-- [ ] Add duplicate import protection or import identity strategy
-- [ ] Improve CSV import feedback and error reporting
-- [ ] Add filters/search for transactions
-- [ ] Add monthly spend summary and recent trends
-- [ ] Add tests for import behavior beyond CSV parsing
-
-### Definition of done
-- time and finance each solve a real daily problem without feeling fragile
+- [x] Duplicate import protection (CSV externalId hash + DB unique + skipDuplicates)
+- [x] Monthly spend, projection, deltas, top categories/merchants/recurring
+- [x] Service-layer tests for derivation + dedupe (53 tests total)
+- [ ] Transaction list filters / search — still useful, not yet built
 
 ---
 
@@ -189,30 +152,6 @@ Why:
 4. Phase 3 — first strong third tool
 5. Phase 4 — cross-tool insight layer
 6. Phase 5 — agent/API surface
-
----
-
-## Recommended immediate sprint
-
-If we want the best next move, I’d make the first working sprint:
-
-### Sprint: “Make aucosto worth opening every morning”
-
-#### Sprint goals
-- clean up repo/docs enough to move fast confidently
-- make time + finance feel dependable
-- make the dashboard show useful daily signal
-
-#### Candidate sprint tasks
-- [ ] replace README scaffold with real project overview
-- [ ] verify local run/build/lint/test/smoke flow
-- [ ] add finance duplicate-import guard
-- [ ] add time tracker summaries for today/this week
-- [ ] add event feed widget to the hub
-- [ ] improve hub copy/layout so it feels like a personal command center
-
-#### Sprint success metric
-- Joshua can open the app in the morning and immediately get value from it
 
 ---
 

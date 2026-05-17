@@ -1,0 +1,37 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # Prisma client needs to exist before tsc/lint/test can import generated
+      # types. `prisma generate` does not need a real DB connection, but the
+      # config reads DATABASE_URL/DIRECT_URL — give it placeholders so the
+      # generator doesn't choke on `undefined`.
+      - run: npx prisma generate
+        env:
+          DATABASE_URL: postgres://noop:noop@127.0.0.1:5432/noop
+          DIRECT_URL: postgres://noop:noop@127.0.0.1:5432/noop
+
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm test
+        env:
+          DATABASE_URL: postgres://noop:noop@127.0.0.1:5432/noop
+          DIRECT_URL: postgres://noop:noop@127.0.0.1:5432/noop

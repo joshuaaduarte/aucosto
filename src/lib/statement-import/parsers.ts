@@ -96,13 +96,13 @@ function extractStatementContext(text: string): StatementContext {
   const periodMatch = text.match(
     /(opening\/closing date|billing period|statement period|billing cycle)\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{2,4}).{0,10}(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
   );
-  const endDate = periodMatch ? new Date(periodMatch[3]) : null;
+  const endDate = periodMatch?.[3] ? new Date(periodMatch[3]) : null;
   const accountMatch = text.match(/(?:account|card)(?: number| ending in)?\s*(?:[#:]|ending in)?\s*(\d{4})/i);
 
   return {
     statementYear: endDate && !Number.isNaN(endDate.getTime()) ? endDate.getUTCFullYear() : null,
     statementEndDate: endDate && !Number.isNaN(endDate.getTime()) ? endDate : null,
-    accountHint: accountMatch ? `••${accountMatch[1]}` : null,
+    accountHint: accountMatch?.[1] ? `••${accountMatch[1]}` : null,
   };
 }
 
@@ -175,9 +175,9 @@ const slashDateRow: ParserPattern = {
   regex: /^(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\s+(.+?)\s+(\(?-?\$?[\d,]+\.\d{2}\)?(?:\s+CR)?)$/,
   map(match) {
     return {
-      date: match[1],
-      description: match[2],
-      amount: match[3],
+      date: match[1]!,
+      description: match[2]!,
+      amount: match[3]!,
     };
   },
 };
@@ -186,9 +186,9 @@ const namedDateRow: ParserPattern = {
   regex: /^([A-Za-z]{3,9}\s+\d{1,2}(?:,\s*\d{2,4})?)\s+(.+?)\s+(\(?-?\$?[\d,]+\.\d{2}\)?(?:\s+CR)?)$/,
   map(match) {
     return {
-      date: match[1],
-      description: match[2],
-      amount: match[3],
+      date: match[1]!,
+      description: match[2]!,
+      amount: match[3]!,
     };
   },
 };

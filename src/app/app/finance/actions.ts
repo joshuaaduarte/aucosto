@@ -9,8 +9,8 @@ import type {
   FinanceGoalStatus,
 } from "@/lib/finance-goals";
 import { parseTransactionsCsv } from "@/lib/csv";
+import { withFinanceUser } from "@/lib/server-action";
 import * as financeService from "@/lib/services/finance";
-import { assertFinanceVisible } from "@/lib/viewer-context";
 
 export type UploadState =
   | {
@@ -49,67 +49,49 @@ function revalidateFinance() {
   revalidatePath("/app/finance");
 }
 
-async function getFinanceUserId(): Promise<string> {
-  const context = await assertFinanceVisible();
-  return context.effectiveUserId;
-}
-
 export async function uploadCsv(
   _prev: UploadState,
   formData: FormData,
 ): Promise<UploadState> {
-  let userId: string;
-  try {
-    userId = await getFinanceUserId();
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : "Not signed in." };
-  }
+  return withFinanceUser<UploadState>(async (userId) => {
+    const file = formData.get("file");
+    if (!(file instanceof File) || file.size === 0) {
+      return { ok: false, error: "Pick a CSV file first." };
+    }
+    if (file.size > 5_000_000) {
+      return { ok: false, error: "File is over 5MB; split it first." };
+    }
 
-  const file = formData.get("file");
-  if (!(file instanceof File) || file.size === 0) {
-    return { ok: false, error: "Pick a CSV file first." };
-  }
-  if (file.size > 5_000_000) {
-    return { ok: false, error: "File is over 5MB; split it first." };
-  }
+    const text = await file.text();
+    const { rows, skipped } = parseTransactionsCsv(text);
 
-  const text = await file.text();
-  const { rows, skipped } = parseTransactionsCsv(text);
+    if (rows.length === 0) {
+      return {
+        ok: false,
+        error:
+          "No transactions parsed. Need a header row with Date, Amount (or Debit/Credit), and Description.",
+      };
+    }
 
-  if (rows.length === 0) {
-    return {
-      ok: false,
-      error:
-        "No transactions parsed. Need a header row with Date, Amount (or Debit/Credit), and Description.",
-    };
-  }
-
-  const { imported, deduped } = await financeService.importTransactions(userId, rows);
-
-  revalidateFinance();
-  return { ok: true, source: "csv", imported, skipped, deduped };
+    const { imported, deduped } = await financeService.importTransactions(userId, rows);
+    revalidateFinance();
+    return { ok: true, source: "csv", imported, skipped, deduped };
+  }, "Could not import CSV.");
 }
 
 export async function uploadStatementPdf(
   _prev: UploadState,
   formData: FormData,
 ): Promise<UploadState> {
-  let userId: string;
-  try {
-    userId = await getFinanceUserId();
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : "Not signed in." };
-  }
+  return withFinanceUser<UploadState>(async (userId) => {
+    const file = formData.get("file");
+    if (!(file instanceof File) || file.size === 0) {
+      return { ok: false, error: "Pick a PDF statement first." };
+    }
+    if (file.size > 10_000_000) {
+      return { ok: false, error: "File is over 10MB; split it first." };
+    }
 
-  const file = formData.get("file");
-  if (!(file instanceof File) || file.size === 0) {
-    return { ok: false, error: "Pick a PDF statement first." };
-  }
-  if (file.size > 10_000_000) {
-    return { ok: false, error: "File is over 10MB; split it first." };
-  }
-
-  try {
     const result = await financeService.importStatement(userId, {
       fileName: file.name,
       mimeType: file.type,
@@ -125,24 +107,18 @@ export async function uploadStatementPdf(
       deduped: result.deduped,
       bankLabel: result.bankLabel,
     };
-  } catch (error) {
-    return {
-      ok: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Could not import statement PDF.",
-    };
-  }
+  }, "Could not import statement PDF.");
 }
 
 export async function updateTransactionCategory(
   id: string,
   category: FinanceCategory,
 ) {
-  const userId = await getFinanceUserId();
-  await financeService.updateTransactionCategory(userId, id, category);
-  revalidateFinance();
+  await withFinanceUser(async (userId) => {
+    await financeService.updateTransactionCategory(userId, id, category);
+    revalidateFinance();
+    return { ok: true as const };
+  });
 }
 
 export async function updateMatchingTransactionCategories(
@@ -150,35 +126,31 @@ export async function updateMatchingTransactionCategories(
   account: string | null,
   category: FinanceCategory,
 ) {
-  const userId = await getFinanceUserId();
-  const count = await financeService.updateMatchingTransactionCategories(userId, {
-    description,
-    account,
-    category,
+  const result = await withFinanceUser(async (userId) => {
+    const count = await financeService.updateMatchingTransactionCategories(userId, {
+      description,
+      account,
+      category,
+    });
+    revalidateFinance();
+    return { ok: true as const, count };
   });
-
-  revalidateFinance();
-  return count;
+  return "ok" in result && result.ok ? result.count : 0;
 }
 
 export async function deleteAllTransactions() {
-  const userId = await getFinanceUserId();
-  await financeService.deleteAllTransactions(userId);
-  revalidateFinance();
+  await withFinanceUser(async (userId) => {
+    await financeService.deleteAllTransactions(userId);
+    revalidateFinance();
+    return { ok: true as const };
+  });
 }
 
 export async function saveFinanceAccount(
   _prev: AccountState,
   formData: FormData,
 ): Promise<AccountState> {
-  let userId: string;
-  try {
-    userId = await getFinanceUserId();
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : "Not signed in." };
-  }
-
-  try {
+  return withFinanceUser<AccountState>(async (userId) => {
     await financeService.saveAccount(userId, {
       id: String(formData.get("id") ?? "").trim() || undefined,
       name: String(formData.get("name") ?? ""),
@@ -191,30 +163,16 @@ export async function saveFinanceAccount(
       dueDate: String(formData.get("dueDate") ?? ""),
       creditLimit: String(formData.get("creditLimit") ?? ""),
     });
-  } catch (error) {
-    return {
-      ok: false,
-      error:
-        error instanceof Error ? error.message : "Could not save account.",
-    };
-  }
-
-  revalidateFinance();
-  return { ok: true };
+    revalidateFinance();
+    return { ok: true };
+  }, "Could not save account.");
 }
 
 export async function saveFinanceGoal(
   _prev: GoalState,
   formData: FormData,
 ): Promise<GoalState> {
-  let userId: string;
-  try {
-    userId = await getFinanceUserId();
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : "Not signed in." };
-  }
-
-  try {
+  return withFinanceUser<GoalState>(async (userId) => {
     await financeService.saveGoal(userId, {
       id: String(formData.get("id") ?? "").trim() || undefined,
       name: String(formData.get("name") ?? ""),
@@ -227,61 +185,32 @@ export async function saveFinanceGoal(
       status: String(formData.get("status") ?? "active") as FinanceGoalStatus,
       notes: String(formData.get("notes") ?? ""),
     });
-  } catch (error) {
-    return {
-      ok: false,
-      error: error instanceof Error ? error.message : "Could not save goal.",
-    };
-  }
-
-  revalidateFinance();
-  return { ok: true };
+    revalidateFinance();
+    return { ok: true };
+  }, "Could not save goal.");
 }
 
 export async function linkTellerConnection(
   accessToken: string,
   enrollmentId?: string | null,
 ): Promise<LinkedConnectionState> {
-  let userId: string;
-  try {
-    userId = await getFinanceUserId();
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : "Not signed in." };
-  }
-
-  try {
+  return withFinanceUser<LinkedConnectionState>(async (userId) => {
     const connection = await financeService.linkTellerConnection(userId, {
       accessToken,
       enrollmentId,
     });
-
     revalidateFinance();
     return {
       ok: true,
       message: `Linked ${connection.institutionName ?? "bank"} and synced ${connection.accountCount} account${connection.accountCount === 1 ? "" : "s"}.`,
     };
-  } catch (error) {
-    return {
-      ok: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Could not link Teller connection.",
-    };
-  }
+  }, "Could not link Teller connection.");
 }
 
 export async function syncLinkedFinanceConnection(
   connectionId: string,
 ): Promise<LinkedConnectionState> {
-  let userId: string;
-  try {
-    userId = await getFinanceUserId();
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : "Not signed in." };
-  }
-
-  try {
+  return withFinanceUser<LinkedConnectionState>(async (userId) => {
     const result = await financeService.syncFinanceConnection(userId, connectionId);
     revalidateFinance();
     return {
@@ -290,41 +219,18 @@ export async function syncLinkedFinanceConnection(
       accountCount: result.accountCount,
       transactionCount: result.transactionCount,
     };
-  } catch (error) {
-    return {
-      ok: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Could not sync linked account.",
-    };
-  }
+  }, "Could not sync linked account.");
 }
 
 export async function disconnectLinkedFinanceConnection(
   connectionId: string,
 ): Promise<LinkedConnectionState> {
-  let userId: string;
-  try {
-    userId = await getFinanceUserId();
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : "Not signed in." };
-  }
-
-  try {
+  return withFinanceUser<LinkedConnectionState>(async (userId) => {
     await financeService.disconnectFinanceConnection(userId, connectionId);
     revalidateFinance();
     return {
       ok: true,
       message: "Disconnected linked bank sync. Imported data was left in place.",
     };
-  } catch (error) {
-    return {
-      ok: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Could not disconnect linked account.",
-    };
-  }
+  }, "Could not disconnect linked account.");
 }

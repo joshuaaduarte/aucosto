@@ -21,7 +21,8 @@ function extractTextOperators(source: string): string[] {
   }
 
   for (const match of source.matchAll(/\[([\s\S]*?)\]\s*TJ/g)) {
-    for (const stringMatch of match[1].matchAll(/\((?:\\.|[^\\()])*\)/g)) {
+    const inner = match[1] ?? "";
+    for (const stringMatch of inner.matchAll(/\((?:\\.|[^\\()])*\)/g)) {
       parts.push(decodePdfString(stringMatch[0].slice(1, -1)));
     }
   }
@@ -45,8 +46,8 @@ export function extractPdfText(bytes: Uint8Array): string {
   const streamPattern = /<<(.*?)>>\s*stream\r?\n([\s\S]*?)\r?\nendstream/g;
 
   for (const match of raw.matchAll(streamPattern)) {
-    const dict = match[1];
-    const streamSource = match[2];
+    const dict = match[1] ?? "";
+    const streamSource = match[2] ?? "";
     let stream = Buffer.from(streamSource, "latin1");
 
     if (/\/FlateDecode/.test(dict)) {

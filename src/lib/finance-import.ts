@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { FinanceTransaction } from "@/generated/prisma/client";
 import type { ParsedRow } from "@/lib/csv";
 
@@ -7,6 +8,18 @@ function normalizeText(value: string | null | undefined): string {
 
 function normalizeDate(value: Date): string {
   return value.toISOString().slice(0, 10);
+}
+
+// Deterministic externalId for CSV-imported rows. Provider-synced rows already
+// have a stable externalId from the provider; CSV rows didn't, so re-imports
+// could quietly duplicate even with the DB unique constraint in place. The
+// "csv:" prefix keeps these from colliding with provider IDs.
+export function csvRowExternalId(row: ParsedRow): string {
+  const hash = createHash("sha1")
+    .update(fingerprintParsedRow(row))
+    .digest("hex")
+    .slice(0, 24);
+  return `csv:${hash}`;
 }
 
 export function fingerprintParsedRow(row: ParsedRow): string {

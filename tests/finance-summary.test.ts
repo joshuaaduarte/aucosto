@@ -14,17 +14,20 @@ function tx({
   description,
   date,
   account,
+  category,
 }: {
   amount: number;
   description: string;
   date: string;
   account?: string | null;
+  category?: string | null;
 }) {
   return {
     amount,
     description,
     date: new Date(date),
     account: account ?? null,
+    category: category ?? null,
   };
 }
 

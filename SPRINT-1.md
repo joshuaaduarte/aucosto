@@ -1,49 +1,35 @@
-# aucosto sprint 1
+# aucosto sprint 1 — done
 
 ## Theme
 
 **Make aucosto worth opening every morning**
 
-## Goals
-
-- make the hub more informative
-- reduce obvious data-integrity risk in finance
-- make time tracking more useful beyond a running timer
-- finish practical setup verification
-
-## Proposed task list
+## What shipped
 
 ### Dashboard
-- [ ] Add recent activity widget backed by the Event log
-- [ ] Improve dashboard information density and ordering if needed after the widget lands
+- [x] Recent activity widget backed by the Event log
+- [x] Hub "Right now" prompts derived from real data (timer, due dates, spend delta)
 
 ### Time tracker
-- [ ] Add "today" summary on the tool page
-- [ ] Add "this week" summary on the tool page or widget
-- [ ] Add category rollups
+- [x] "Today" and "this week" summaries on the tool page
+- [x] Category rollups (weekly split)
 
 ### Finance
-- [ ] Define duplicate detection strategy
-- [ ] Prevent accidental duplicate imports
-- [ ] Improve import result messaging when rows are skipped or deduped
+- [x] Deterministic `csv:<sha1>` externalId + `@@unique` + `skipDuplicates`
+  so repeat imports cannot duplicate rows
+- [x] Import result messaging covers `imported`, `deduped`, `skipped`
 
 ### Foundation
-- [ ] Verify build with real `.env`
-- [ ] Verify migrate / seed / smoke path with real `.env`
-- [ ] Resolve `main` vs `nextjs-rewrite` doc drift
+- [x] `noUncheckedIndexedAccess: true` plus typecheck-clean tests
+- [x] Service-layer tests against the import path (35 → 53)
+- [x] `services/finance.ts` split into a folder; `finance/page.tsx`
+  reduced from 999 → 51 lines
+- [x] Privacy mutations routed through `services/user.ts`
+- [x] `withFinanceUser` action wrapper removes auth try/catch boilerplate
 
-## Suggested implementation order
+## Carried into the next sprint
 
-1. recent activity widget
-2. finance duplicate protection
-3. time summaries
-4. env-backed verification
-5. branch/docs cleanup
-
-## Definition of success
-
-By the end of this sprint:
-- the dashboard gives useful daily signal
-- finance is safer to use repeatedly
-- time tracker data is more actionable
-- setup is documented and verified well enough to trust
+- Build / migrate / seed / smoke pass against a real Supabase env still
+  not executed by us — needs secrets.
+- Cross-tool insights (spend vs. tracked hours) still pending; was
+  always Phase 4 in `ROADMAP.md`, not a regression.

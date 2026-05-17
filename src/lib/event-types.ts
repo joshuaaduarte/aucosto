@@ -1,0 +1,37 @@
+// Human-readable labels for the event log. Lives outside server-only so the
+// activity widget and any future read-only consumer can import it without
+// pulling in Prisma. Keep this in sync with the type strings used by the
+// services that call recordEvent(); the rule of thumb: if you write a new
+// "<tool>.<verb>" event type, add the label here too.
+
+const EVENT_LABELS: Record<string, string> = {
+  // time
+  "time.started": "started a timer",
+  "time.stopped": "stopped a timer",
+  "time.deleted": "deleted a time entry",
+
+  // finance — manual edits
+  "finance.account_created": "added a finance account",
+  "finance.account_updated": "updated a finance account",
+  "finance.goal_created": "added a goal bucket",
+  "finance.goal_updated": "updated a goal bucket",
+  "finance.category_updated": "recategorized a transaction",
+  "finance.category_bulk_updated": "recategorized matching transactions",
+
+  // finance — imports and clears
+  "finance.imported": "imported transactions",
+  "finance.cleared": "cleared finance data",
+
+  // finance — linked banks
+  "finance.connection_linked": "linked a bank",
+  "finance.connection_synced": "synced linked accounts",
+  "finance.connection_disconnected": "disconnected a linked bank",
+  "finance.webhook_transactions_processed": "new linked transactions",
+
+  // user
+  "user.privacy_updated": "updated privacy settings",
+};
+
+export function describeEventType(type: string): string {
+  return EVENT_LABELS[type] ?? type;
+}

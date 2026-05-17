@@ -1,23 +1,13 @@
 import { summarizeBalances } from "@/lib/finance-accounts";
 import { calculateSpendProjection } from "@/lib/finance-pace";
 import { summarizeCashflow, summarizeTransactionTypes, topCategoriesBySpend } from "@/lib/finance-summary";
+import { startOfMonth, formatUSDFromCents as formatUSD } from "@/lib/money";
 import { countTransactions, listAccounts, listTransactions } from "@/lib/services/finance";
 import { assertFinanceVisible } from "@/lib/viewer-context";
 import { WidgetCard } from "./widget-card";
 
-function startOfMonth(): Date {
-  const d = new Date();
-  d.setDate(1);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
 function formatUSDFromCents(cents: number): string {
-  return (cents / 100).toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  });
+  return formatUSD(cents, { maximumFractionDigits: 0 });
 }
 
 export async function FinanceWidget() {

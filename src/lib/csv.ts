@@ -64,7 +64,9 @@ function parseDate(s: string): Date | null {
   if (!Number.isNaN(iso.getTime())) return iso;
   const m = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
   if (m) {
-    const [, a, b, c] = m;
+    const a = m[1]!;
+    const b = m[2]!;
+    const c = m[3]!;
     const year = c.length === 2 ? 2000 + Number(c) : Number(c);
     const month = Number(a) - 1;
     const day = Number(b);

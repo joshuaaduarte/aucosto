@@ -21,6 +21,12 @@ function tx(overrides: Partial<FinanceTransaction> = {}): FinanceTransaction {
   return {
     id: "tx-1",
     userId: "user-1",
+    externalId: null,
+    syncSource: "csv",
+    financeAccountId: null,
+    postedStatus: null,
+    providerCategory: null,
+    category: null,
     date: new Date("2026-05-01T10:15:00.000Z"),
     amount: -1234,
     currency: "USD",
@@ -28,6 +34,7 @@ function tx(overrides: Partial<FinanceTransaction> = {}): FinanceTransaction {
     account: " checking ",
     raw: null,
     createdAt: new Date("2026-05-02T00:00:00.000Z"),
+    updatedAt: new Date("2026-05-02T00:00:00.000Z"),
     ...overrides,
   };
 }

@@ -26,9 +26,9 @@ describe("parseStatementPdf", () => {
 
     expect(preview.bank).toBe("chase");
     expect(preview.rows).toHaveLength(2);
-    expect(preview.rows[0].account).toBe("••1234");
+    expect(preview.rows[0]!.account).toBe("••1234");
     expect(preview.rows.map((row) => row.amount)).toEqual([-545, 150000]);
-    expect(preview.rows[0].date.toISOString().slice(0, 10)).toBe("2026-04-15");
+    expect(preview.rows[0]!.date.toISOString().slice(0, 10)).toBe("2026-04-15");
   });
 
   it("detects and parses an Apple Card-style statement", () => {

@@ -1,23 +1,7 @@
+import { describeEventType } from "@/lib/event-types";
 import { listRecentEvents } from "@/lib/services/events";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import { WidgetCard } from "./widget-card";
-
-function describeEvent(type: string): string {
-  switch (type) {
-    case "time.started":
-      return "started a timer";
-    case "time.stopped":
-      return "stopped a timer";
-    case "time.deleted":
-      return "deleted a time entry";
-    case "finance.imported":
-      return "imported transactions";
-    case "finance.cleared":
-      return "cleared finance data";
-    default:
-      return type;
-  }
-}
 
 function formatWhen(at: Date): string {
   return at.toLocaleString([], {
@@ -46,7 +30,7 @@ export async function ActivityWidget() {
             {events.map((event) => (
               <li key={event.id} className="rounded-2xl border border-zinc-200/80 bg-zinc-50/90 px-4 py-3">
                 <p className="text-sm font-medium text-zinc-900">
-                  {describeEvent(event.type)}
+                  {describeEventType(event.type)}
                 </p>
                 <p className="mt-1 text-xs text-zinc-500">
                   {event.tool} · {formatWhen(event.at)}

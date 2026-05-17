@@ -1,17 +1,28 @@
 "use server";
 
-import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { ensureDemoWorkspace, seedDemoWorkspaceData } from "@/lib/demo-workspace";
-import { prisma } from "@/lib/prisma";
+import {
+  PrivacyValidationError,
+  updatePrivacySettings,
+  verifyAppLockPin,
+} from "@/lib/services/user";
 import { APP_UNLOCK_COOKIE, DEMO_MODE_COOKIE } from "@/lib/viewer-context";
 
 export type PrivacyState =
   | { ok: true; message: string }
   | { ok: false; error: string }
   | undefined;
+
+const UNLOCK_COOKIE_OPTS = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: process.env.NODE_ENV === "production",
+  path: "/",
+  maxAge: 60 * 60 * 12,
+};
 
 function revalidateApp() {
   revalidatePath("/app");
@@ -34,47 +45,20 @@ export async function savePrivacySettings(
   const ownerUserId = await requireOwnerUser();
   const financeVisible = formData.get("financeVisible") === "on";
   const appLockEnabled = formData.get("appLockEnabled") === "on";
-  const pin = String(formData.get("pin") ?? "").trim();
+  const pin = String(formData.get("pin") ?? "");
 
-  const existing = await prisma.user.findUnique({
-    where: { id: ownerUserId },
-    select: { appLockPinHash: true },
-  });
-
-  if (!existing) return { ok: false, error: "User not found." };
-
-  let appLockPinHash = existing.appLockPinHash;
-  if (appLockEnabled) {
-    if (pin) {
-      if (!/^\d{4,8}$/.test(pin)) {
-        return { ok: false, error: "PIN must be 4 to 8 digits." };
-      }
-      appLockPinHash = await bcrypt.hash(pin, 10);
-    } else if (!appLockPinHash) {
-      return { ok: false, error: "Set a PIN before enabling the app lock." };
+  try {
+    await updatePrivacySettings(ownerUserId, { financeVisible, appLockEnabled, pin });
+  } catch (error) {
+    if (error instanceof PrivacyValidationError) {
+      return { ok: false, error: error.message };
     }
-  } else {
-    appLockPinHash = null;
+    throw error;
   }
-
-  await prisma.user.update({
-    where: { id: ownerUserId },
-    data: {
-      financeVisible,
-      appLockEnabled,
-      appLockPinHash,
-    },
-  });
 
   const cookieStore = await cookies();
   if (appLockEnabled) {
-    cookieStore.set(APP_UNLOCK_COOKIE, "1", {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 60 * 60 * 12,
-    });
+    cookieStore.set(APP_UNLOCK_COOKIE, "1", UNLOCK_COOKIE_OPTS);
   } else {
     cookieStore.delete(APP_UNLOCK_COOKIE);
   }
@@ -96,27 +80,15 @@ export async function unlockApp(
   const pin = String(formData.get("pin") ?? "").trim();
   if (!pin) return { ok: false, error: "Enter your PIN." };
 
-  const user = await prisma.user.findUnique({
-    where: { id: ownerUserId },
-    select: { appLockEnabled: true, appLockPinHash: true },
-  });
-
-  if (!user?.appLockEnabled || !user.appLockPinHash) {
-    return { ok: false, error: "App lock is not enabled." };
+  const result = await verifyAppLockPin(ownerUserId, pin);
+  if (!result.ok) {
+    return {
+      ok: false,
+      error: result.reason === "disabled" ? "App lock is not enabled." : "Incorrect PIN.",
+    };
   }
 
-  const valid = await bcrypt.compare(pin, user.appLockPinHash);
-  if (!valid) {
-    return { ok: false, error: "Incorrect PIN." };
-  }
-
-  (await cookies()).set(APP_UNLOCK_COOKIE, "1", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 12,
-  });
+  (await cookies()).set(APP_UNLOCK_COOKIE, "1", UNLOCK_COOKIE_OPTS);
 
   revalidateApp();
   return { ok: true, message: "Unlocked." };
@@ -132,13 +104,7 @@ export async function enableDemoMode(): Promise<PrivacyState> {
   const demoUserId = await ensureDemoWorkspace(ownerUserId);
   await seedDemoWorkspaceData(demoUserId);
 
-  (await cookies()).set(DEMO_MODE_COOKIE, "1", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 12,
-  });
+  (await cookies()).set(DEMO_MODE_COOKIE, "1", UNLOCK_COOKIE_OPTS);
 
   revalidateApp();
   return { ok: true, message: "Demo mode is on." };
@@ -154,13 +120,7 @@ export async function resetDemoMode(): Promise<PrivacyState> {
   const ownerUserId = await requireOwnerUser();
   const demoUserId = await ensureDemoWorkspace(ownerUserId);
   await seedDemoWorkspaceData(demoUserId);
-  (await cookies()).set(DEMO_MODE_COOKIE, "1", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 12,
-  });
+  (await cookies()).set(DEMO_MODE_COOKIE, "1", UNLOCK_COOKIE_OPTS);
   revalidateApp();
   return { ok: true, message: "Demo data reset." };
 }
