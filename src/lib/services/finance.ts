@@ -416,6 +416,32 @@ function tellerMoneyToCents(value: string | null | undefined): number {
   return Math.round(Number(value) * 100);
 }
 
+function normalizeSyncedAmountCents(accountKind: string, rawCents: number): number {
+  if (accountKind === "credit_card") {
+    return rawCents * -1;
+  }
+  return rawCents;
+}
+
+function inferSyncedCategory({
+  providerCategory,
+  description,
+  amount,
+}: {
+  providerCategory: string | null | undefined;
+  description: string;
+  amount: number;
+}): string {
+  const providerMatch = tellerCategoryToFinanceCategory(providerCategory);
+  if (providerMatch) return providerMatch;
+
+  if (amount > 0 && /(payment|thank you|autopay|ccpymt|card ccpymt|gsbank payment)/i.test(description)) {
+    return "Other";
+  }
+
+  return inferCategory(description, amount);
+}
+
 function tellerDateToMidday(value: string): Date {
   return new Date(`${value}T12:00:00.000Z`);
 }
@@ -514,10 +540,17 @@ async function syncTellerAccountTransactions(
   let changed = 0;
   for (const transaction of transactions) {
     const existingTransaction = existingByExternalId.get(transaction.id);
+    const normalizedAmount = normalizeSyncedAmountCents(
+      account.kind,
+      tellerMoneyToCents(transaction.amount),
+    );
     const nextCategory =
       existingTransaction?.category ??
-      tellerCategoryToFinanceCategory(transaction.category ?? transaction.details?.category) ??
-      inferCategory(transaction.description, tellerMoneyToCents(transaction.amount));
+      inferSyncedCategory({
+        providerCategory: transaction.category ?? transaction.details?.category,
+        description: transaction.description,
+        amount: normalizedAmount,
+      });
 
     const data = {
       financeAccountId: account.id,
@@ -525,7 +558,7 @@ async function syncTellerAccountTransactions(
       postedStatus: transaction.status ?? null,
       providerCategory: transaction.category ?? transaction.details?.category ?? null,
       date: tellerDateToMidday(transaction.date),
-      amount: tellerMoneyToCents(transaction.amount),
+      amount: normalizedAmount,
       currency: account.currency,
       description: transaction.description,
       account: account.name,
@@ -823,9 +856,16 @@ async function upsertWebhookTransactions(transactions: NonNullable<TellerWebhook
     });
     if (!account?.connection) continue;
 
+    const normalizedAmount = normalizeSyncedAmountCents(
+      account.kind,
+      tellerMoneyToCents(transaction.amount),
+    );
     const nextCategory =
-      tellerCategoryToFinanceCategory(transaction.category ?? transaction.details?.category) ??
-      inferCategory(transaction.description, tellerMoneyToCents(transaction.amount));
+      inferSyncedCategory({
+        providerCategory: transaction.category ?? transaction.details?.category,
+        description: transaction.description,
+        amount: normalizedAmount,
+      });
 
     const existing = await prisma.financeTransaction.findFirst({
       where: {
@@ -840,7 +880,7 @@ async function upsertWebhookTransactions(transactions: NonNullable<TellerWebhook
       postedStatus: transaction.status ?? null,
       providerCategory: transaction.category ?? transaction.details?.category ?? null,
       date: tellerDateToMidday(transaction.date),
-      amount: tellerMoneyToCents(transaction.amount),
+      amount: normalizedAmount,
       currency: account.currency,
       description: transaction.description,
       account: account.name,
