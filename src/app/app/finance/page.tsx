@@ -96,13 +96,13 @@ function summaryCard({
 }) {
   return (
     <div
-      className={`min-w-0 rounded-[1.5rem] border border-zinc-200/80 bg-white/90 p-5 shadow-[0_20px_60px_-45px_rgba(24,24,27,0.32)] dark:border-zinc-800/80 dark:bg-zinc-900/90 dark:shadow-none ${className ?? ""}`}
+      className={`min-w-0 rounded-[1.65rem] border border-zinc-200/80 bg-white/92 p-5 shadow-[0_20px_60px_-45px_rgba(24,24,27,0.16)] ${className ?? ""}`}
     >
       <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">
         {label}
       </p>
       <p
-        className={`mt-3 min-w-0 overflow-hidden text-ellipsis break-words text-xl font-semibold tracking-tight sm:text-2xl ${valueClassName ?? "text-zinc-950 dark:text-zinc-50"}`}
+        className={`mt-3 min-w-0 overflow-hidden text-ellipsis break-words text-xl font-semibold tracking-tight sm:text-2xl ${valueClassName ?? "text-zinc-950"}`}
       >
         {value}
       </p>
@@ -124,7 +124,7 @@ function sectionCard({
 }) {
   return (
     <div
-      className={`rounded-[1.75rem] border border-zinc-200/80 bg-white/90 p-5 shadow-[0_20px_60px_-45px_rgba(24,24,27,0.32)] dark:border-zinc-800/80 dark:bg-zinc-900/90 dark:shadow-none sm:p-6 ${className ?? ""}`}
+      className={`rounded-[1.9rem] border border-zinc-200/80 bg-white/92 p-5 shadow-[0_20px_60px_-45px_rgba(24,24,27,0.16)] sm:p-6 ${className ?? ""}`}
     >
       <div className="flex flex-col gap-1">
         <h2 className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">
@@ -141,16 +141,16 @@ function typeTone(type: string): string {
   switch (type) {
     case "income":
     case "reimbursement":
-      return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20";
+      return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200";
     case "credit_card_payment":
     case "transfer":
-      return "bg-sky-50 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-500/20";
+      return "bg-sky-50 text-sky-700 ring-1 ring-sky-200";
     case "housing":
-      return "bg-violet-50 text-violet-700 ring-1 ring-violet-200 dark:bg-violet-500/10 dark:text-violet-300 dark:ring-violet-500/20";
+      return "bg-violet-50 text-violet-700 ring-1 ring-violet-200";
     case "fee":
-      return "bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20";
+      return "bg-amber-50 text-amber-700 ring-1 ring-amber-200";
     default:
-      return "bg-zinc-100 text-zinc-700 ring-1 ring-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:ring-zinc-700";
+      return "bg-zinc-100 text-zinc-700 ring-1 ring-zinc-200";
   }
 }
 
@@ -165,7 +165,7 @@ function progressBar(
   }[tone];
 
   return (
-    <div className="mt-3 h-2 rounded-full bg-zinc-100 dark:bg-zinc-800">
+    <div className="mt-3 h-2 rounded-full bg-zinc-100">
       <div
         className={`${toneClass} h-2 rounded-full transition-all`}
         style={{ width: `${Math.max(4, Math.min(100, percent))}%` }}
@@ -178,7 +178,7 @@ function actionPill({ href, label }: { href: string; label: string }) {
   return (
     <a
       href={href}
-      className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-white px-3.5 py-2 text-sm text-zinc-700 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-100"
+      className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-white px-3.5 py-2 text-sm text-zinc-700 shadow-sm shadow-zinc-950/5 transition-all hover:-translate-y-0.5 hover:border-zinc-300 hover:text-zinc-900"
     >
       {label}
     </a>
@@ -195,10 +195,10 @@ function quickStat({
   tone?: "default" | "positive";
 }) {
   return (
-    <div className="min-w-0 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 shadow-sm shadow-zinc-950/5 backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-900/80 dark:shadow-none">
+    <div className="min-w-0 rounded-[1.4rem] border border-white/70 bg-white/88 px-4 py-3 shadow-sm shadow-zinc-950/5 backdrop-blur">
       <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">{label}</p>
       <p
-        className={`mt-2 min-w-0 overflow-hidden text-ellipsis break-words text-base font-semibold tracking-tight sm:text-lg ${tone === "positive" ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-950 dark:text-zinc-50"}`}
+        className={`mt-2 min-w-0 overflow-hidden text-ellipsis break-words text-base font-semibold tracking-tight sm:text-lg ${tone === "positive" ? "text-emerald-600" : "text-zinc-950"}`}
       >
         {value}
       </p>
@@ -444,8 +444,8 @@ export default async function FinancePage() {
                 hint: `${snapshot.netWorthAccountCount} included account${snapshot.netWorthAccountCount === 1 ? "" : "s"}`,
                 valueClassName:
                   snapshot.netWorthCents >= 0
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : "text-zinc-950 dark:text-zinc-50",
+                    ? "text-emerald-600"
+                    : "text-zinc-950",
               })}
             </div>
           ),
@@ -460,22 +460,33 @@ export default async function FinancePage() {
                 actionableAlerts.map((alert) => (
                   <div
                     key={alert.title}
-                    className={`rounded-2xl border px-4 py-4 dark:border-zinc-800 ${
+                    className={`rounded-[1.4rem] border px-4 py-4 shadow-sm shadow-zinc-950/5 ${
                       alert.tone === "amber"
-                        ? "border-amber-200 bg-amber-50/70 dark:bg-amber-950/20"
+                        ? "border-amber-200 bg-amber-50/75"
                         : alert.tone === "emerald"
-                          ? "border-emerald-200 bg-emerald-50/70 dark:bg-emerald-950/20"
+                          ? "border-emerald-200 bg-emerald-50/75"
                           : alert.tone === "sky"
-                            ? "border-sky-200 bg-sky-50/70 dark:bg-sky-950/20"
-                            : "border-zinc-200 bg-white dark:bg-zinc-900"
+                            ? "border-sky-200 bg-sky-50/75"
+                            : "border-zinc-200 bg-zinc-50/75"
                     }`}
                   >
-                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      {alert.title}
-                    </p>
-                    <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                      {alert.body}
-                    </p>
+                    <div className="flex gap-3">
+                      <span
+                        className={`mt-1.5 h-2.5 w-2.5 rounded-full ${
+                          alert.tone === "amber"
+                            ? "bg-amber-500"
+                            : alert.tone === "emerald"
+                              ? "bg-emerald-500"
+                              : alert.tone === "sky"
+                                ? "bg-sky-500"
+                                : "bg-zinc-400"
+                        }`}
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-zinc-900">{alert.title}</p>
+                        <p className="mt-1 text-sm text-zinc-500">{alert.body}</p>
+                      </div>
+                    </div>
                   </div>
                 ))
               ) : (
@@ -487,20 +498,20 @@ export default async function FinancePage() {
               )}
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50/80 px-4 py-4 dark:border-zinc-800 dark:bg-zinc-950/60">
+                <div className="rounded-[1.4rem] border border-zinc-200/80 bg-zinc-50/90 px-4 py-4 shadow-sm shadow-zinc-950/5">
                   <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">
                     Net flow
                   </p>
-                  <p className="mt-2 text-lg font-semibold text-zinc-950 dark:text-zinc-50">
+                  <p className="mt-2 text-lg font-semibold text-zinc-950">
                     {formatUSDFromCents(thisMonthSummary.netCents)}
                   </p>
                   <p className="mt-1 text-xs text-zinc-500">after true spending</p>
                 </div>
-                <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50/80 px-4 py-4 dark:border-zinc-800 dark:bg-zinc-950/60">
+                <div className="rounded-[1.4rem] border border-zinc-200/80 bg-zinc-50/90 px-4 py-4 shadow-sm shadow-zinc-950/5">
                   <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">
                     Next due
                   </p>
-                  <p className="mt-2 text-lg font-semibold text-zinc-950 dark:text-zinc-50">
+                  <p className="mt-2 text-lg font-semibold text-zinc-950">
                     {nextDueAccounts[0]?.dueDate
                       ? nextDueAccounts[0].dueDate.toLocaleDateString([], {
                           month: "short",
@@ -512,11 +523,11 @@ export default async function FinancePage() {
                     {nextDueAccounts[0]?.name ?? "No due dates tracked yet"}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50/80 px-4 py-4 dark:border-zinc-800 dark:bg-zinc-950/60">
+                <div className="rounded-[1.4rem] border border-zinc-200/80 bg-zinc-50/90 px-4 py-4 shadow-sm shadow-zinc-950/5">
                   <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">
                     Top pressure
                   </p>
-                  <p className="mt-2 text-lg font-semibold text-zinc-950 dark:text-zinc-50">
+                  <p className="mt-2 text-lg font-semibold text-zinc-950">
                     {topGoal?.name ?? topProjectedCategory?.category ?? "Waiting for more signal"}
                   </p>
                   <p className="mt-1 text-xs text-zinc-500">
@@ -533,22 +544,27 @@ export default async function FinancePage() {
         })}
       </section>
 
-      <section id="transactions">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">
-            {count > 0 ? `Review ${Math.min(history.length, count)} of ${count}` : "Transactions"}
-          </h2>
+      <section id="transactions" className="space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">
+              {count > 0 ? `Review ${Math.min(history.length, count)} of ${count}` : "Transactions"}
+            </h2>
+            <p className="mt-2 text-sm text-zinc-500">
+              Clean filters, faster scanning, and the latest linked activity first.
+            </p>
+          </div>
           {count > 0 ? (
             <a
               href="#manage"
-              className="text-sm text-zinc-500 underline-offset-4 hover:text-zinc-900 hover:underline dark:hover:text-zinc-100"
+              className="text-sm text-zinc-500 underline-offset-4 hover:text-zinc-900 hover:underline"
             >
               Need to edit accounts or goals?
             </a>
           ) : null}
         </div>
         {history.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-zinc-300 px-5 py-8 text-sm text-zinc-500 dark:border-zinc-700">
+          <div className="rounded-2xl border border-dashed border-zinc-300 px-5 py-8 text-sm text-zinc-500">
             No transactions yet. Import a CSV or statement PDF above.
           </div>
         ) : (
@@ -603,13 +619,13 @@ export default async function FinancePage() {
                     return (
                       <div
                         key={goal.id}
-                        className="rounded-2xl border border-zinc-200 px-4 py-4 dark:border-zinc-800"
+                        className="rounded-[1.4rem] border border-zinc-200 bg-zinc-50/75 px-4 py-4 shadow-sm shadow-zinc-950/5"
                       >
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium text-zinc-900 dark:text-zinc-100">
+                          <p className="font-medium text-zinc-900">
                             {goal.name}
                           </p>
-                          <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                          <span className="rounded-full bg-white px-2.5 py-1 text-[11px] text-zinc-600 ring-1 ring-zinc-200">
                             {formatGoalCategory(goal.category)}
                           </span>
                         </div>
@@ -634,7 +650,7 @@ export default async function FinancePage() {
                 </div>
               </>
             ) : (
-              <div className="mt-5 rounded-xl border border-dashed border-zinc-300 px-4 py-8 text-sm text-zinc-500 dark:border-zinc-700">
+              <div className="mt-5 rounded-xl border border-dashed border-zinc-300 px-4 py-8 text-sm text-zinc-500">
                 Add your first bucket to start tracking wedding, trips, emergency fund, or project savings.
               </div>
             ),
@@ -649,9 +665,9 @@ export default async function FinancePage() {
           children:
             count > 0 ? (
               <div className="mt-5 space-y-4">
-                <div className="rounded-2xl bg-zinc-50 px-4 py-4 dark:bg-zinc-800/70">
+                <div className="rounded-[1.5rem] border border-zinc-200 bg-zinc-50/90 px-4 py-4 shadow-sm shadow-zinc-950/5">
                   <p className="text-sm text-zinc-500">Projected true spend</p>
-                  <p className="mt-1 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+                  <p className="mt-1 text-2xl font-semibold tracking-tight text-zinc-950">
                     {formatUSDFromCents(spendProjection.projectedCents)}
                   </p>
                   <p className="mt-1 text-sm text-zinc-500">
@@ -660,7 +676,7 @@ export default async function FinancePage() {
                   {lastMonthSummary.spentCents > 0 ? (
                     <p className="mt-2 text-sm text-zinc-500">
                       vs last month true spend:{" "}
-                      <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                      <span className="font-medium text-zinc-700">
                         {formatSignedUSDFromCents(spendDeltaCents)}
                         {spendDeltaPercent ? ` (${spendDeltaPercent})` : ""}
                       </span>
@@ -680,7 +696,7 @@ export default async function FinancePage() {
                     label: "Income",
                     value: formatUSDFromCents(thisMonthSummary.incomeCents),
                     hint: "income + reimbursements",
-                    valueClassName: "text-emerald-600 dark:text-emerald-400",
+                    valueClassName: "text-emerald-600",
                   })}
                   {summaryCard({
                     label: "Net flow",

@@ -108,14 +108,14 @@ export function LinkedConnectionsPanel({
         onLoad={() => setScriptReady(true)}
       />
 
-      <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-950/5 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none">
+      <div className="rounded-[1.7rem] border border-zinc-200 bg-white/92 p-5 shadow-[0_18px_50px_-38px_rgba(24,24,27,0.16)]">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-2xl">
             <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-zinc-500">Linked banks</p>
-            <h2 className="mt-2 text-xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+            <h2 className="mt-2 text-xl font-semibold tracking-tight text-zinc-950">
               Read-only live balances and transactions.
             </h2>
-            <p className="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">
+            <p className="mt-2 text-sm leading-6 text-zinc-500">
               Teller handles the bank login flow. Aucosto stores an encrypted access token so it can refresh balances and pull new transactions later.
             </p>
           </div>
@@ -124,52 +124,52 @@ export function LinkedConnectionsPanel({
             type="button"
             disabled={!enabled || pending || !scriptReady}
             onClick={() => launchConnect()}
-            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-zinc-900 px-4 text-sm font-medium text-zinc-50 transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-zinc-900 px-4 text-sm font-medium text-zinc-50 transition-colors hover:bg-zinc-800 disabled:opacity-50"
           >
             {pending ? "Working…" : "Connect bank"}
           </button>
         </div>
 
         {!enabled ? (
-          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             {reason ?? "Teller is not configured yet."}
           </div>
         ) : null}
         {enabled && !scriptReady ? (
           <p className="mt-4 text-sm text-zinc-500">Loading Teller Connect…</p>
         ) : null}
-        {statusMessage ? <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">{statusMessage}</p> : null}
+        {statusMessage ? <p className="mt-4 text-sm text-zinc-500">{statusMessage}</p> : null}
       </div>
 
       {sortedConnections.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-zinc-300 px-5 py-8 text-sm text-zinc-500 dark:border-zinc-700">
+        <div className="rounded-2xl border border-dashed border-zinc-300 px-5 py-8 text-sm text-zinc-500">
           No linked bank connections yet.
         </div>
       ) : (
         <div className="space-y-3">
           {sortedConnections.map((connection) => (
-            <div key={connection.id} className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm shadow-zinc-950/5 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none">
+            <div key={connection.id} className="rounded-[1.5rem] border border-zinc-200 bg-white p-4 shadow-sm shadow-zinc-950/5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-base font-medium text-zinc-900 dark:text-zinc-100">
+                    <p className="text-base font-medium text-zinc-900">
                       {connection.institutionName ?? "Linked institution"}
                     </p>
-                    <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] uppercase tracking-[0.16em] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                    <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] uppercase tracking-[0.16em] text-zinc-600">
                       {connection.provider}
                     </span>
-                    <span className={`rounded-full px-2.5 py-1 text-[11px] ${connection.status === "active" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300" : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"}`}>
+                    <span className={`rounded-full px-2.5 py-1 text-[11px] ${connection.status === "active" ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-700"}`}>
                       {connection.status}
                     </span>
                   </div>
-                  <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                  <p className="mt-2 text-sm text-zinc-500">
                     {connection.accountCount} linked account{connection.accountCount === 1 ? "" : "s"} · {formatSyncLabel(connection.lastSyncedAt)}
                   </p>
                   {connection.lastSyncError ? (
-                    <p className="mt-2 text-sm text-red-600 dark:text-red-400">{connection.lastSyncError}</p>
+                    <p className="mt-2 text-sm text-red-600">{connection.lastSyncError}</p>
                   ) : null}
                   {connection.disconnectedReason ? (
-                    <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">Disconnected: {connection.disconnectedReason}</p>
+                    <p className="mt-2 text-sm text-amber-700">Disconnected: {connection.disconnectedReason}</p>
                   ) : null}
                 </div>
 
@@ -184,7 +184,7 @@ export function LinkedConnectionsPanel({
                         setStatusMessage(result?.ok ? `${result.message}${result.transactionCount != null ? ` Pulled ${result.transactionCount} transaction updates.` : ""}` : result?.error ?? "Could not sync linked account.");
                       });
                     }}
-                    className="inline-flex min-h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3.5 text-sm text-zinc-700 hover:border-zinc-300 hover:text-zinc-900 disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-100"
+                    className="inline-flex min-h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3.5 text-sm text-zinc-700 hover:border-zinc-300 hover:text-zinc-900 disabled:opacity-50"
                   >
                     Sync now
                   </button>
@@ -192,7 +192,7 @@ export function LinkedConnectionsPanel({
                     type="button"
                     disabled={!enabled || pending || !scriptReady}
                     onClick={() => launchConnect(connection.enrollmentId)}
-                    className="inline-flex min-h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3.5 text-sm text-zinc-700 hover:border-zinc-300 hover:text-zinc-900 disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-100"
+                    className="inline-flex min-h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3.5 text-sm text-zinc-700 hover:border-zinc-300 hover:text-zinc-900 disabled:opacity-50"
                   >
                     Repair connection
                   </button>
@@ -206,7 +206,7 @@ export function LinkedConnectionsPanel({
                         setStatusMessage(result?.ok ? result.message : result?.error ?? "Could not disconnect linked account.");
                       });
                     }}
-                    className="inline-flex min-h-10 items-center justify-center rounded-xl border border-red-200 bg-red-50 px-3.5 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300 dark:hover:bg-red-950/40"
+                    className="inline-flex min-h-10 items-center justify-center rounded-xl border border-red-200 bg-red-50 px-3.5 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50"
                   >
                     Disconnect
                   </button>

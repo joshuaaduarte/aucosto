@@ -46,8 +46,8 @@ function toDateInput(value: string | null): string {
 }
 
 const initialState: GoalState = undefined;
-const fieldClassName = "block min-h-11 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900";
-const buttonClassName = "inline-flex min-h-11 items-center justify-center rounded-xl bg-zinc-900 px-4 text-sm font-medium text-zinc-50 transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300";
+const fieldClassName = "block min-h-11 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm";
+const buttonClassName = "inline-flex min-h-11 items-center justify-center rounded-xl bg-zinc-900 px-4 text-sm font-medium text-zinc-50 transition-colors hover:bg-zinc-800 disabled:opacity-50";
 
 function GoalRow({ goal }: { goal: GoalView }) {
   const [state, formAction, pending] = useActionState(saveFinanceGoal, initialState);
@@ -59,19 +59,19 @@ function GoalRow({ goal }: { goal: GoalView }) {
   });
 
   return (
-    <form action={formAction} className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+    <form action={formAction} className="rounded-[1.4rem] border border-zinc-200 bg-zinc-50/60 p-4 shadow-sm shadow-zinc-950/5">
       <input type="hidden" name="id" value={goal.id} />
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-medium text-zinc-900 dark:text-zinc-100">{goal.name}</p>
-            <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{formatGoalCategory(goal.category)}</span>
-            <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{formatGoalOwner(goal.owner)}</span>
+            <p className="font-medium text-zinc-900">{goal.name}</p>
+            <span className="rounded-full bg-white px-2.5 py-1 text-[11px] text-zinc-600 ring-1 ring-zinc-200">{formatGoalCategory(goal.category)}</span>
+            <span className="rounded-full bg-white px-2.5 py-1 text-[11px] text-zinc-600 ring-1 ring-zinc-200">{formatGoalOwner(goal.owner)}</span>
           </div>
           <p className="mt-1 text-xs text-zinc-500">{summary.fundedPercent}% funded · {formatUSDFromCents(summary.remainingCents)} left{summary.targetDateLabel ? ` · target ${summary.targetDateLabel}` : ""}</p>
         </div>
         <div className="text-left sm:text-right">
-          <p className="font-mono text-sm tabular-nums text-zinc-900 dark:text-zinc-100">{formatUSDFromCents(goal.currentAmountCents)} / {formatUSDFromCents(goal.targetAmountCents)}</p>
+          <p className="font-mono text-sm tabular-nums text-zinc-900">{formatUSDFromCents(goal.currentAmountCents)} / {formatUSDFromCents(goal.targetAmountCents)}</p>
           {summary.monthlyNeededCents > 0 && <p className="text-xs text-zinc-500">{formatUSDFromCents(summary.monthlyNeededCents)} / month needed</p>}
         </div>
       </div>
@@ -120,7 +120,7 @@ function GoalRow({ goal }: { goal: GoalView }) {
         <textarea name="notes" defaultValue={goal.notes ?? ""} rows={2} className={`${fieldClassName} min-h-[88px] resize-y`} />
       </label>
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        {state && !state.ok ? <p className="text-sm text-red-600 dark:text-red-400">{state.error}</p> : <span />}
+        {state && !state.ok ? <p className="text-sm text-red-600">{state.error}</p> : <span />}
         <button type="submit" disabled={pending} className={`${buttonClassName} w-full sm:w-auto`}>
           {pending ? "Saving…" : "Save goal"}
         </button>
@@ -136,9 +136,9 @@ export function GoalsPanel({ goals }: { goals: GoalView[] }) {
     <div className="space-y-4">
       {goals.map((goal) => <GoalRow key={goal.id} goal={goal} />)}
 
-      <form action={formAction} className="rounded-xl border border-dashed border-zinc-300 p-4 dark:border-zinc-700">
+      <form action={formAction} className="rounded-[1.4rem] border border-dashed border-zinc-300 bg-white/70 p-4">
         <div>
-          <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Add goal bucket</h3>
+          <h3 className="text-sm font-medium text-zinc-900">Add goal bucket</h3>
           <p className="mt-1 text-sm text-zinc-500">Track future-facing buckets like wedding, emergency fund, vacation, or projects.</p>
         </div>
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -186,7 +186,7 @@ export function GoalsPanel({ goals }: { goals: GoalView[] }) {
           <textarea name="notes" rows={2} placeholder="Optional context or budget notes" className={`${fieldClassName} min-h-[88px] resize-y`} />
         </label>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          {state && !state.ok ? <p className="text-sm text-red-600 dark:text-red-400">{state.error}</p> : <span />}
+          {state && !state.ok ? <p className="text-sm text-red-600">{state.error}</p> : <span />}
           <button type="submit" disabled={pending} className={`${buttonClassName} w-full sm:w-auto`}>
             {pending ? "Adding…" : "Add goal"}
           </button>

@@ -43,16 +43,16 @@ function typeTone(type: string): string {
   switch (type) {
     case "income":
     case "reimbursement":
-      return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20";
+      return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200";
     case "credit_card_payment":
     case "transfer":
-      return "bg-sky-50 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-500/20";
+      return "bg-sky-50 text-sky-700 ring-1 ring-sky-200";
     case "housing":
-      return "bg-violet-50 text-violet-700 ring-1 ring-violet-200 dark:bg-violet-500/10 dark:text-violet-300 dark:ring-violet-500/20";
+      return "bg-violet-50 text-violet-700 ring-1 ring-violet-200";
     case "fee":
-      return "bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20";
+      return "bg-amber-50 text-amber-700 ring-1 ring-amber-200";
     default:
-      return "bg-zinc-100 text-zinc-700 ring-1 ring-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:ring-zinc-700";
+      return "bg-zinc-100 text-zinc-700 ring-1 ring-zinc-200";
   }
 }
 
@@ -71,7 +71,7 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
   const [category, setCategory] = useState<string>("all");
   const [type, setType] = useState<FinanceTransactionType | "all">("all");
   const [sort, setSort] = useState<SortKey>("newest");
-  const [view, setView] = useState<ViewKey>("cards");
+  const [view, setView] = useState<ViewKey>("compact");
 
   const accountOptions = useMemo(() => {
     return Array.from(
@@ -128,7 +128,7 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm shadow-zinc-950/5 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none">
+      <div className="rounded-[1.9rem] border border-zinc-200 bg-white/92 p-4 shadow-[0_18px_50px_-38px_rgba(24,24,27,0.16)]">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div className="space-y-3">
             <div>
@@ -136,7 +136,7 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
                 Review transactions
               </p>
               <p className="mt-1 text-sm text-zinc-500">
-                Filter by time, account, category, or money movement type, then review in cards or a tighter desktop table.
+                Filter fast, then review the cleanest possible read of the ledger.
               </p>
             </div>
             <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
@@ -147,8 +147,8 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
                   onClick={() => setRange(option.key)}
                   className={`inline-flex min-h-11 shrink-0 items-center rounded-full px-3.5 text-sm transition-colors ${
                     range === option.key
-                      ? "bg-zinc-900 text-zinc-50 dark:bg-zinc-100 dark:text-zinc-900"
-                      : "border border-zinc-200 bg-zinc-50 text-zinc-700 hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-100"
+                      ? "bg-zinc-900 text-zinc-50"
+                      : "border border-zinc-200 bg-zinc-50 text-zinc-700 hover:border-zinc-300 hover:text-zinc-900"
                   }`}
                 >
                   {option.label}
@@ -158,20 +158,20 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-3 dark:border-zinc-800 dark:bg-zinc-950/70">
+            <div className="rounded-[1.2rem] border border-zinc-200 bg-zinc-50/90 px-3 py-3 shadow-sm shadow-zinc-950/5">
               <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Showing</p>
-              <p className="mt-1 text-lg font-semibold text-zinc-950 dark:text-zinc-50">{filtered.length}</p>
+              <p className="mt-1 text-lg font-semibold text-zinc-950">{filtered.length}</p>
             </div>
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-3 dark:border-zinc-800 dark:bg-zinc-950/70">
+            <div className="rounded-[1.2rem] border border-zinc-200 bg-zinc-50/90 px-3 py-3 shadow-sm shadow-zinc-950/5">
               <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Spend</p>
-              <p className="mt-1 text-lg font-semibold text-zinc-950 dark:text-zinc-50">{formatUSDFromCents(filteredSpend)}</p>
+              <p className="mt-1 text-lg font-semibold text-zinc-950">{formatUSDFromCents(filteredSpend)}</p>
             </div>
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-3 dark:border-zinc-800 dark:bg-zinc-950/70">
+            <div className="rounded-[1.2rem] border border-zinc-200 bg-zinc-50/90 px-3 py-3 shadow-sm shadow-zinc-950/5">
               <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Sort</p>
               <select
                 value={sort}
                 onChange={(event) => setSort(event.target.value as SortKey)}
-                className="mt-1 w-full bg-transparent text-sm text-zinc-700 outline-none dark:text-zinc-300"
+                className="mt-1 w-full bg-transparent text-sm text-zinc-700 outline-none"
               >
                 <option value="newest">Newest first</option>
                 <option value="oldest">Oldest first</option>
@@ -179,13 +179,13 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
                 <option value="smallest">Smallest first</option>
               </select>
             </div>
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-3 dark:border-zinc-800 dark:bg-zinc-950/70">
+            <div className="rounded-[1.2rem] border border-zinc-200 bg-zinc-50/90 px-3 py-3 shadow-sm shadow-zinc-950/5">
               <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">View</p>
               <div className="mt-1 flex gap-2 text-sm">
                 <button
                   type="button"
                   onClick={() => setView("cards")}
-                  className={view === "cards" ? "font-medium text-zinc-950 dark:text-zinc-50" : "text-zinc-500 dark:text-zinc-400"}
+                  className={view === "cards" ? "font-medium text-zinc-950" : "text-zinc-500"}
                 >
                   Cards
                 </button>
@@ -194,7 +194,7 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
                   <button
                     type="button"
                     onClick={() => setView("compact")}
-                    className={view === "compact" ? "font-medium text-zinc-950 dark:text-zinc-50" : "text-zinc-500 dark:text-zinc-400"}
+                    className={view === "compact" ? "font-medium text-zinc-950" : "text-zinc-500"}
                   >
                     Compact
                   </button>
@@ -207,7 +207,7 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
           <label className="space-y-1 text-sm">
             <span className="text-zinc-500">Account</span>
-            <select value={account} onChange={(event) => setAccount(event.target.value)} className="block min-h-11 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900">
+            <select value={account} onChange={(event) => setAccount(event.target.value)} className="block min-h-11 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm">
               <option value="all">All accounts</option>
               {accountOptions.map((option) => (
                 <option key={option} value={option ?? ""}>{option}</option>
@@ -216,7 +216,7 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
           </label>
           <label className="space-y-1 text-sm">
             <span className="text-zinc-500">Category</span>
-            <select value={category} onChange={(event) => setCategory(event.target.value)} className="block min-h-11 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900">
+            <select value={category} onChange={(event) => setCategory(event.target.value)} className="block min-h-11 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm">
               <option value="all">All categories</option>
               {FINANCE_CATEGORIES.map((option) => (
                 <option key={option} value={option}>{option}</option>
@@ -225,7 +225,7 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
           </label>
           <label className="space-y-1 text-sm">
             <span className="text-zinc-500">Type</span>
-            <select value={type} onChange={(event) => setType(event.target.value as FinanceTransactionType | "all")} className="block min-h-11 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900">
+            <select value={type} onChange={(event) => setType(event.target.value as FinanceTransactionType | "all")} className="block min-h-11 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm">
               <option value="all">All movement</option>
               {FINANCE_TRANSACTION_TYPES.map((option) => (
                 <option key={option} value={option}>{formatTransactionType(option)}</option>
@@ -233,7 +233,7 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
             </select>
           </label>
           <div className="flex items-end">
-            <button type="button" onClick={resetFilters} className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 text-sm text-zinc-700 hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-100">
+            <button type="button" onClick={resetFilters} className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 text-sm text-zinc-700 hover:border-zinc-300 hover:text-zinc-900">
               Reset filters
             </button>
           </div>
@@ -241,7 +241,7 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
       </div>
 
       {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-zinc-300 px-5 py-8 text-sm text-zinc-500 dark:border-zinc-700">
+        <div className="rounded-2xl border border-dashed border-zinc-300 px-5 py-8 text-sm text-zinc-500">
           No transactions match these filters.
         </div>
       ) : view === "compact" ? (
@@ -251,12 +251,12 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
               const transactionType = classifyTransaction(transaction);
               const resolvedCategory = (transaction.category ?? "Other") as FinanceCategory;
               return (
-                <li key={transaction.id} className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm shadow-zinc-950/5 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none">
+                <li key={transaction.id} className="rounded-[1.5rem] border border-zinc-200 bg-white p-4 shadow-sm shadow-zinc-950/5">
                   <div className="flex flex-col gap-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{transaction.description}</p>
+                          <p className="truncate text-sm font-medium text-zinc-900">{transaction.description}</p>
                           <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${typeTone(transactionType)}`}>
                             {formatTransactionType(transactionType)}
                           </span>
@@ -270,7 +270,7 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
                           {transaction.account ? ` · ${transaction.account}` : ""}
                         </p>
                       </div>
-                      <span className={`font-mono text-sm tabular-nums ${transaction.amount < 0 ? "text-zinc-900 dark:text-zinc-100" : "text-emerald-600 dark:text-emerald-400"}`}>
+                      <span className={`font-mono text-sm tabular-nums ${transaction.amount < 0 ? "text-zinc-900" : "text-emerald-600"}`}>
                         {formatUSDFromCents(transaction.amount)}
                       </span>
                     </div>
@@ -285,8 +285,8 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
               );
             })}
           </ul>
-          <div className="hidden overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm shadow-zinc-950/5 md:block dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none">
-            <div className="hidden grid-cols-[120px_minmax(220px,1.6fr)_150px_160px_180px_120px] gap-3 border-b border-zinc-200 px-4 py-3 text-[11px] uppercase tracking-[0.2em] text-zinc-500 md:grid dark:border-zinc-800">
+          <div className="hidden overflow-hidden rounded-[1.6rem] border border-zinc-200 bg-white shadow-sm shadow-zinc-950/5 md:block">
+            <div className="hidden grid-cols-[120px_minmax(220px,1.6fr)_150px_160px_180px_120px] gap-3 border-b border-zinc-200 px-4 py-3 text-[11px] uppercase tracking-[0.2em] text-zinc-500 md:grid">
               <span>Date</span>
               <span>Description</span>
               <span>Account</span>
@@ -299,7 +299,7 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
                 const transactionType = classifyTransaction(transaction);
                 const resolvedCategory = (transaction.category ?? "Other") as FinanceCategory;
                 return (
-                  <li key={transaction.id} className="border-t border-zinc-200 first:border-t-0 dark:border-zinc-800">
+                  <li key={transaction.id} className="border-t border-zinc-200 first:border-t-0">
                     <div className="grid gap-3 px-4 py-4 md:grid-cols-[120px_minmax(220px,1.6fr)_150px_160px_180px_120px] md:items-center">
                       <span className="text-sm text-zinc-500">
                         {new Date(transaction.date).toLocaleDateString([], {
@@ -309,7 +309,7 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
                         })}
                       </span>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{transaction.description}</p>
+                        <p className="truncate text-sm font-medium text-zinc-900">{transaction.description}</p>
                       </div>
                       <span className="truncate text-sm text-zinc-500">{transaction.account ?? "—"}</span>
                       <div>
@@ -323,7 +323,7 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
                         description={transaction.description}
                         account={transaction.account}
                       />
-                      <span className={`text-right font-mono text-sm tabular-nums ${transaction.amount < 0 ? "text-zinc-900 dark:text-zinc-100" : "text-emerald-600 dark:text-emerald-400"}`}>
+                      <span className={`text-right font-mono text-sm tabular-nums ${transaction.amount < 0 ? "text-zinc-900" : "text-emerald-600"}`}>
                         {formatUSDFromCents(transaction.amount)}
                       </span>
                     </div>
@@ -339,13 +339,13 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
             const transactionType = classifyTransaction(transaction);
             const resolvedCategory = (transaction.category ?? "Other") as FinanceCategory;
             return (
-              <li key={transaction.id} className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm shadow-zinc-950/5 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none">
+              <li key={transaction.id} className="rounded-[1.5rem] border border-zinc-200 bg-white p-4 shadow-sm shadow-zinc-950/5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-start justify-between gap-3 sm:block">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="max-w-full truncate text-sm font-medium text-zinc-900 dark:text-zinc-100 sm:text-base">{transaction.description}</p>
+                          <p className="max-w-full truncate text-sm font-medium text-zinc-900 sm:text-base">{transaction.description}</p>
                           <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${typeTone(transactionType)}`}>
                             {formatTransactionType(transactionType)}
                           </span>
@@ -359,7 +359,7 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
                           {transaction.account ? ` · ${transaction.account}` : ""}
                         </p>
                       </div>
-                      <span className={`font-mono text-base tabular-nums sm:hidden ${transaction.amount < 0 ? "text-zinc-900 dark:text-zinc-100" : "text-emerald-600 dark:text-emerald-400"}`}>
+                      <span className={`font-mono text-base tabular-nums sm:hidden ${transaction.amount < 0 ? "text-zinc-900" : "text-emerald-600"}`}>
                         {formatUSDFromCents(transaction.amount)}
                       </span>
                     </div>
@@ -372,7 +372,7 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
                       />
                     </div>
                   </div>
-                  <span className={`hidden font-mono text-sm tabular-nums sm:block ${transaction.amount < 0 ? "text-zinc-900 dark:text-zinc-100" : "text-emerald-600 dark:text-emerald-400"}`}>
+                  <span className={`hidden font-mono text-sm tabular-nums sm:block ${transaction.amount < 0 ? "text-zinc-900" : "text-emerald-600"}`}>
                     {formatUSDFromCents(transaction.amount)}
                   </span>
                 </div>
