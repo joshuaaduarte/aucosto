@@ -91,7 +91,7 @@ export default function LandingPage() {
         </span>
         <Link
           href="/login"
-          className="flex items-center gap-1.5 text-sm font-medium text-ink-fade transition-colors hover:text-ink"
+          className="flex items-center gap-1.5 text-sm font-medium text-ink-fade transition-colors hover:text-ink -my-2 py-2 -mx-1 px-1"
         >
           Sign in
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
@@ -106,12 +106,12 @@ export default function LandingPage() {
           <p className="mb-5 font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-ink-fade">
             Personal dashboard
           </p>
-          <h1 className="text-[3rem] font-semibold leading-[1.05] tracking-[-0.03em] text-ink sm:text-[4rem] lg:text-[5rem]">
+          <h1 className="text-[2rem] font-semibold leading-[1.1] tracking-[-0.03em] text-ink sm:text-[3.25rem] sm:leading-[1.05] lg:text-[4.5rem]">
             Every tool you need,
             <br />
             <span style={{ color: "var(--verdigris)" }}>talking to each other.</span>
           </h1>
-          <p className="fade-in-delay-1 mt-6 max-w-lg text-[1.0625rem] leading-[1.7] text-ink-fade">
+          <p className="fade-in-delay-1 mt-5 text-base leading-[1.7] text-ink-fade sm:mt-6 sm:max-w-lg sm:text-[1.0625rem]">
             Time, money, food, fitness, projects, devices — all in one place, all sharing context.
             The insight you want is usually hiding at the intersection of two tools. Aucosto puts them together.
           </p>
@@ -129,7 +129,7 @@ export default function LandingPage() {
         </div>
 
         {/* Live count pill */}
-        <div className="fade-in-delay-3 mt-16 flex items-center gap-3">
+        <div className="fade-in-delay-3 mt-10 flex items-center gap-3 sm:mt-16">
           <span
             className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[0.6875rem] font-medium font-mono uppercase tracking-[0.1em]"
             style={{
@@ -159,7 +159,7 @@ export default function LandingPage() {
           <div className="mb-10">
             <p className="eyebrow">The toolkit</p>
           </div>
-          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-4">
             {tools.map((tool) => (
               <div
                 key={tool.index}
@@ -262,7 +262,7 @@ export default function LandingPage() {
               <span style={{ color: "var(--ink-fade)" }}>Designed to understand all of them.</span>
             </h2>
           </div>
-          <Link href="/login" className="btn-ink shrink-0">
+          <Link href="/login" className="btn-ink w-full shrink-0 sm:w-auto">
             Open your dashboard →
           </Link>
         </div>
