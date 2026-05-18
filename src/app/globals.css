@@ -187,8 +187,10 @@ body > * {
   color: #fff;
 }
 
-a {
-  color: inherit;
+@layer base {
+  a {
+    color: inherit;
+  }
 }
 
 /* ━━━ Utilities: scrollbar + safe area ━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
