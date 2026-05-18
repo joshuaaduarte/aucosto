@@ -11,26 +11,28 @@ export async function TimeTrackerWidget() {
 
   if (running) {
     return (
-      <WidgetCard name="The Dispatch" href="/app/time" folio="I.">
-        <div className="space-y-5">
-          <div className="flex items-center gap-3">
-            <span className="ink-pulse h-1.5 w-1.5 rounded-full bg-oxblood" aria-hidden />
-            <span className="font-mono text-[0.6875rem] uppercase tracking-[0.24em] text-oxblood">
-              Filed in progress
+      <WidgetCard name="Time" href="/app/time">
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <span
+              className="ink-pulse h-2 w-2 rounded-full shrink-0"
+              style={{ background: "var(--verdigris)" }}
+              aria-hidden
+            />
+            <span className="font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-ink-fade">
+              Running
             </span>
           </div>
-          <div className="space-y-2">
-            <p className="font-display text-[1.65rem] leading-[1.05] tracking-[-0.02em] text-ink">
+          <div>
+            <p className="text-[1.5rem] font-semibold leading-tight tracking-[-0.02em] text-ink">
               {running.label}
             </p>
-            <p className="font-serif text-sm italic text-ink-fade">
-              opened at{" "}
-              <span className="not-italic font-mono tabular text-ink-soft">
-                {running.startedAt.toLocaleTimeString([], {
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}
-              </span>
+            <p className="mt-1 font-mono text-xs text-ink-ghost">
+              started{" "}
+              {running.startedAt.toLocaleTimeString([], {
+                hour: "numeric",
+                minute: "2-digit",
+              })}
             </p>
           </div>
         </div>
@@ -47,21 +49,27 @@ export async function TimeTrackerWidget() {
   const totalMsWeek = sumDurations(completedWeek);
 
   return (
-    <WidgetCard name="The Dispatch" href="/app/time" folio="I.">
-      <div className="space-y-6">
+    <WidgetCard name="Time" href="/app/time">
+      <div className="space-y-4">
         <div>
-          <p className="font-display text-[3rem] font-medium leading-none tracking-[-0.035em] tabular text-ink">
+          <p
+            className="font-mono text-[2.5rem] font-medium leading-none tabular"
+            style={{ color: "var(--ink)" }}
+          >
             {formatHM(totalMsToday)}
           </p>
-          <p className="mt-2 font-serif text-sm italic text-ink-fade">
-            filed today
-          </p>
+          <p className="mt-1.5 text-xs text-ink-fade">filed today</p>
         </div>
-        <div className="flex items-baseline justify-between rule-soft-t border-rule pt-3">
-          <span className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade">
-            Week to date
+        <div
+          className="flex items-center justify-between pt-3"
+          style={{ borderTop: "1px solid var(--rule-faint)" }}
+        >
+          <span className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-ghost">
+            Week
           </span>
-          <span className="font-mono text-sm tabular text-ink">{formatHM(totalMsWeek)}</span>
+          <span className="font-mono text-sm tabular text-ink">
+            {formatHM(totalMsWeek)}
+          </span>
         </div>
       </div>
     </WidgetCard>

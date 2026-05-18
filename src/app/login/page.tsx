@@ -3,58 +3,61 @@ import { LoginForm } from "./login-form";
 
 export default function LoginPage() {
   return (
-    <main className="relative flex flex-1 flex-col">
-      <header className="mx-auto w-full max-w-[1280px] px-5 pt-6 sm:px-10 sm:pt-10">
-        <div className="flex items-center justify-between gap-4 font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade">
-          <Link href="/" className="text-ink hover:text-oxblood transition-colors">
-            ← Aucosto
-          </Link>
-          <span className="hidden sm:inline">Subscriber entrance</span>
-        </div>
+    <div
+      className="flex min-h-screen flex-col"
+      style={{ backgroundColor: "var(--paper)", color: "var(--ink)" }}
+    >
+      {/* Top bar */}
+      <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-6 sm:px-10 sm:py-8">
+        <Link
+          href="/"
+          className="flex items-center gap-1.5 text-sm font-medium text-ink-fade transition-colors hover:text-ink"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+            <path d="M11 7H3M6.5 3.5 3 7l3.5 3.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          aucosto
+        </Link>
       </header>
 
-      <div className="mx-auto flex w-full max-w-[1280px] flex-1 flex-col items-center justify-center px-5 py-16 sm:px-10 sm:py-24">
-        <div className="grid w-full max-w-5xl gap-14 lg:grid-cols-[1fr_1fr] lg:items-center">
-          {/* Left column — editorial welcome */}
-          <div className="lg:rule-r lg:border-rule lg:pr-14">
-            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.28em] text-ink-fade">
-              The Subscribers’ Entrance
-            </p>
-            <h1 className="mt-6 font-display font-medium leading-[0.9] tracking-[-0.045em] text-ink text-[3rem] sm:text-[4rem]">
-              Welcome back,
-              <br />
-              <span className="italic text-oxblood">dear reader.</span>
-            </h1>
-            <p className="mt-7 max-w-md font-serif text-[1.05rem] italic leading-[1.75] text-ink-soft">
-              Today’s edition is set and waiting. The figures are reconciled,
-              the columns are quiet, and the briefing is on the editor’s desk.
-            </p>
-            <p className="mt-7 font-serif text-sm italic text-ink-fade">
-              ❦ Aucosto is printed in one copy, for one reader. ❦
-            </p>
+      {/* Sign-in card */}
+      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-6 pb-20 pt-8 sm:px-10">
+        <div className="fade-in w-full max-w-sm">
+          {/* Wordmark */}
+          <div className="mb-8 text-center">
+            <span
+              className="text-[1.8rem] font-semibold tracking-[-0.04em] text-ink"
+              style={{ fontFamily: "var(--font-dm-sans), sans-serif" }}
+            >
+              aucosto
+            </span>
           </div>
 
-          {/* Right column — the sign-in card, as a subscription slip */}
-          <div className="rule-t rule-b border-ink py-10">
-            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.28em] text-oxblood">
-              Identify yourself
-            </p>
-            <h2 className="mt-2 font-display text-2xl font-medium italic tracking-[-0.02em] text-ink">
-              The subscription slip.
-            </h2>
-
-            <div className="mt-8">
-              <LoginForm />
+          {/* Card */}
+          <div
+            className="rounded-xl px-7 py-8"
+            style={{
+              background: "var(--surface)",
+              boxShadow: "var(--surface-shadow)",
+            }}
+          >
+            <div className="mb-7">
+              <h1 className="text-[1.4rem] font-semibold tracking-[-0.02em] text-ink">
+                Welcome back
+              </h1>
+              <p className="mt-1 text-sm text-ink-fade">
+                Sign in to your dashboard.
+              </p>
             </div>
 
-            <p className="mt-8 font-serif text-xs italic text-ink-fade leading-relaxed">
-              Set in Fraunces and Newsreader. No third-party sign-in, no
-              tracking cookies, no analytics — just a quiet, single-reader
-              publication.
-            </p>
+            <LoginForm />
           </div>
+
+          <p className="mt-6 text-center font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-ink-ghost">
+            Private · No tracking · One user
+          </p>
         </div>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

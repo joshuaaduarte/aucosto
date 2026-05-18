@@ -1,135 +1,211 @@
 @import "tailwindcss";
 
+/* ━━━ Light mode (default) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 :root {
-  /* paper */
-  --paper: #f1ead9;
-  --paper-deep: #e6dec8;
-  --paper-well: #d9cfb5;
+  /* Surfaces */
+  --paper:      #F5F4F1;
+  --paper-deep: #EDEBE6;
+  --paper-well: #E3E1DB;
+  --surface:    #FFFFFF;
 
-  /* ink */
-  --ink: #1b1610;
-  --ink-soft: #3a302a;
-  --ink-fade: #6e5f50;
-  --ink-ghost: #978674;
+  /* Text */
+  --ink:        #111110;
+  --ink-soft:   #2A2928;
+  --ink-fade:   #706D69;
+  --ink-ghost:  #A8A5A0;
 
-  /* hairline rules */
-  --rule: #8b7355;
-  --rule-soft: rgba(139, 115, 85, 0.32);
-  --rule-faint: rgba(139, 115, 85, 0.16);
+  /* Borders */
+  --rule:       #C9C6C0;
+  --rule-soft:  rgba(17, 17, 16, 0.09);
+  --rule-faint: rgba(17, 17, 16, 0.05);
 
-  /* semantic accent */
-  --oxblood: #7a1f24;
-  --oxblood-soft: rgba(122, 31, 36, 0.12);
-  --verdigris: #3b5a3a;
-  --verdigris-soft: rgba(59, 90, 58, 0.12);
-  --aged-gold: #a88433;
+  /* Card elevation */
+  --surface-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04);
 
-  /* danger / system colors */
+  /* Accent palette */
+  --oxblood:        #C0392B;
+  --oxblood-soft:   rgba(192, 57, 43, 0.10);
+  --verdigris:      #1C6E4E;
+  --verdigris-soft: rgba(28, 110, 78, 0.10);
+  --aged-gold:      #B45309;
+
+  /* Semantic aliases */
   --background: var(--paper);
   --foreground: var(--ink);
 
-  --safe-area-top: env(safe-area-inset-top, 0px);
-  --safe-area-right: env(safe-area-inset-right, 0px);
+  /* Safe areas */
+  --safe-area-top:    env(safe-area-inset-top, 0px);
+  --safe-area-right:  env(safe-area-inset-right, 0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
-  --safe-area-left: env(safe-area-inset-left, 0px);
+  --safe-area-left:   env(safe-area-inset-left, 0px);
 }
 
+/* ━━━ Dark mode (via OS preference) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:      #0F0E0D;
+    --paper-deep: #171614;
+    --paper-well: #1E1C1A;
+    --surface:    #1E1C1A;
+
+    --ink:        #EDECEA;
+    --ink-soft:   #D0CECC;
+    --ink-fade:   #8A8784;
+    --ink-ghost:  #3D3B38;
+
+    --rule:       #2C2A27;
+    --rule-soft:  rgba(255, 255, 255, 0.08);
+    --rule-faint: rgba(255, 255, 255, 0.04);
+
+    --surface-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06);
+
+    --oxblood:        #FCA5A5;
+    --oxblood-soft:   rgba(252, 165, 165, 0.12);
+    --verdigris:      #4ADE80;
+    --verdigris-soft: rgba(74, 222, 128, 0.12);
+    --aged-gold:      #FCD34D;
+
+    --background: var(--paper);
+    --foreground: var(--ink);
+  }
+}
+
+/* ━━━ Manual override: dark ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+[data-theme="dark"] {
+  --paper:      #0F0E0D;
+  --paper-deep: #171614;
+  --paper-well: #1E1C1A;
+  --surface:    #1E1C1A;
+
+  --ink:        #EDECEA;
+  --ink-soft:   #D0CECC;
+  --ink-fade:   #8A8784;
+  --ink-ghost:  #3D3B38;
+
+  --rule:       #2C2A27;
+  --rule-soft:  rgba(255, 255, 255, 0.08);
+  --rule-faint: rgba(255, 255, 255, 0.04);
+
+  --surface-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06);
+
+  --oxblood:        #FCA5A5;
+  --oxblood-soft:   rgba(252, 165, 165, 0.12);
+  --verdigris:      #4ADE80;
+  --verdigris-soft: rgba(74, 222, 128, 0.12);
+  --aged-gold:      #FCD34D;
+
+  --background: var(--paper);
+  --foreground: var(--ink);
+}
+
+/* ━━━ Manual override: light ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+[data-theme="light"] {
+  --paper:      #F5F4F1;
+  --paper-deep: #EDEBE6;
+  --paper-well: #E3E1DB;
+  --surface:    #FFFFFF;
+
+  --ink:        #111110;
+  --ink-soft:   #2A2928;
+  --ink-fade:   #706D69;
+  --ink-ghost:  #A8A5A0;
+
+  --rule:       #C9C6C0;
+  --rule-soft:  rgba(17, 17, 16, 0.09);
+  --rule-faint: rgba(17, 17, 16, 0.05);
+
+  --surface-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04);
+
+  --oxblood:        #C0392B;
+  --oxblood-soft:   rgba(192, 57, 43, 0.10);
+  --verdigris:      #1C6E4E;
+  --verdigris-soft: rgba(28, 110, 78, 0.10);
+  --aged-gold:      #B45309;
+
+  --background: var(--paper);
+  --foreground: var(--ink);
+}
+
+/* ━━━ Tailwind token registration ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background:   var(--background);
+  --color-foreground:   var(--foreground);
 
-  --color-paper: var(--paper);
-  --color-paper-deep: var(--paper-deep);
-  --color-paper-well: var(--paper-well);
+  --color-paper:        var(--paper);
+  --color-paper-deep:   var(--paper-deep);
+  --color-paper-well:   var(--paper-well);
+  --color-surface:      var(--surface);
 
-  --color-ink: var(--ink);
-  --color-ink-soft: var(--ink-soft);
-  --color-ink-fade: var(--ink-fade);
-  --color-ink-ghost: var(--ink-ghost);
+  --color-ink:          var(--ink);
+  --color-ink-soft:     var(--ink-soft);
+  --color-ink-fade:     var(--ink-fade);
+  --color-ink-ghost:    var(--ink-ghost);
 
-  --color-rule: var(--rule);
-  --color-rule-soft: var(--rule-soft);
-  --color-rule-faint: var(--rule-faint);
+  --color-rule:         var(--rule);
+  --color-rule-soft:    var(--rule-soft);
+  --color-rule-faint:   var(--rule-faint);
 
-  --color-oxblood: var(--oxblood);
+  --color-oxblood:      var(--oxblood);
   --color-oxblood-soft: var(--oxblood-soft);
-  --color-verdigris: var(--verdigris);
+  --color-verdigris:    var(--verdigris);
   --color-verdigris-soft: var(--verdigris-soft);
-  --color-aged-gold: var(--aged-gold);
+  --color-aged-gold:    var(--aged-gold);
 
-  --font-display: var(--font-fraunces);
-  --font-serif: var(--font-newsreader);
-  --font-mono: var(--font-jetbrains);
-  --font-sans: var(--font-newsreader);
+  --font-display: var(--font-dm-sans);
+  --font-serif:   var(--font-dm-sans);
+  --font-mono:    var(--font-jetbrains);
+  --font-sans:    var(--font-dm-sans);
 }
 
+/* ━━━ Base styles ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 html {
   scroll-behavior: smooth;
+  color-scheme: light dark;
 }
 
 body {
   min-height: 100vh;
   background-color: var(--paper);
-  background-image:
-    /* warm vignette in the corners */
-    radial-gradient(ellipse at top, rgba(168, 132, 51, 0.06), transparent 55%),
-    radial-gradient(ellipse at bottom right, rgba(122, 31, 36, 0.04), transparent 60%),
-    /* paper tone shift */
-    linear-gradient(180deg, #f3ecdc 0%, #ede5d2 100%);
   color: var(--ink);
-  font-family: var(--font-newsreader), Iowan Old Style, Charter, Georgia, serif;
+  font-family: var(--font-dm-sans), -apple-system, ui-sans-serif, system-ui, sans-serif;
   font-feature-settings: "kern", "liga", "calt";
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* paper grain — a subtle SVG noise tile applied on top of everything */
+/* Explicitly disable the old paper grain overlay */
 body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 1;
-  opacity: 0.55;
-  mix-blend-mode: multiply;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.10  0 0 0 0 0.08  0 0 0 0 0.05  0 0 0 0.045 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-  background-size: 220px 220px;
+  display: none;
 }
 
-/* anything above the grain (the app shell) sits on z-index >= 10 */
 body > * {
   position: relative;
-  z-index: 10;
 }
 
 ::selection {
-  background: var(--oxblood);
-  color: var(--paper);
+  background: var(--verdigris);
+  color: #fff;
 }
 
-/* selectable links pick up the body font weight, not the system blue */
 a {
   color: inherit;
 }
 
-/* utilities ----------------------------------------------------------- */
-
+/* ━━━ Utilities: scrollbar + safe area ━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 @utility no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
-
-  &::-webkit-scrollbar {
-    display: none;
-  }
+  &::-webkit-scrollbar { display: none; }
 }
 
 @utility pb-safe {
   padding-bottom: calc(var(--safe-area-bottom) + 1rem);
 }
 
-/* font-feature-settings helpers */
+/* ━━━ Utilities: typography ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 @utility tabular {
   font-variant-numeric: tabular-nums lining-nums;
-  font-feature-settings: "tnum" 1, "lnum" 1, "ss01" 1;
+  font-feature-settings: "tnum" 1, "lnum" 1;
 }
 
 @utility oldstyle {
@@ -140,73 +216,50 @@ a {
 @utility smallcaps {
   font-variant-caps: all-small-caps;
   font-feature-settings: "smcp" 1, "c2sc" 1;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: lowercase;
 }
 
 @utility eyebrow {
   font-family: var(--font-jetbrains), ui-monospace, monospace;
   font-size: 0.6875rem;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--ink-fade);
   font-weight: 500;
 }
 
-/* hairline rules — the spine of the design */
-@utility rule-t {
-  border-top: 1px solid var(--rule);
-}
-@utility rule-b {
-  border-bottom: 1px solid var(--rule);
-}
-@utility rule-l {
-  border-left: 1px solid var(--rule);
-}
-@utility rule-r {
-  border-right: 1px solid var(--rule);
-}
-@utility rule-soft-t {
-  border-top: 1px solid var(--rule-soft);
-}
-@utility rule-soft-b {
-  border-bottom: 1px solid var(--rule-soft);
-}
+/* ━━━ Utilities: borders ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+@utility rule-t      { border-top:    1px solid var(--rule); }
+@utility rule-b      { border-bottom: 1px solid var(--rule); }
+@utility rule-l      { border-left:   1px solid var(--rule); }
+@utility rule-r      { border-right:  1px solid var(--rule); }
+@utility rule-soft-t { border-top:    1px solid var(--rule-soft); }
+@utility rule-soft-b { border-bottom: 1px solid var(--rule-soft); }
 
-/* hairline-thin double rule, for mastheads */
-@utility double-rule-b {
-  border-bottom: 3px double var(--ink);
-}
-@utility double-rule-t {
-  border-top: 3px double var(--ink);
-}
+@utility double-rule-b { border-bottom: 3px double var(--ink); }
+@utility double-rule-t { border-top:    3px double var(--ink); }
 
-/* drop cap on the first letter of a paragraph */
+/* ━━━ Utilities: decorative (kept for compat with sub-pages) ━━━━━━ */
 @utility drop-cap {
   &::first-letter {
-    font-family: var(--font-fraunces), serif;
-    font-weight: 500;
-    font-style: normal;
+    font-weight: 700;
     float: left;
-    font-size: 4.6em;
-    line-height: 0.82;
-    padding: 0.05em 0.12em 0 0;
+    font-size: 3.5em;
+    line-height: 0.86;
+    padding: 0.04em 0.1em 0 0;
     color: var(--ink);
-    font-feature-settings: "ss01" 1;
   }
 }
 
-/* fleuron divider — a centered ornament between sections */
 @utility fleuron {
   display: flex;
   align-items: center;
   gap: 1rem;
-  color: var(--rule);
-  font-size: 1.1rem;
-  font-family: var(--font-fraunces), serif;
+  color: var(--ink-ghost);
+  font-size: 0.875rem;
 
-  &::before,
-  &::after {
+  &::before, &::after {
     content: "";
     flex: 1;
     height: 1px;
@@ -214,96 +267,83 @@ a {
   }
 }
 
-/* a ledger row — alternating paper tone for tables */
 @utility ledger-row {
-  background-image: linear-gradient(180deg, transparent 50%, rgba(139, 115, 85, 0.05) 50%);
+  background-image: linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.015) 50%);
   background-size: 100% 3.6rem;
 }
 
-/* the "ink button" — flat, ink-on-paper, rule frame */
+/* ━━━ Utilities: buttons ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 @utility btn-ink {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.75rem;
-  padding-inline: 1.25rem;
+  height: 2.5rem;
+  padding-inline: 1.125rem;
   background: var(--ink);
   color: var(--paper);
-  font-family: var(--font-newsreader), serif;
+  font-family: var(--font-dm-sans), sans-serif;
   font-size: 0.875rem;
   font-weight: 500;
-  letter-spacing: 0.01em;
-  border: 1px solid var(--ink);
-  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+  letter-spacing: -0.005em;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  transition: opacity 0.15s ease;
   cursor: pointer;
 
-  &:hover:not(:disabled) {
-    background: var(--oxblood);
-    border-color: var(--oxblood);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
+  &:hover:not(:disabled) { opacity: 0.80; }
+  &:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 
 @utility btn-ghost {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.75rem;
-  padding-inline: 1.25rem;
+  height: 2.5rem;
+  padding-inline: 1.125rem;
   background: transparent;
   color: var(--ink);
-  font-family: var(--font-newsreader), serif;
+  font-family: var(--font-dm-sans), sans-serif;
   font-size: 0.875rem;
   font-weight: 500;
+  letter-spacing: -0.005em;
+  border-radius: 7px;
   border: 1px solid var(--rule);
-  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
   cursor: pointer;
 
   &:hover:not(:disabled) {
     background: var(--paper-deep);
-    border-color: var(--ink);
+    border-color: var(--ink-ghost);
   }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
+  &:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 
-/* form inputs in the almanac style */
+/* ━━━ Utilities: form fields ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 @utility field {
   display: block;
   width: 100%;
-  min-height: 2.75rem;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid var(--rule);
-  padding: 0.5rem 0 0.5rem 0;
+  height: 2.75rem;
+  padding-inline: 0.875rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 7px;
   color: var(--ink);
-  font-family: var(--font-newsreader), serif;
-  font-size: 1rem;
-  transition: border-color 0.18s ease;
+  font-family: var(--font-dm-sans), sans-serif;
+  font-size: 0.9375rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
-  &::placeholder {
-    color: var(--ink-ghost);
-    font-style: italic;
-  }
-
+  &::placeholder { color: var(--ink-ghost); }
   &:focus {
     outline: none;
-    border-bottom-color: var(--oxblood);
-    border-bottom-width: 2px;
+    border-color: var(--verdigris);
+    box-shadow: 0 0 0 3px var(--verdigris-soft);
   }
 }
 
-/* animated underline for the active nav item */
+/* ━━━ Utilities: nav active underline ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 @keyframes ruleDraw {
   from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
+  to   { transform: scaleX(1); }
 }
 
 @utility rule-draw {
@@ -311,36 +351,28 @@ a {
   &::after {
     content: "";
     position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -6px;
-    height: 1px;
+    left: 0; right: 0; bottom: -6px;
+    height: 1.5px;
     background: var(--ink);
     transform-origin: left;
-    animation: ruleDraw 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    animation: ruleDraw 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
   }
 }
 
-/* gentle paper fade-in for the body of a section */
+/* ━━━ Animations ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 @keyframes paperFade {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(5px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-@utility fade-in {
-  animation: paperFade 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-}
+@utility fade-in         { animation: paperFade 0.4s cubic-bezier(0.25, 0.1, 0.25, 1) both; }
+@utility fade-in-delay-1 { animation: paperFade 0.4s cubic-bezier(0.25, 0.1, 0.25, 1) 0.06s both; }
+@utility fade-in-delay-2 { animation: paperFade 0.4s cubic-bezier(0.25, 0.1, 0.25, 1) 0.12s both; }
+@utility fade-in-delay-3 { animation: paperFade 0.4s cubic-bezier(0.25, 0.1, 0.25, 1) 0.18s both; }
+@utility fade-in-delay-4 { animation: paperFade 0.4s cubic-bezier(0.25, 0.1, 0.25, 1) 0.24s both; }
 
-@utility fade-in-delay-1 { animation: paperFade 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) 0.08s both; }
-@utility fade-in-delay-2 { animation: paperFade 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) 0.16s both; }
-@utility fade-in-delay-3 { animation: paperFade 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) 0.24s both; }
-@utility fade-in-delay-4 { animation: paperFade 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) 0.32s both; }
-
-/* a slow blink for the "dispatch in progress" indicator */
 @keyframes inkPulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
+  50%       { opacity: 0.35; }
 }
-@utility ink-pulse {
-  animation: inkPulse 2.4s ease-in-out infinite;
-}
+@utility ink-pulse { animation: inkPulse 2s ease-in-out infinite; }

@@ -9,13 +9,13 @@ export function LoginForm() {
   const [state, formAction, pending] = useActionState(login, initialState);
 
   return (
-    <form action={formAction} className="space-y-7">
-      <div className="space-y-2">
+    <form action={formAction} className="space-y-5">
+      <div className="space-y-1.5">
         <label
           htmlFor="email"
-          className="block font-mono text-[0.625rem] uppercase tracking-[0.22em] text-ink-fade"
+          className="block text-sm font-medium text-ink"
         >
-          Reader’s name on record
+          Email
         </label>
         <input
           id="email"
@@ -23,16 +23,17 @@ export function LoginForm() {
           type="email"
           autoComplete="email"
           required
-          placeholder="name@dispatch.test"
-          className="field font-display text-lg italic"
+          placeholder="you@example.com"
+          className="field"
         />
       </div>
-      <div className="space-y-2">
+
+      <div className="space-y-1.5">
         <label
           htmlFor="password"
-          className="block font-mono text-[0.625rem] uppercase tracking-[0.22em] text-ink-fade"
+          className="block text-sm font-medium text-ink"
         >
-          Cipher
+          Password
         </label>
         <input
           id="password"
@@ -40,16 +41,18 @@ export function LoginForm() {
           type="password"
           autoComplete="current-password"
           required
-          className="field font-mono text-lg tracking-[0.2em] tabular"
+          className="field font-mono tracking-[0.1em]"
         />
       </div>
 
       {state?.error && (
-        <p className="font-serif text-sm italic text-oxblood">{state.error}</p>
+        <p className="text-sm font-medium" style={{ color: "var(--oxblood)" }}>
+          {state.error}
+        </p>
       )}
 
       <button type="submit" disabled={pending} className="btn-ink w-full">
-        {pending ? "Releasing the edition…" : "Release today's edition  →"}
+        {pending ? "Signing in…" : "Sign in"}
       </button>
     </form>
   );

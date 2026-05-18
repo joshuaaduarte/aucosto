@@ -1,19 +1,10 @@
 import type { Metadata } from "next";
-import { Fraunces, JetBrains_Mono, Newsreader } from "next/font/google";
+import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
+const dmSans = DM_Sans({
+  variable: "--font-dm-sans",
   subsets: ["latin"],
-  axes: ["SOFT", "WONK", "opsz"],
-  display: "swap",
-});
-
-const newsreader = Newsreader({
-  variable: "--font-newsreader",
-  subsets: ["latin"],
-  axes: ["opsz"],
-  style: ["normal", "italic"],
   display: "swap",
 });
 
@@ -24,8 +15,8 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Aucosto — A Daily Edition",
-  description: "A private daily edition, typeset for one reader.",
+  title: "Aucosto — Your Daily Dashboard",
+  description: "Time, finance, and activity in one view.",
 };
 
 export default function RootLayout({
@@ -36,8 +27,16 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${fraunces.variable} ${newsreader.variable} ${jetbrains.variable} h-full antialiased`}
+      className={`${dmSans.variable} ${jetbrains.variable} h-full antialiased`}
     >
+      <head>
+        {/* Prevent theme flash by reading localStorage before React hydrates */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem("aucosto-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}`,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

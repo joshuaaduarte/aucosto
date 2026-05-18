@@ -6,7 +6,7 @@ import { countTransactions, listAccounts, listTransactions } from "@/lib/service
 import { assertFinanceVisible } from "@/lib/viewer-context";
 import { WidgetCard } from "./widget-card";
 
-function formatUSDFromCents(cents: number): string {
+function fmt(cents: number) {
   return formatUSD(cents, { maximumFractionDigits: 0 });
 }
 
@@ -20,35 +20,47 @@ export async function FinanceWidget() {
     listTransactions(userId, { since: monthStart, limit: 500 }),
   ]);
 
+  /* ── With connected accounts ─────────────────────────── */
   if (accounts.length > 0) {
     const snapshot = summarizeBalances(accounts);
     return (
-      <WidgetCard name="The Ledger" href="/app/finance" folio="II.">
-        <div className="space-y-6">
+      <WidgetCard name="Finance" href="/app/finance">
+        <div className="space-y-4">
           <div>
-            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade">
+            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-ghost">
               Net worth
             </p>
-            <p className="mt-2 font-display text-[2.6rem] font-medium leading-none tracking-[-0.035em] tabular text-ink">
-              {formatUSDFromCents(snapshot.netWorthCents)}
+            <p
+              className="mt-1.5 font-mono text-[2.5rem] font-medium leading-none tabular"
+              style={{ color: "var(--ink)" }}
+            >
+              {fmt(snapshot.netWorthCents)}
             </p>
           </div>
-          <dl className="rule-soft-t border-rule pt-3 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-            <div className="flex items-baseline justify-between">
-              <dt className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-ink-fade">Cash</dt>
-              <dd className="font-mono tabular text-ink">{formatUSDFromCents(snapshot.cashCents)}</dd>
+          <div
+            className="grid grid-cols-2 gap-3 pt-3 text-sm"
+            style={{ borderTop: "1px solid var(--rule-faint)" }}
+          >
+            <div>
+              <p className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-ghost">Cash</p>
+              <p className="mt-1 font-mono tabular text-ink">{fmt(snapshot.cashCents)}</p>
             </div>
-            <div className="flex items-baseline justify-between">
-              <dt className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-ink-fade">Owed</dt>
-              <dd className="font-mono tabular text-oxblood">{formatUSDFromCents(snapshot.cardsOwedCents)}</dd>
+            <div>
+              <p className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-ghost">Owed</p>
+              <p
+                className="mt-1 font-mono tabular"
+                style={{ color: "var(--oxblood)" }}
+              >
+                {fmt(snapshot.cardsOwedCents)}
+              </p>
             </div>
-          </dl>
+          </div>
           {(snapshot.investmentCents > 0 || snapshot.retirementCents > 0) && (
-            <p className="font-serif text-sm italic leading-relaxed text-ink-fade">
-              <span className="not-italic font-mono tabular text-ink-soft">
-                {formatUSDFromCents(snapshot.investmentCents + snapshot.retirementCents)}
+            <p className="text-xs text-ink-ghost">
+              <span className="font-mono tabular text-ink-fade">
+                {fmt(snapshot.investmentCents + snapshot.retirementCents)}
               </span>{" "}
-              held in long-term positions.
+              in long-term positions
             </p>
           )}
         </div>
@@ -56,21 +68,21 @@ export async function FinanceWidget() {
     );
   }
 
+  /* ── No data yet ─────────────────────────────────────── */
   if (count === 0) {
     return (
-      <WidgetCard name="The Ledger" href="/app/finance" folio="II.">
-        <div className="space-y-3">
-          <p className="font-display text-[1.5rem] leading-tight tracking-[-0.02em] text-ink">
-            No entries on record.
-          </p>
-          <p className="font-serif text-sm italic leading-relaxed text-ink-fade">
-            Import a statement, upload a CSV, or post the first account by hand.
+      <WidgetCard name="Finance" href="/app/finance">
+        <div className="space-y-2">
+          <p className="text-base font-medium text-ink">No entries yet.</p>
+          <p className="text-sm leading-relaxed text-ink-fade">
+            Import a statement or upload a CSV to get started.
           </p>
         </div>
       </WidgetCard>
     );
   }
 
+  /* ── Transactions but no accounts ───────────────────── */
   const { spentCents, netCents } = summarizeCashflow(thisMonth);
   const projection = calculateSpendProjection(thisMonth);
   const cardPayments = summarizeTransactionTypes(thisMonth).find(
@@ -79,42 +91,49 @@ export async function FinanceWidget() {
   const topCategory = topCategoriesBySpend(thisMonth, { limit: 1 })[0] ?? null;
 
   return (
-    <WidgetCard name="The Ledger" href="/app/finance" folio="II.">
-      <div className="space-y-6">
+    <WidgetCard name="Finance" href="/app/finance">
+      <div className="space-y-4">
         <div>
-          <p className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade">
-            True spend, month to date
+          <p className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-ghost">
+            True spend, MTD
           </p>
-          <p className="mt-2 font-display text-[2.6rem] font-medium leading-none tracking-[-0.035em] tabular text-oxblood">
-            {formatUSDFromCents(spentCents)}
+          <p
+            className="mt-1.5 font-mono text-[2.5rem] font-medium leading-none tabular"
+            style={{ color: "var(--oxblood)" }}
+          >
+            {fmt(spentCents)}
           </p>
         </div>
-        <dl className="rule-soft-t border-rule pt-3 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-          <div className="flex items-baseline justify-between">
-            <dt className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-ink-fade">Net</dt>
-            <dd className={`font-mono tabular ${netCents >= 0 ? "text-verdigris" : "text-oxblood"}`}>
-              {formatUSDFromCents(netCents)}
-            </dd>
+        <div
+          className="grid grid-cols-2 gap-3 pt-3"
+          style={{ borderTop: "1px solid var(--rule-faint)" }}
+        >
+          <div>
+            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-ghost">Net</p>
+            <p
+              className="mt-1 font-mono text-sm tabular"
+              style={{ color: netCents >= 0 ? "var(--verdigris)" : "var(--oxblood)" }}
+            >
+              {fmt(netCents)}
+            </p>
           </div>
-          <div className="flex items-baseline justify-between">
-            <dt className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-ink-fade">Pace</dt>
-            <dd className="font-mono tabular text-ink">{formatUSDFromCents(projection.projectedCents)}</dd>
+          <div>
+            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-ghost">Pace</p>
+            <p className="mt-1 font-mono text-sm tabular text-ink">
+              {fmt(projection.projectedCents)}
+            </p>
           </div>
-        </dl>
+        </div>
         {topCategory && (
-          <p className="font-serif text-sm italic leading-relaxed text-ink-fade">
-            Heaviest line item:{" "}
-            <span className="not-italic font-medium text-ink">{topCategory.category}</span>
-            {cardPayments ? (
+          <p className="text-xs text-ink-ghost">
+            Top: <span className="font-medium text-ink-fade">{topCategory.category}</span>
+            {cardPayments && (
               <>
                 {" · "}
-                <span className="not-italic font-mono tabular text-ink-soft">
-                  {formatUSDFromCents(cardPayments.amountCents)}
-                </span>{" "}
-                cleared on cards
+                <span className="font-mono tabular">{fmt(cardPayments.amountCents)}</span>
+                {" cleared on cards"}
               </>
-            ) : null}
-            .
+            )}
           </p>
         )}
       </div>
