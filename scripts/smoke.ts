@@ -46,8 +46,26 @@ async function main() {
   const existingTimeCount = await prisma.timeEntry.count({
     where: { userId: user.id },
   });
+  const existingCalendarCount = await prisma.calendarItem.count({
+    where: { userId: user.id },
+  });
   console.log(`Existing finance rows: ${existingFinanceCount}`);
   console.log(`Existing time rows: ${existingTimeCount}`);
+  console.log(`Existing calendar rows: ${existingCalendarCount}`);
+
+  const tempCalendar = await prisma.calendarItem.create({
+    data: {
+      userId: user.id,
+      title: "smoke calendar block",
+      kind: "block",
+      status: "confirmed",
+      startsAt: new Date(Date.now() + 60 * 60 * 1000),
+      endsAt: new Date(Date.now() + 2 * 60 * 60 * 1000),
+    },
+  });
+  console.log(`Calendar create: OK (${tempCalendar.id})`);
+  await prisma.calendarItem.delete({ where: { id: tempCalendar.id } });
+  console.log("Calendar delete: OK");
 
   if (!writeDemo) {
     console.log(
@@ -79,6 +97,7 @@ async function main() {
   console.log(`FinanceTransaction table: ${txCount} rows`);
 
   await prisma.timeEntry.deleteMany({ where: { userId: user.id } });
+  await prisma.calendarItem.deleteMany({ where: { userId: user.id } });
   const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
   await prisma.timeEntry.create({
     data: {
@@ -103,6 +122,31 @@ async function main() {
     where: { userId: user.id },
   });
   console.log(`TimeEntry table: ${teCount} rows`);
+
+  await prisma.calendarItem.createMany({
+    data: [
+      {
+        userId: user.id,
+        title: "Morning planning",
+        kind: "block",
+        status: "confirmed",
+        startsAt: new Date(Date.now() + 30 * 60 * 1000),
+        endsAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+      {
+        userId: user.id,
+        title: "Evening reset",
+        kind: "block",
+        status: "confirmed",
+        startsAt: new Date(Date.now() + 8 * 60 * 60 * 1000),
+        endsAt: new Date(Date.now() + 9 * 60 * 60 * 1000),
+      },
+    ],
+  });
+  const calendarCount = await prisma.calendarItem.count({
+    where: { userId: user.id },
+  });
+  console.log(`CalendarItem table: ${calendarCount} rows`);
 
   await prisma.$disconnect();
   console.log("OK");

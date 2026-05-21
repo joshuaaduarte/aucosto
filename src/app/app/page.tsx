@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { startOfMonth, startOfPreviousMonth } from "@/lib/money";
 import { listAccounts, listTransactions } from "@/lib/services/finance";
 import { getRunningEntry, listCompletedSince } from "@/lib/services/time";
+import { CalendarWidget } from "@/lib/widgets/calendar";
 import { startOfWeek } from "@/lib/time";
 import { sumDurations } from "@/lib/time-summary";
 import { getViewerContext } from "@/lib/viewer-context";
@@ -71,7 +72,7 @@ export default async function HubPage() {
     year: "numeric",
   });
 
-  const colCount = financeVisible ? "lg:grid-cols-3" : "lg:grid-cols-2";
+  const colCount = financeVisible ? "lg:grid-cols-4" : "lg:grid-cols-3";
 
   return (
     <div className="space-y-10">
@@ -128,6 +129,7 @@ export default async function HubPage() {
 
       {/* ── Widgets ───────────────────────────────────────────── */}
       <section className={`fade-in-delay-2 grid gap-4 ${colCount}`}>
+        <CalendarWidget />
         <TimeTrackerWidget />
         {financeVisible ? <FinanceWidget /> : null}
         <ActivityWidget />
@@ -135,6 +137,17 @@ export default async function HubPage() {
 
       {/* ── Quick links ───────────────────────────────────────── */}
       <section className="fade-in-delay-3 flex flex-wrap gap-3">
+        <Link
+          href="/app/calendar"
+          className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-ink-fade transition-colors hover:bg-paper-deep hover:text-ink"
+          style={{ border: "1px solid var(--rule-soft)" }}
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+            <rect x="2" y="2.5" width="10" height="9" rx="1.2" stroke="currentColor" strokeWidth="1.2" />
+            <path d="M4.5 1.75V4M9.5 1.75V4M2 5.25H12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+          </svg>
+          Open Calendar
+        </Link>
         <Link
           href="/app/time"
           className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-ink-fade transition-colors hover:bg-paper-deep hover:text-ink"

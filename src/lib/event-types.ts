@@ -28,6 +28,12 @@ const EVENT_LABELS: Record<string, string> = {
   "finance.connection_disconnected": "disconnected a linked bank",
   "finance.webhook_transactions_processed": "new linked transactions",
 
+  // calendar
+  "calendar.created": "added a calendar block",
+  "calendar.updated": "updated a calendar block",
+  "calendar.deleted": "deleted a calendar block",
+  "calendar.completed": "completed a calendar block",
+
   // user
   "user.privacy_updated": "updated privacy settings",
 };

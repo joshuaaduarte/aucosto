@@ -3,6 +3,7 @@
 aucosto is a personal daily dashboard: a hub for tools that help Joshua run day-to-day life with less friction.
 
 Right now it is centered on two practical tools:
+- **calendar / planning blocks**
 - **time tracking**
 - **finance imports and review**
 
@@ -19,6 +20,12 @@ Under the hood, it is being shaped to grow into a broader personal operations sy
 - recent completed entries
 - category support
 - server-action based mutations
+
+### Calendar
+- native personal calendar blocks
+- today agenda + week view
+- signals informed by time + finance context
+- foundation for future external calendar sync
 
 ### Finance
 - CSV import for transactions
@@ -75,6 +82,7 @@ src/
   app/
     app/
       finance/
+      calendar/
       time/
     api/auth/[...nextauth]/
     login/
@@ -91,6 +99,7 @@ prisma/
     core.prisma
     events.prisma
     finance.prisma
+    calendar.prisma
     time.prisma
   migrations/
   seed.ts
