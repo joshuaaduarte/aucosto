@@ -3,15 +3,11 @@ import { auth } from "@/auth";
 import { startOfMonth, startOfPreviousMonth } from "@/lib/money";
 import { listAccounts, listTransactions } from "@/lib/services/finance";
 import { getRunningEntry, listCompletedSince } from "@/lib/services/time";
-import { CalendarWidget } from "@/lib/widgets/calendar";
 import { startOfWeek } from "@/lib/time";
 import { sumDurations } from "@/lib/time-summary";
 import { getViewerContext } from "@/lib/viewer-context";
-import { ActivityWidget } from "@/lib/widgets/activity";
-import { FinanceWidget } from "@/lib/widgets/finance";
-import { TimeTrackerWidget } from "@/lib/widgets/time-tracker";
 import { deriveHubPrompts } from "./_lib/hub-prompts";
-import { PrivacyPanel } from "./privacy-panel";
+import { CardMenu } from "./card-menu";
 
 const toneColor: Record<string, string> = {
   amber:   "var(--aged-gold)",
@@ -27,17 +23,19 @@ export default async function HubPage() {
 
   const userId = context?.effectiveUserId;
   const financeVisible = context?.financeVisible ?? false;
+  const financeHasPin = false;
+  const financeLocked = false;
 
   const [runningEntry, weekEntries, accounts, thisMonthTx, lastMonthTx] =
     userId
       ? await Promise.all([
           getRunningEntry(userId),
           listCompletedSince(userId, startOfWeek()),
-          financeVisible ? listAccounts(userId) : Promise.resolve([]),
-          financeVisible
+          financeVisible && !financeLocked ? listAccounts(userId) : Promise.resolve([]),
+          financeVisible && !financeLocked
             ? listTransactions(userId, { since: startOfMonth(), limit: 1000 })
             : Promise.resolve([]),
-          financeVisible
+          financeVisible && !financeLocked
             ? listTransactions(userId, {
                 since: startOfPreviousMonth(),
                 limit: 1000,
@@ -48,6 +46,7 @@ export default async function HubPage() {
 
   const monthStart = startOfMonth();
   const previousMonthStart = startOfPreviousMonth();
+  const weekTotalMs = sumDurations(weekEntries);
   const thisMonthSpentCents = sumSpend(
     thisMonthTx.filter((t) => t.date >= monthStart),
   );
@@ -59,10 +58,10 @@ export default async function HubPage() {
 
   const prompts = deriveHubPrompts({
     runningEntry,
-    weekTotalMs: sumDurations(weekEntries),
-    accounts: financeVisible ? accounts : undefined,
-    thisMonthSpentCents: financeVisible ? thisMonthSpentCents : undefined,
-    lastMonthSpentCents: financeVisible ? lastMonthSpentCents : undefined,
+    weekTotalMs,
+    accounts: financeVisible && !financeLocked ? accounts : undefined,
+    thisMonthSpentCents: financeVisible && !financeLocked ? thisMonthSpentCents : undefined,
+    lastMonthSpentCents: financeVisible && !financeLocked ? lastMonthSpentCents : undefined,
   });
 
   const today = new Date().toLocaleDateString([], {
@@ -72,10 +71,8 @@ export default async function HubPage() {
     year: "numeric",
   });
 
-  const colCount = financeVisible ? "lg:grid-cols-4" : "lg:grid-cols-3";
-
   return (
-    <div className="space-y-10">
+    <div className="space-y-10 max-w-2xl mx-auto">
       {/* ── Greeting ──────────────────────────────────────────── */}
       <section className="fade-in flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <h1 className="text-[1.75rem] font-semibold tracking-[-0.02em] text-ink sm:text-[2rem]">
@@ -91,9 +88,94 @@ export default async function HubPage() {
         <p className="font-mono text-sm text-ink-fade shrink-0">{today}</p>
       </section>
 
+      {/* ── Snapshot ──────────────────────────────────────────── */}
+      <section className="fade-in-delay-1 grid grid-cols-2 gap-3">
+        {/* Time card */}
+        <div
+          className="group relative rounded-xl"
+          style={{ background: "var(--surface)", boxShadow: "var(--surface-shadow)" }}
+        >
+          <Link
+            href="/app/time"
+            className="block px-4 py-4 transition-opacity hover:opacity-80"
+          >
+            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-ink-ghost">
+              Time
+            </p>
+            {runningEntry ? (
+              <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-ink">
+                <span
+                  className="inline-block h-1.5 w-1.5 rounded-full shrink-0"
+                  style={{ background: "var(--verdigris)" }}
+                  aria-hidden
+                />
+                Running
+              </p>
+            ) : (
+              <p className="mt-2 text-sm font-medium text-ink">
+                {formatHoursMs(weekTotalMs)}
+              </p>
+            )}
+            <p className="mt-0.5 font-mono text-[0.6875rem] text-ink-ghost">
+              {runningEntry ? (runningEntry.label ?? "Untitled") : "this week"}
+            </p>
+          </Link>
+        </div>
+
+        {/* Finance card */}
+        {financeVisible && (
+          <div
+            className="group relative rounded-xl"
+            style={{ background: "var(--surface)", boxShadow: "var(--surface-shadow)" }}
+          >
+            <Link
+              href="/app/finance"
+              className="block px-4 py-4 transition-opacity hover:opacity-80"
+            >
+              <p className="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-ink-ghost">
+                Finance
+              </p>
+              {financeLocked ? (
+                <>
+                  <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-ink-ghost">
+                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden>
+                      <rect x="2" y="5.5" width="8" height="5.5" rx="1" stroke="currentColor" strokeWidth="1.1" />
+                      <path d="M4 5.5V3.5a2 2 0 0 1 4 0v2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+                    </svg>
+                    Locked
+                  </p>
+                  <p className="mt-0.5 font-mono text-[0.6875rem] text-ink-ghost">
+                    tap to unlock
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="mt-2 text-sm font-medium text-ink">
+                    {formatCents(thisMonthSpentCents)}
+                  </p>
+                  <p className="mt-0.5 font-mono text-[0.6875rem] text-ink-ghost">
+                    spent this month
+                    {lastMonthSpentCents > 0 && (
+                      <span className="ml-1.5">
+                        vs {formatCents(lastMonthSpentCents)} last
+                      </span>
+                    )}
+                  </p>
+                </>
+              )}
+            </Link>
+            <CardMenu
+              widgetId="finance"
+              hasPin={financeHasPin}
+              isLocked={financeLocked}
+            />
+          </div>
+        )}
+      </section>
+
       {/* ── Today's signals ───────────────────────────────────── */}
       {prompts.length > 0 && (
-        <section className="fade-in-delay-1">
+        <section className="fade-in-delay-2">
           <p className="mb-3 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-ink-ghost">
             Today&apos;s signals
           </p>
@@ -126,68 +208,6 @@ export default async function HubPage() {
           </ol>
         </section>
       )}
-
-      {/* ── Widgets ───────────────────────────────────────────── */}
-      <section className={`fade-in-delay-2 grid gap-4 ${colCount}`}>
-        <CalendarWidget />
-        <TimeTrackerWidget />
-        {financeVisible ? <FinanceWidget /> : null}
-        <ActivityWidget />
-      </section>
-
-      {/* ── Quick links ───────────────────────────────────────── */}
-      <section className="fade-in-delay-3 flex flex-wrap gap-3">
-        <Link
-          href="/app/calendar"
-          className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-ink-fade transition-colors hover:bg-paper-deep hover:text-ink"
-          style={{ border: "1px solid var(--rule-soft)" }}
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-            <rect x="2" y="2.5" width="10" height="9" rx="1.2" stroke="currentColor" strokeWidth="1.2" />
-            <path d="M4.5 1.75V4M9.5 1.75V4M2 5.25H12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-          </svg>
-          Open Calendar
-        </Link>
-        <Link
-          href="/app/time"
-          className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-ink-fade transition-colors hover:bg-paper-deep hover:text-ink"
-          style={{ border: "1px solid var(--rule-soft)" }}
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-            <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.2" />
-            <path d="M7 4.5V7l2 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          Open Time
-        </Link>
-        {financeVisible && (
-          <Link
-            href="/app/finance"
-            className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-ink-fade transition-colors hover:bg-paper-deep hover:text-ink"
-            style={{ border: "1px solid var(--rule-soft)" }}
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-              <rect x="1.5" y="3.5" width="11" height="7" rx="1" stroke="currentColor" strokeWidth="1.2" />
-              <path d="M1.5 6h11" stroke="currentColor" strokeWidth="1.2" />
-            </svg>
-            Open Finance
-          </Link>
-        )}
-      </section>
-
-      {/* ── Settings ──────────────────────────────────────────── */}
-      <section
-        className="fade-in-delay-4 rounded-xl px-5 py-5 sm:px-6"
-        style={{
-          background: "var(--surface)",
-          boxShadow: "var(--surface-shadow)",
-        }}
-      >
-        <PrivacyPanel
-          financeVisible={financeVisible}
-          appLockEnabled={context?.appLockEnabled ?? false}
-          isDemoMode={context?.isDemoMode ?? false}
-        />
-      </section>
     </div>
   );
 }
@@ -197,4 +217,20 @@ function sumSpend(transactions: { amount: number }[]): number {
     (acc, t) => (t.amount < 0 ? acc + Math.abs(t.amount) : acc),
     0,
   );
+}
+
+function formatHoursMs(ms: number): string {
+  const h = Math.floor(ms / 3_600_000);
+  const m = Math.floor((ms % 3_600_000) / 60_000);
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+function formatCents(cents: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(cents / 100);
 }

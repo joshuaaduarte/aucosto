@@ -124,3 +124,19 @@ export async function resetDemoMode(): Promise<PrivacyState> {
   revalidateApp();
   return { ok: true, message: "Demo data reset." };
 }
+
+export async function lockWidgetNow(_widgetId: string): Promise<void> {
+  revalidateApp();
+}
+
+export async function removeWidgetPin(_widgetId: string): Promise<void> {
+  revalidateApp();
+}
+
+export async function unlockWidget(
+  _prev: PrivacyState,
+  _formData: FormData,
+): Promise<PrivacyState> {
+  revalidateApp();
+  return { ok: true, message: "Unlocked." };
+}
