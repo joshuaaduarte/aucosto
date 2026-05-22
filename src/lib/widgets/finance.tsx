@@ -1,8 +1,16 @@
 import { summarizeBalances } from "@/lib/finance-accounts";
 import { calculateSpendProjection } from "@/lib/finance-pace";
-import { summarizeCashflow, summarizeTransactionTypes, topCategoriesBySpend } from "@/lib/finance-summary";
+import {
+  summarizeCashflow,
+  summarizeTransactionTypes,
+  topCategoriesBySpend,
+} from "@/lib/finance-summary";
 import { startOfMonth, formatUSDFromCents as formatUSD } from "@/lib/money";
-import { countTransactions, listAccounts, listTransactions } from "@/lib/services/finance";
+import {
+  countTransactions,
+  listAccounts,
+  listTransactions,
+} from "@/lib/services/finance";
 import { assertFinanceVisible } from "@/lib/viewer-context";
 import { WidgetCard } from "./widget-card";
 
@@ -25,39 +33,63 @@ export async function FinanceWidget() {
     const snapshot = summarizeBalances(accounts);
     return (
       <WidgetCard name="Finance" href="/app/finance">
-        <div className="space-y-4">
+        <div className="space-y-3">
           <div>
-            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-ghost">
+            <p
+              className="text-[0.6875rem] font-medium uppercase tracking-wider"
+              style={{ color: "var(--text-faint)" }}
+            >
               Net worth
             </p>
             <p
-              className="mt-1.5 font-mono text-[2.5rem] font-medium leading-none tabular"
-              style={{ color: "var(--ink)" }}
+              className="mt-0.5 text-[1.625rem] font-semibold tracking-tight tabular"
+              style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
             >
               {fmt(snapshot.netWorthCents)}
             </p>
           </div>
           <div
-            className="grid grid-cols-2 gap-3 pt-3 text-sm"
-            style={{ borderTop: "1px solid var(--rule-faint)" }}
+            className="grid grid-cols-2 gap-3 pt-2"
+            style={{ borderTop: "1px solid var(--border-faint)" }}
           >
             <div>
-              <p className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-ghost">Cash</p>
-              <p className="mt-1 font-mono tabular text-ink">{fmt(snapshot.cashCents)}</p>
+              <p
+                className="text-[0.6875rem] font-medium uppercase tracking-wider"
+                style={{ color: "var(--text-faint)" }}
+              >
+                Cash
+              </p>
+              <p
+                className="mt-0.5 text-[0.875rem] tabular font-medium"
+                style={{ color: "var(--text)" }}
+              >
+                {fmt(snapshot.cashCents)}
+              </p>
             </div>
             <div>
-              <p className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-ghost">Owed</p>
               <p
-                className="mt-1 font-mono tabular"
-                style={{ color: "var(--oxblood)" }}
+                className="text-[0.6875rem] font-medium uppercase tracking-wider"
+                style={{ color: "var(--text-faint)" }}
+              >
+                Owed
+              </p>
+              <p
+                className="mt-0.5 text-[0.875rem] tabular font-medium"
+                style={{ color: "var(--accent-strong)" }}
               >
                 {fmt(snapshot.cardsOwedCents)}
               </p>
             </div>
           </div>
           {(snapshot.investmentCents > 0 || snapshot.retirementCents > 0) && (
-            <p className="text-xs text-ink-ghost">
-              <span className="font-mono tabular text-ink-fade">
+            <p
+              className="text-[0.75rem]"
+              style={{ color: "var(--text-faint)" }}
+            >
+              <span
+                className="tabular"
+                style={{ color: "var(--text-muted)" }}
+              >
                 {fmt(snapshot.investmentCents + snapshot.retirementCents)}
               </span>{" "}
               in long-term positions
@@ -73,8 +105,16 @@ export async function FinanceWidget() {
     return (
       <WidgetCard name="Finance" href="/app/finance">
         <div className="space-y-2">
-          <p className="text-base font-medium text-ink">No entries yet.</p>
-          <p className="text-sm leading-relaxed text-ink-fade">
+          <p
+            className="text-[0.9375rem] font-semibold tracking-tight"
+            style={{ color: "var(--text)" }}
+          >
+            No entries yet.
+          </p>
+          <p
+            className="text-[0.8125rem] leading-relaxed"
+            style={{ color: "var(--text-muted)" }}
+          >
             Import a statement or upload a CSV to get started.
           </p>
         </div>
@@ -92,45 +132,72 @@ export async function FinanceWidget() {
 
   return (
     <WidgetCard name="Finance" href="/app/finance">
-      <div className="space-y-4">
+      <div className="space-y-3">
         <div>
-          <p className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-ghost">
+          <p
+            className="text-[0.6875rem] font-medium uppercase tracking-wider"
+            style={{ color: "var(--text-faint)" }}
+          >
             True spend, MTD
           </p>
           <p
-            className="mt-1.5 font-mono text-[2.5rem] font-medium leading-none tabular"
-            style={{ color: "var(--oxblood)" }}
+            className="mt-0.5 text-[1.625rem] font-semibold tracking-tight tabular"
+            style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
           >
             {fmt(spentCents)}
           </p>
         </div>
         <div
-          className="grid grid-cols-2 gap-3 pt-3"
-          style={{ borderTop: "1px solid var(--rule-faint)" }}
+          className="grid grid-cols-2 gap-3 pt-2"
+          style={{ borderTop: "1px solid var(--border-faint)" }}
         >
           <div>
-            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-ghost">Net</p>
             <p
-              className="mt-1 font-mono text-sm tabular"
-              style={{ color: netCents >= 0 ? "var(--verdigris)" : "var(--oxblood)" }}
+              className="text-[0.6875rem] font-medium uppercase tracking-wider"
+              style={{ color: "var(--text-faint)" }}
+            >
+              Net
+            </p>
+            <p
+              className="mt-0.5 text-[0.875rem] tabular font-medium"
+              style={{
+                color:
+                  netCents >= 0
+                    ? "var(--text)"
+                    : "var(--accent-strong)",
+              }}
             >
               {fmt(netCents)}
             </p>
           </div>
           <div>
-            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-ghost">Pace</p>
-            <p className="mt-1 font-mono text-sm tabular text-ink">
+            <p
+              className="text-[0.6875rem] font-medium uppercase tracking-wider"
+              style={{ color: "var(--text-faint)" }}
+            >
+              Pace
+            </p>
+            <p
+              className="mt-0.5 text-[0.875rem] tabular font-medium"
+              style={{ color: "var(--text)" }}
+            >
               {fmt(projection.projectedCents)}
             </p>
           </div>
         </div>
         {topCategory && (
-          <p className="text-xs text-ink-ghost">
-            Top: <span className="font-medium text-ink-fade">{topCategory.category}</span>
+          <p
+            className="text-[0.75rem]"
+            style={{ color: "var(--text-faint)" }}
+          >
+            Top:{" "}
+            <span style={{ color: "var(--text-muted)" }}>
+              {topCategory.category}
+            </span>
             {cardPayments && (
               <>
                 {" · "}
-                <span className="font-mono tabular">{fmt(cardPayments.amountCents)}</span>
+                <span className="tabular">{fmt(cardPayments.amountCents)}</span>
                 {" cleared on cards"}
               </>
             )}

@@ -24,89 +24,110 @@ export function StartForm({
   }, [pending, state]);
 
   return (
-    <article className="rule-t rule-b border-ink py-8 sm:py-10">
-      <header className="mb-7 flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
-        <div>
-          <p className="font-mono text-[0.6875rem] uppercase tracking-[0.26em] text-ink-fade">
-            Open a fresh dispatch
-          </p>
-          <h2 className="mt-1.5 font-display text-3xl font-medium italic tracking-[-0.02em] text-ink sm:text-4xl">
-            Set the column.
-          </h2>
-        </div>
-        <p className="max-w-sm font-serif text-sm italic text-ink-fade">
-          One press at a time. Opening a new column closes any prior dispatch in
-          progress.
+    <article
+      className="rounded-md p-5"
+      style={{
+        background: "var(--bg-page)",
+        border: "1px solid var(--border-soft)",
+      }}
+    >
+      <header className="mb-4">
+        <p
+          className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+          style={{ color: "var(--text-faint)" }}
+        >
+          Start a session
         </p>
+        <h2
+          className="mt-1 text-[1rem] font-semibold tracking-tight"
+          style={{ color: "var(--text)" }}
+        >
+          What are you working on?
+        </h2>
       </header>
 
-      <form ref={formRef} action={formAction} className="space-y-6">
-        <div className="grid gap-x-10 gap-y-6 md:grid-cols-[1.6fr_1fr]">
-          <div>
+      <form ref={formRef} action={formAction} className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-[1.6fr_1fr]">
+          <div className="space-y-1.5">
             <label
               htmlFor="label"
-              className="block font-mono text-[0.625rem] uppercase tracking-[0.22em] text-ink-fade"
+              className="block text-[0.75rem] font-medium"
+              style={{ color: "var(--text-muted)" }}
             >
-              The matter at hand
+              Session
             </label>
             <input
               id="label"
               name="label"
               type="text"
               required
-              placeholder="What is being worked on?"
-              className="field font-display text-xl"
+              placeholder="What's being worked on?"
+              className="field"
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <label
               htmlFor="category"
-              className="block font-mono text-[0.625rem] uppercase tracking-[0.22em] text-ink-fade"
+              className="block text-[0.75rem] font-medium"
+              style={{ color: "var(--text-muted)" }}
             >
-              Column (optional)
+              Category <span style={{ color: "var(--text-faint)" }}>(optional)</span>
             </label>
             <input
               ref={categoryRef}
               id="category"
               name="category"
               type="text"
-              placeholder="e.g. deep work, errands…"
-              className="field font-display text-xl italic"
+              placeholder="deep work, errands…"
+              className="field"
             />
           </div>
         </div>
 
-        {suggestedCategories.length > 0 ? (
-          <div className="rule-soft-t border-rule pt-4">
-            <p className="mb-3 font-mono text-[0.625rem] uppercase tracking-[0.22em] text-ink-fade">
-              Recently used columns
-            </p>
-            <div className="no-scrollbar flex flex-wrap gap-x-5 gap-y-2">
-              {suggestedCategories.map((suggestion) => (
-                <button
-                  key={suggestion}
-                  type="button"
-                  onClick={() => {
-                    if (categoryRef.current) categoryRef.current.value = suggestion;
-                  }}
-                  className="font-serif text-sm italic text-ink-fade transition-colors hover:text-ink hover:underline underline-offset-4 decoration-rule"
-                >
-                  {suggestion}
-                </button>
-              ))}
-            </div>
+        {suggestedCategories.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span
+              className="mr-1 text-[0.6875rem] font-medium uppercase tracking-wider"
+              style={{ color: "var(--text-faint)" }}
+            >
+              Recent
+            </span>
+            {suggestedCategories.map((suggestion) => (
+              <button
+                key={suggestion}
+                type="button"
+                onClick={() => {
+                  if (categoryRef.current)
+                    categoryRef.current.value = suggestion;
+                }}
+                className="inline-flex items-center rounded px-1.5 py-0.5 text-[0.75rem] font-medium transition-colors"
+                style={{
+                  background: "var(--bg-tint)",
+                  color: "var(--text-muted)",
+                }}
+              >
+                {suggestion}
+              </button>
+            ))}
           </div>
-        ) : null}
+        )}
 
         {state?.error && (
-          <p className="font-serif text-sm italic text-oxblood">
+          <p
+            className="rounded-md px-3 py-2 text-[0.8125rem]"
+            style={{
+              background: "var(--accent-tint)",
+              color: "var(--accent-strong)",
+              border: "1px solid var(--accent-tint-strong)",
+            }}
+          >
             {state.error}
           </p>
         )}
 
-        <div className="rule-soft-t border-rule pt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+        <div className="flex items-center justify-end pt-1">
           <button type="submit" disabled={pending} className="btn-ink">
-            {pending ? "Opening dispatch…" : "Open the dispatch  →"}
+            {pending ? "Starting…" : "Start session"}
           </button>
         </div>
       </form>

@@ -25,15 +25,24 @@ export function ManageSection({
 
   return (
     <section id="manage" className="space-y-10">
-      <header className="rule-t border-ink pt-4">
-        <p className="font-mono text-[0.6875rem] uppercase tracking-[0.26em] text-ink-fade">
-          Section V · Editorial Office
+      <header>
+        <p
+          className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+          style={{ color: "var(--text-faint)" }}
+        >
+          Manage
         </p>
-        <h2 className="mt-2 font-display text-3xl font-medium italic tracking-[-0.02em] text-ink">
-          Accounts, goals, and the press connections.
+        <h2
+          className="mt-1 text-[1.25rem] font-semibold tracking-tight"
+          style={{ color: "var(--text)" }}
+        >
+          Accounts, goals, and connections.
         </h2>
-        <p className="mt-2 font-serif text-sm italic text-ink-fade">
-          Kept out of the way of the daily read, available when needed.
+        <p
+          className="mt-1 text-[0.875rem]"
+          style={{ color: "var(--text-muted)" }}
+        >
+          Kept out of the way of the daily read.
         </p>
       </header>
 
@@ -45,15 +54,24 @@ export function ManageSection({
         connections={linkedConnections}
       />
 
-      <div className="grid grid-cols-1 gap-12 xl:grid-cols-[1fr_1fr] xl:gap-14">
+      <div className="grid grid-cols-1 gap-10 xl:grid-cols-[1fr_1fr] xl:gap-12">
         <SectionCard title="Accounts" subtitle="Manual and linked accounts in one place.">
-          <details className="mt-4 rule-t rule-b border-rule">
-            <summary className="cursor-pointer list-none py-4 font-display text-lg italic text-ink hover:text-oxblood">
+          <details
+            className="group rounded-md"
+            style={{ border: "1px solid var(--border-soft)" }}
+          >
+            <summary
+              className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-[0.875rem] font-medium transition-colors hover:bg-bg-hover"
+              style={{ color: "var(--text)" }}
+            >
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="transition-transform group-open:rotate-90">
+                <path d="m4 3 2.5 2.5L4 8" />
+              </svg>
               {accounts.length > 0
-                ? `Edit ${accounts.length} account${accounts.length === 1 ? "" : "s"}, or add another  →`
-                : "Add the first account  →"}
+                ? `Edit ${accounts.length} account${accounts.length === 1 ? "" : "s"}, or add another`
+                : "Add the first account"}
             </summary>
-            <div className="py-4">
+            <div className="px-3 py-3" style={{ borderTop: "1px solid var(--border-faint)" }}>
               <AccountsPanel
                 accounts={accounts.map((account) => ({
                   id: account.id,
@@ -74,13 +92,22 @@ export function ManageSection({
         </SectionCard>
 
         <SectionCard title="Goals" subtitle="Wedding, vacations, projects — kept in their bucket.">
-          <details className="mt-4 rule-t rule-b border-rule">
-            <summary className="cursor-pointer list-none py-4 font-display text-lg italic text-ink hover:text-oxblood">
+          <details
+            className="group rounded-md"
+            style={{ border: "1px solid var(--border-soft)" }}
+          >
+            <summary
+              className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-[0.875rem] font-medium transition-colors hover:bg-bg-hover"
+              style={{ color: "var(--text)" }}
+            >
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="transition-transform group-open:rotate-90">
+                <path d="m4 3 2.5 2.5L4 8" />
+              </svg>
               {goals.length > 0
-                ? `Edit ${goals.length} bucket${goals.length === 1 ? "" : "s"}, or add another  →`
-                : "Add the first bucket  →"}
+                ? `Edit ${goals.length} bucket${goals.length === 1 ? "" : "s"}, or add another`
+                : "Add the first bucket"}
             </summary>
-            <div className="py-4">
+            <div className="px-3 py-3" style={{ borderTop: "1px solid var(--border-faint)" }}>
               <GoalsPanel
                 goals={goals.map((goal) => ({
                   id: goal.id,

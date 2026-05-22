@@ -3,35 +3,63 @@
 /* ━━━ Light mode (default) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 :root {
   /* Surfaces */
-  --paper:      #F5F4F1;
-  --paper-deep: #EDEBE6;
-  --paper-well: #E3E1DB;
-  --surface:    #FFFFFF;
+  --bg-app:           #FAFAF8;          /* sidebar / chrome */
+  --bg-page:          #FFFFFF;          /* main content */
+  --bg-elevated:      #FFFFFF;          /* popovers, menus */
+  --bg-hover:         rgba(55, 53, 47, 0.06);
+  --bg-active:        rgba(55, 53, 47, 0.09);
+  --bg-tint:          rgba(55, 53, 47, 0.035);    /* callout */
+  --bg-tint-strong:   rgba(55, 53, 47, 0.07);
 
   /* Text */
-  --ink:        #111110;
-  --ink-soft:   #2A2928;
-  --ink-fade:   #706D69;
-  --ink-ghost:  #A8A5A0;
+  --text:             #37352F;          /* warm near-black */
+  --text-muted:       #6F6B66;
+  --text-faint:       #9B968F;
+  --text-ghost:       #BAB6AF;
+  --text-on-accent:   #FFFFFF;
 
   /* Borders */
-  --rule:       #C9C6C0;
-  --rule-soft:  rgba(17, 17, 16, 0.09);
-  --rule-faint: rgba(17, 17, 16, 0.05);
+  --border:           rgba(55, 53, 47, 0.13);
+  --border-soft:      rgba(55, 53, 47, 0.085);
+  --border-faint:     rgba(55, 53, 47, 0.05);
 
-  /* Card elevation */
-  --surface-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04);
+  /* Accent — warm orange, used sparingly */
+  --accent:           #DE6B2A;
+  --accent-strong:    #C45615;
+  --accent-tint:      rgba(222, 107, 42, 0.10);
+  --accent-tint-strong: rgba(222, 107, 42, 0.16);
 
-  /* Accent palette */
-  --oxblood:        #C0392B;
-  --oxblood-soft:   rgba(192, 57, 43, 0.10);
-  --verdigris:      #1C6E4E;
-  --verdigris-soft: rgba(28, 110, 78, 0.10);
-  --aged-gold:      #B45309;
+  /* Shadows (mostly border-only, Notion style) */
+  --shadow-card:      0 0 0 1px var(--border);
+  --shadow-pop:       0 0 0 1px rgba(15, 15, 15, 0.05),
+                      0 3px 6px rgba(15, 15, 15, 0.06),
+                      0 9px 24px rgba(15, 15, 15, 0.10);
 
-  /* Semantic aliases */
-  --background: var(--paper);
-  --foreground: var(--ink);
+  /* ── Legacy token aliases (so existing components inherit the new look) ── */
+  --paper:        var(--bg-app);
+  --paper-deep:   var(--bg-tint);
+  --paper-well:   var(--bg-tint-strong);
+  --surface:      var(--bg-page);
+
+  --ink:          var(--text);
+  --ink-soft:     var(--text);
+  --ink-fade:     var(--text-muted);
+  --ink-ghost:    var(--text-faint);
+
+  --rule:         var(--border);
+  --rule-soft:    var(--border-soft);
+  --rule-faint:   var(--border-faint);
+
+  --oxblood:      var(--accent);
+  --oxblood-soft: var(--accent-tint);
+  --verdigris:      var(--text);          /* was green-positive → neutral */
+  --verdigris-soft: var(--bg-tint);
+  --aged-gold:      var(--text-faint);    /* was amber → neutral */
+
+  --surface-shadow: var(--shadow-card);
+
+  --background: var(--bg-app);
+  --foreground: var(--text);
 
   /* Safe areas */
   --safe-area-top:    env(safe-area-inset-top, 0px);
@@ -43,87 +71,96 @@
 /* ━━━ Dark mode (via OS preference) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper:      #0F0E0D;
-    --paper-deep: #171614;
-    --paper-well: #1E1C1A;
-    --surface:    #1E1C1A;
+    --bg-app:           #191919;
+    --bg-page:          #1F1F1F;
+    --bg-elevated:      #252525;
+    --bg-hover:         rgba(255, 255, 255, 0.055);
+    --bg-active:        rgba(255, 255, 255, 0.09);
+    --bg-tint:          rgba(255, 255, 255, 0.04);
+    --bg-tint-strong:   rgba(255, 255, 255, 0.07);
 
-    --ink:        #EDECEA;
-    --ink-soft:   #D0CECC;
-    --ink-fade:   #8A8784;
-    --ink-ghost:  #3D3B38;
+    --text:             #E5E4E0;
+    --text-muted:       #9B9892;
+    --text-faint:       #6E6B66;
+    --text-ghost:       #4A4845;
+    --text-on-accent:   #1A1A1A;
 
-    --rule:       #2C2A27;
-    --rule-soft:  rgba(255, 255, 255, 0.08);
-    --rule-faint: rgba(255, 255, 255, 0.04);
+    --border:           rgba(255, 255, 255, 0.13);
+    --border-soft:      rgba(255, 255, 255, 0.08);
+    --border-faint:     rgba(255, 255, 255, 0.045);
 
-    --surface-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06);
+    --accent:           #F09464;
+    --accent-strong:    #FDB388;
+    --accent-tint:      rgba(240, 148, 100, 0.14);
+    --accent-tint-strong: rgba(240, 148, 100, 0.22);
 
-    --oxblood:        #FCA5A5;
-    --oxblood-soft:   rgba(252, 165, 165, 0.12);
-    --verdigris:      #4ADE80;
-    --verdigris-soft: rgba(74, 222, 128, 0.12);
-    --aged-gold:      #FCD34D;
-
-    --background: var(--paper);
-    --foreground: var(--ink);
+    --shadow-card:      0 0 0 1px var(--border);
+    --shadow-pop:       0 0 0 1px rgba(0, 0, 0, 0.35),
+                        0 3px 6px rgba(0, 0, 0, 0.30),
+                        0 12px 28px rgba(0, 0, 0, 0.45);
   }
 }
 
 /* ━━━ Manual override: dark ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 [data-theme="dark"] {
-  --paper:      #0F0E0D;
-  --paper-deep: #171614;
-  --paper-well: #1E1C1A;
-  --surface:    #1E1C1A;
+  --bg-app:           #191919;
+  --bg-page:          #1F1F1F;
+  --bg-elevated:      #252525;
+  --bg-hover:         rgba(255, 255, 255, 0.055);
+  --bg-active:        rgba(255, 255, 255, 0.09);
+  --bg-tint:          rgba(255, 255, 255, 0.04);
+  --bg-tint-strong:   rgba(255, 255, 255, 0.07);
 
-  --ink:        #EDECEA;
-  --ink-soft:   #D0CECC;
-  --ink-fade:   #8A8784;
-  --ink-ghost:  #3D3B38;
+  --text:             #E5E4E0;
+  --text-muted:       #9B9892;
+  --text-faint:       #6E6B66;
+  --text-ghost:       #4A4845;
+  --text-on-accent:   #1A1A1A;
 
-  --rule:       #2C2A27;
-  --rule-soft:  rgba(255, 255, 255, 0.08);
-  --rule-faint: rgba(255, 255, 255, 0.04);
+  --border:           rgba(255, 255, 255, 0.13);
+  --border-soft:      rgba(255, 255, 255, 0.08);
+  --border-faint:     rgba(255, 255, 255, 0.045);
 
-  --surface-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06);
+  --accent:           #F09464;
+  --accent-strong:    #FDB388;
+  --accent-tint:      rgba(240, 148, 100, 0.14);
+  --accent-tint-strong: rgba(240, 148, 100, 0.22);
 
-  --oxblood:        #FCA5A5;
-  --oxblood-soft:   rgba(252, 165, 165, 0.12);
-  --verdigris:      #4ADE80;
-  --verdigris-soft: rgba(74, 222, 128, 0.12);
-  --aged-gold:      #FCD34D;
-
-  --background: var(--paper);
-  --foreground: var(--ink);
+  --shadow-card:      0 0 0 1px var(--border);
+  --shadow-pop:       0 0 0 1px rgba(0, 0, 0, 0.35),
+                      0 3px 6px rgba(0, 0, 0, 0.30),
+                      0 12px 28px rgba(0, 0, 0, 0.45);
 }
 
 /* ━━━ Manual override: light ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 [data-theme="light"] {
-  --paper:      #F5F4F1;
-  --paper-deep: #EDEBE6;
-  --paper-well: #E3E1DB;
-  --surface:    #FFFFFF;
+  --bg-app:           #FAFAF8;
+  --bg-page:          #FFFFFF;
+  --bg-elevated:      #FFFFFF;
+  --bg-hover:         rgba(55, 53, 47, 0.06);
+  --bg-active:        rgba(55, 53, 47, 0.09);
+  --bg-tint:          rgba(55, 53, 47, 0.035);
+  --bg-tint-strong:   rgba(55, 53, 47, 0.07);
 
-  --ink:        #111110;
-  --ink-soft:   #2A2928;
-  --ink-fade:   #706D69;
-  --ink-ghost:  #A8A5A0;
+  --text:             #37352F;
+  --text-muted:       #6F6B66;
+  --text-faint:       #9B968F;
+  --text-ghost:       #BAB6AF;
+  --text-on-accent:   #FFFFFF;
 
-  --rule:       #C9C6C0;
-  --rule-soft:  rgba(17, 17, 16, 0.09);
-  --rule-faint: rgba(17, 17, 16, 0.05);
+  --border:           rgba(55, 53, 47, 0.13);
+  --border-soft:      rgba(55, 53, 47, 0.085);
+  --border-faint:     rgba(55, 53, 47, 0.05);
 
-  --surface-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04);
+  --accent:           #DE6B2A;
+  --accent-strong:    #C45615;
+  --accent-tint:      rgba(222, 107, 42, 0.10);
+  --accent-tint-strong: rgba(222, 107, 42, 0.16);
 
-  --oxblood:        #C0392B;
-  --oxblood-soft:   rgba(192, 57, 43, 0.10);
-  --verdigris:      #1C6E4E;
-  --verdigris-soft: rgba(28, 110, 78, 0.10);
-  --aged-gold:      #B45309;
-
-  --background: var(--paper);
-  --foreground: var(--ink);
+  --shadow-card:      0 0 0 1px var(--border);
+  --shadow-pop:       0 0 0 1px rgba(15, 15, 15, 0.05),
+                      0 3px 6px rgba(15, 15, 15, 0.06),
+                      0 9px 24px rgba(15, 15, 15, 0.10);
 }
 
 /* ━━━ Tailwind token registration ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
@@ -131,30 +168,50 @@
   --color-background:   var(--background);
   --color-foreground:   var(--foreground);
 
-  --color-paper:        var(--paper);
-  --color-paper-deep:   var(--paper-deep);
-  --color-paper-well:   var(--paper-well);
-  --color-surface:      var(--surface);
+  --color-bg-app:       var(--bg-app);
+  --color-bg-page:      var(--bg-page);
+  --color-bg-elevated:  var(--bg-elevated);
+  --color-bg-hover:     var(--bg-hover);
+  --color-bg-active:    var(--bg-active);
+  --color-bg-tint:      var(--bg-tint);
+  --color-bg-tint-strong: var(--bg-tint-strong);
 
-  --color-ink:          var(--ink);
-  --color-ink-soft:     var(--ink-soft);
-  --color-ink-fade:     var(--ink-fade);
-  --color-ink-ghost:    var(--ink-ghost);
+  --color-text:         var(--text);
+  --color-text-muted:   var(--text-muted);
+  --color-text-faint:   var(--text-faint);
+  --color-text-ghost:   var(--text-ghost);
 
-  --color-rule:         var(--rule);
-  --color-rule-soft:    var(--rule-soft);
-  --color-rule-faint:   var(--rule-faint);
+  --color-border:       var(--border);
+  --color-border-soft:  var(--border-soft);
+  --color-border-faint: var(--border-faint);
 
-  --color-oxblood:      var(--oxblood);
-  --color-oxblood-soft: var(--oxblood-soft);
-  --color-verdigris:    var(--verdigris);
-  --color-verdigris-soft: var(--verdigris-soft);
-  --color-aged-gold:    var(--aged-gold);
+  --color-accent:       var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-tint:  var(--accent-tint);
+  --color-accent-tint-strong: var(--accent-tint-strong);
 
-  --font-display: var(--font-dm-sans);
-  --font-serif:   var(--font-dm-sans);
+  /* Legacy aliases — Tailwind classes from before the redesign still resolve */
+  --color-paper:        var(--bg-app);
+  --color-paper-deep:   var(--bg-tint);
+  --color-paper-well:   var(--bg-tint-strong);
+  --color-surface:      var(--bg-page);
+  --color-ink:          var(--text);
+  --color-ink-soft:     var(--text);
+  --color-ink-fade:     var(--text-muted);
+  --color-ink-ghost:    var(--text-faint);
+  --color-rule:         var(--border);
+  --color-rule-soft:    var(--border-soft);
+  --color-rule-faint:   var(--border-faint);
+  --color-oxblood:      var(--accent);
+  --color-oxblood-soft: var(--accent-tint);
+  --color-verdigris:    var(--text);
+  --color-verdigris-soft: var(--bg-tint);
+  --color-aged-gold:    var(--text-faint);
+
+  --font-display: var(--font-inter-tight);
+  --font-serif:   var(--font-inter-tight);
+  --font-sans:    var(--font-inter-tight);
   --font-mono:    var(--font-jetbrains);
-  --font-sans:    var(--font-dm-sans);
 }
 
 /* ━━━ Base styles ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
@@ -165,17 +222,13 @@ html {
 
 body {
   min-height: 100vh;
-  background-color: var(--paper);
-  color: var(--ink);
-  font-family: var(--font-dm-sans), -apple-system, ui-sans-serif, system-ui, sans-serif;
-  font-feature-settings: "kern", "liga", "calt";
+  background-color: var(--bg-app);
+  color: var(--text);
+  font-family: var(--font-inter-tight), -apple-system, ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "kern", "liga", "calt", "ss01";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-/* Explicitly disable the old paper grain overlay */
-body::before {
-  display: none;
+  letter-spacing: -0.005em;
 }
 
 body > * {
@@ -183,13 +236,17 @@ body > * {
 }
 
 ::selection {
-  background: var(--verdigris);
-  color: #fff;
+  background: var(--accent-tint-strong);
+  color: var(--text);
 }
 
 @layer base {
-  a {
-    color: inherit;
+  a { color: inherit; }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-inter-tight), sans-serif;
+    color: var(--text);
+    letter-spacing: -0.018em;
   }
 }
 
@@ -212,66 +269,44 @@ body > * {
 
 @utility oldstyle {
   font-variant-numeric: oldstyle-nums proportional-nums;
-  font-feature-settings: "onum" 1, "pnum" 1;
 }
 
 @utility smallcaps {
-  font-variant-caps: all-small-caps;
-  font-feature-settings: "smcp" 1, "c2sc" 1;
-  letter-spacing: 0.12em;
-  text-transform: lowercase;
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--text-faint);
 }
 
+/* Eyebrow now: compact upper-case label, not editorial mono — fits Notion */
 @utility eyebrow {
-  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-family: var(--font-inter-tight), sans-serif;
   font-size: 0.6875rem;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--ink-fade);
+  color: var(--text-faint);
   font-weight: 500;
 }
 
-/* ━━━ Utilities: borders ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-@utility rule-t      { border-top:    1px solid var(--rule); }
-@utility rule-b      { border-bottom: 1px solid var(--rule); }
-@utility rule-l      { border-left:   1px solid var(--rule); }
-@utility rule-r      { border-right:  1px solid var(--rule); }
-@utility rule-soft-t { border-top:    1px solid var(--rule-soft); }
-@utility rule-soft-b { border-bottom: 1px solid var(--rule-soft); }
+/* ━━━ Utilities: borders (legacy names, softened) ━━━━━━━━━━━━━━━━━ */
+@utility rule-t      { border-top:    1px solid var(--border); }
+@utility rule-b      { border-bottom: 1px solid var(--border); }
+@utility rule-l      { border-left:   1px solid var(--border); }
+@utility rule-r      { border-right:  1px solid var(--border); }
+@utility rule-soft-t { border-top:    1px solid var(--border-soft); }
+@utility rule-soft-b { border-bottom: 1px solid var(--border-soft); }
 
-@utility double-rule-b { border-bottom: 3px double var(--ink); }
-@utility double-rule-t { border-top:    3px double var(--ink); }
+/* Double-rule legacy: degrade to a single hairline */
+@utility double-rule-b { border-bottom: 1px solid var(--border); }
+@utility double-rule-t { border-top:    1px solid var(--border); }
 
-/* ━━━ Utilities: decorative (kept for compat with sub-pages) ━━━━━━ */
-@utility drop-cap {
-  &::first-letter {
-    font-weight: 700;
-    float: left;
-    font-size: 3.5em;
-    line-height: 0.86;
-    padding: 0.04em 0.1em 0 0;
-    color: var(--ink);
-  }
-}
-
+/* Decorative legacy: degraded to no-op-but-valid */
 @utility fleuron {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  color: var(--ink-ghost);
-  font-size: 0.875rem;
-
-  &::before, &::after {
-    content: "";
-    flex: 1;
-    height: 1px;
-    background: var(--rule-soft);
-  }
-}
-
-@utility ledger-row {
-  background-image: linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.015) 50%);
-  background-size: 100% 3.6rem;
+  display: block;
+  height: 0;
+  margin: 0;
+  visibility: hidden;
 }
 
 /* ━━━ Utilities: buttons ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
@@ -279,20 +314,21 @@ body > * {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 2.5rem;
-  padding-inline: 1.125rem;
-  background: var(--ink);
-  color: var(--paper);
-  font-family: var(--font-dm-sans), sans-serif;
+  height: 2.25rem;
+  padding-inline: 0.875rem;
+  background: var(--text);
+  color: var(--bg-page);
+  font-family: var(--font-inter-tight), sans-serif;
   font-size: 0.875rem;
   font-weight: 500;
   letter-spacing: -0.005em;
-  border-radius: 7px;
+  border-radius: 6px;
   border: 1px solid transparent;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.12s ease, transform 0.12s ease;
   cursor: pointer;
 
-  &:hover:not(:disabled) { opacity: 0.80; }
+  &:hover:not(:disabled) { opacity: 0.88; }
+  &:active:not(:disabled) { opacity: 0.78; }
   &:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 
@@ -300,22 +336,43 @@ body > * {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 2.5rem;
-  padding-inline: 1.125rem;
+  height: 2.25rem;
+  padding-inline: 0.75rem;
   background: transparent;
-  color: var(--ink);
-  font-family: var(--font-dm-sans), sans-serif;
+  color: var(--text);
+  font-family: var(--font-inter-tight), sans-serif;
   font-size: 0.875rem;
   font-weight: 500;
   letter-spacing: -0.005em;
-  border-radius: 7px;
-  border: 1px solid var(--rule);
-  transition: background 0.15s ease, border-color 0.15s ease;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  transition: background 0.12s ease, border-color 0.12s ease;
   cursor: pointer;
 
   &:hover:not(:disabled) {
-    background: var(--paper-deep);
-    border-color: var(--ink-ghost);
+    background: var(--bg-hover);
+    border-color: var(--border);
+  }
+  &:disabled { opacity: 0.4; cursor: not-allowed; }
+}
+
+/* Quiet icon button — only chrome */
+@utility btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 4px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+
+  &:hover:not(:disabled) {
+    background: var(--bg-hover);
+    color: var(--text);
   }
   &:disabled { opacity: 0.4; cursor: not-allowed; }
 }
@@ -324,25 +381,157 @@ body > * {
 @utility field {
   display: block;
   width: 100%;
-  height: 2.75rem;
-  padding-inline: 0.875rem;
-  background: var(--surface);
-  border: 1px solid var(--rule);
-  border-radius: 7px;
-  color: var(--ink);
-  font-family: var(--font-dm-sans), sans-serif;
-  font-size: 0.9375rem;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  height: 2.25rem;
+  padding-inline: 0.625rem;
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--font-inter-tight), sans-serif;
+  font-size: 0.875rem;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
 
-  &::placeholder { color: var(--ink-ghost); }
+  &::placeholder { color: var(--text-faint); }
   &:focus {
     outline: none;
-    border-color: var(--verdigris);
-    box-shadow: 0 0 0 3px var(--verdigris-soft);
+    border-color: var(--text-faint);
+    box-shadow: 0 0 0 3px var(--bg-tint-strong);
   }
 }
 
-/* ━━━ Utilities: nav active underline ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* Inline-editable looking field — no chrome until hover/focus */
+@utility field-inline {
+  display: block;
+  width: 100%;
+  padding: 0.25rem 0.4rem;
+  margin-left: -0.4rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  transition: background 0.1s ease, border-color 0.1s ease;
+
+  &::placeholder { color: var(--text-faint); }
+  &:hover { background: var(--bg-hover); }
+  &:focus {
+    outline: none;
+    background: var(--bg-page);
+    border-color: var(--border);
+    box-shadow: 0 0 0 3px var(--bg-tint-strong);
+  }
+}
+
+/* ━━━ Utilities: Notion-style blocks ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+@utility callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  background: var(--bg-tint);
+  border-radius: 6px;
+  border: 1px solid var(--border-faint);
+  color: var(--text);
+}
+
+@utility callout-accent {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  background: var(--accent-tint);
+  border-radius: 6px;
+  border: 1px solid var(--accent-tint-strong);
+  color: var(--text);
+}
+
+@utility pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.2;
+  border-radius: 4px;
+  background: var(--bg-tint-strong);
+  color: var(--text-muted);
+  letter-spacing: 0.01em;
+}
+
+@utility pill-accent {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.2;
+  border-radius: 4px;
+  background: var(--accent-tint);
+  color: var(--accent-strong);
+  letter-spacing: 0.01em;
+}
+
+@utility hover-row {
+  border-radius: 4px;
+  transition: background 0.08s ease;
+  &:hover { background: var(--bg-hover); }
+}
+
+@utility nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  min-height: 1.875rem;
+  transition: background 0.08s ease, color 0.08s ease;
+  cursor: pointer;
+
+  &:hover { background: var(--bg-hover); color: var(--text); }
+
+  &[aria-current="page"], &[data-active="true"] {
+    background: var(--bg-active);
+    color: var(--text);
+    font-weight: 600;
+  }
+}
+
+@utility card-block {
+  background: var(--bg-page);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+}
+
+@utility hairline { background: var(--border); height: 1px; }
+@utility hairline-soft { background: var(--border-soft); height: 1px; }
+
+/* ━━━ Animations ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+@keyframes blockFade {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@utility fade-in         { animation: blockFade 0.28s cubic-bezier(0.25, 0.1, 0.25, 1) both; }
+@utility fade-in-delay-1 { animation: blockFade 0.28s cubic-bezier(0.25, 0.1, 0.25, 1) 0.05s both; }
+@utility fade-in-delay-2 { animation: blockFade 0.28s cubic-bezier(0.25, 0.1, 0.25, 1) 0.10s both; }
+@utility fade-in-delay-3 { animation: blockFade 0.28s cubic-bezier(0.25, 0.1, 0.25, 1) 0.15s both; }
+@utility fade-in-delay-4 { animation: blockFade 0.28s cubic-bezier(0.25, 0.1, 0.25, 1) 0.20s both; }
+
+@keyframes accentPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(0.92); }
+}
+@utility ink-pulse { animation: accentPulse 1.6s ease-in-out infinite; }
+
+/* Animated underline reveal — kept for compat */
 @keyframes ruleDraw {
   from { transform: scaleX(0); }
   to   { transform: scaleX(1); }
@@ -353,28 +542,10 @@ body > * {
   &::after {
     content: "";
     position: absolute;
-    left: 0; right: 0; bottom: -6px;
-    height: 1.5px;
-    background: var(--ink);
+    left: 0; right: 0; bottom: -4px;
+    height: 1px;
+    background: var(--text);
     transform-origin: left;
-    animation: ruleDraw 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    animation: ruleDraw 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
   }
 }
-
-/* ━━━ Animations ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-@keyframes paperFade {
-  from { opacity: 0; transform: translateY(5px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@utility fade-in         { animation: paperFade 0.4s cubic-bezier(0.25, 0.1, 0.25, 1) both; }
-@utility fade-in-delay-1 { animation: paperFade 0.4s cubic-bezier(0.25, 0.1, 0.25, 1) 0.06s both; }
-@utility fade-in-delay-2 { animation: paperFade 0.4s cubic-bezier(0.25, 0.1, 0.25, 1) 0.12s both; }
-@utility fade-in-delay-3 { animation: paperFade 0.4s cubic-bezier(0.25, 0.1, 0.25, 1) 0.18s both; }
-@utility fade-in-delay-4 { animation: paperFade 0.4s cubic-bezier(0.25, 0.1, 0.25, 1) 0.24s both; }
-
-@keyframes inkPulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.35; }
-}
-@utility ink-pulse { animation: inkPulse 2s ease-in-out infinite; }

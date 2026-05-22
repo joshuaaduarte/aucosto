@@ -28,7 +28,7 @@ export function CardMenu({ widgetId, hasPin, isLocked }: CardMenuProps) {
   return (
     <div
       ref={ref}
-      className="absolute top-2 right-2 z-10"
+      className="absolute top-1.5 right-1.5 z-10"
       onClick={(e) => e.preventDefault()}
     >
       <button
@@ -38,7 +38,7 @@ export function CardMenu({ widgetId, hasPin, isLocked }: CardMenuProps) {
           e.stopPropagation();
           setOpen((v) => !v);
         }}
-        className="flex h-6 w-6 items-center justify-center rounded-md text-ink-ghost opacity-0 transition-opacity group-hover:opacity-100 hover:bg-paper-deep hover:text-ink focus:opacity-100"
+        className="btn-icon opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
         aria-label="Widget options"
       >
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden>
@@ -50,10 +50,10 @@ export function CardMenu({ widgetId, hasPin, isLocked }: CardMenuProps) {
 
       {open && (
         <div
-          className="absolute right-0 top-7 z-20 min-w-[160px] overflow-hidden rounded-lg py-1 shadow-lg"
+          className="absolute right-0 top-8 z-20 min-w-[170px] overflow-hidden rounded-md py-1"
           style={{
-            background: "var(--surface)",
-            border: "1px solid var(--rule-faint)",
+            background: "var(--bg-elevated)",
+            boxShadow: "var(--shadow-pop)",
           }}
         >
           {hasPin && !isLocked && (
@@ -65,11 +65,12 @@ export function CardMenu({ widgetId, hasPin, isLocked }: CardMenuProps) {
                 setOpen(false);
                 startTransition(() => lockWidgetNow(widgetId));
               }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-ink-fade hover:bg-paper-deep hover:text-ink disabled:opacity-50"
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[0.8125rem] transition-colors hover:bg-bg-hover disabled:opacity-50"
+              style={{ color: "var(--text)" }}
             >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
-                <rect x="2" y="5.5" width="8" height="5.5" rx="1" stroke="currentColor" strokeWidth="1.1" />
-                <path d="M4 5.5V3.5a2 2 0 0 1 4 0v2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" aria-hidden>
+                <rect x="2.5" y="5.75" width="8" height="5.25" rx="1" />
+                <path d="M4.5 5.75V4a2 2 0 0 1 4 0v1.75" />
               </svg>
               Lock now
             </button>
@@ -78,16 +79,12 @@ export function CardMenu({ widgetId, hasPin, isLocked }: CardMenuProps) {
           <a
             href={`/app/settings#${widgetId}`}
             onClick={() => setOpen(false)}
-            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-ink-fade hover:bg-paper-deep hover:text-ink"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-[0.8125rem] transition-colors hover:bg-bg-hover"
+            style={{ color: "var(--text)" }}
           >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
-              <circle cx="6" cy="6" r="1.5" stroke="currentColor" strokeWidth="1.1" />
-              <path
-                d="M6 1v1M6 10v1M1 6h1M10 6h1M2.222 2.222l.707.707M9.071 9.071l.707.707M2.222 9.778l.707-.707M9.071 2.929l.707-.707"
-                stroke="currentColor"
-                strokeWidth="1.1"
-                strokeLinecap="round"
-              />
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" aria-hidden>
+              <circle cx="6.5" cy="6.5" r="1.5" />
+              <path d="M6.5 1.5v1M6.5 10.5v1M1.5 6.5h1M10.5 6.5h1M2.7 2.7l.7.7M9.3 9.3l.7.7M2.7 10.3l.7-.7M9.3 3.7l.7-.7" />
             </svg>
             {hasPin ? "Change PIN" : "Set PIN"}
           </a>
@@ -103,10 +100,11 @@ export function CardMenu({ widgetId, hasPin, isLocked }: CardMenuProps) {
                   await removeWidgetPin(widgetId);
                 });
               }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-oxblood hover:bg-paper-deep disabled:opacity-50"
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[0.8125rem] transition-colors hover:bg-bg-hover disabled:opacity-50"
+              style={{ color: "var(--accent-strong)" }}
             >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
-                <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" aria-hidden>
+                <path d="M2.5 2.5l8 8M10.5 2.5l-8 8" />
               </svg>
               Remove PIN
             </button>

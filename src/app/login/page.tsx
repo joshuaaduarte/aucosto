@@ -5,55 +5,73 @@ export default function LoginPage() {
   return (
     <div
       className="flex min-h-screen flex-col"
-      style={{ backgroundColor: "var(--paper)", color: "var(--ink)" }}
+      style={{ backgroundColor: "var(--bg-app)", color: "var(--text)" }}
     >
-      {/* Top bar */}
-      <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-6 sm:px-10 sm:py-8">
+      <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-5 sm:px-10 sm:py-6">
         <Link
           href="/"
-          className="flex items-center gap-1.5 text-sm font-medium text-ink-fade transition-colors hover:text-ink"
+          className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[0.8125rem] font-medium transition-colors hover:bg-bg-hover"
+          style={{ color: "var(--text-muted)" }}
         >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-            <path d="M11 7H3M6.5 3.5 3 7l3.5 3.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 13 13"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.25"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <path d="M10.5 6.5h-8M6 3 2.5 6.5 6 10" />
           </svg>
           aucosto
         </Link>
       </header>
 
-      {/* Sign-in card */}
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-6 pb-20 pt-8 sm:px-10">
-        <div className="fade-in w-full max-w-sm">
-          {/* Wordmark */}
+        <div className="fade-in w-full max-w-[360px]">
+          {/* Wordmark + tagline */}
           <div className="mb-8 text-center">
-            <span
-              className="text-[1.8rem] font-semibold tracking-[-0.04em] text-ink"
-              style={{ fontFamily: "var(--font-dm-sans), sans-serif" }}
+            <p
+              className="text-[1.25rem] font-semibold tracking-tight"
+              style={{ color: "var(--text)" }}
             >
               aucosto
-            </span>
+            </p>
+            <p
+              className="mt-2 text-[0.875rem]"
+              style={{ color: "var(--text-muted)" }}
+            >
+              One workspace for one life.
+            </p>
           </div>
 
-          {/* Card */}
-          <div
-            className="rounded-xl px-7 py-8"
-            style={{
-              background: "var(--surface)",
-              boxShadow: "var(--surface-shadow)",
-            }}
-          >
-            <div className="mb-7">
-              <h1 className="text-[1.4rem] font-semibold tracking-[-0.02em] text-ink">
-                Welcome back
-              </h1>
-              <p className="mt-1 text-sm text-ink-fade">
-                Sign in to your dashboard.
-              </p>
-            </div>
+          {/* Form — bare, no card chrome */}
+          <div className="space-y-1">
+            <h1
+              className="text-[1.125rem] font-semibold tracking-tight"
+              style={{ color: "var(--text)" }}
+            >
+              Welcome back
+            </h1>
+            <p
+              className="text-[0.8125rem]"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Sign in to open your workspace.
+            </p>
+          </div>
 
+          <div className="mt-6">
             <LoginForm />
           </div>
 
-          <p className="mt-6 text-center font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-ink-ghost">
+          <p
+            className="mt-8 text-center text-[0.6875rem]"
+            style={{ color: "var(--text-faint)" }}
+          >
             Private · No tracking · One user
           </p>
         </div>

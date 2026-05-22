@@ -23,33 +23,42 @@ export function RunningCard({
   }, []);
 
   return (
-    <article className="rule-t rule-b border-ink relative bg-paper-deep/40 py-8 sm:py-12">
-      {/* corner folio */}
-      <span
-        aria-hidden
-        className="absolute left-0 top-2 font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-oxblood"
-      >
-        ❦ In progress
-      </span>
-      <span
-        aria-hidden
-        className="absolute right-0 top-2 font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade"
-      >
-        Dispatch open
-      </span>
-
-      <div className="flex flex-col gap-8 px-2 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:gap-12">
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <span className="ink-pulse h-2 w-2 rounded-full bg-oxblood" aria-hidden />
-            <span className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-oxblood">
-              Filed live{category ? ` · ${category}` : ""}
+    <article
+      className="rounded-md px-5 py-5"
+      style={{
+        background: "var(--accent-tint)",
+        border: "1px solid var(--accent-tint-strong)",
+      }}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span
+              className="ink-pulse inline-block h-1.5 w-1.5 rounded-full"
+              style={{ background: "var(--accent)" }}
+              aria-hidden
+            />
+            <span
+              className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+              style={{ color: "var(--accent-strong)" }}
+            >
+              Running{category ? ` · ${category}` : ""}
             </span>
           </div>
-          <h2 className="font-display text-[2rem] font-medium leading-[1.05] tracking-[-0.03em] text-ink sm:text-[2.8rem]">
+          <h2
+            className="mt-2 truncate text-[1.5rem] font-bold tracking-tight sm:text-[1.875rem]"
+            style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
+          >
             {label}
           </h2>
-          <p className="font-display font-medium leading-none tracking-[-0.04em] tabular text-ink text-[3rem] sm:text-[5rem]">
+          <p
+            className="mt-1 text-[2.5rem] font-semibold tabular leading-none sm:text-[3.25rem]"
+            style={{
+              color: "var(--text)",
+              letterSpacing: "-0.03em",
+              fontFeatureSettings: '"tnum" 1',
+            }}
+          >
             {formatDuration(now - startedAt)}
           </p>
         </div>
@@ -57,9 +66,9 @@ export function RunningCard({
           type="button"
           onClick={() => startTransition(() => stopEntry())}
           disabled={pending}
-          className="btn-ghost shrink-0 self-start lg:self-end"
+          className="btn-ghost shrink-0"
         >
-          {pending ? "Closing dispatch…" : "Close this dispatch"}
+          {pending ? "Stopping…" : "Stop"}
         </button>
       </div>
     </article>

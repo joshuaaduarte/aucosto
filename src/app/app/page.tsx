@@ -9,12 +9,72 @@ import { getViewerContext } from "@/lib/viewer-context";
 import { deriveHubPrompts } from "./_lib/hub-prompts";
 import { CardMenu } from "./card-menu";
 
-const toneColor: Record<string, string> = {
-  amber:   "var(--aged-gold)",
-  emerald: "var(--verdigris)",
-  zinc:    "var(--ink-ghost)",
-  red:     "var(--oxblood)",
+const toneAccent: Record<string, string> = {
+  amber: "var(--accent)",
+  sky: "var(--text)",
+  emerald: "var(--text)",
+  zinc: "var(--text-faint)",
 };
+
+/* ──────────────────────────────────────────────────────────────────
+   Icons (kept here — small set, no need for a shared file)
+   ────────────────────────────────────────────────────────────────── */
+const ip = {
+  width: 14,
+  height: 14,
+  viewBox: "0 0 15 15",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.25,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
+function ClockIcon() {
+  return (
+    <svg {...ip}>
+      <circle cx="7.5" cy="7.5" r="5.5" />
+      <path d="M7.5 4.5V7.5l2 1.25" />
+    </svg>
+  );
+}
+function WalletIcon() {
+  return (
+    <svg {...ip}>
+      <path d="M2 5.5C2 4.67 2.67 4 3.5 4H12a1 1 0 0 1 1 1v6.5c0 .83-.67 1.5-1.5 1.5h-8A1.5 1.5 0 0 1 2 11.5V5.5Z" />
+      <path d="M10 8.25h2.5" />
+    </svg>
+  );
+}
+function CalendarIcon() {
+  return (
+    <svg {...ip}>
+      <rect x="2" y="3" width="11" height="10" rx="1.5" />
+      <path d="M2 6h11M5 1.75v2.5M10 1.75v2.5" />
+    </svg>
+  );
+}
+function ConnectionIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="3" cy="3" r="1.5" />
+      <circle cx="10" cy="10" r="1.5" />
+      <path d="M4.4 4.4 8.6 8.6" />
+    </svg>
+  );
+}
+function ArrowRight() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M2.5 6.5h8M7 3l3.5 3.5L7 10" />
+    </svg>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   Page
+   ────────────────────────────────────────────────────────────────── */
 
 export default async function HubPage() {
   const session = await auth();
@@ -26,23 +86,24 @@ export default async function HubPage() {
   const financeHasPin = false;
   const financeLocked = false;
 
-  const [runningEntry, weekEntries, accounts, thisMonthTx, lastMonthTx] =
-    userId
-      ? await Promise.all([
-          getRunningEntry(userId),
-          listCompletedSince(userId, startOfWeek()),
-          financeVisible && !financeLocked ? listAccounts(userId) : Promise.resolve([]),
-          financeVisible && !financeLocked
-            ? listTransactions(userId, { since: startOfMonth(), limit: 1000 })
-            : Promise.resolve([]),
-          financeVisible && !financeLocked
-            ? listTransactions(userId, {
-                since: startOfPreviousMonth(),
-                limit: 1000,
-              })
-            : Promise.resolve([]),
-        ])
-      : [null, [], [], [], []];
+  const [runningEntry, weekEntries, accounts, thisMonthTx, lastMonthTx] = userId
+    ? await Promise.all([
+        getRunningEntry(userId),
+        listCompletedSince(userId, startOfWeek()),
+        financeVisible && !financeLocked
+          ? listAccounts(userId)
+          : Promise.resolve([]),
+        financeVisible && !financeLocked
+          ? listTransactions(userId, { since: startOfMonth(), limit: 1000 })
+          : Promise.resolve([]),
+        financeVisible && !financeLocked
+          ? listTransactions(userId, {
+              since: startOfPreviousMonth(),
+              limit: 1000,
+            })
+          : Promise.resolve([]),
+      ])
+    : [null, [], [], [], []];
 
   const monthStart = startOfMonth();
   const previousMonthStart = startOfPreviousMonth();
@@ -60,156 +121,398 @@ export default async function HubPage() {
     runningEntry,
     weekTotalMs,
     accounts: financeVisible && !financeLocked ? accounts : undefined,
-    thisMonthSpentCents: financeVisible && !financeLocked ? thisMonthSpentCents : undefined,
-    lastMonthSpentCents: financeVisible && !financeLocked ? lastMonthSpentCents : undefined,
+    thisMonthSpentCents:
+      financeVisible && !financeLocked ? thisMonthSpentCents : undefined,
+    lastMonthSpentCents:
+      financeVisible && !financeLocked ? lastMonthSpentCents : undefined,
   });
 
-  const today = new Date().toLocaleDateString([], {
+  const todayLong = new Date().toLocaleDateString([], {
     weekday: "long",
     month: "long",
     day: "numeric",
-    year: "numeric",
   });
 
+  const greeting = hourOfDayGreeting();
+
   return (
-    <div className="space-y-10 max-w-2xl mx-auto">
-      {/* ── Greeting ──────────────────────────────────────────── */}
-      <section className="fade-in flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <h1 className="text-[1.75rem] font-semibold tracking-[-0.02em] text-ink sm:text-[2rem]">
-          {firstName ? (
-            <>
-              Good morning,{" "}
-              <span style={{ color: "var(--verdigris)" }}>{firstName}</span>.
-            </>
-          ) : (
-            "Good morning."
-          )}
-        </h1>
-        <p className="font-mono text-sm text-ink-fade shrink-0">{today}</p>
-      </section>
-
-      {/* ── Snapshot ──────────────────────────────────────────── */}
-      <section className="fade-in-delay-1 grid grid-cols-2 gap-3">
-        {/* Time card */}
-        <div
-          className="group relative rounded-xl"
-          style={{ background: "var(--surface)", boxShadow: "var(--surface-shadow)" }}
+    <div className="space-y-10">
+      {/* ── Page header ─────────────────────────────────────── */}
+      <header className="fade-in">
+        <p
+          className="text-[0.75rem] font-medium uppercase tracking-wider"
+          style={{ color: "var(--text-faint)" }}
         >
-          <Link
-            href="/app/time"
-            className="block px-4 py-4 transition-opacity hover:opacity-80"
-          >
-            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-ink-ghost">
-              Time
-            </p>
-            {runningEntry ? (
-              <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-ink">
-                <span
-                  className="inline-block h-1.5 w-1.5 rounded-full shrink-0"
-                  style={{ background: "var(--verdigris)" }}
-                  aria-hidden
-                />
-                Running
-              </p>
-            ) : (
-              <p className="mt-2 text-sm font-medium text-ink">
-                {formatHoursMs(weekTotalMs)}
-              </p>
-            )}
-            <p className="mt-0.5 font-mono text-[0.6875rem] text-ink-ghost">
-              {runningEntry ? (runningEntry.label ?? "Untitled") : "this week"}
-            </p>
-          </Link>
-        </div>
+          {todayLong}
+        </p>
+        <h1
+          className="mt-1 text-[2rem] font-bold tracking-tight sm:text-[2.5rem]"
+          style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
+        >
+          {greeting}
+          {firstName ? `, ${firstName}` : ""}.
+        </h1>
+        <p
+          className="mt-2 text-[0.9375rem]"
+          style={{ color: "var(--text-muted)" }}
+        >
+          {composeSubline({
+            runningEntry,
+            weekTotalMs,
+            financeVisible,
+            financeLocked,
+            thisMonthSpentCents,
+          })}
+        </p>
+      </header>
 
-        {/* Finance card */}
-        {financeVisible && (
-          <div
-            className="group relative rounded-xl"
-            style={{ background: "var(--surface)", boxShadow: "var(--surface-shadow)" }}
-          >
-            <Link
+      {/* ── Cross-tool callout — the headline insight ─────── */}
+      <CrossToolCallout
+        runningEntry={runningEntry}
+        weekTotalMs={weekTotalMs}
+        financeVisible={financeVisible && !financeLocked}
+        thisMonthSpentCents={thisMonthSpentCents}
+      />
+
+      {/* ── Quick cards ─────────────────────────────────────── */}
+      <section className="fade-in-delay-1">
+        <p
+          className="mb-2 px-1 text-[0.6875rem] font-semibold uppercase tracking-wider"
+          style={{ color: "var(--text-faint)" }}
+        >
+          Quick read
+        </p>
+        <div className="grid grid-cols-1 gap-px sm:grid-cols-2"
+             style={{ background: "var(--border-faint)", borderRadius: "8px", overflow: "hidden", border: "1px solid var(--border-faint)" }}>
+          <QuickCard
+            href="/app/time"
+            icon={<ClockIcon />}
+            label="Time"
+            value={runningEntry ? "Running" : formatHoursMs(weekTotalMs)}
+            meta={
+              runningEntry
+                ? (runningEntry.label ?? "Untitled session")
+                : "this week so far"
+            }
+            running={Boolean(runningEntry)}
+          />
+          {financeVisible ? (
+            <QuickCard
               href="/app/finance"
-              className="block px-4 py-4 transition-opacity hover:opacity-80"
-            >
-              <p className="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-ink-ghost">
-                Finance
-              </p>
-              {financeLocked ? (
-                <>
-                  <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-ink-ghost">
-                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden>
-                      <rect x="2" y="5.5" width="8" height="5.5" rx="1" stroke="currentColor" strokeWidth="1.1" />
-                      <path d="M4 5.5V3.5a2 2 0 0 1 4 0v2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
-                    </svg>
-                    Locked
-                  </p>
-                  <p className="mt-0.5 font-mono text-[0.6875rem] text-ink-ghost">
-                    tap to unlock
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="mt-2 text-sm font-medium text-ink">
-                    {formatCents(thisMonthSpentCents)}
-                  </p>
-                  <p className="mt-0.5 font-mono text-[0.6875rem] text-ink-ghost">
-                    spent this month
-                    {lastMonthSpentCents > 0 && (
-                      <span className="ml-1.5">
-                        vs {formatCents(lastMonthSpentCents)} last
-                      </span>
-                    )}
-                  </p>
-                </>
-              )}
-            </Link>
-            <CardMenu
-              widgetId="finance"
-              hasPin={financeHasPin}
-              isLocked={financeLocked}
+              icon={<WalletIcon />}
+              label="Finance"
+              value={
+                financeLocked
+                  ? "Locked"
+                  : formatCents(thisMonthSpentCents)
+              }
+              meta={
+                financeLocked
+                  ? "Tap to unlock"
+                  : lastMonthSpentCents > 0
+                    ? `vs ${formatCents(lastMonthSpentCents)} last month`
+                    : "spent this month"
+              }
+              menu={
+                <CardMenu
+                  widgetId="finance"
+                  hasPin={financeHasPin}
+                  isLocked={financeLocked}
+                />
+              }
             />
-          </div>
-        )}
+          ) : (
+            <QuickCard
+              href="/app/calendar"
+              icon={<CalendarIcon />}
+              label="Calendar"
+              value="Today"
+              meta="see what's scheduled"
+            />
+          )}
+        </div>
       </section>
 
-      {/* ── Today's signals ───────────────────────────────────── */}
+      {/* ── Signals ─────────────────────────────────────────── */}
       {prompts.length > 0 && (
         <section className="fade-in-delay-2">
-          <p className="mb-3 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-ink-ghost">
+          <p
+            className="mb-2 px-1 text-[0.6875rem] font-semibold uppercase tracking-wider"
+            style={{ color: "var(--text-faint)" }}
+          >
             Today&apos;s signals
           </p>
-          <ol className="space-y-2">
+          <ul className="space-y-1.5">
             {prompts.map((prompt, i) => (
               <li
-                key={prompt.text}
-                className="flex items-start gap-3 rounded-lg px-4 py-3"
-                style={{
-                  background: "var(--surface)",
-                  boxShadow: "var(--surface-shadow)",
-                }}
+                key={`${prompt.text}-${i}`}
+                className="grid grid-cols-[20px_1fr] items-start gap-3 rounded-md px-3 py-2.5 transition-colors hover:bg-bg-hover"
               >
-                <span className="mt-0.5 font-mono text-[0.6875rem] tabular text-ink-ghost shrink-0">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
                 <span
-                  className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full"
+                  className="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full"
                   style={{
-                    background:
-                      toneColor[prompt.tone ?? "red"] ?? "var(--oxblood)",
+                    background: toneAccent[prompt.tone] ?? "var(--text)",
                   }}
-                  aria-hidden
                 />
-                <p className="text-sm leading-[1.6] text-ink-fade">
+                <p
+                  className="text-[0.9375rem] leading-[1.55]"
+                  style={{ color: "var(--text)" }}
+                >
                   {prompt.text}
                 </p>
               </li>
             ))}
-          </ol>
+          </ul>
         </section>
       )}
+
+      {/* ── Tools index — like a Notion sub-page list ─────── */}
+      <section className="fade-in-delay-3">
+        <p
+          className="mb-2 px-1 text-[0.6875rem] font-semibold uppercase tracking-wider"
+          style={{ color: "var(--text-faint)" }}
+        >
+          Your workspace
+        </p>
+        <ul className="flex flex-col gap-0.5">
+          <ToolLink href="/app/calendar" icon={<CalendarIcon />} label="Calendar" hint="The week, shaped on purpose." />
+          <ToolLink href="/app/time" icon={<ClockIcon />} label="Time" hint="Sessions logged. Where the week actually went." />
+          {financeVisible && (
+            <ToolLink href="/app/finance" icon={<WalletIcon />} label="Finance" hint="Net worth, monthly pace, the category to watch." />
+          )}
+        </ul>
+      </section>
     </div>
   );
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   Subcomponents
+   ────────────────────────────────────────────────────────────────── */
+
+function QuickCard({
+  href,
+  icon,
+  label,
+  value,
+  meta,
+  running,
+  menu,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  meta: string;
+  running?: boolean;
+  menu?: React.ReactNode;
+}) {
+  return (
+    <div className="group relative" style={{ background: "var(--bg-page)" }}>
+      <Link
+        href={href}
+        className="block px-4 py-4 transition-colors hover:bg-bg-hover"
+      >
+        <div className="flex items-center gap-2">
+          <span style={{ color: "var(--text-faint)" }}>{icon}</span>
+          <span
+            className="text-[0.75rem] font-semibold uppercase tracking-wider"
+            style={{ color: "var(--text-faint)" }}
+          >
+            {label}
+          </span>
+          {running && (
+            <span
+              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.625rem] font-medium uppercase tracking-wider"
+              style={{
+                background: "var(--accent-tint)",
+                color: "var(--accent-strong)",
+              }}
+            >
+              <span
+                className="ink-pulse inline-block h-1 w-1 rounded-full"
+                style={{ background: "var(--accent)" }}
+              />
+              Live
+            </span>
+          )}
+        </div>
+        <p
+          className="mt-2 text-[1.5rem] font-semibold tracking-tight"
+          style={{
+            color: "var(--text)",
+            letterSpacing: "-0.025em",
+            fontFeatureSettings: '"tnum" 1',
+          }}
+        >
+          {value}
+        </p>
+        <p
+          className="mt-0.5 text-[0.8125rem]"
+          style={{ color: "var(--text-muted)" }}
+        >
+          {meta}
+        </p>
+      </Link>
+      {menu}
+    </div>
+  );
+}
+
+function ToolLink({
+  href,
+  icon,
+  label,
+  hint,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  hint: string;
+}) {
+  return (
+    <li>
+      <Link
+        href={href}
+        className="group grid grid-cols-[20px_1fr_auto] items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-bg-hover"
+      >
+        <span style={{ color: "var(--text-faint)" }}>{icon}</span>
+        <div className="min-w-0">
+          <p
+            className="text-[0.9375rem] font-semibold tracking-tight"
+            style={{ color: "var(--text)" }}
+          >
+            {label}
+          </p>
+          <p
+            className="mt-0.5 text-[0.8125rem]"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {hint}
+          </p>
+        </div>
+        <span
+          className="opacity-0 transition-opacity group-hover:opacity-100"
+          style={{ color: "var(--text-faint)" }}
+        >
+          <ArrowRight />
+        </span>
+      </Link>
+    </li>
+  );
+}
+
+function CrossToolCallout({
+  runningEntry,
+  weekTotalMs,
+  financeVisible,
+  thisMonthSpentCents,
+}: {
+  runningEntry: { label: string | null } | null;
+  weekTotalMs: number;
+  financeVisible: boolean;
+  thisMonthSpentCents: number;
+}) {
+  // Pick the most useful intersection given the data we have.
+  const lines: { headline: string; body: string } = (() => {
+    if (financeVisible && weekTotalMs > 0 && thisMonthSpentCents > 0) {
+      const weekHours = weekTotalMs / 3_600_000;
+      return {
+        headline: "Time × Finance",
+        body: `${weekHours.toFixed(1)}h logged this week · ${formatCents(thisMonthSpentCents)} out the door this month. The intersection lives here.`,
+      };
+    }
+    if (runningEntry) {
+      return {
+        headline: "Time",
+        body: `A session is open right now. The hub will stay aware of it until you close it.`,
+      };
+    }
+    if (weekTotalMs > 0) {
+      return {
+        headline: "This week",
+        body: `${formatHoursMs(weekTotalMs)} logged so far — open Time to add to it, or Calendar to shape what's next.`,
+      };
+    }
+    return {
+      headline: "A quiet start",
+      body: "Nothing's running and nothing's overdue. Pick a tool below — the others will catch on.",
+    };
+  })();
+
+  return (
+    <div
+      className="fade-in-delay-1 flex items-start gap-3 rounded-md px-4 py-3.5"
+      style={{
+        background: "var(--bg-tint)",
+        border: "1px solid var(--border-faint)",
+      }}
+    >
+      <span
+        className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded"
+        style={{ color: "var(--text)" }}
+      >
+        <ConnectionIcon />
+      </span>
+      <div className="min-w-0">
+        <p
+          className="text-[0.8125rem] font-semibold"
+          style={{ color: "var(--text)" }}
+        >
+          {lines.headline}
+        </p>
+        <p
+          className="mt-0.5 text-[0.875rem] leading-[1.5]"
+          style={{ color: "var(--text-muted)" }}
+        >
+          {lines.body}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   Helpers (no client APIs here — these are pure values used in
+   Server Components, so they avoid the react-hooks/purity gotcha)
+   ────────────────────────────────────────────────────────────────── */
+
+function hourOfDayGreeting(): string {
+  // Server-rendered greeting — fine to call at request time
+  const hour = new Date().getHours();
+  if (hour < 5) return "Still up";
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  if (hour < 21) return "Good evening";
+  return "Good night";
+}
+
+function composeSubline({
+  runningEntry,
+  weekTotalMs,
+  financeVisible,
+  financeLocked,
+  thisMonthSpentCents,
+}: {
+  runningEntry: unknown;
+  weekTotalMs: number;
+  financeVisible: boolean;
+  financeLocked: boolean;
+  thisMonthSpentCents: number;
+}): string {
+  const bits: string[] = [];
+  if (runningEntry) bits.push("a session is running");
+  if (weekTotalMs > 0) bits.push(`${formatHoursMs(weekTotalMs)} logged this week`);
+  if (financeVisible && !financeLocked && thisMonthSpentCents > 0)
+    bits.push(`${formatCents(thisMonthSpentCents)} spent this month`);
+
+  if (bits.length === 0) return "Quiet so far — open a tool to start the day.";
+  if (bits.length === 1) return capitalize(bits[0]!) + ".";
+  return capitalize(bits.slice(0, -1).join(", ")) + ", and " + bits.at(-1) + ".";
+}
+
+function capitalize(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function sumSpend(transactions: { amount: number }[]): number {

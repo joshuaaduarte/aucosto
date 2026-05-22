@@ -9,11 +9,12 @@ export function LoginForm() {
   const [state, formAction, pending] = useActionState(login, initialState);
 
   return (
-    <form action={formAction} className="space-y-5">
+    <form action={formAction} className="space-y-4">
       <div className="space-y-1.5">
         <label
           htmlFor="email"
-          className="block text-sm font-medium text-ink"
+          className="block text-[0.75rem] font-medium"
+          style={{ color: "var(--text-muted)" }}
         >
           Email
         </label>
@@ -31,7 +32,8 @@ export function LoginForm() {
       <div className="space-y-1.5">
         <label
           htmlFor="password"
-          className="block text-sm font-medium text-ink"
+          className="block text-[0.75rem] font-medium"
+          style={{ color: "var(--text-muted)" }}
         >
           Password
         </label>
@@ -41,17 +43,28 @@ export function LoginForm() {
           type="password"
           autoComplete="current-password"
           required
-          className="field font-mono tracking-[0.1em]"
+          className="field font-mono tracking-[0.08em]"
         />
       </div>
 
       {state?.error && (
-        <p className="text-sm font-medium" style={{ color: "var(--oxblood)" }}>
+        <p
+          className="rounded-md px-3 py-2 text-[0.8125rem]"
+          style={{
+            background: "var(--accent-tint)",
+            color: "var(--accent-strong)",
+            border: "1px solid var(--accent-tint-strong)",
+          }}
+        >
           {state.error}
         </p>
       )}
 
-      <button type="submit" disabled={pending} className="btn-ink w-full">
+      <button
+        type="submit"
+        disabled={pending}
+        className="btn-ink w-full"
+      >
         {pending ? "Signing in…" : "Sign in"}
       </button>
     </form>

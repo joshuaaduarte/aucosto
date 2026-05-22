@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { DM_Sans, JetBrains_Mono } from "next/font/google";
+import { Inter_Tight, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const dmSans = DM_Sans({
-  variable: "--font-dm-sans",
+const interTight = Inter_Tight({
+  variable: "--font-inter-tight",
   subsets: ["latin"],
   display: "swap",
+  weight: ["400", "500", "600", "700"],
 });
 
 const jetbrains = JetBrains_Mono({
@@ -15,8 +16,9 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Aucosto — Your Daily Dashboard",
-  description: "Time, finance, and activity in one view.",
+  title: "Aucosto — One workspace for one life.",
+  description:
+    "Time, money, calendar, and the rest of you — in one workspace where the tools share what they know.",
 };
 
 export default function RootLayout({
@@ -27,10 +29,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${dmSans.variable} ${jetbrains.variable} h-full antialiased`}
+      className={`${interTight.variable} ${jetbrains.variable} h-full antialiased`}
     >
       <head>
-        {/* Prevent theme flash by reading localStorage before React hydrates */}
         <script
           dangerouslySetInnerHTML={{
             __html: `try{var t=localStorage.getItem("aucosto-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}`,

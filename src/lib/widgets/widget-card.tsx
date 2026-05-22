@@ -14,39 +14,43 @@ export function WidgetCard({
   return (
     <Link
       href={href}
-      className="group relative block rounded-xl px-5 pt-5 pb-5 transition-shadow hover:shadow-md"
+      className="group relative block rounded-md px-4 py-4 transition-colors hover:bg-bg-hover"
       style={{
-        background: "var(--surface)",
-        boxShadow: "var(--surface-shadow)",
+        background: "var(--bg-page)",
+        border: "1px solid var(--border-soft)",
       }}
     >
-      {/* Header */}
-      <header className="mb-5 flex items-center justify-between gap-3">
+      <header className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           {folio && (
-            <span className="font-mono text-[0.625rem] tracking-[0.1em] text-ink-ghost">
+            <span
+              className="text-[0.6875rem] font-medium"
+              style={{ color: "var(--text-faint)" }}
+            >
               {folio}
             </span>
           )}
-          <h3 className="text-sm font-semibold tracking-[-0.01em] text-ink">
+          <h3
+            className="text-[0.8125rem] font-semibold tracking-tight"
+            style={{ color: "var(--text)" }}
+          >
             {name}
           </h3>
         </div>
         <svg
-          width="14"
-          height="14"
-          viewBox="0 0 14 14"
+          width="12"
+          height="12"
+          viewBox="0 0 13 13"
           fill="none"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
           aria-hidden
-          className="shrink-0 text-ink-ghost transition-transform group-hover:translate-x-0.5"
+          className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+          style={{ color: "var(--text-faint)" }}
         >
-          <path
-            d="M3 7h8M7.5 3.5 11 7l-3.5 3.5"
-            stroke="currentColor"
-            strokeWidth="1.25"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+          <path d="M2.5 6.5h8M7 3l3.5 3.5L7 10" />
         </svg>
       </header>
 

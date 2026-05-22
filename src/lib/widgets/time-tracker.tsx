@@ -12,22 +12,31 @@ export async function TimeTrackerWidget() {
   if (running) {
     return (
       <WidgetCard name="Time" href="/app/time">
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
+        <div className="space-y-3">
+          <span
+            className="inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[0.625rem] font-medium uppercase tracking-wider"
+            style={{
+              background: "var(--accent-tint)",
+              color: "var(--accent-strong)",
+            }}
+          >
             <span
-              className="ink-pulse h-2 w-2 rounded-full shrink-0"
-              style={{ background: "var(--verdigris)" }}
-              aria-hidden
+              className="ink-pulse inline-block h-1 w-1 rounded-full"
+              style={{ background: "var(--accent)" }}
             />
-            <span className="font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-ink-fade">
-              Running
-            </span>
-          </div>
+            Running
+          </span>
           <div>
-            <p className="text-[1.5rem] font-semibold leading-tight tracking-[-0.02em] text-ink">
+            <p
+              className="truncate text-[1rem] font-semibold tracking-tight"
+              style={{ color: "var(--text)" }}
+            >
               {running.label}
             </p>
-            <p className="mt-1 font-mono text-xs text-ink-ghost">
+            <p
+              className="mt-0.5 text-[0.75rem]"
+              style={{ color: "var(--text-faint)" }}
+            >
               started{" "}
               {running.startedAt.toLocaleTimeString([], {
                 hour: "numeric",
@@ -50,24 +59,35 @@ export async function TimeTrackerWidget() {
 
   return (
     <WidgetCard name="Time" href="/app/time">
-      <div className="space-y-4">
+      <div className="space-y-3">
         <div>
           <p
-            className="font-mono text-[2.5rem] font-medium leading-none tabular"
-            style={{ color: "var(--ink)" }}
+            className="text-[1.625rem] font-semibold tracking-tight tabular"
+            style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
           >
             {formatHM(totalMsToday)}
           </p>
-          <p className="mt-1.5 text-xs text-ink-fade">filed today</p>
+          <p
+            className="mt-0.5 text-[0.75rem]"
+            style={{ color: "var(--text-faint)" }}
+          >
+            logged today
+          </p>
         </div>
         <div
-          className="flex items-center justify-between pt-3"
-          style={{ borderTop: "1px solid var(--rule-faint)" }}
+          className="flex items-center justify-between pt-2"
+          style={{ borderTop: "1px solid var(--border-faint)" }}
         >
-          <span className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-ghost">
+          <span
+            className="text-[0.6875rem] font-medium uppercase tracking-wider"
+            style={{ color: "var(--text-faint)" }}
+          >
             Week
           </span>
-          <span className="font-mono text-sm tabular text-ink">
+          <span
+            className="text-[0.8125rem] tabular font-medium"
+            style={{ color: "var(--text)" }}
+          >
             {formatHM(totalMsWeek)}
           </span>
         </div>

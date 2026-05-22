@@ -17,29 +17,21 @@ import { StartForm } from "./start-form";
 
 export const dynamic = "force-dynamic";
 
-function statLine({ label, value, hint }: { label: string; value: string; hint: string }) {
-  return (
-    <div className="rule-t border-ink/30 py-4">
-      <p className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade">
-        {label}
-      </p>
-      <p className="mt-3 font-display text-[2.4rem] font-medium leading-none tracking-[-0.03em] tabular text-ink">
-        {value}
-      </p>
-      <p className="mt-1.5 font-serif text-sm italic text-ink-fade">{hint}</p>
-    </div>
-  );
-}
-
 function formatDayLabel(date: Date) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const target = new Date(date);
   target.setHours(0, 0, 0, 0);
-  const diffDays = Math.round((today.getTime() - target.getTime()) / (24 * 60 * 60 * 1000));
+  const diffDays = Math.round(
+    (today.getTime() - target.getTime()) / (24 * 60 * 60 * 1000),
+  );
   if (diffDays === 0) return "Today";
   if (diffDays === 1) return "Yesterday";
-  return target.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
+  return target.toLocaleDateString([], {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export default async function TimePage() {
@@ -60,7 +52,9 @@ export default async function TimePage() {
   const topCategories = summarizeCategories(completedWeek, { limit: 4 });
   const suggestedCategories = topCategories
     .map((item) => item.category)
-    .filter((category) => category && category.toLowerCase() !== "uncategorized");
+    .filter(
+      (category) => category && category.toLowerCase() !== "uncategorized",
+    );
 
   const groupedEntries = recent.reduce<
     Array<{ label: string; items: typeof recent }>
@@ -76,88 +70,101 @@ export default async function TimePage() {
   }, []);
 
   return (
-    <div className="space-y-12 lg:space-y-16">
-      {/* Section header */}
-      <header className="fade-in grid gap-10 lg:grid-cols-[1.6fr_1fr] lg:gap-14">
-        <div className="lg:rule-r lg:border-rule lg:pr-14">
-          <p className="font-mono text-[0.6875rem] uppercase tracking-[0.28em] text-ink-fade">
-            Section II · The Dispatch
-          </p>
-          <h1 className="mt-5 font-display font-medium leading-[0.9] tracking-[-0.045em] text-ink text-[2.6rem] sm:text-[3.6rem] lg:text-[4.4rem]">
-            Hours,{" "}
-            <span className="italic text-oxblood">filed in order</span>
-            <br />
-            of their occurrence.
-          </h1>
-          <p className="mt-6 max-w-xl font-serif text-[1.05rem] leading-[1.75] italic text-ink-soft">
-            One press at a time. Open the day’s record, set the column for what
-            you intend to work on, and the clock will keep faithful count until
-            you close it.
-          </p>
-        </div>
-
-        <div className="space-y-0">
-          {statLine({
-            label: "Filed today",
-            value: formatHM(todayTotalMs),
-            hint: "completed in this column",
-          })}
-          {statLine({
-            label: "Week to date",
-            value: formatHM(weekTotalMs),
-            hint: "from Monday's first dispatch",
-          })}
-        </div>
+    <div className="space-y-10">
+      {/* Page header */}
+      <header className="fade-in">
+        <p
+          className="text-[0.75rem] font-medium uppercase tracking-wider"
+          style={{ color: "var(--text-faint)" }}
+        >
+          Time
+        </p>
+        <h1
+          className="mt-1 text-[2rem] font-bold tracking-tight sm:text-[2.5rem]"
+          style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
+        >
+          Sessions
+        </h1>
+        <p
+          className="mt-2 text-[0.9375rem]"
+          style={{ color: "var(--text-muted)" }}
+        >
+          Open a session when you start, close it when you switch. The archive
+          builds itself.
+        </p>
       </header>
 
-      <div className="fleuron text-ink-fade">
-        <span aria-hidden>❧</span>
-      </div>
+      {/* Running session or start form */}
+      <section className="fade-in-delay-1">
+        {running ? (
+          <RunningCard
+            label={running.label}
+            category={running.category}
+            startedAtIso={running.startedAt.toISOString()}
+          />
+        ) : (
+          <StartForm suggestedCategories={suggestedCategories} />
+        )}
+      </section>
 
-      {running ? (
-        <RunningCard
-          label={running.label}
-          category={running.category}
-          startedAtIso={running.startedAt.toISOString()}
-        />
-      ) : (
-        <StartForm suggestedCategories={suggestedCategories} />
-      )}
+      {/* Quick stats */}
+      <section className="fade-in-delay-2 grid grid-cols-2 gap-px overflow-hidden rounded-md"
+               style={{ background: "var(--border-faint)", border: "1px solid var(--border-faint)" }}>
+        <Stat label="Today" value={formatHM(todayTotalMs)} hint={completedToday.length === 1 ? "1 session closed" : `${completedToday.length} sessions closed`} />
+        <Stat label="This week" value={formatHM(weekTotalMs)} hint="since Monday" />
+      </section>
 
-      <section className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:gap-14">
-        {/* Weekly split */}
-        <div>
-          <header className="rule-b border-ink pb-3">
-            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.26em] text-ink-fade">
-              The Week in Columns
-            </p>
-            <h2 className="mt-1.5 font-display text-2xl font-medium italic tracking-[-0.02em] text-ink">
-              Where the hours went.
-            </h2>
-          </header>
+      {/* Category breakdown + recent entries side-by-side */}
+      <section className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:gap-12">
+        {/* Category breakdown */}
+        <div className="fade-in-delay-3">
+          <p
+            className="mb-3 text-[0.6875rem] font-semibold uppercase tracking-wider"
+            style={{ color: "var(--text-faint)" }}
+          >
+            Where the week went
+          </p>
 
           {topCategories.length === 0 ? (
-            <p className="mt-6 font-serif italic text-ink-fade">
-              Nothing filed yet this week.
+            <p
+              className="text-[0.875rem]"
+              style={{ color: "var(--text-muted)" }}
+            >
+              No sessions filed yet this week.
             </p>
           ) : (
-            <ul className="mt-2">
+            <ul className="space-y-3">
               {topCategories.map((item) => {
-                const share = weekTotalMs > 0 ? Math.max(6, Math.round((item.totalMs / weekTotalMs) * 100)) : 0;
+                const share =
+                  weekTotalMs > 0
+                    ? Math.max(4, Math.round((item.totalMs / weekTotalMs) * 100))
+                    : 0;
                 return (
-                  <li key={item.category} className="rule-soft-b border-rule py-5">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="truncate font-display text-lg italic text-ink">
+                  <li key={item.category}>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span
+                        className="truncate text-[0.875rem] font-medium"
+                        style={{ color: "var(--text)" }}
+                      >
                         {item.category}
                       </span>
-                      <span className="font-mono text-sm tabular text-ink-fade">
+                      <span
+                        className="text-[0.75rem] tabular"
+                        style={{ color: "var(--text-muted)" }}
+                      >
                         {formatHM(item.totalMs)}
                       </span>
                     </div>
-                    <div className="mt-3 h-[3px] bg-rule-faint">
+                    <div
+                      className="mt-1.5 h-[3px] rounded-full"
+                      style={{ background: "var(--bg-tint-strong)" }}
+                    >
                       <div
-                        className="h-[3px] bg-ink"
-                        style={{ width: `${share}%` }}
+                        className="h-[3px] rounded-full"
+                        style={{
+                          width: `${share}%`,
+                          background: "var(--text)",
+                        }}
                       />
                     </div>
                   </li>
@@ -167,48 +174,70 @@ export default async function TimePage() {
           )}
         </div>
 
-        {/* Recent entries — the daily archive */}
-        <div>
-          <header className="rule-b border-ink pb-3">
-            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.26em] text-ink-fade">
-              The Archive
-            </p>
-            <h2 className="mt-1.5 font-display text-2xl font-medium italic tracking-[-0.02em] text-ink">
-              Recently filed dispatches.
-            </h2>
-          </header>
+        {/* Recent entries */}
+        <div className="fade-in-delay-4">
+          <p
+            className="mb-3 text-[0.6875rem] font-semibold uppercase tracking-wider"
+            style={{ color: "var(--text-faint)" }}
+          >
+            Recent sessions
+          </p>
 
           {recent.length === 0 ? (
-            <p className="mt-6 font-serif italic text-ink-fade">
-              The archive is empty. Open a dispatch above.
+            <p
+              className="text-[0.875rem]"
+              style={{ color: "var(--text-muted)" }}
+            >
+              The archive is empty. Open a session above.
             </p>
           ) : (
-            <div className="mt-2 space-y-6">
+            <div className="space-y-5">
               {groupedEntries.map((group) => (
                 <div key={group.label}>
-                  <h3 className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-oxblood py-2 rule-soft-b border-rule">
+                  <h3
+                    className="px-1 pb-1 text-[0.6875rem] font-semibold uppercase tracking-wider"
+                    style={{ color: "var(--text-faint)" }}
+                  >
                     {group.label}
                   </h3>
                   <ul>
                     {group.items.map((entry) => {
-                      const duration = (entry.endedAt!.getTime() - entry.startedAt.getTime()) | 0;
+                      const duration =
+                        (entry.endedAt!.getTime() -
+                          entry.startedAt.getTime()) |
+                        0;
                       return (
                         <li
                           key={entry.id}
-                          className="grid grid-cols-[1fr_auto] items-baseline gap-4 rule-soft-b border-rule py-3.5"
+                          className="group grid grid-cols-[1fr_auto_24px] items-baseline gap-3 rounded-md px-2 py-2 transition-colors hover:bg-bg-hover"
+                          style={{
+                            borderTop: "1px solid var(--border-faint)",
+                          }}
                         >
                           <div className="min-w-0">
-                            <div className="flex items-baseline gap-2 flex-wrap">
-                              <p className="truncate font-display text-[1.05rem] text-ink">
+                            <div className="flex flex-wrap items-baseline gap-2">
+                              <p
+                                className="truncate text-[0.9375rem] font-medium"
+                                style={{ color: "var(--text)" }}
+                              >
                                 {entry.label}
                               </p>
-                              {entry.category ? (
-                                <span className="font-mono text-[0.625rem] uppercase tracking-[0.2em] text-ink-fade">
-                                  — {entry.category}
+                              {entry.category && (
+                                <span
+                                  className="inline-flex items-center rounded px-1.5 py-0.5 text-[0.625rem] font-medium"
+                                  style={{
+                                    background: "var(--bg-tint)",
+                                    color: "var(--text-muted)",
+                                  }}
+                                >
+                                  {entry.category}
                                 </span>
-                              ) : null}
+                              )}
                             </div>
-                            <p className="mt-1 font-serif text-xs italic text-ink-fade">
+                            <p
+                              className="mt-0.5 text-[0.75rem]"
+                              style={{ color: "var(--text-faint)" }}
+                            >
                               {entry.startedAt.toLocaleString([], {
                                 month: "short",
                                 day: "numeric",
@@ -217,12 +246,13 @@ export default async function TimePage() {
                               })}
                             </p>
                           </div>
-                          <div className="flex items-baseline gap-4">
-                            <span className="font-mono text-sm tabular text-ink-soft">
-                              {formatDuration(duration)}
-                            </span>
-                            <EntryDeleteButton id={entry.id} />
-                          </div>
+                          <span
+                            className="text-[0.8125rem] tabular font-medium"
+                            style={{ color: "var(--text)" }}
+                          >
+                            {formatDuration(duration)}
+                          </span>
+                          <EntryDeleteButton id={entry.id} />
                         </li>
                       );
                     })}
@@ -233,6 +263,39 @@ export default async function TimePage() {
           )}
         </div>
       </section>
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+}) {
+  return (
+    <div className="px-4 py-4" style={{ background: "var(--bg-page)" }}>
+      <p
+        className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+        style={{ color: "var(--text-faint)" }}
+      >
+        {label}
+      </p>
+      <p
+        className="mt-1 text-[1.5rem] font-semibold tracking-tight tabular"
+        style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
+      >
+        {value}
+      </p>
+      <p
+        className="mt-0.5 text-[0.75rem]"
+        style={{ color: "var(--text-faint)" }}
+      >
+        {hint}
+      </p>
     </div>
   );
 }

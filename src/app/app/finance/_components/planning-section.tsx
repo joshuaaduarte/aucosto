@@ -24,11 +24,17 @@ export function PlanningSection({ data }: { data: FinanceDashboard }) {
 
   return (
     <section id="planning" className="space-y-10">
-      <header className="rule-t border-ink pt-4">
-        <p className="font-mono text-[0.6875rem] uppercase tracking-[0.26em] text-ink-fade">
-          Section III · Planning
+      <header>
+        <p
+          className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+          style={{ color: "var(--text-faint)" }}
+        >
+          Planning
         </p>
-        <h2 className="mt-2 font-display text-3xl font-medium italic tracking-[-0.02em] text-ink">
+        <h2
+          className="mt-1 text-[1.25rem] font-semibold tracking-tight"
+          style={{ color: "var(--text)" }}
+        >
           The figures, looking forward.
         </h2>
       </header>
@@ -44,12 +50,11 @@ export function PlanningSection({ data }: { data: FinanceDashboard }) {
         >
           {goals.length > 0 ? (
             <>
-              <div className="mt-3 grid grid-cols-2 gap-x-10 gap-y-2 xl:grid-cols-4">
+              <div className="grid grid-cols-2 gap-x-8 gap-y-5 xl:grid-cols-4">
                 <SummaryCard
                   label="Funded"
                   value={formatUSDFromCents(goalSnapshot.fundedCents)}
                   hint={`${goalSnapshot.activeCount} active`}
-                  valueClassName="text-verdigris"
                 />
                 <SummaryCard
                   label="Target"
@@ -67,23 +72,41 @@ export function PlanningSection({ data }: { data: FinanceDashboard }) {
                   hint="to stay on track"
                 />
               </div>
-              <ul className="mt-6 divide-y divide-rule-soft">
+              <ul className="mt-6 space-y-4">
                 {activeGoals.slice(0, 4).map((goal) => {
                   const summary = summarizeGoal(goal);
                   return (
-                    <li key={goal.id} className="py-5">
+                    <li
+                      key={goal.id}
+                      className="rounded-md px-3 py-3"
+                      style={{ background: "var(--bg-tint)" }}
+                    >
                       <div className="flex flex-wrap items-baseline gap-2">
-                        <p className="font-display text-lg text-ink">{goal.name}</p>
-                        <span className="font-mono text-[0.625rem] uppercase tracking-[0.22em] text-ink-fade">
-                          — {formatGoalCategory(goal.category)}
+                        <p
+                          className="text-[0.9375rem] font-semibold tracking-tight"
+                          style={{ color: "var(--text)" }}
+                        >
+                          {goal.name}
+                        </p>
+                        <span
+                          className="inline-flex items-center rounded px-1.5 py-0.5 text-[0.625rem] font-medium"
+                          style={{
+                            background: "var(--bg-tint-strong)",
+                            color: "var(--text-muted)",
+                          }}
+                        >
+                          {formatGoalCategory(goal.category)}
                         </span>
                       </div>
-                      <p className="mt-1 font-serif text-sm italic text-ink-fade">
-                        <span className="not-italic font-mono tabular text-ink-soft">
+                      <p
+                        className="mt-1 text-[0.8125rem]"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        <span className="tabular font-medium">
                           {formatUSDFromCents(goal.currentAmountCents)}
                         </span>{" "}
                         of{" "}
-                        <span className="not-italic font-mono tabular text-ink-soft">
+                        <span className="tabular font-medium">
                           {formatUSDFromCents(goal.targetAmountCents)}
                         </span>
                       </p>
@@ -97,9 +120,12 @@ export function PlanningSection({ data }: { data: FinanceDashboard }) {
                               : "amber"
                         }
                       />
-                      <div className="mt-2 flex items-center justify-between gap-3 font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-ink-fade">
+                      <div
+                        className="mt-2 flex items-center justify-between gap-3 text-[0.6875rem] font-medium uppercase tracking-wider"
+                        style={{ color: "var(--text-faint)" }}
+                      >
                         <span>{summary.fundedPercent}% funded</span>
-                        <span className="italic font-serif normal-case tracking-normal">
+                        <span className="normal-case tracking-normal">
                           {summary.targetDateLabel ?? "no date set"}
                         </span>
                       </div>
@@ -109,8 +135,14 @@ export function PlanningSection({ data }: { data: FinanceDashboard }) {
               </ul>
             </>
           ) : (
-            <p className="mt-5 rule-t rule-b border-rule px-2 py-10 text-center font-serif italic text-ink-fade">
-              ❦ Set your first bucket and the planning will begin to take shape. ❦
+            <p
+              className="rounded-md py-8 text-center text-[0.875rem]"
+              style={{
+                color: "var(--text-muted)",
+                border: "1px dashed var(--border)",
+              }}
+            >
+              Set your first bucket and the planning will begin to take shape.
             </p>
           )}
         </SectionCard>
@@ -124,35 +156,55 @@ export function PlanningSection({ data }: { data: FinanceDashboard }) {
           }
         >
           {count > 0 ? (
-            <div className="mt-3 space-y-6">
-              <div className="rule-t border-ink/30 pt-4">
-                <p className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade">
+            <div className="space-y-6">
+              <div
+                className="rounded-md p-4"
+                style={{
+                  background: "var(--bg-tint)",
+                  border: "1px solid var(--border-faint)",
+                }}
+              >
+                <p
+                  className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+                  style={{ color: "var(--text-faint)" }}
+                >
                   Projected true spend
                 </p>
-                <p className="mt-3 font-display text-[2.4rem] font-medium leading-none tracking-[-0.03em] tabular text-oxblood">
+                <p
+                  className="mt-1 text-[1.875rem] font-semibold tracking-tight tabular"
+                  style={{
+                    color: "var(--text)",
+                    letterSpacing: "-0.025em",
+                  }}
+                >
                   {formatUSDFromCents(spendProjection.projectedCents)}
                 </p>
-                <p className="mt-2 font-serif text-sm italic text-ink-fade">
-                  <span className="not-italic font-mono tabular text-ink-soft">
+                <p
+                  className="mt-1 text-[0.8125rem]"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  <span className="tabular font-medium">
                     {formatUSDFromCents(Math.round(spendProjection.burnRateCentsPerDay))}
                   </span>{" "}
                   per day at the current pace
                 </p>
-                {lastMonthSummary.spentCents > 0 ? (
-                  <p className="mt-2 font-serif text-sm italic text-ink-fade">
-                    against last month’s spend:{" "}
-                    <span className="not-italic font-mono tabular text-ink-soft">
+                {lastMonthSummary.spentCents > 0 && (
+                  <p
+                    className="mt-1 text-[0.8125rem]"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    vs last month spend:{" "}
+                    <span className="tabular font-medium">
                       {formatSignedUSDFromCents(spendDeltaCents)}
                     </span>
                     {spendDeltaPercent ? ` (${spendDeltaPercent})` : ""}
                   </p>
-                ) : null}
+                )}
               </div>
-              <div className="grid grid-cols-1 gap-x-10 gap-y-2 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-3">
                 <SummaryCard
                   label="Spent"
                   value={formatUSDFromCents(thisMonthSummary.spentCents)}
-                  valueClassName="text-oxblood"
                   hint={
                     lastMonthSummary.spentCents > 0
                       ? `vs last ${formatSignedUSDFromCents(spendDeltaCents)}${spendDeltaPercent ? ` · ${spendDeltaPercent}` : ""}`
@@ -163,7 +215,6 @@ export function PlanningSection({ data }: { data: FinanceDashboard }) {
                   label="Income"
                   value={formatUSDFromCents(thisMonthSummary.incomeCents)}
                   hint="income + reimbursements"
-                  valueClassName="text-verdigris"
                 />
                 <SummaryCard
                   label="Net flow"
@@ -173,11 +224,10 @@ export function PlanningSection({ data }: { data: FinanceDashboard }) {
                       ? `vs last ${formatSignedUSDFromCents(netDeltaCents)}${netDeltaPercent ? ` · ${netDeltaPercent}` : ""}`
                       : "income minus true spend"
                   }
-                  valueClassName={thisMonthSummary.netCents >= 0 ? "text-verdigris" : "text-oxblood"}
                 />
               </div>
               {categoryProjections.length > 0 && (
-                <ul className="rule-soft-t border-rule pt-4 divide-y divide-rule-soft">
+                <ul className="pt-4" style={{ borderTop: "1px solid var(--border-faint)" }}>
                   {categoryProjections.map((item) => {
                     const lastMonthCategory = lastMonthTopCategories.find(
                       (category) => category.category === item.category,
@@ -185,22 +235,32 @@ export function PlanningSection({ data }: { data: FinanceDashboard }) {
                     return (
                       <li
                         key={item.category}
-                        className="grid grid-cols-[1fr_auto] items-baseline gap-4 py-3"
+                        className="grid grid-cols-[1fr_auto] items-baseline gap-4 py-2"
+                        style={{ borderTop: "1px solid var(--border-faint)" }}
                       >
                         <div className="min-w-0">
-                          <p className="truncate font-display text-base text-ink">
+                          <p
+                            className="truncate text-[0.875rem] font-medium"
+                            style={{ color: "var(--text)" }}
+                          >
                             {item.category}
                           </p>
-                          {lastMonthCategory ? (
-                            <p className="font-serif text-xs italic text-ink-fade">
+                          {lastMonthCategory && (
+                            <p
+                              className="text-[0.75rem]"
+                              style={{ color: "var(--text-faint)" }}
+                            >
                               {formatSignedUSDFromCents(
                                 item.projectedCents - lastMonthCategory.spendCents,
                               )}{" "}
                               vs last month
                             </p>
-                          ) : null}
+                          )}
                         </div>
-                        <span className="font-mono text-sm tabular text-ink-soft">
+                        <span
+                          className="text-[0.8125rem] tabular font-medium"
+                          style={{ color: "var(--text)" }}
+                        >
                           {formatUSDFromCents(item.projectedCents)}
                         </span>
                       </li>
@@ -210,8 +270,14 @@ export function PlanningSection({ data }: { data: FinanceDashboard }) {
               )}
             </div>
           ) : (
-            <p className="mt-5 rule-t rule-b border-rule px-2 py-10 text-center font-serif italic text-ink-fade">
-              ❦ Import entries to see pace, projection, and drift. ❦
+            <p
+              className="rounded-md py-8 text-center text-[0.875rem]"
+              style={{
+                color: "var(--text-muted)",
+                border: "1px dashed var(--border)",
+              }}
+            >
+              Import entries to see pace, projection, and drift.
             </p>
           )}
         </SectionCard>

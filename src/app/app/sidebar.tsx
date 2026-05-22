@@ -6,6 +6,103 @@ import { useState } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SignOutButton } from "./sign-out-button";
 
+/* ──────────────────────────────────────────────────────────────────
+   Monoline icons
+   ────────────────────────────────────────────────────────────────── */
+const ip = {
+  width: 15,
+  height: 15,
+  viewBox: "0 0 15 15",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.25,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
+function HomeIcon() {
+  return (
+    <svg {...ip}>
+      <path d="M2 6.5 7.5 2l5.5 4.5V13H2V6.5Z" />
+      <path d="M6 13V9h3v4" />
+    </svg>
+  );
+}
+function CalendarIcon() {
+  return (
+    <svg {...ip}>
+      <rect x="2" y="3" width="11" height="10" rx="1.5" />
+      <path d="M2 6h11M5 1.75v2.5M10 1.75v2.5" />
+    </svg>
+  );
+}
+function ClockIcon() {
+  return (
+    <svg {...ip}>
+      <circle cx="7.5" cy="7.5" r="5.5" />
+      <path d="M7.5 4.5V7.5l2 1.25" />
+    </svg>
+  );
+}
+function WalletIcon() {
+  return (
+    <svg {...ip}>
+      <path d="M2 5.5C2 4.67 2.67 4 3.5 4H12a1 1 0 0 1 1 1v6.5c0 .83-.67 1.5-1.5 1.5h-8A1.5 1.5 0 0 1 2 11.5V5.5Z" />
+      <path d="M10 8.25h2.5" />
+    </svg>
+  );
+}
+function PlateIcon() {
+  return (
+    <svg {...ip}>
+      <circle cx="7.5" cy="7.5" r="5.5" />
+      <circle cx="7.5" cy="7.5" r="2.5" />
+    </svg>
+  );
+}
+function PulseIcon() {
+  return (
+    <svg {...ip}>
+      <path d="M1.5 8h2.25l1.5-4 2 8 1.75-4h4.5" />
+    </svg>
+  );
+}
+function ProjectsIcon() {
+  return (
+    <svg {...ip}>
+      <rect x="2" y="3" width="11" height="3" rx="0.75" />
+      <rect x="2" y="8.5" width="7.5" height="3" rx="0.75" />
+    </svg>
+  );
+}
+function GearIcon() {
+  return (
+    <svg {...ip}>
+      <circle cx="7.5" cy="7.5" r="2" />
+      <path d="M7.5 1.5v1.5M7.5 12v1.5M1.5 7.5H3M12 7.5h1.5M3 3l1 1M11 11l1 1M12 3l-1 1M4 11l-1 1" />
+    </svg>
+  );
+}
+function ChevronDown() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="m3 4 2.5 2.5L8 4" />
+    </svg>
+  );
+}
+function ChevronRight() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="m4 3 2.5 2.5L4 8" />
+    </svg>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   Nav model
+   ────────────────────────────────────────────────────────────────── */
+
 interface NavItem {
   href: string;
   label: string;
@@ -15,127 +112,79 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  {
-    href: "/app",
-    label: "Today",
-    match: (p) => p === "/app",
-    finance: false,
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden>
-        <rect x="1.5" y="1.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-        <rect x="8.5" y="1.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-        <rect x="1.5" y="8.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-        <rect x="8.5" y="8.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-      </svg>
-    ),
-  },
-  {
-    href: "/app/calendar",
-    label: "Calendar",
-    match: (p) => p.startsWith("/app/calendar"),
-    finance: false,
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden>
-        <rect x="1.5" y="2.5" width="12" height="10" rx="1.2" stroke="currentColor" strokeWidth="1.2" />
-        <path d="M4.5 1.5V4M10.5 1.5V4M1.5 6H13.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    href: "/app/time",
-    label: "Time",
-    match: (p) => p.startsWith("/app/time"),
-    finance: false,
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden>
-        <circle cx="7.5" cy="7.5" r="5.5" stroke="currentColor" strokeWidth="1.2" />
-        <path d="M7.5 4.5V7.5l2 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    href: "/app/finance",
-    label: "Finance",
-    match: (p) => p.startsWith("/app/finance"),
-    finance: true,
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden>
-        <rect x="1.5" y="4" width="12" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
-        <path d="M1.5 7.5h12" stroke="currentColor" strokeWidth="1.2" />
-        <path d="M4.5 10.5h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-      </svg>
-    ),
-  },
+  { href: "/app", label: "Today", match: (p) => p === "/app", finance: false, icon: <HomeIcon /> },
+  { href: "/app/calendar", label: "Calendar", match: (p) => p.startsWith("/app/calendar"), finance: false, icon: <CalendarIcon /> },
+  { href: "/app/time", label: "Time", match: (p) => p.startsWith("/app/time"), finance: false, icon: <ClockIcon /> },
+  { href: "/app/finance", label: "Finance", match: (p) => p.startsWith("/app/finance"), finance: true, icon: <WalletIcon /> },
 ];
 
-function NavLinks({
-  items,
+const comingSoon: Array<{ label: string; icon: React.ReactNode }> = [
+  { label: "Calories", icon: <PlateIcon /> },
+  { label: "Fitness", icon: <PulseIcon /> },
+  { label: "Projects", icon: <ProjectsIcon /> },
+];
+
+/* ──────────────────────────────────────────────────────────────────
+   Sidebar pieces
+   ────────────────────────────────────────────────────────────────── */
+
+function NavLink({
+  item,
   pathname,
   onNavigate,
 }: {
-  items: NavItem[];
+  item: NavItem;
   pathname: string;
   onNavigate?: () => void;
 }) {
+  const active = item.match(pathname);
   return (
-    <nav className="flex flex-col gap-0.5" aria-label="Tools">
-      {items.map((item) => {
-        const active = item.match(pathname);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={onNavigate}
-            aria-current={active ? "page" : undefined}
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              active
-                ? "bg-paper-deep text-ink"
-                : "text-ink-fade hover:bg-paper-deep/60 hover:text-ink"
-            }`}
-          >
-            <span className={active ? "text-ink" : "text-ink-ghost"}>
-              {item.icon}
-            </span>
-            {item.label}
-          </Link>
-        );
-      })}
-    </nav>
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      aria-current={active ? "page" : undefined}
+      className="nav-item group"
+    >
+      <span
+        className="shrink-0"
+        style={{
+          color: active ? "var(--text)" : "var(--text-faint)",
+        }}
+      >
+        {item.icon}
+      </span>
+      <span className="truncate">{item.label}</span>
+    </Link>
   );
 }
 
-function SettingsLink({
-  pathname,
-  onNavigate,
+function GroupHeader({
+  label,
+  open,
+  onToggle,
 }: {
-  pathname: string;
-  onNavigate?: () => void;
+  label: string;
+  open: boolean;
+  onToggle: () => void;
 }) {
-  const active = pathname.startsWith("/app/settings");
   return (
-    <Link
-      href="/app/settings"
-      onClick={onNavigate}
-      aria-current={active ? "page" : undefined}
-      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-        active
-          ? "bg-paper-deep text-ink"
-          : "text-ink-fade hover:bg-paper-deep/60 hover:text-ink"
-      }`}
+    <button
+      type="button"
+      onClick={onToggle}
+      className="flex w-full items-center gap-1 rounded px-2 py-1 text-left text-[0.6875rem] font-semibold uppercase tracking-wider transition-colors hover:bg-bg-hover"
+      style={{ color: "var(--text-faint)" }}
     >
-      <span className={active ? "text-ink" : "text-ink-ghost"}>
-        <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden>
-          <circle cx="7.5" cy="7.5" r="2" stroke="currentColor" strokeWidth="1.2" />
-          <path
-            d="M7.5 1v1.5M7.5 12.5V14M1 7.5h1.5M12.5 7.5H14M2.697 2.697l1.06 1.06M11.243 11.243l1.06 1.06M2.697 12.303l1.06-1.06M11.243 3.757l1.06-1.06"
-            stroke="currentColor"
-            strokeWidth="1.2"
-            strokeLinecap="round"
-          />
-        </svg>
+      <span
+        style={{
+          display: "inline-flex",
+          width: "11px",
+          color: "var(--text-faint)",
+        }}
+      >
+        {open ? <ChevronDown /> : <ChevronRight />}
       </span>
-      Settings
-    </Link>
+      <span>{label}</span>
+    </button>
   );
 }
 
@@ -144,94 +193,203 @@ interface NavProps {
   isDemoMode: boolean;
 }
 
-export function AppSidebar({ showFinance, isDemoMode }: NavProps) {
+function SidebarContents({
+  showFinance,
+  isDemoMode,
+  onNavigate,
+}: NavProps & { onNavigate?: () => void }) {
   const pathname = usePathname();
   const items = navItems.filter((i) => showFinance || !i.finance);
 
+  const [soonOpen, setSoonOpen] = useState(false);
+
   return (
-    <aside
-      className="hidden lg:flex shrink-0 flex-col"
-      style={{
-        width: "220px",
-        position: "sticky",
-        top: 0,
-        height: "100vh",
-        overflowY: "auto",
-        borderRight: "1px solid var(--rule-faint)",
-        padding: "1.75rem 1rem",
-      }}
-    >
-      <div className="mb-8 flex items-center gap-2 px-3">
-        <Link
-          href="/app"
-          className="text-[1rem] font-semibold tracking-[-0.04em] text-ink transition-opacity hover:opacity-70"
+    <>
+      {/* Workspace header */}
+      <div className="mb-3 flex items-center gap-2 px-2 pt-0.5">
+        <span
+          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-[0.6875rem] font-semibold"
+          style={{
+            background: "var(--text)",
+            color: "var(--bg-page)",
+            letterSpacing: "-0.02em",
+          }}
         >
-          aucosto
-        </Link>
+          A
+        </span>
+        <div className="min-w-0 flex-1">
+          <p
+            className="truncate text-[0.8125rem] font-semibold tracking-tight"
+            style={{ color: "var(--text)" }}
+          >
+            Joshua&apos;s workspace
+          </p>
+        </div>
         {isDemoMode && (
           <span
-            className="rounded px-1.5 py-0.5 font-mono text-[0.5625rem] uppercase tracking-[0.14em]"
-            style={{ background: "var(--oxblood-soft)", color: "var(--oxblood)" }}
+            className="shrink-0 rounded px-1.5 py-0.5 text-[0.625rem] font-medium uppercase tracking-wider"
+            style={{
+              background: "var(--accent-tint)",
+              color: "var(--accent-strong)",
+            }}
           >
             Demo
           </span>
         )}
       </div>
 
-      <NavLinks items={items} pathname={pathname} />
-
-      <div className="mt-auto flex flex-col gap-0.5">
-        <SettingsLink pathname={pathname} />
-        <div
-          className="flex items-center gap-1 px-3 pt-3"
-          style={{ borderTop: "1px solid var(--rule-faint)" }}
+      {/* Search-like quick action (visual only — keeps the Notion familiarity) */}
+      <button
+        type="button"
+        className="mb-4 flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[0.8125rem] transition-colors hover:bg-bg-hover"
+        style={{ color: "var(--text-faint)" }}
+        disabled
+        aria-disabled
+      >
+        <svg width="14" height="14" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" aria-hidden>
+          <circle cx="6.5" cy="6.5" r="4" />
+          <path d="m9.5 9.5 3 3" />
+        </svg>
+        <span>Search</span>
+        <span
+          className="ml-auto font-mono text-[0.6875rem]"
+          style={{ color: "var(--text-ghost)" }}
         >
+          ⌘K
+        </span>
+      </button>
+
+      {/* Workspace group */}
+      <p
+        className="mb-1 px-2 text-[0.6875rem] font-semibold uppercase tracking-wider"
+        style={{ color: "var(--text-faint)" }}
+      >
+        Workspace
+      </p>
+      <nav className="mb-2 flex flex-col gap-0.5" aria-label="Tools">
+        {items.map((item) => (
+          <NavLink
+            key={item.href}
+            item={item}
+            pathname={pathname}
+            onNavigate={onNavigate}
+          />
+        ))}
+      </nav>
+
+      {/* Coming soon group — collapsible */}
+      <div className="mt-3">
+        <GroupHeader
+          label="Coming soon"
+          open={soonOpen}
+          onToggle={() => setSoonOpen((v) => !v)}
+        />
+        {soonOpen && (
+          <div className="mt-0.5 flex flex-col gap-0.5">
+            {comingSoon.map((item) => (
+              <div
+                key={item.label}
+                className="nav-item cursor-default"
+                style={{ color: "var(--text-faint)" }}
+                title="Not built yet"
+              >
+                <span style={{ color: "var(--text-ghost)" }}>{item.icon}</span>
+                <span className="truncate">{item.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="mt-auto pt-3" style={{ borderTop: "1px solid var(--border-faint)" }}>
+        <Link
+          href="/app/settings"
+          onClick={onNavigate}
+          aria-current={pathname.startsWith("/app/settings") ? "page" : undefined}
+          className="nav-item"
+        >
+          <span style={{ color: "var(--text-faint)" }}>
+            <GearIcon />
+          </span>
+          Settings
+        </Link>
+        <div className="mt-2 flex items-center justify-between px-1">
           <ThemeToggle />
           <SignOutButton />
         </div>
       </div>
+    </>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   Public components
+   ────────────────────────────────────────────────────────────────── */
+
+export function AppSidebar({ showFinance, isDemoMode }: NavProps) {
+  return (
+    <aside
+      className="hidden lg:flex shrink-0 flex-col"
+      style={{
+        width: "240px",
+        position: "sticky",
+        top: 0,
+        height: "100vh",
+        overflowY: "auto",
+        background: "var(--bg-app)",
+        borderRight: "1px solid var(--border-faint)",
+        padding: "0.875rem 0.625rem",
+      }}
+    >
+      <SidebarContents showFinance={showFinance} isDemoMode={isDemoMode} />
     </aside>
   );
 }
 
 export function MobileNav({ showFinance, isDemoMode }: NavProps) {
-  const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const items = navItems.filter((i) => showFinance || !i.finance);
 
   return (
     <>
       <header
-        className="lg:hidden sticky top-0 z-20 flex h-12 shrink-0 items-center gap-3 px-5"
+        className="lg:hidden sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 px-4"
         style={{
-          background: "var(--paper)",
-          borderBottom: "1px solid var(--rule-faint)",
+          background: "var(--bg-app)",
+          borderBottom: "1px solid var(--border-faint)",
         }}
       >
         <button
           onClick={() => setOpen(true)}
-          className="rounded-md p-1.5 text-ink-fade transition-colors hover:bg-paper-deep hover:text-ink"
+          className="btn-icon"
           aria-label="Open navigation"
         >
-          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden>
-            <path
-              d="M1.5 4h12M1.5 7.5h12M1.5 11h12"
-              stroke="currentColor"
-              strokeWidth="1.3"
-              strokeLinecap="round"
-            />
+          <svg width="14" height="14" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden>
+            <path d="M1.5 4h12M1.5 7.5h12M1.5 11h12" />
           </svg>
         </button>
-        <Link
-          href="/app"
-          className="text-[0.9375rem] font-semibold tracking-[-0.04em] text-ink"
+        <span
+          className="inline-flex h-6 w-6 items-center justify-center rounded text-[0.6875rem] font-semibold"
+          style={{
+            background: "var(--text)",
+            color: "var(--bg-page)",
+          }}
+        >
+          A
+        </span>
+        <span
+          className="text-[0.875rem] font-semibold tracking-tight"
+          style={{ color: "var(--text)" }}
         >
           aucosto
-        </Link>
+        </span>
         {isDemoMode && (
           <span
-            className="rounded px-1.5 py-0.5 font-mono text-[0.5625rem] uppercase tracking-[0.14em]"
-            style={{ background: "var(--oxblood-soft)", color: "var(--oxblood)" }}
+            className="rounded px-1.5 py-0.5 text-[0.625rem] font-medium uppercase tracking-wider"
+            style={{
+              background: "var(--accent-tint)",
+              color: "var(--accent-strong)",
+            }}
           >
             Demo
           </span>
@@ -246,60 +404,33 @@ export function MobileNav({ showFinance, isDemoMode }: NavProps) {
         <>
           <div
             className="fixed inset-0 z-30"
-            style={{ background: "rgba(0,0,0,0.25)" }}
+            style={{ background: "rgba(15,15,15,0.32)" }}
             onClick={() => setOpen(false)}
             aria-hidden
           />
           <div
             className="fixed inset-y-0 left-0 z-40 flex flex-col"
             style={{
-              width: "240px",
-              background: "var(--paper)",
-              borderRight: "1px solid var(--rule-faint)",
-              padding: "1.5rem 1rem",
+              width: "260px",
+              background: "var(--bg-app)",
+              borderRight: "1px solid var(--border-soft)",
+              padding: "0.875rem 0.625rem",
             }}
           >
-            <div className="mb-8 flex items-center justify-between px-3">
-              <Link
-                href="/app"
-                onClick={() => setOpen(false)}
-                className="text-[1rem] font-semibold tracking-[-0.04em] text-ink"
-              >
-                aucosto
-              </Link>
-              <button
-                onClick={() => setOpen(false)}
-                className="rounded-md p-1.5 text-ink-fade transition-colors hover:bg-paper-deep hover:text-ink"
-                aria-label="Close navigation"
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-                  <path
-                    d="M2 2l10 10M12 2L2 12"
-                    stroke="currentColor"
-                    strokeWidth="1.3"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </button>
-            </div>
-            <NavLinks
-              items={items}
-              pathname={pathname}
+            <button
+              onClick={() => setOpen(false)}
+              className="btn-icon absolute right-2 top-2"
+              aria-label="Close navigation"
+            >
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden>
+                <path d="M2 2l10 10M12 2L2 12" />
+              </svg>
+            </button>
+            <SidebarContents
+              showFinance={showFinance}
+              isDemoMode={isDemoMode}
               onNavigate={() => setOpen(false)}
             />
-            <div className="mt-auto flex flex-col gap-0.5">
-              <SettingsLink
-                pathname={pathname}
-                onNavigate={() => setOpen(false)}
-              />
-              <div
-                className="flex items-center gap-1 px-3 pt-3"
-                style={{ borderTop: "1px solid var(--rule-faint)" }}
-              >
-                <ThemeToggle />
-                <SignOutButton />
-              </div>
-            </div>
           </div>
         </>
       )}

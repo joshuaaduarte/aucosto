@@ -36,36 +36,29 @@ export default async function FinancePage() {
   const data = deriveFinanceDashboard({ accounts, goals, history, count });
 
   return (
-    <div className="space-y-14 pb-6 lg:space-y-20">
+    <div className="space-y-12 pb-6">
       <OverviewSection data={data} />
-
-      <div className="fleuron text-ink-fade">
-        <span aria-hidden>❦ The Daily Accounts ❦</span>
-      </div>
-
+      <Divider />
       <TransactionsSection data={data} />
-
-      <div className="fleuron text-ink-fade">
-        <span aria-hidden>❧</span>
-      </div>
-
+      <Divider />
       <PlanningSection data={data} />
-
-      <div className="fleuron text-ink-fade">
-        <span aria-hidden>✣</span>
-      </div>
-
+      <Divider />
       <InsightsSection data={data} />
-
-      <div className="fleuron text-ink-fade">
-        <span aria-hidden>❧</span>
-      </div>
-
+      <Divider />
       <ManageSection
         data={data}
         tellerConfig={tellerConfig}
         linkedConnections={linkedConnections}
       />
     </div>
+  );
+}
+
+function Divider() {
+  return (
+    <div
+      style={{ height: 1, background: "var(--border-faint)" }}
+      aria-hidden
+    />
   );
 }

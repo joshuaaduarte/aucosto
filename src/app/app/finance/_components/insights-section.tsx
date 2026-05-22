@@ -15,11 +15,17 @@ export function InsightsSection({ data }: { data: FinanceDashboard }) {
 
   return (
     <section id="insights" className="space-y-12">
-      <header className="rule-t border-ink pt-4">
-        <p className="font-mono text-[0.6875rem] uppercase tracking-[0.26em] text-ink-fade">
-          Section IV · Patterns of Coin
+      <header>
+        <p
+          className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+          style={{ color: "var(--text-faint)" }}
+        >
+          Patterns
         </p>
-        <h2 className="mt-2 font-display text-3xl font-medium italic tracking-[-0.02em] text-ink">
+        <h2
+          className="mt-1 text-[1.25rem] font-semibold tracking-tight"
+          style={{ color: "var(--text)" }}
+        >
           What the entries, taken together, suggest.
         </h2>
       </header>
@@ -31,30 +37,40 @@ export function InsightsSection({ data }: { data: FinanceDashboard }) {
             subtitle="True spend, separated from transfers, payoffs, and inflows."
           >
             {typeSummary.length > 0 ? (
-              <ul className="mt-3 divide-y divide-rule-soft">
+              <ul>
                 {typeSummary.map((item) => (
                   <li
                     key={item.type}
-                    className="grid grid-cols-[1fr_auto] items-baseline gap-4 py-4"
+                    className="grid grid-cols-[1fr_auto] items-baseline gap-4 py-3"
+                    style={{ borderTop: "1px solid var(--border-faint)" }}
                   >
                     <div className="min-w-0">
                       <span
-                        className={`inline-flex border px-2 py-0.5 font-mono text-[0.625rem] uppercase tracking-[0.18em] ${typeTone(item.type)}`}
+                        className={`inline-flex items-center rounded px-1.5 py-0.5 text-[0.6875rem] font-medium ${typeTone(item.type)}`}
                       >
                         {formatTransactionType(item.type)}
                       </span>
-                      <p className="mt-1.5 font-serif text-xs italic text-ink-fade">
+                      <p
+                        className="mt-1 text-[0.75rem]"
+                        style={{ color: "var(--text-faint)" }}
+                      >
                         {item.count} entr{item.count === 1 ? "y" : "ies"}
                       </p>
                     </div>
-                    <p className="font-mono tabular text-ink">
+                    <p
+                      className="text-[0.875rem] tabular font-medium"
+                      style={{ color: "var(--text)" }}
+                    >
                       {formatUSDFromCents(item.amountCents)}
                     </p>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="mt-4 font-serif italic text-ink-fade">
+              <p
+                className="text-[0.875rem]"
+                style={{ color: "var(--text-muted)" }}
+              >
                 Import entries to read the movement split.
               </p>
             )}
@@ -65,101 +81,56 @@ export function InsightsSection({ data }: { data: FinanceDashboard }) {
           title="Cash Position"
           subtitle="What is at hand against what is owed."
         >
-          <div className="mt-4 grid grid-cols-1 gap-x-8 sm:grid-cols-3">
-            <div className="rule-l border-rule pl-4 py-2">
-              <p className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-ink-fade">
-                Available
-              </p>
-              <p className="mt-1.5 font-display text-xl font-medium tabular tracking-[-0.02em] text-verdigris">
-                {formatUSDFromCents(snapshot.cashCents)}
-              </p>
-            </div>
-            <div className="rule-l border-rule pl-4 py-2">
-              <p className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-ink-fade">
-                Cards owed
-              </p>
-              <p className="mt-1.5 font-display text-xl font-medium tabular tracking-[-0.02em] text-oxblood">
-                {formatUSDFromCents(snapshot.cardsOwedCents)}
-              </p>
-            </div>
-            <div className="rule-l border-rule pl-4 py-2">
-              <p className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-ink-fade">
-                Loans owed
-              </p>
-              <p className="mt-1.5 font-display text-xl font-medium tabular tracking-[-0.02em] text-oxblood">
-                {formatUSDFromCents(snapshot.loansOwedCents)}
-              </p>
-            </div>
+          <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-3">
+            <CashTile label="Available" value={formatUSDFromCents(snapshot.cashCents)} />
+            <CashTile label="Cards owed" value={formatUSDFromCents(snapshot.cardsOwedCents)} owed />
+            <CashTile label="Loans owed" value={formatUSDFromCents(snapshot.loansOwedCents)} owed />
           </div>
         </SectionCard>
       </div>
 
-      <div className="grid grid-cols-1 gap-10 xl:grid-cols-3 xl:gap-14">
+      <div className="grid grid-cols-1 gap-10 xl:grid-cols-3 xl:gap-12">
         <SectionCard
-          title="Top Categories"
+          title="Top categories"
           subtitle="Where true spend is concentrating this month."
         >
           {topCategories.length === 0 ? (
-            <p className="mt-4 font-serif italic text-ink-fade">
+            <p className="text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
               No spending recorded this month.
             </p>
           ) : (
-            <ul className="mt-3 divide-y divide-rule-soft">
+            <ul>
               {topCategories.map((category, i) => (
-                <li
+                <Row
                   key={category.category}
-                  className="grid grid-cols-[auto_1fr_auto] items-baseline gap-4 py-3.5"
-                >
-                  <span className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] tabular text-ink-ghost">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate font-display text-base text-ink">
-                      {category.category}
-                    </p>
-                    <p className="font-serif text-xs italic text-ink-fade">
-                      {category.count} entr{category.count === 1 ? "y" : "ies"}
-                    </p>
-                  </div>
-                  <span className="font-mono text-sm tabular text-ink-soft">
-                    {formatUSDFromCents(category.spendCents)}
-                  </span>
-                </li>
+                  index={i + 1}
+                  title={category.category}
+                  hint={`${category.count} entr${category.count === 1 ? "y" : "ies"}`}
+                  value={formatUSDFromCents(category.spendCents)}
+                />
               ))}
             </ul>
           )}
         </SectionCard>
 
         <SectionCard
-          title="Top Merchants"
+          title="Top merchants"
           subtitle="The biggest names in this month's accounts."
         >
           {topMerchants.length === 0 ? (
-            <p className="mt-4 font-serif italic text-ink-fade">
+            <p className="text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
               No spending recorded this month.
             </p>
           ) : (
-            <ul className="mt-3 divide-y divide-rule-soft">
+            <ul>
               {topMerchants.map((merchant, i) => (
-                <li
+                <Row
                   key={merchant.merchant}
-                  className="grid grid-cols-[auto_1fr_auto] items-baseline gap-4 py-3.5"
-                >
-                  <span className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] tabular text-ink-ghost">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate font-display text-base text-ink">
-                      {merchant.merchant}
-                    </p>
-                    <p className="font-serif text-xs italic text-ink-fade">
-                      {merchant.count} entr{merchant.count === 1 ? "y" : "ies"}
-                    </p>
-                  </div>
-                  <span className="font-mono text-sm tabular text-ink-soft">
-                    {formatUSDFromCents(merchant.spendCents)}
-                  </span>
-                </li>
+                  index={i + 1}
+                  title={merchant.merchant}
+                  hint={`${merchant.count} entr${merchant.count === 1 ? "y" : "ies"}`}
+                  value={formatUSDFromCents(merchant.spendCents)}
+                />
               ))}
             </ul>
           )}
@@ -170,39 +141,106 @@ export function InsightsSection({ data }: { data: FinanceDashboard }) {
           subtitle="Charges that appear, again, on the regular."
         >
           {recurringCandidates.length === 0 ? (
-            <p className="mt-4 font-serif italic text-ink-fade">
+            <p className="text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
               No strong patterns yet.
             </p>
           ) : (
-            <ul className="mt-3 divide-y divide-rule-soft">
+            <ul>
               {recurringCandidates.map((item) => (
-                <li
+                <Row
                   key={`${item.merchant}-${item.amountCents}-${item.account ?? ""}`}
-                  className="grid grid-cols-[1fr_auto] items-baseline gap-4 py-3.5"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate font-display text-base text-ink">
-                      {item.merchant}
-                    </p>
-                    <p className="mt-0.5 font-serif text-xs italic text-ink-fade">
-                      {item.count} charges
-                      {item.account ? ` · ${item.account}` : ""}
-                      {` · last ${item.lastDate.toLocaleDateString([], {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}`}
-                    </p>
-                  </div>
-                  <span className="font-mono text-sm tabular text-ink-soft">
-                    {formatUSDFromCents(item.amountCents)}
-                  </span>
-                </li>
+                  title={item.merchant}
+                  hint={`${item.count} charges${item.account ? ` · ${item.account}` : ""} · last ${item.lastDate.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}`}
+                  value={formatUSDFromCents(item.amountCents)}
+                />
               ))}
             </ul>
           )}
         </SectionCard>
       </div>
     </section>
+  );
+}
+
+function CashTile({
+  label,
+  value,
+  owed = false,
+}: {
+  label: string;
+  value: string;
+  owed?: boolean;
+}) {
+  return (
+    <div
+      className="py-2"
+      style={{ borderLeft: "1px solid var(--border)", paddingLeft: "1rem" }}
+    >
+      <p
+        className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+        style={{ color: "var(--text-faint)" }}
+      >
+        {label}
+      </p>
+      <p
+        className="mt-1 text-[1.125rem] font-semibold tracking-tight tabular"
+        style={{
+          color: owed ? "var(--accent-strong)" : "var(--text)",
+          letterSpacing: "-0.02em",
+        }}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function Row({
+  index,
+  title,
+  hint,
+  value,
+}: {
+  index?: number;
+  title: string;
+  hint: string;
+  value: string;
+}) {
+  return (
+    <li
+      className="grid grid-cols-[auto_1fr_auto] items-baseline gap-3 py-2.5"
+      style={{ borderTop: "1px solid var(--border-faint)" }}
+    >
+      {index !== undefined ? (
+        <span
+          className="text-[0.6875rem] tabular font-medium"
+          style={{ color: "var(--text-faint)" }}
+        >
+          {String(index).padStart(2, "0")}
+        </span>
+      ) : (
+        <span />
+      )}
+      <div className="min-w-0">
+        <p
+          className="truncate text-[0.875rem] font-medium"
+          style={{ color: "var(--text)" }}
+        >
+          {title}
+        </p>
+        <p
+          className="mt-0.5 text-[0.75rem]"
+          style={{ color: "var(--text-faint)" }}
+        >
+          {hint}
+        </p>
+      </div>
+      <span
+        className="text-[0.8125rem] tabular font-medium"
+        style={{ color: "var(--text)" }}
+      >
+        {value}
+      </span>
+    </li>
   );
 }

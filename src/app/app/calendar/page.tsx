@@ -1,7 +1,10 @@
 import { getRunningEntry, listCompletedSince } from "@/lib/services/time";
 import { listAccounts } from "@/lib/services/finance";
 import { listCalendarItems } from "@/lib/services/calendar";
-import { resolveActiveUserId, requireViewerContext } from "@/lib/viewer-context";
+import {
+  resolveActiveUserId,
+  requireViewerContext,
+} from "@/lib/viewer-context";
 import { startOfWeek } from "@/lib/time";
 import { sumDurations } from "@/lib/time-summary";
 import type { CalendarItem } from "@/generated/prisma/client";
@@ -24,22 +27,10 @@ import {
 export const dynamic = "force-dynamic";
 
 function itemTone(kind: string, status: string) {
-  if (status === "done") return "var(--verdigris)";
-  if (kind === "suggestion") return "var(--aged-gold)";
-  if (kind === "external") return "var(--ink-ghost)";
-  return "var(--oxblood)";
-}
-
-function SectionEyebrow({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="font-mono text-[0.6875rem] uppercase tracking-[0.26em] text-ink-fade">
-      {children}
-    </p>
-  );
-}
-
-function EmptyNote({ children }: { children: React.ReactNode }) {
-  return <p className="font-serif italic text-sm text-ink-fade">{children}</p>;
+  if (status === "done") return "var(--text-faint)";
+  if (kind === "suggestion") return "var(--accent)";
+  if (kind === "external") return "var(--text-faint)";
+  return "var(--text)";
 }
 
 function groupForDay(items: CalendarItem[], day: Date) {
@@ -76,68 +67,116 @@ export default async function CalendarPage() {
   const todayDateValue = new Date().toLocaleDateString("en-CA");
 
   return (
-    <div className="space-y-12 lg:space-y-16">
-      <header className="fade-in grid gap-10 lg:grid-cols-[1.55fr_1fr] lg:gap-14">
-        <div className="lg:rule-r lg:border-rule lg:pr-14">
-          <SectionEyebrow>Section I · The Calendar</SectionEyebrow>
-          <h1 className="mt-5 font-display text-[2.7rem] font-medium leading-[0.9] tracking-[-0.045em] text-ink sm:text-[3.7rem] lg:text-[4.5rem]">
-            Turn the week into
-            <span className="italic text-oxblood"> deliberate time</span>.
-          </h1>
-          <p className="mt-6 max-w-xl font-serif text-[1.05rem] leading-[1.75] italic text-ink-soft">
-            This is the working calendar: fixed commitments, intentional blocks,
-            and the signals aucosto can already see from the rest of your system.
-          </p>
-        </div>
-
-        <section
-          className="rounded-xl px-5 py-5"
-          style={{ background: "var(--surface)", boxShadow: "var(--surface-shadow)" }}
+    <div className="space-y-10">
+      {/* Page header */}
+      <header className="fade-in">
+        <p
+          className="text-[0.75rem] font-medium uppercase tracking-wider"
+          style={{ color: "var(--text-faint)" }}
         >
-          <SectionEyebrow>Today&apos;s signals</SectionEyebrow>
-          <ol className="mt-4 space-y-3">
-            {signals.map((signal, index) => (
-              <li key={`${signal.title}-${index}`} className="flex items-start gap-3">
-                <span className="mt-1 font-mono text-[0.6875rem] text-ink-ghost">
-                  {String(index + 1).padStart(2, "0")}
-                </span>
+          Calendar
+        </p>
+        <h1
+          className="mt-1 text-[2rem] font-bold tracking-tight sm:text-[2.5rem]"
+          style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
+        >
+          The week, shaped on purpose
+        </h1>
+        <p
+          className="mt-2 text-[0.9375rem]"
+          style={{ color: "var(--text-muted)" }}
+        >
+          Fixed commitments, intentional blocks, and the signals aucosto can
+          already see from the rest of your system.
+        </p>
+      </header>
+
+      {/* Signals */}
+      {signals.length > 0 && (
+        <section className="fade-in-delay-1">
+          <p
+            className="mb-2 text-[0.6875rem] font-semibold uppercase tracking-wider"
+            style={{ color: "var(--text-faint)" }}
+          >
+            Today&apos;s signals
+          </p>
+          <ul className="space-y-1.5">
+            {signals.map((signal, i) => (
+              <li
+                key={`${signal.title}-${i}`}
+                className="grid grid-cols-[16px_1fr] items-start gap-3 rounded-md px-2 py-2.5"
+              >
+                <span
+                  className="mt-1.5 inline-block h-1.5 w-1.5 rounded-full"
+                  style={{ background: "var(--text)" }}
+                />
                 <div>
-                  <p className="text-sm font-medium text-ink">{signal.title}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-ink-fade">{signal.detail}</p>
+                  <p
+                    className="text-[0.875rem] font-medium"
+                    style={{ color: "var(--text)" }}
+                  >
+                    {signal.title}
+                  </p>
+                  <p
+                    className="mt-0.5 text-[0.8125rem]"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {signal.detail}
+                  </p>
                 </div>
               </li>
             ))}
-          </ol>
+          </ul>
         </section>
-      </header>
+      )}
 
-      <div className="fleuron text-ink-fade">
-        <span aria-hidden>✣</span>
-      </div>
-
-      <section className="grid gap-8 lg:grid-cols-[1.25fr_0.85fr] lg:gap-12">
+      {/* Add a block + today's agenda */}
+      <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:gap-10">
         <div
-          className="rounded-xl px-5 py-5 sm:px-6"
-          style={{ background: "var(--surface)", boxShadow: "var(--surface-shadow)" }}
+          className="rounded-md p-5"
+          style={{
+            background: "var(--bg-page)",
+            border: "1px solid var(--border-soft)",
+          }}
         >
-          <SectionEyebrow>Add a block</SectionEyebrow>
-          <form action={createCalendarBlockAction} className="mt-5 space-y-4">
-            <div>
-              <label className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade" htmlFor="title">
+          <p
+            className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+            style={{ color: "var(--text-faint)" }}
+          >
+            Add a block
+          </p>
+          <h2
+            className="mt-1 text-[1rem] font-semibold tracking-tight"
+            style={{ color: "var(--text)" }}
+          >
+            Carve out the next hour you mean to keep.
+          </h2>
+
+          <form action={createCalendarBlockAction} className="mt-4 space-y-4">
+            <div className="space-y-1.5">
+              <label
+                className="block text-[0.75rem] font-medium"
+                style={{ color: "var(--text-muted)" }}
+                htmlFor="title"
+              >
                 Title
               </label>
               <input
                 id="title"
                 name="title"
                 required
-                placeholder="Deep work, wedding planning, long run..."
-                className="mt-2 w-full rounded-lg border border-rule bg-paper px-3 py-2.5 text-sm text-ink outline-none focus:border-ink"
+                placeholder="Deep work, long run, wedding planning…"
+                className="field"
               />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div>
-                <label className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade" htmlFor="date">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="space-y-1.5">
+                <label
+                  className="block text-[0.75rem] font-medium"
+                  style={{ color: "var(--text-muted)" }}
+                  htmlFor="date"
+                >
                   Date
                 </label>
                 <input
@@ -146,11 +185,15 @@ export default async function CalendarPage() {
                   type="date"
                   required
                   defaultValue={todayDateValue}
-                  className="mt-2 w-full rounded-lg border border-rule bg-paper px-3 py-2.5 text-sm text-ink outline-none focus:border-ink"
+                  className="field"
                 />
               </div>
-              <div>
-                <label className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade" htmlFor="start">
+              <div className="space-y-1.5">
+                <label
+                  className="block text-[0.75rem] font-medium"
+                  style={{ color: "var(--text-muted)" }}
+                  htmlFor="start"
+                >
                   Start
                 </label>
                 <input
@@ -159,11 +202,15 @@ export default async function CalendarPage() {
                   type="time"
                   required
                   defaultValue="09:00"
-                  className="mt-2 w-full rounded-lg border border-rule bg-paper px-3 py-2.5 text-sm text-ink outline-none focus:border-ink"
+                  className="field"
                 />
               </div>
-              <div>
-                <label className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade" htmlFor="end">
+              <div className="space-y-1.5">
+                <label
+                  className="block text-[0.75rem] font-medium"
+                  style={{ color: "var(--text-muted)" }}
+                  htmlFor="end"
+                >
                   End
                 </label>
                 <input
@@ -172,90 +219,125 @@ export default async function CalendarPage() {
                   type="time"
                   required
                   defaultValue="10:00"
-                  className="mt-2 w-full rounded-lg border border-rule bg-paper px-3 py-2.5 text-sm text-ink outline-none focus:border-ink"
+                  className="field"
                 />
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade" htmlFor="location">
-                  Location
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label
+                  className="block text-[0.75rem] font-medium"
+                  style={{ color: "var(--text-muted)" }}
+                  htmlFor="location"
+                >
+                  Location <span style={{ color: "var(--text-faint)" }}>(optional)</span>
                 </label>
-                <input
-                  id="location"
-                  name="location"
-                  placeholder="Optional"
-                  className="mt-2 w-full rounded-lg border border-rule bg-paper px-3 py-2.5 text-sm text-ink outline-none focus:border-ink"
-                />
+                <input id="location" name="location" className="field" />
               </div>
-              <div>
-                <label className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-ink-fade" htmlFor="notes">
-                  Notes
+              <div className="space-y-1.5">
+                <label
+                  className="block text-[0.75rem] font-medium"
+                  style={{ color: "var(--text-muted)" }}
+                  htmlFor="notes"
+                >
+                  Notes <span style={{ color: "var(--text-faint)" }}>(optional)</span>
                 </label>
-                <input
-                  id="notes"
-                  name="notes"
-                  placeholder="Optional"
-                  className="mt-2 w-full rounded-lg border border-rule bg-paper px-3 py-2.5 text-sm text-ink outline-none focus:border-ink"
-                />
+                <input id="notes" name="notes" className="field" />
               </div>
             </div>
 
-            <button
-              type="submit"
-              className="rounded-lg bg-ink px-4 py-2.5 text-sm font-medium text-paper transition-opacity hover:opacity-90"
-            >
-              Save block
-            </button>
+            <div className="flex justify-end">
+              <button type="submit" className="btn-ink">
+                Save block
+              </button>
+            </div>
           </form>
         </div>
 
         <div
-          className="rounded-xl px-5 py-5 sm:px-6"
-          style={{ background: "var(--surface)", boxShadow: "var(--surface-shadow)" }}
+          className="rounded-md p-5"
+          style={{
+            background: "var(--bg-page)",
+            border: "1px solid var(--border-soft)",
+          }}
         >
-          <SectionEyebrow>Today&apos;s agenda</SectionEyebrow>
+          <p
+            className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+            style={{ color: "var(--text-faint)" }}
+          >
+            Today&apos;s agenda
+          </p>
+
           {todayItems.length === 0 ? (
-            <div className="mt-5">
-              <EmptyNote>No blocks yet. Add one above so the day has a shape.</EmptyNote>
-            </div>
+            <p
+              className="mt-4 text-[0.875rem]"
+              style={{ color: "var(--text-muted)" }}
+            >
+              No blocks yet. Add one so the day has a shape.
+            </p>
           ) : (
-            <ol className="mt-4 space-y-3">
+            <ol className="mt-3 space-y-1.5">
               {todayItems.map((item) => (
                 <li
                   key={item.id}
-                  className="rounded-lg border border-rule px-4 py-3"
+                  className="group rounded-md px-3 py-2.5 transition-colors hover:bg-bg-hover"
+                  style={{ border: "1px solid var(--border-faint)" }}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span
-                          className="h-2 w-2 rounded-full"
+                          className="h-1.5 w-1.5 rounded-full"
                           style={{ background: itemTone(item.kind, item.status) }}
                         />
-                        <p className="text-sm font-medium text-ink">{item.title}</p>
+                        <p
+                          className="truncate text-[0.875rem] font-medium"
+                          style={{ color: "var(--text)" }}
+                        >
+                          {item.title}
+                        </p>
                       </div>
-                      <p className="mt-1 font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-ink-fade">
+                      <p
+                        className="mt-1 text-[0.75rem]"
+                        style={{ color: "var(--text-faint)" }}
+                      >
                         {formatCalendarTimeRange(item)} · {item.kind}
                       </p>
-                      {item.notes ? (
-                        <p className="mt-2 text-sm text-ink-fade">{item.notes}</p>
-                      ) : null}
+                      {item.notes && (
+                        <p
+                          className="mt-1.5 text-[0.8125rem]"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          {item.notes}
+                        </p>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                       {item.status !== "done" && (
                         <form action={completeCalendarItemAction}>
                           <input type="hidden" name="id" value={item.id} />
-                          <button className="rounded-md border border-rule px-2.5 py-1.5 text-xs text-ink-fade hover:text-ink">
-                            Done
+                          <button
+                            className="btn-icon"
+                            title="Mark done"
+                            aria-label="Mark done"
+                          >
+                            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                              <path d="m3 7 3 3 5-6" />
+                            </svg>
                           </button>
                         </form>
                       )}
                       <form action={deleteCalendarItemAction}>
                         <input type="hidden" name="id" value={item.id} />
-                        <button className="rounded-md border border-rule px-2.5 py-1.5 text-xs text-ink-fade hover:text-ink">
-                          Delete
+                        <button
+                          className="btn-icon"
+                          title="Delete"
+                          aria-label="Delete"
+                        >
+                          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden>
+                            <path d="M3.5 3.5l6 6M9.5 3.5l-6 6" />
+                          </svg>
                         </button>
                       </form>
                     </div>
@@ -267,52 +349,90 @@ export default async function CalendarPage() {
         </div>
       </section>
 
+      {/* The week */}
       <section>
-        <header className="rule-b border-ink pb-3">
-          <SectionEyebrow>The week</SectionEyebrow>
-          <h2 className="mt-1.5 font-display text-2xl font-medium italic tracking-[-0.02em] text-ink">
-            A rough working view of the next seven days.
+        <header>
+          <p
+            className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+            style={{ color: "var(--text-faint)" }}
+          >
+            The week
+          </p>
+          <h2
+            className="mt-1 text-[1.25rem] font-semibold tracking-tight"
+            style={{ color: "var(--text)" }}
+          >
+            Next seven days at a glance
           </h2>
         </header>
 
-        <div className="mt-6 grid gap-4 lg:grid-cols-7">
+        <div className="mt-5 grid gap-2 lg:grid-cols-7">
           {weekDays.map((day) => {
             const items = groupForDay(weekItems, day.date);
             return (
               <section
                 key={day.key}
-                className="rounded-xl px-4 py-4"
-                style={{ background: "var(--surface)", boxShadow: "var(--surface-shadow)" }}
+                className="rounded-md p-3"
+                style={{
+                  background: "var(--bg-page)",
+                  border: "1px solid var(--border-faint)",
+                }}
               >
-                <div className="rule-soft-b border-rule pb-3">
-                  <p className="font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-ink-fade">
+                <div
+                  className="pb-2"
+                  style={{ borderBottom: "1px solid var(--border-faint)" }}
+                >
+                  <p
+                    className="text-[0.625rem] font-semibold uppercase tracking-wider"
+                    style={{ color: "var(--text-faint)" }}
+                  >
                     {day.label}
                   </p>
-                  <p className="mt-1 text-sm font-medium text-ink">{day.monthDay}</p>
+                  <p
+                    className="mt-0.5 text-[0.8125rem] font-semibold tracking-tight"
+                    style={{ color: "var(--text)" }}
+                  >
+                    {day.monthDay}
+                  </p>
                 </div>
 
-                <div className="mt-4 space-y-3">
+                <div className="mt-2 space-y-1.5">
                   {items.length === 0 ? (
-                    <EmptyNote>Open space.</EmptyNote>
+                    <p
+                      className="text-[0.75rem]"
+                      style={{ color: "var(--text-faint)" }}
+                    >
+                      Open
+                    </p>
                   ) : (
                     items.map((item) => (
                       <article
                         key={item.id}
-                        className="rounded-lg border border-rule px-3 py-3"
+                        className="rounded px-2 py-1.5"
+                        style={{
+                          background: "var(--bg-tint)",
+                        }}
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <span
-                            className="h-2 w-2 rounded-full"
-                            style={{ background: itemTone(item.kind, item.status) }}
+                            className="h-1.5 w-1.5 shrink-0 rounded-full"
+                            style={{
+                              background: itemTone(item.kind, item.status),
+                            }}
                           />
-                          <p className="text-sm font-medium leading-snug text-ink">{item.title}</p>
+                          <p
+                            className="truncate text-[0.75rem] font-medium leading-snug"
+                            style={{ color: "var(--text)" }}
+                          >
+                            {item.title}
+                          </p>
                         </div>
-                        <p className="mt-2 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-ink-fade">
+                        <p
+                          className="mt-0.5 pl-3 text-[0.6875rem]"
+                          style={{ color: "var(--text-faint)" }}
+                        >
                           {formatCalendarTimeRange(item)}
                         </p>
-                        {item.location ? (
-                          <p className="mt-2 text-xs text-ink-fade">{item.location}</p>
-                        ) : null}
                       </article>
                     ))
                   )}
