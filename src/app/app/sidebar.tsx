@@ -30,6 +30,18 @@ const navItems: NavItem[] = [
     ),
   },
   {
+    href: "/app/calendar",
+    label: "Calendar",
+    match: (p) => p.startsWith("/app/calendar"),
+    finance: false,
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden>
+        <rect x="1.5" y="2.5" width="12" height="10" rx="1.2" stroke="currentColor" strokeWidth="1.2" />
+        <path d="M4.5 1.5V4M10.5 1.5V4M1.5 6H13.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/app/time",
     label: "Time",
     match: (p) => p.startsWith("/app/time"),
