@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireCan } from "@/lib/auth/can";
 import { recordEvent } from "@/lib/services/events";
 import type { CalendarItem } from "@/generated/prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 
 export type CalendarRange = { from: Date; to: Date };
 
@@ -34,20 +35,34 @@ function validateWindow(startsAt: Date, endsAt: Date) {
   }
 }
 
+function isMissingCalendarTableError(error: unknown) {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2021"
+  );
+}
+
 export async function listCalendarItems(
   userId: string,
   range: CalendarRange,
 ): Promise<CalendarItem[]> {
   requireCan(userId, "calendar", "read");
-  return prisma.calendarItem.findMany({
-    where: {
-      userId,
-      startsAt: { lt: range.to },
-      endsAt: { gt: range.from },
-      status: { not: "cancelled" },
-    },
-    orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }],
-  });
+  try {
+    return await prisma.calendarItem.findMany({
+      where: {
+        userId,
+        startsAt: { lt: range.to },
+        endsAt: { gt: range.from },
+        status: { not: "cancelled" },
+      },
+      orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }],
+    });
+  } catch (error) {
+    if (isMissingCalendarTableError(error)) {
+      return [];
+    }
+    throw error;
+  }
 }
 
 export async function listUpcomingCalendarItems(
@@ -55,15 +70,22 @@ export async function listUpcomingCalendarItems(
   options: { from?: Date; limit?: number } = {},
 ): Promise<CalendarItem[]> {
   requireCan(userId, "calendar", "read");
-  return prisma.calendarItem.findMany({
-    where: {
-      userId,
-      endsAt: { gte: options.from ?? new Date() },
-      status: { not: "cancelled" },
-    },
-    orderBy: [{ startsAt: "asc" }],
-    take: options.limit ?? 10,
-  });
+  try {
+    return await prisma.calendarItem.findMany({
+      where: {
+        userId,
+        endsAt: { gte: options.from ?? new Date() },
+        status: { not: "cancelled" },
+      },
+      orderBy: [{ startsAt: "asc" }],
+      take: options.limit ?? 10,
+    });
+  } catch (error) {
+    if (isMissingCalendarTableError(error)) {
+      return [];
+    }
+    throw error;
+  }
 }
 
 export async function createCalendarItem(
@@ -77,22 +99,30 @@ export async function createCalendarItem(
   }
   validateWindow(input.startsAt, input.endsAt);
 
-  const item = await prisma.calendarItem.create({
-    data: {
-      userId,
-      title,
-      kind: input.kind ?? "block",
-      status: input.status ?? "confirmed",
-      startsAt: input.startsAt,
-      endsAt: input.endsAt,
-      allDay: input.allDay ?? false,
-      notes: input.notes?.trim() || null,
-      location: input.location?.trim() || null,
-      sourceTool: input.sourceTool ?? null,
-      sourceRefId: input.sourceRefId ?? null,
-      externalId: input.externalId ?? null,
-    },
-  });
+  let item: CalendarItem;
+  try {
+    item = await prisma.calendarItem.create({
+      data: {
+        userId,
+        title,
+        kind: input.kind ?? "block",
+        status: input.status ?? "confirmed",
+        startsAt: input.startsAt,
+        endsAt: input.endsAt,
+        allDay: input.allDay ?? false,
+        notes: input.notes?.trim() || null,
+        location: input.location?.trim() || null,
+        sourceTool: input.sourceTool ?? null,
+        sourceRefId: input.sourceRefId ?? null,
+        externalId: input.externalId ?? null,
+      },
+    });
+  } catch (error) {
+    if (isMissingCalendarTableError(error)) {
+      throw new Error("Calendar is deployed before its database table. Try again in a moment.");
+    }
+    throw error;
+  }
 
   await recordEvent({
     userId,
@@ -112,27 +142,43 @@ export async function updateCalendarItem(
 ): Promise<CalendarItem | null> {
   requireCan(userId, "calendar", "write");
 
-  const existing = await prisma.calendarItem.findFirst({ where: { id, userId } });
+  let existing: CalendarItem | null;
+  try {
+    existing = await prisma.calendarItem.findFirst({ where: { id, userId } });
+  } catch (error) {
+    if (isMissingCalendarTableError(error)) {
+      return null;
+    }
+    throw error;
+  }
   if (!existing) return null;
 
   const startsAt = input.startsAt ?? existing.startsAt;
   const endsAt = input.endsAt ?? existing.endsAt;
   validateWindow(startsAt, endsAt);
 
-  const item = await prisma.calendarItem.update({
-    where: { id },
-    data: {
-      title: input.title ? sanitizeTitle(input.title) : undefined,
-      startsAt,
-      endsAt,
-      notes: input.notes === undefined ? undefined : input.notes?.trim() || null,
-      location:
-        input.location === undefined ? undefined : input.location?.trim() || null,
-      kind: input.kind ?? undefined,
-      status: input.status ?? undefined,
-      allDay: input.allDay ?? undefined,
-    },
-  });
+  let item: CalendarItem;
+  try {
+    item = await prisma.calendarItem.update({
+      where: { id },
+      data: {
+        title: input.title ? sanitizeTitle(input.title) : undefined,
+        startsAt,
+        endsAt,
+        notes: input.notes === undefined ? undefined : input.notes?.trim() || null,
+        location:
+          input.location === undefined ? undefined : input.location?.trim() || null,
+        kind: input.kind ?? undefined,
+        status: input.status ?? undefined,
+        allDay: input.allDay ?? undefined,
+      },
+    });
+  } catch (error) {
+    if (isMissingCalendarTableError(error)) {
+      return null;
+    }
+    throw error;
+  }
 
   await recordEvent({
     userId,
@@ -147,9 +193,17 @@ export async function updateCalendarItem(
 
 export async function deleteCalendarItem(userId: string, id: string): Promise<void> {
   requireCan(userId, "calendar", "write");
-  const { count } = await prisma.calendarItem.deleteMany({
-    where: { id, userId },
-  });
+  let count = 0;
+  try {
+    ({ count } = await prisma.calendarItem.deleteMany({
+      where: { id, userId },
+    }));
+  } catch (error) {
+    if (isMissingCalendarTableError(error)) {
+      return;
+    }
+    throw error;
+  }
   if (count > 0) {
     await recordEvent({
       userId,
