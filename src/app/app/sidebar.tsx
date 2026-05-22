@@ -238,7 +238,7 @@ function SidebarContents({
         )}
       </div>
 
-      {/* Search-like quick action (visual only — keeps the Notion familiarity) */}
+      {/* Search affordance — visual only for now, wires up to a real palette later */}
       <button
         type="button"
         className="mb-4 flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[0.8125rem] transition-colors hover:bg-bg-hover"

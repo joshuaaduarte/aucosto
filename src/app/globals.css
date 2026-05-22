@@ -29,7 +29,7 @@
   --accent-tint:      rgba(222, 107, 42, 0.10);
   --accent-tint-strong: rgba(222, 107, 42, 0.16);
 
-  /* Shadows (mostly border-only, Notion style) */
+  /* Shadows — mostly border-only */
   --shadow-card:      0 0 0 1px var(--border);
   --shadow-pop:       0 0 0 1px rgba(15, 15, 15, 0.05),
                       0 3px 6px rgba(15, 15, 15, 0.06),
@@ -279,7 +279,7 @@ body > * {
   color: var(--text-faint);
 }
 
-/* Eyebrow now: compact upper-case label, not editorial mono — fits Notion */
+/* Eyebrow: compact upper-case label */
 @utility eyebrow {
   font-family: var(--font-inter-tight), sans-serif;
   font-size: 0.6875rem;
@@ -425,7 +425,7 @@ body > * {
   }
 }
 
-/* ━━━ Utilities: Notion-style blocks ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* ━━━ Utilities: workspace blocks ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 @utility callout {
   display: flex;
   align-items: flex-start;

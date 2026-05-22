@@ -145,7 +145,7 @@ export function ProgressBar({
 }
 
 export function typeTone(type: string): string {
-  // Notion-style: keep pills neutral; reserve accent for the rare "fee" case.
+  // Keep pills neutral; reserve the accent for the rare "fee" case.
   switch (type) {
     case "income":
     case "reimbursement":

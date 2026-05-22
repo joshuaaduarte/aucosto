@@ -266,7 +266,7 @@ export default async function HubPage() {
         </section>
       )}
 
-      {/* ── Tools index — like a Notion sub-page list ─────── */}
+      {/* ── Tools index ───────────────────────────────────── */}
       <section className="fade-in-delay-3">
         <p
           className="mb-2 px-1 text-[0.6875rem] font-semibold uppercase tracking-wider"

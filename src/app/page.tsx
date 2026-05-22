@@ -223,7 +223,7 @@ const intersections: Array<{ a: string; b: string; line: string }> = [
 ];
 
 /* ──────────────────────────────────────────────────────────────────
-   Stylized workspace preview (Notion-like sidebar + page)
+   Stylized workspace preview — sidebar + a page
    ────────────────────────────────────────────────────────────────── */
 
 function WorkspacePreview() {
@@ -562,9 +562,9 @@ export default function LandingPage() {
               className="text-[1.75rem] font-semibold tracking-tight sm:text-[2.25rem]"
               style={{ color: "var(--text)" }}
             >
-              Built like Notion pages.{" "}
+              Distinct surfaces, shared spine.{" "}
               <span style={{ color: "var(--text-muted)" }}>
-                Each one is a database you actually use.
+                Each tool earns its own page — and all of them share what they know.
               </span>
             </h2>
           </div>
@@ -682,9 +682,9 @@ export default function LandingPage() {
               className="text-[1.75rem] font-semibold tracking-tight sm:text-[2.25rem]"
               style={{ color: "var(--text)" }}
             >
-              Notion never made your apps share notes.{" "}
+              Most tools refuse to share what they know.{" "}
               <span style={{ color: "var(--text-muted)" }}>
-                Aucosto does that part on purpose.
+                Aucosto makes that the whole point.
               </span>
             </h2>
           </div>
