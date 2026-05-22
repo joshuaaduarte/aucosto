@@ -4,6 +4,7 @@ import type { NextAuthConfig } from "next-auth";
 // touch Node-only APIs. Middleware imports this directly so it can verify
 // the session JWT at the edge without dragging in Prisma/bcrypt.
 export default {
+  trustHost: true,
   pages: {
     signIn: "/login",
   },
