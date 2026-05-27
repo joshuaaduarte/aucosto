@@ -1,8 +1,8 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 
-/* ──────────────────────────────────────────────────────────────────
-   Monoline tool icons — single set, reused across landing + app
-   ────────────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   Monoline tool icons â€” single set, reused across landing + app
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 const iconProps = {
   width: 15,
@@ -125,9 +125,9 @@ function ConnectionIcon() {
   );
 }
 
-/* ──────────────────────────────────────────────────────────────────
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    Content
-   ────────────────────────────────────────────────────────────────── */
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 type ToolStatus = "live" | "soon";
 type Tool = {
@@ -141,7 +141,7 @@ type Tool = {
 const tools: Tool[] = [
   {
     title: "Today",
-    body: "The hub. What's running, what's owed, what to notice next.",
+    body: "See what is running, what needs attention, and what is next.",
     status: "live",
     Icon: HomeIcon,
     href: "/app",
@@ -155,7 +155,7 @@ const tools: Tool[] = [
   },
   {
     title: "Time",
-    body: "Open a session when you start, close it when you switch. The archive builds itself.",
+    body: "Start a session when you begin, then close it when you switch tasks.",
     status: "live",
     Icon: ClockIcon,
     href: "/app/time",
@@ -169,7 +169,7 @@ const tools: Tool[] = [
   },
   {
     title: "Calories",
-    body: "Log meals, track macros, see how eating patterns shape the week — not just the day.",
+    body: "Log meals, track macros, and spot patterns across the week.",
     status: "soon",
     Icon: PlateIcon,
   },
@@ -181,7 +181,7 @@ const tools: Tool[] = [
   },
   {
     title: "Fitness",
-    body: "Workouts, lifts, runs — logged once, visible to every tool that cares about recovery.",
+    body: "Track workouts, lifts, and runs in one place.",
     status: "soon",
     Icon: PulseIcon,
   },
@@ -193,7 +193,7 @@ const tools: Tool[] = [
   },
   {
     title: "Signals",
-    body: "Devices and sensors — sleep, temperature, activity — feeding a single readable stream.",
+    body: "Bring sleep, temperature, and activity into one stream.",
     status: "soon",
     Icon: SignalIcon,
   },
@@ -203,7 +203,7 @@ const intersections: Array<{ a: string; b: string; line: string }> = [
   {
     a: "Time",
     b: "Finance",
-    line: "Your hourly rate emerges on its own — earnings against logged hours, no spreadsheet bridge.",
+    line: "See earnings next to logged hours without doing the math yourself.",
   },
   {
     a: "Calendar",
@@ -213,18 +213,18 @@ const intersections: Array<{ a: string; b: string; line: string }> = [
   {
     a: "Finance",
     b: "Meals",
-    line: "What you planned to eat against what actually got bought. The drift is the lesson.",
+    line: "Compare meal plans with what you actually bought.",
   },
   {
     a: "Fitness",
     b: "Signals",
-    line: "Sleep and intake plotted together — the picture most apps refuse to show.",
+    line: "View sleep and intake together in one place.",
   },
 ];
 
-/* ──────────────────────────────────────────────────────────────────
-   Stylized workspace preview — sidebar + a page
-   ────────────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   Stylized workspace preview â€” sidebar + a page
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function WorkspacePreview() {
   return (
@@ -313,13 +313,13 @@ function WorkspacePreview() {
                     className="text-[0.8125rem] font-medium leading-5 sm:leading-normal"
                     style={{ color: "var(--text)" }}
                   >
-                    Time × Finance — $34 / hr earned this week
+                    Time Ã— Finance â€” $34 / hr earned this week
                   </p>
                   <p
                     className="mt-0.5 text-[0.75rem]"
                     style={{ color: "var(--text-muted)" }}
                   >
-                    18h 42m logged · $642 in
+                    18h 42m logged Â· $642 in
                   </p>
                 </div>
               </div>
@@ -358,31 +358,31 @@ function WorkspacePreview() {
             <div className="mt-2 space-y-0">
               <PreviewRow
                 title="aucosto polish"
-                meta="Time · running"
+                meta="Time Â· running"
                 value="1h 12m"
                 active
               />
               <PreviewRow
-                title="Groceries — Costco"
-                meta="Finance · cleared"
-                value="−$214.30"
+                title="Groceries â€” Costco"
+                meta="Finance Â· cleared"
+                value="âˆ’$214.30"
               />
               <PreviewRow
-                title="Long run · East River"
-                meta="Calendar · 7:00am"
+                title="Long run Â· East River"
+                meta="Calendar Â· 7:00am"
                 value="10 km"
               />
               <PreviewRow
-                title="Read · 'The Decision Stack'"
-                meta="Time · 23m"
-                value="—"
+                title="Read Â· 'The Decision Stack'"
+                meta="Time Â· 23m"
+                value="â€”"
               />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Floating "live" pill — connects landing copy to the preview */}
+      {/* Floating "live" pill â€” connects landing copy to the preview */}
       <div
         className="absolute -top-3 left-4 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 sm:left-8"
         style={{
@@ -483,9 +483,9 @@ function PreviewRow({
   );
 }
 
-/* ──────────────────────────────────────────────────────────────────
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    Page
-   ────────────────────────────────────────────────────────────────── */
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 export default function LandingPage() {
   const liveCount = tools.filter((t) => t.status === "live").length;
@@ -525,25 +525,24 @@ export default function LandingPage() {
             }}
           >
             <ConnectionIcon />
-            One workspace for one life
+            Personal workspace
           </span>
           <h1
             className="mt-5 text-[2rem] font-semibold leading-[1.05] tracking-[-0.03em] sm:text-[3.25rem] lg:text-[4rem]"
             style={{ color: "var(--text)" }}
           >
-            All your tools, in one place —{" "}
+            All your tools, in one place{" "}
             <span style={{ color: "var(--text-muted)" }}>
-              and they talk to each other.
+              so they work together.
             </span>
           </h1>
           <p
             className="fade-in-delay-1 mt-5 max-w-2xl text-base leading-[1.6] sm:mt-6 sm:text-[1.0625rem]"
             style={{ color: "var(--text-muted)" }}
           >
-            Aucosto is a workspace for the seventeen apps you&apos;d rather stop juggling.
-            Time, money, calendar, calories, projects — under one roof, sharing context
-            instead of fighting for attention. The insight is usually hiding between two
-            tools. Put them together.
+            Aucosto brings time, money, calendar, calories, and projects into
+            one workspace. The goal is fewer tabs, clearer context, and less
+            manual stitching between tools.
           </p>
           <div className="fade-in-delay-2 mt-7 flex flex-wrap items-center gap-3">
             <Link href="/login" className="btn-ink">
@@ -567,7 +566,7 @@ export default function LandingPage() {
                 className="inline-block h-1.5 w-1.5 rounded-full"
                 style={{ background: "var(--accent)" }}
               />
-              {liveCount} live · {tools.length - liveCount} on the way
+              {liveCount} live Â· {tools.length - liveCount} coming soon
             </span>
           </div>
         </div>
@@ -587,9 +586,9 @@ export default function LandingPage() {
               className="text-[1.75rem] font-semibold tracking-tight sm:text-[2.25rem]"
               style={{ color: "var(--text)" }}
             >
-              Distinct surfaces, shared spine.{" "}
+              Separate tools, shared context.{" "}
               <span style={{ color: "var(--text-muted)" }}>
-                Each tool earns its own page — and all of them share what they know.
+                Each tool has its own page, and they still work together.
               </span>
             </h2>
           </div>
@@ -790,7 +789,7 @@ export default function LandingPage() {
             className="text-[0.75rem]"
             style={{ color: "var(--text-faint)" }}
           >
-            Aucosto · Built for one.
+            Aucosto Â· Built for one.
           </p>
           <Link
             href="/login"
@@ -804,3 +803,6 @@ export default function LandingPage() {
     </div>
   );
 }
+
+
+

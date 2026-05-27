@@ -1,4 +1,4 @@
-import { formatUSDFromCents } from "@/lib/money";
+﻿import { formatUSDFromCents } from "@/lib/money";
 import type { FinanceDashboard } from "../_lib/derive";
 import { QuickStat, SectionCard, SummaryCard } from "./ui";
 import { ClearButton } from "../clear-button";
@@ -162,7 +162,7 @@ export function OverviewSection({ data }: { data: FinanceDashboard }) {
 
           <SectionCard
             title="Watchlist"
-            subtitle="The next useful nudge, kept in plain sight."
+            subtitle="Things worth checking next."
           >
             <div className="space-y-1.5">
               {alerts.length > 0 ? (

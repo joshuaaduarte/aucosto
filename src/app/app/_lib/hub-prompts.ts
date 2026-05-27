@@ -1,7 +1,7 @@
 // "Right now" prompts on the hub. Derived from real data so the dashboard
 // has a chance of feeling alive: if a timer is running, it leads; if a card
 // is due soon, it nudges; otherwise it surfaces a weekly tracking total or
-// onboarding hint. All inputs are optional — the page passes whatever it has
+// onboarding hint. All inputs are optional - the page passes whatever it has
 // and we degrade gracefully.
 
 import { summarizeBalances } from "@/lib/finance-accounts";
@@ -27,11 +27,11 @@ export type HubPromptInput = {
 
 const FALLBACK_PROMPTS: HubPrompt[] = [
   {
-    text: "Protect one block of deep work before the day fragments.",
+    text: "Protect one block of focused work early in the day.",
     tone: "sky",
   },
   {
-    text: "Use the hub to notice pressure early, not after the fact.",
+    text: "Use the hub to catch problems earlier.",
     tone: "zinc",
   },
 ];
@@ -45,7 +45,7 @@ export function deriveHubPrompts(input: HubPromptInput): HubPrompt[] {
       0,
       Math.round((Date.now() - startedAt.getTime()) / 60000),
     );
-    const suffix = ranMinutes > 0 ? ` — running ${ranMinutes}m` : "";
+    const suffix = ranMinutes > 0 ? `, running ${ranMinutes}m` : "";
     prompts.push({
       text: `Currently tracking: ${input.runningEntry.label}${suffix}.`,
       tone: "sky",
@@ -64,7 +64,7 @@ export function deriveHubPrompts(input: HubPromptInput): HubPrompt[] {
       const days = daysUntil(dueSoon.dueDate);
       if (days <= 7) {
         prompts.push({
-          text: `${dueSoon.name} is due in ${days} day${days === 1 ? "" : "s"} — ${formatUSDFromCents(dueSoon.balanceCents)} owed.`,
+          text: `${dueSoon.name} is due in ${days} day${days === 1 ? "" : "s"}, ${formatUSDFromCents(dueSoon.balanceCents)} owed.`,
           tone: days <= 3 ? "amber" : "zinc",
         });
       }
@@ -110,7 +110,7 @@ function pickNextDueCard(accounts: FinanceAccount[]) {
     }))
     .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
 
-  // skip past dues — they need a different surface than "right now"
+  // skip past dues - they need a different surface than "right now"
   const upcoming = cards.find((c) => c.dueDate.getTime() >= Date.now() - 24 * 60 * 60 * 1000);
 
   // Summarize to avoid "0 days left" weirdness once the day rolls past.

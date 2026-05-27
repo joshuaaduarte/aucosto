@@ -16,9 +16,8 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Aucosto — One workspace for one life.",
-  description:
-    "Time, money, calendar, and the rest of you — in one workspace where the tools share what they know.",
+  title: "Aucosto | Personal workspace",
+  description: "A personal workspace for time, money, calendar, and daily life.",
 };
 
 export default function RootLayout({

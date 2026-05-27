@@ -32,7 +32,6 @@ export default function LoginPage() {
 
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-6 pb-20 pt-8 sm:px-10">
         <div className="fade-in w-full max-w-[360px]">
-          {/* Wordmark + tagline */}
           <div className="mb-8 text-center">
             <p
               className="text-[1.25rem] font-semibold tracking-tight"
@@ -44,11 +43,10 @@ export default function LoginPage() {
               className="mt-2 text-[0.875rem]"
               style={{ color: "var(--text-muted)" }}
             >
-              One workspace for one life.
+              Personal workspace
             </p>
           </div>
 
-          {/* Form — bare, no card chrome */}
           <div className="space-y-1">
             <h1
               className="text-[1.125rem] font-semibold tracking-tight"
