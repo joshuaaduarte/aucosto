@@ -229,7 +229,7 @@ const intersections: Array<{ a: string; b: string; line: string }> = [
 function WorkspacePreview() {
   return (
     <div
-      className="fade-in-delay-2 relative mt-12 sm:mt-16 lg:mt-20"
+      className="fade-in-delay-2 relative mt-12 px-1 sm:mt-16 sm:px-0 lg:mt-20"
       aria-hidden
     >
       <div
@@ -240,7 +240,7 @@ function WorkspacePreview() {
             "0 0 0 1px var(--border-soft), 0 18px 50px -20px rgba(0,0,0,0.18)",
         }}
       >
-        <div className="grid grid-cols-[170px_1fr] min-h-[360px] sm:grid-cols-[200px_1fr] sm:min-h-[420px]">
+        <div className="grid min-h-[360px] grid-cols-1 sm:grid-cols-[200px_1fr] sm:min-h-[420px]">
           {/* Sidebar */}
           <aside
             className="hidden sm:flex flex-col p-3"
@@ -279,7 +279,7 @@ function WorkspacePreview() {
           </aside>
 
           {/* Page */}
-          <div className="p-5 sm:p-7">
+          <div className="p-4 sm:p-7">
             <p
               className="text-[0.6875rem] font-medium uppercase tracking-wider"
               style={{ color: "var(--text-faint)" }}
@@ -295,30 +295,55 @@ function WorkspacePreview() {
 
             {/* Callout */}
             <div
-              className="mt-5 flex items-start gap-3 rounded-md px-3.5 py-3"
+              className="mt-5 rounded-xl px-3.5 py-3 sm:flex sm:items-start sm:gap-3 sm:rounded-md"
               style={{
                 background: "var(--bg-tint)",
                 border: "1px solid var(--border-faint)",
               }}
             >
-              <span
-                className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded"
-                style={{ color: "var(--text-muted)" }}
-              >
-                <ConnectionIcon />
-              </span>
-              <div className="min-w-0">
-                <p
-                  className="text-[0.8125rem] font-medium"
-                  style={{ color: "var(--text)" }}
-                >
-                  Time × Finance — $34 / hr earned this week
-                </p>
-                <p
-                  className="mt-0.5 text-[0.75rem]"
+              <div className="flex items-start gap-3">
+                <span
+                  className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded"
                   style={{ color: "var(--text-muted)" }}
                 >
-                  18h 42m logged · $642 in
+                  <ConnectionIcon />
+                </span>
+                <div className="min-w-0">
+                  <p
+                    className="text-[0.8125rem] font-medium leading-5 sm:leading-normal"
+                    style={{ color: "var(--text)" }}
+                  >
+                    Time × Finance — $34 / hr earned this week
+                  </p>
+                  <p
+                    className="mt-0.5 text-[0.75rem]"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    18h 42m logged · $642 in
+                  </p>
+                </div>
+              </div>
+              <div
+                className="mt-3 grid grid-cols-2 gap-2 sm:mt-0 sm:ml-auto sm:min-w-[148px] sm:grid-cols-1"
+                style={{ color: "var(--text-muted)" }}
+              >
+                <p
+                  className="rounded-lg px-2.5 py-2 text-[0.6875rem] font-medium"
+                  style={{
+                    background: "var(--bg-page)",
+                    border: "1px solid var(--border-faint)",
+                  }}
+                >
+                  Hourly read
+                </p>
+                <p
+                  className="rounded-lg px-2.5 py-2 text-[0.6875rem] font-medium"
+                  style={{
+                    background: "var(--bg-page)",
+                    border: "1px solid var(--border-faint)",
+                  }}
+                >
+                  Cross-tool signal
                 </p>
               </div>
             </div>
@@ -359,7 +384,7 @@ function WorkspacePreview() {
 
       {/* Floating "live" pill — connects landing copy to the preview */}
       <div
-        className="absolute -top-3 left-6 sm:left-8 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1"
+        className="absolute -top-3 left-4 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 sm:left-8"
         style={{
           background: "var(--bg-page)",
           color: "var(--text-muted)",
