@@ -1,8 +1,6 @@
 ﻿import Link from "next/link";
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   Monoline tool icons â€” single set, reused across landing + app
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* Monoline tool icons: single set, reused across landing + app */
 
 const iconProps = {
   width: 15,
@@ -125,9 +123,7 @@ function ConnectionIcon() {
   );
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   Content
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* Content */
 
 type ToolStatus = "live" | "soon";
 type Tool = {
@@ -222,9 +218,7 @@ const intersections: Array<{ a: string; b: string; line: string }> = [
   },
 ];
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   Stylized workspace preview â€” sidebar + a page
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* Stylized workspace preview: sidebar + a page */
 
 function WorkspacePreview() {
   return (
@@ -313,13 +307,13 @@ function WorkspacePreview() {
                     className="text-[0.8125rem] font-medium leading-5 sm:leading-normal"
                     style={{ color: "var(--text)" }}
                   >
-                    Time Ã— Finance â€” $34 / hr earned this week
+                    Time x Finance - $34 / hr earned this week
                   </p>
                   <p
                     className="mt-0.5 text-[0.75rem]"
                     style={{ color: "var(--text-muted)" }}
                   >
-                    18h 42m logged Â· $642 in
+                    18h 42m logged · $642 in
                   </p>
                 </div>
               </div>
@@ -358,31 +352,31 @@ function WorkspacePreview() {
             <div className="mt-2 space-y-0">
               <PreviewRow
                 title="aucosto polish"
-                meta="Time Â· running"
+                meta="Time · running"
                 value="1h 12m"
                 active
               />
               <PreviewRow
-                title="Groceries â€” Costco"
-                meta="Finance Â· cleared"
-                value="âˆ’$214.30"
+                title="Groceries - Costco"
+                meta="Finance · cleared"
+                value="-$214.30"
               />
               <PreviewRow
-                title="Long run Â· East River"
-                meta="Calendar Â· 7:00am"
+                title="Long run · East River"
+                meta="Calendar · 7:00am"
                 value="10 km"
               />
               <PreviewRow
-                title="Read Â· 'The Decision Stack'"
-                meta="Time Â· 23m"
-                value="â€”"
+                title="Read · 'The Decision Stack'"
+                meta="Time · 23m"
+                value="-"
               />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Floating "live" pill â€” connects landing copy to the preview */}
+      {/* Floating "live" pill that connects landing copy to the preview */}
       <div
         className="absolute -top-3 left-4 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 sm:left-8"
         style={{
@@ -483,9 +477,7 @@ function PreviewRow({
   );
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   Page
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* Page */
 
 export default function LandingPage() {
   const liveCount = tools.filter((t) => t.status === "live").length;
@@ -566,7 +558,7 @@ export default function LandingPage() {
                 className="inline-block h-1.5 w-1.5 rounded-full"
                 style={{ background: "var(--accent)" }}
               />
-              {liveCount} live Â· {tools.length - liveCount} coming soon
+              {liveCount} live · {tools.length - liveCount} coming soon
             </span>
           </div>
         </div>
@@ -789,7 +781,7 @@ export default function LandingPage() {
             className="text-[0.75rem]"
             style={{ color: "var(--text-faint)" }}
           >
-            Aucosto Â· Built for one.
+            Aucosto · Built for one.
           </p>
           <Link
             href="/login"
