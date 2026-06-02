@@ -1,10 +1,21 @@
 import { daysUntil, formatUSDFromCents } from "@/lib/money";
-import type { CalendarItem, FinanceAccount, TimeEntry } from "@/generated/prisma/client";
+import type {
+  CalendarItem,
+  FinanceAccount,
+  TimeEntry,
+} from "@/generated/prisma/client";
 
 export type CalendarSignal = {
   title: string;
   detail: string;
   tone: "sky" | "amber" | "emerald" | "zinc";
+};
+
+export type CalendarTodayBuckets = {
+  now: CalendarItem[];
+  next: CalendarItem[];
+  later: CalendarItem[];
+  needsAttention: CalendarItem[];
 };
 
 export function startOfDay(date: Date): Date {
@@ -41,7 +52,10 @@ export function buildWeekDays(anchor: Date = new Date()) {
       key: date.toISOString(),
       date,
       label: date.toLocaleDateString([], { weekday: "short" }),
-      monthDay: date.toLocaleDateString([], { month: "short", day: "numeric" }),
+      monthDay: date.toLocaleDateString([], {
+        month: "short",
+        day: "numeric",
+      }),
     };
   });
 }
@@ -50,7 +64,9 @@ export function isSameDay(a: Date, b: Date) {
   return startOfDay(a).getTime() === startOfDay(b).getTime();
 }
 
-export function formatCalendarTimeRange(item: Pick<CalendarItem, "startsAt" | "endsAt" | "allDay">): string {
+export function formatCalendarTimeRange(
+  item: Pick<CalendarItem, "startsAt" | "endsAt" | "allDay">,
+): string {
   if (item.allDay) return "All day";
   const start = item.startsAt.toLocaleTimeString([], {
     hour: "numeric",
@@ -60,7 +76,41 @@ export function formatCalendarTimeRange(item: Pick<CalendarItem, "startsAt" | "e
     hour: "numeric",
     minute: "2-digit",
   });
-  return `${start}–${end}`;
+  return `${start}-${end}`;
+}
+
+export function deriveTodayBuckets(
+  items: CalendarItem[],
+  now: Date = new Date(),
+): CalendarTodayBuckets {
+  const sorted = [...items].sort(
+    (a, b) => a.startsAt.getTime() - b.startsAt.getTime(),
+  );
+  const currentTime = now.getTime();
+
+  const active = sorted.filter((item) => {
+    if (item.status === "done" || item.status === "cancelled") return false;
+    return (
+      item.startsAt.getTime() <= currentTime && item.endsAt.getTime() > currentTime
+    );
+  });
+
+  const needsAttention = sorted.filter((item) => {
+    if (item.status === "done" || item.status === "cancelled") return false;
+    return item.endsAt.getTime() <= currentTime;
+  });
+
+  const upcoming = sorted.filter((item) => {
+    if (item.status === "done" || item.status === "cancelled") return false;
+    return item.startsAt.getTime() > currentTime;
+  });
+
+  return {
+    now: active,
+    next: upcoming.slice(0, 1),
+    later: upcoming.slice(1),
+    needsAttention,
+  };
 }
 
 export function deriveCalendarSignals(input: {
@@ -70,7 +120,9 @@ export function deriveCalendarSignals(input: {
   accounts: FinanceAccount[];
 }): CalendarSignal[] {
   const signals: CalendarSignal[] = [];
-  const actionableCount = input.todayItems.filter((item) => item.kind !== "external").length;
+  const actionableCount = input.todayItems.filter(
+    (item) => item.kind !== "external",
+  ).length;
 
   if (input.runningEntry) {
     signals.push({
@@ -89,7 +141,8 @@ export function deriveCalendarSignals(input: {
   } else {
     signals.push({
       title: `${actionableCount} planned block${actionableCount === 1 ? "" : "s"} today`,
-      detail: "Your calendar already has at least one intentional commitment in it.",
+      detail:
+        "Your calendar already has at least one intentional commitment in it.",
       tone: "emerald",
     });
   }
@@ -102,7 +155,11 @@ export function deriveCalendarSignals(input: {
     if (days >= 0 && days <= 7) {
       signals.push({
         title: `${dueSoon.name} due in ${days} day${days === 1 ? "" : "s"}`,
-        detail: `Worth blocking 15 minutes to review ${formatUSDFromCents(Math.abs(dueSoon.statementBalanceCents ?? dueSoon.currentBalanceCents))}.`,
+        detail: `Worth blocking 15 minutes to review ${formatUSDFromCents(
+          Math.abs(
+            dueSoon.statementBalanceCents ?? dueSoon.currentBalanceCents,
+          ),
+        )}.`,
         tone: days <= 3 ? "amber" : "zinc",
       });
     }
@@ -111,7 +168,8 @@ export function deriveCalendarSignals(input: {
   if (input.weekTotalMs < 2 * 60 * 60 * 1000) {
     signals.push({
       title: "Week is still light on tracked work",
-      detail: "A focused block on the calendar would make the rest of the week easier to defend.",
+      detail:
+        "A focused block on the calendar would make the rest of the week easier to defend.",
       tone: "zinc",
     });
   }

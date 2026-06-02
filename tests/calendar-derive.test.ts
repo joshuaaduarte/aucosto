@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { deriveCalendarSignals, formatCalendarTimeRange, startOfCalendarWeek } from "@/app/app/calendar/_lib/derive";
+import {
+  deriveCalendarSignals,
+  deriveTodayBuckets,
+  formatCalendarTimeRange,
+  startOfCalendarWeek,
+} from "@/app/app/calendar/_lib/derive";
 import type { CalendarItem, FinanceAccount, TimeEntry } from "@/generated/prisma/client";
 
 function calendarItem(overrides: Partial<CalendarItem> = {}): CalendarItem {
@@ -83,6 +88,40 @@ describe("calendar derive helpers", () => {
 
   it("formats all-day entries cleanly", () => {
     expect(formatCalendarTimeRange(calendarItem({ allDay: true }))).toBe("All day");
+  });
+
+  it("splits today into now, next, later, and needs attention", () => {
+    const now = new Date("2026-05-21T09:30:00.000Z");
+    const buckets = deriveTodayBuckets(
+      [
+        calendarItem({
+          id: "past",
+          startsAt: new Date("2026-05-21T07:00:00.000Z"),
+          endsAt: new Date("2026-05-21T08:00:00.000Z"),
+        }),
+        calendarItem({
+          id: "active",
+          startsAt: new Date("2026-05-21T09:00:00.000Z"),
+          endsAt: new Date("2026-05-21T10:00:00.000Z"),
+        }),
+        calendarItem({
+          id: "next",
+          startsAt: new Date("2026-05-21T11:00:00.000Z"),
+          endsAt: new Date("2026-05-21T12:00:00.000Z"),
+        }),
+        calendarItem({
+          id: "later",
+          startsAt: new Date("2026-05-21T13:00:00.000Z"),
+          endsAt: new Date("2026-05-21T14:00:00.000Z"),
+        }),
+      ],
+      now,
+    );
+
+    expect(buckets.now.map((item) => item.id)).toEqual(["active"]);
+    expect(buckets.next.map((item) => item.id)).toEqual(["next"]);
+    expect(buckets.later.map((item) => item.id)).toEqual(["later"]);
+    expect(buckets.needsAttention.map((item) => item.id)).toEqual(["past"]);
   });
 
   it("starts calendar weeks on monday", () => {

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import * as timeService from "@/lib/services/time";
 import {
   createCalendarItem,
   deleteCalendarItem,
@@ -22,14 +23,19 @@ function parseDateTime(date: string, time: string) {
   return new Date(`${date}T${time}`);
 }
 
+function parseOptionalString(value: FormDataEntryValue | null) {
+  const normalized = String(value ?? "").trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
 export async function createCalendarBlockAction(formData: FormData) {
   const userId = await requireUserId();
   const title = String(formData.get("title") ?? "");
   const date = String(formData.get("date") ?? "");
   const start = String(formData.get("start") ?? "");
   const end = String(formData.get("end") ?? "");
-  const notes = String(formData.get("notes") ?? "");
-  const location = String(formData.get("location") ?? "");
+  const notes = parseOptionalString(formData.get("notes"));
+  const location = parseOptionalString(formData.get("location"));
 
   await createCalendarItem(userId, {
     title,
@@ -49,6 +55,53 @@ export async function completeCalendarItemAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   await updateCalendarItem(userId, id, { status: "done" });
   revalidateCalendar();
+}
+
+export async function updateCalendarBlockAction(formData: FormData) {
+  const userId = await requireUserId();
+  const id = String(formData.get("id") ?? "");
+  const title = String(formData.get("title") ?? "");
+  const date = String(formData.get("date") ?? "");
+  const start = String(formData.get("start") ?? "");
+  const end = String(formData.get("end") ?? "");
+  const notes = parseOptionalString(formData.get("notes"));
+  const location = parseOptionalString(formData.get("location"));
+
+  await updateCalendarItem(userId, id, {
+    title,
+    startsAt: parseDateTime(date, start),
+    endsAt: parseDateTime(date, end),
+    notes,
+    location,
+    status: "confirmed",
+  });
+  revalidateCalendar();
+}
+
+export async function moveCalendarItemAction(formData: FormData) {
+  const userId = await requireUserId();
+  const id = String(formData.get("id") ?? "");
+  const date = String(formData.get("date") ?? "");
+  const start = String(formData.get("start") ?? "");
+  const end = String(formData.get("end") ?? "");
+
+  await updateCalendarItem(userId, id, {
+    startsAt: parseDateTime(date, start),
+    endsAt: parseDateTime(date, end),
+    status: "confirmed",
+  });
+  revalidateCalendar();
+}
+
+export async function startTimerFromCalendarItemAction(formData: FormData) {
+  const userId = await requireUserId();
+  const id = String(formData.get("id") ?? "");
+  const title = String(formData.get("title") ?? "");
+
+  await timeService.startEntry(userId, { label: title });
+  await updateCalendarItem(userId, id, { status: "confirmed" });
+  revalidateCalendar();
+  revalidatePath("/app/time");
 }
 
 export async function deleteCalendarItemAction(formData: FormData) {
