@@ -22,12 +22,12 @@ import {
 } from "./_lib/derive";
 import {
   completeCalendarItemAction,
-  createCalendarBlockAction,
   deleteCalendarItemAction,
   moveCalendarItemAction,
   startTimerFromCalendarItemAction,
   updateCalendarBlockAction,
 } from "./actions";
+import { CalendarQuickAddModal } from "./quick-add-modal";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +47,13 @@ function formatTimeValue(date: Date) {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
+  });
+}
+
+function formatShortTime(date: Date) {
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
   });
 }
 
@@ -87,14 +94,6 @@ function SectionCard({
       ) : null}
       <div className={title ? "mt-4" : "mt-3"}>{children}</div>
     </section>
-  );
-}
-
-function EmptyState({ children }: { children: ReactNode }) {
-  return (
-    <p className="text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
-      {children}
-    </p>
   );
 }
 
@@ -369,9 +368,27 @@ export default async function CalendarPage() {
   });
   const buckets = deriveTodayBuckets(todayItems, now);
   const todayDateValue = formatDateValue(now);
+  const nextItem = buckets.now[0] ?? buckets.next[0] ?? null;
+  const totalTodayCount = todayItems.length;
+  const slippedCount = buckets.needsAttention.length;
+  const todayFocusLabel =
+    totalTodayCount === 0
+      ? "Open day"
+      : `${totalTodayCount} ${totalTodayCount === 1 ? "block" : "blocks"}`;
+  const nextLabel = nextItem
+    ? `${nextItem.title} at ${formatShortTime(nextItem.startsAt)}`
+    : "Nothing lined up";
+  const slippedLabel =
+    slippedCount === 0
+      ? "Nothing slipping"
+      : `${slippedCount} ${slippedCount === 1 ? "block needs" : "blocks need"} attention`;
+  const showNowSection = buckets.now.length > 0;
+  const showNextSection = buckets.next.length > 0;
+  const showAttentionSection = buckets.needsAttention.length > 0;
+  const showLaterSection = buckets.later.length > 0;
 
   return (
-    <div className="space-y-8 sm:space-y-10">
+    <div className="space-y-8 pb-28 sm:space-y-10 sm:pb-8">
       <header className="fade-in">
         <p
           className="text-[0.75rem] font-medium uppercase tracking-wider"
@@ -380,36 +397,68 @@ export default async function CalendarPage() {
           Calendar
         </p>
         <h1
-          className="mt-1 text-[2rem] font-bold tracking-tight sm:text-[2.5rem]"
+          className="mt-1 text-[1.75rem] font-bold tracking-tight sm:text-[2.5rem]"
           style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
         >
-          The week, shaped on purpose
+          Know today fast
         </h1>
         <p
-          className="mt-2 max-w-2xl text-[0.9375rem]"
+          className="mt-2 max-w-2xl text-[0.9375rem] hidden sm:block"
           style={{ color: "var(--text-muted)" }}
         >
-          Fixed commitments, intentional blocks, and a clearer sense of what
-          needs your attention now versus later.
+          See what matters now, rescue what slipped, and shape the rest of the
+          week without digging through clutter.
         </p>
+
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          <div className="rounded-md border px-3 py-2.5" style={{ borderColor: "var(--border-faint)", background: "var(--bg-page)" }}>
+            <p className="text-[0.6875rem] font-semibold uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>
+              Today
+            </p>
+            <p className="mt-1 text-[0.9375rem] font-medium" style={{ color: "var(--text)" }}>
+              {todayFocusLabel}
+            </p>
+          </div>
+          <div className="rounded-md border px-3 py-2.5" style={{ borderColor: "var(--border-faint)", background: "var(--bg-page)" }}>
+            <p className="text-[0.6875rem] font-semibold uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>
+              Next up
+            </p>
+            <p className="mt-1 text-[0.9375rem] font-medium" style={{ color: "var(--text)" }}>
+              {nextLabel}
+            </p>
+          </div>
+          <div className="rounded-md border px-3 py-2.5" style={{ borderColor: "var(--border-faint)", background: "var(--bg-page)" }}>
+            <p className="text-[0.6875rem] font-semibold uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>
+              Attention
+            </p>
+            <p className="mt-1 text-[0.9375rem] font-medium" style={{ color: "var(--text)" }}>
+              {slippedLabel}
+            </p>
+          </div>
+        </div>
       </header>
 
       {signals.length > 0 ? (
-        <section className="fade-in-delay-1">
-          <p
-            className="mb-2 text-[0.6875rem] font-semibold uppercase tracking-wider"
-            style={{ color: "var(--text-faint)" }}
-          >
-            Today&apos;s signals
-          </p>
-          <ul className="space-y-1.5">
-            {signals.map((signal, i) => (
+        <section className="fade-in-delay-1 rounded-md border p-4 sm:p-5" style={{ borderColor: "var(--border-soft)", background: "var(--bg-page)" }}>
+          <div className="flex items-center justify-between gap-3">
+            <p
+              className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+              style={{ color: "var(--text-faint)" }}
+            >
+              Today&apos;s signals
+            </p>
+            <p className="text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+              {signals.length} {signals.length === 1 ? "note" : "notes"}
+            </p>
+          </div>
+          <ul className="mt-3 space-y-1.5">
+            {signals.slice(0, 2).map((signal, i) => (
               <li
                 key={`${signal.title}-${i}`}
-                className="grid grid-cols-[16px_1fr] items-start gap-3 rounded-md px-2 py-2.5"
+                className="grid grid-cols-[16px_1fr] items-start gap-3 rounded-md px-2 py-2"
               >
                 <span
-                  className="mt-1.5 inline-block h-1.5 w-1.5 rounded-full"
+                  className="mt-1.25 inline-block h-1.5 w-1.5 rounded-full"
                   style={{ background: "var(--text)" }}
                 />
                 <div>
@@ -429,186 +478,112 @@ export default async function CalendarPage() {
               </li>
             ))}
           </ul>
+          {signals.length > 2 ? (
+            <p className="mt-2 px-2 text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+              +{signals.length - 2} more inferences. Keep this section short and useful.
+            </p>
+          ) : null}
         </section>
       ) : null}
 
-      <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <SectionCard eyebrow="Add a block" title="Carve out the next hour you mean to keep.">
-          <form action={createCalendarBlockAction} className="space-y-4">
-            <div className="space-y-1.5">
-              <label
-                className="block text-[0.75rem] font-medium"
-                style={{ color: "var(--text-muted)" }}
-                htmlFor="title"
-              >
-                Title
-              </label>
-              <input
-                id="title"
-                name="title"
-                required
-                placeholder="Deep work, long run, wedding planning..."
-                className="field"
-              />
-            </div>
+      <section className="grid gap-6">
+        {(showNowSection || showNextSection) ? (
+          <div className="grid gap-6 xl:grid-cols-2">
+            {showNowSection ? (
+              <SectionCard eyebrow="Now" title="What matters first.">
+                <ol className="space-y-3">
+                  {buckets.now.map((item) => (
+                    <CalendarItemCard key={item.id} item={item} />
+                  ))}
+                </ol>
+              </SectionCard>
+            ) : null}
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="space-y-1.5">
-                <label
-                  className="block text-[0.75rem] font-medium"
-                  style={{ color: "var(--text-muted)" }}
-                  htmlFor="date"
-                >
-                  Date
-                </label>
-                <input
-                  id="date"
-                  name="date"
-                  type="date"
-                  required
-                  defaultValue={todayDateValue}
-                  className="field"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label
-                  className="block text-[0.75rem] font-medium"
-                  style={{ color: "var(--text-muted)" }}
-                  htmlFor="start"
-                >
-                  Start
-                </label>
-                <input
-                  id="start"
-                  name="start"
-                  type="time"
-                  required
-                  defaultValue="09:00"
-                  className="field"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label
-                  className="block text-[0.75rem] font-medium"
-                  style={{ color: "var(--text-muted)" }}
-                  htmlFor="end"
-                >
-                  End
-                </label>
-                <input
-                  id="end"
-                  name="end"
-                  type="time"
-                  required
-                  defaultValue="10:00"
-                  className="field"
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <label
-                  className="block text-[0.75rem] font-medium"
-                  style={{ color: "var(--text-muted)" }}
-                  htmlFor="location"
-                >
-                  Location
-                </label>
-                <input id="location" name="location" className="field" />
-              </div>
-              <div className="space-y-1.5">
-                <label
-                  className="block text-[0.75rem] font-medium"
-                  style={{ color: "var(--text-muted)" }}
-                  htmlFor="notes"
-                >
-                  Notes
-                </label>
-                <input id="notes" name="notes" className="field" />
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <button type="submit" className="btn-ink">
-                Save block
-              </button>
-            </div>
-          </form>
-        </SectionCard>
-
-        <div className="grid gap-6">
-          <SectionCard eyebrow="Now" title="What the day is asking for first.">
-            {buckets.now.length === 0 ? (
-              <EmptyState>Nothing is active right now.</EmptyState>
-            ) : (
-              <ol className="space-y-3">
-                {buckets.now.map((item) => (
-                  <CalendarItemCard key={item.id} item={item} />
-                ))}
-              </ol>
-            )}
-          </SectionCard>
-
-          <SectionCard eyebrow="Next" title="The next commitment worth protecting.">
-            {buckets.next.length === 0 ? (
-              <EmptyState>No upcoming block yet. Give the rest of the day a shape.</EmptyState>
-            ) : (
-              <ol className="space-y-3">
-                {buckets.next.map((item) => (
-                  <CalendarItemCard key={item.id} item={item} />
-                ))}
-              </ol>
-            )}
-          </SectionCard>
-        </div>
-      </section>
-
-      <section className="grid gap-6 lg:grid-cols-2">
-        <SectionCard eyebrow="Needs attention" title="Unfinished blocks you may want to move.">
-          {buckets.needsAttention.length === 0 ? (
-            <EmptyState>Nothing has slipped yet.</EmptyState>
-          ) : (
-            <ol className="space-y-3">
-              {buckets.needsAttention.map((item) => (
-                <CalendarItemCard
-                  key={item.id}
-                  item={item}
-                  showAttentionActions
-                />
-              ))}
-            </ol>
-          )}
-        </SectionCard>
-
-        <SectionCard eyebrow="Later today" title="Everything else still on deck.">
-          {buckets.later.length === 0 ? (
-            <EmptyState>The rest of today is still open.</EmptyState>
-          ) : (
-            <ol className="space-y-3">
-              {buckets.later.map((item) => (
-                <CalendarItemCard key={item.id} item={item} />
-              ))}
-            </ol>
-          )}
-        </SectionCard>
-      </section>
-
-      <section>
-        <header>
-          <p
-            className="text-[0.6875rem] font-semibold uppercase tracking-wider"
-            style={{ color: "var(--text-faint)" }}
+            {showNextSection ? (
+              <SectionCard eyebrow="Next" title="What you should protect next.">
+                <ol className="space-y-3">
+                  {buckets.next.map((item) => (
+                    <CalendarItemCard key={item.id} item={item} />
+                  ))}
+                </ol>
+              </SectionCard>
+            ) : null}
+          </div>
+        ) : (
+          <section
+            className="rounded-md border px-4 py-4"
+            style={{
+              borderColor: "var(--border-soft)",
+              background: "var(--bg-page)",
+            }}
           >
-            The week
+            <p
+              className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+              style={{ color: "var(--text-faint)" }}
+            >
+              Open space
+            </p>
+            <p
+              className="mt-1 text-[1rem] font-semibold tracking-tight"
+              style={{ color: "var(--text)" }}
+            >
+              The day is still open.
+            </p>
+            <p className="mt-2 text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
+              Use the add button when you know the next block worth protecting.
+            </p>
+          </section>
+        )}
+      </section>
+
+      {(showAttentionSection || showLaterSection) ? (
+        <section className="grid gap-6 lg:grid-cols-2">
+          {showAttentionSection ? (
+            <SectionCard eyebrow="Needs attention" title="Unfinished blocks you may want to move.">
+              <ol className="space-y-3">
+                {buckets.needsAttention.map((item) => (
+                  <CalendarItemCard
+                    key={item.id}
+                    item={item}
+                    showAttentionActions
+                  />
+                ))}
+              </ol>
+            </SectionCard>
+          ) : null}
+
+          {showLaterSection ? (
+            <SectionCard eyebrow="Later today" title="Everything else still on deck.">
+              <ol className="space-y-3">
+                {buckets.later.map((item) => (
+                  <CalendarItemCard key={item.id} item={item} />
+                ))}
+              </ol>
+            </SectionCard>
+          ) : null}
+        </section>
+      ) : null}
+
+      <details className="group rounded-md border p-4 sm:p-5" style={{ borderColor: "var(--border-soft)", background: "var(--bg-page)" }}>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+          <div>
+            <p
+              className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+              style={{ color: "var(--text-faint)" }}
+            >
+              The week
+            </p>
+            <h2
+              className="mt-1 text-[1.0625rem] font-semibold tracking-tight"
+              style={{ color: "var(--text)" }}
+            >
+              Next seven days at a glance
+            </h2>
+          </div>
+          <p className="text-[0.75rem] transition-transform group-open:rotate-180" style={{ color: "var(--text-faint)" }}>
+            v
           </p>
-          <h2
-            className="mt-1 text-[1.25rem] font-semibold tracking-tight"
-            style={{ color: "var(--text)" }}
-          >
-            Next seven days at a glance
-          </h2>
-        </header>
+        </summary>
 
         <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-7">
           {weekDays.map((day) => {
@@ -683,7 +658,9 @@ export default async function CalendarPage() {
             );
           })}
         </div>
-      </section>
+      </details>
+
+      <CalendarQuickAddModal todayDateValue={todayDateValue} />
     </div>
   );
 }
