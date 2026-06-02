@@ -144,7 +144,7 @@ export function CalendarQuickAddModal({
                   className="text-[0.6875rem] font-semibold uppercase tracking-wider"
                   style={{ color: "var(--text-faint)" }}
                 >
-                  From your do list
+                  From your Do List
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {suggestedTasks.map((task) => (

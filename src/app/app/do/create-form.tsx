@@ -31,7 +31,7 @@ export function DoCreateForm() {
         className="text-[0.6875rem] font-semibold uppercase tracking-wider"
         style={{ color: "var(--text-faint)" }}
       >
-        Add to the do list
+        Add to the Do List
       </p>
       <h2
         className="mt-1 text-[1rem] font-semibold tracking-tight"

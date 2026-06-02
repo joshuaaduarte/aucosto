@@ -302,7 +302,7 @@ export default async function DoPage() {
           className="mt-1 text-[2rem] font-bold tracking-tight sm:text-[2.5rem]"
           style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
         >
-          The do list
+          The Do List
         </h1>
         <p
           className="mt-2 text-[0.9375rem]"
