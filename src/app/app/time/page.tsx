@@ -4,6 +4,7 @@ import {
   listCompletedSince,
   listRecentEntries,
 } from "@/lib/services/time";
+import { listSuggestedDoItems } from "@/lib/services/do";
 import {
   formatDuration,
   formatHM,
@@ -40,11 +41,12 @@ export default async function TimePage() {
   const todayStart = startOfToday();
   const weekStart = startOfWeek();
 
-  const [running, recent, completedToday, completedWeek] = await Promise.all([
+  const [running, recent, completedToday, completedWeek, suggestedTasks] = await Promise.all([
     getRunningEntry(userId),
     listRecentEntries(userId, { limit: 30 }),
     listCompletedSince(userId, todayStart),
     listCompletedSince(userId, weekStart),
+    listSuggestedDoItems(userId, { limit: 4 }),
   ]);
 
   const todayTotalMs = sumDurations(completedToday);
@@ -103,7 +105,14 @@ export default async function TimePage() {
             startedAtIso={running.startedAt.toISOString()}
           />
         ) : (
-          <StartForm suggestedCategories={suggestedCategories} />
+          <StartForm
+            suggestedCategories={suggestedCategories}
+            suggestedTasks={suggestedTasks.map((task) => ({
+              id: task.id,
+              title: task.title,
+              estimatedMinutes: task.estimatedMinutes,
+            }))}
+          />
         )}
       </section>
 

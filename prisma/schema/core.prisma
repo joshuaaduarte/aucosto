@@ -30,6 +30,7 @@ model User {
   accounts            Account[]
   sessions            Session[]
   timeEntries         TimeEntry[]
+  doItems             DoItem[]
   financeConnections  FinanceConnection[]
   financeAccounts     FinanceAccount[]
   financeGoals        FinanceGoal[]

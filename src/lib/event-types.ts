@@ -34,6 +34,13 @@ const EVENT_LABELS: Record<string, string> = {
   "calendar.deleted": "deleted a calendar block",
   "calendar.completed": "completed a calendar block",
 
+  // do
+  "do.created": "added a do item",
+  "do.updated": "updated a do item",
+  "do.completed": "completed a do item",
+  "do.deleted": "deleted a do item",
+  "do.timer_started": "started a timer from a do item",
+
   // user
   "user.privacy_updated": "updated privacy settings",
 };

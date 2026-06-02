@@ -34,6 +34,7 @@ export async function createCalendarBlockAction(formData: FormData) {
   const date = String(formData.get("date") ?? "");
   const start = String(formData.get("start") ?? "");
   const end = String(formData.get("end") ?? "");
+  const doItemId = parseOptionalString(formData.get("doItemId"));
   const notes = parseOptionalString(formData.get("notes"));
   const location = parseOptionalString(formData.get("location"));
 
@@ -45,6 +46,8 @@ export async function createCalendarBlockAction(formData: FormData) {
     location,
     kind: "block",
     status: "confirmed",
+    sourceTool: doItemId ? "do" : null,
+    sourceRefId: doItemId,
   });
 
   revalidateCalendar();
@@ -97,8 +100,9 @@ export async function startTimerFromCalendarItemAction(formData: FormData) {
   const userId = await requireUserId();
   const id = String(formData.get("id") ?? "");
   const title = String(formData.get("title") ?? "");
+  const doItemId = parseOptionalString(formData.get("doItemId"));
 
-  await timeService.startEntry(userId, { label: title });
+  await timeService.startEntry(userId, { label: title, doItemId });
   await updateCalendarItem(userId, id, { status: "confirmed" });
   revalidateCalendar();
   revalidatePath("/app/time");

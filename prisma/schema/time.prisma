@@ -3,6 +3,7 @@
 model TimeEntry {
   id        String    @id @default(cuid())
   userId    String
+  doItemId  String?
   label     String
   category  String?
   startedAt DateTime
@@ -10,6 +11,8 @@ model TimeEntry {
   notes     String?
   createdAt DateTime  @default(now())
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  doItem    DoItem?   @relation(fields: [doItemId], references: [id], onDelete: SetNull)
 
   @@index([userId, startedAt])
+  @@index([doItemId, startedAt])
 }

@@ -1,14 +1,22 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
+import { formatMinutes } from "@/lib/do";
 import { startEntry, type StartState } from "./actions";
+import { startDoItemTimerAction } from "../do/actions";
 
 const initialState: StartState = undefined;
 
 export function StartForm({
   suggestedCategories = [],
+  suggestedTasks = [],
 }: {
   suggestedCategories?: string[];
+  suggestedTasks?: Array<{
+    id: string;
+    title: string;
+    estimatedMinutes: number | null;
+  }>;
 }) {
   const [state, formAction, pending] = useActionState(
     startEntry,
@@ -109,6 +117,37 @@ export function StartForm({
                 {suggestion}
               </button>
             ))}
+          </div>
+        )}
+
+        {suggestedTasks.length > 0 && (
+          <div className="space-y-2">
+            <p
+              className="text-[0.6875rem] font-medium uppercase tracking-wider"
+              style={{ color: "var(--text-faint)" }}
+            >
+              Suggested from Do
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {suggestedTasks.map((task) => (
+                <form key={task.id} action={startDoItemTimerAction}>
+                  <input type="hidden" name="id" value={task.id} />
+                  <button
+                    type="submit"
+                    className="inline-flex items-center rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
+                    style={{
+                      background: "var(--bg-tint)",
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    {task.title}
+                    {task.estimatedMinutes
+                      ? ` · ${formatMinutes(task.estimatedMinutes)}`
+                      : ""}
+                  </button>
+                </form>
+              ))}
+            </div>
           </div>
         )}
 

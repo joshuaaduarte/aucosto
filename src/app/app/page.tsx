@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { auth } from "@/auth";
 import { startOfMonth, startOfPreviousMonth } from "@/lib/money";
 import { listAccounts, listTransactions } from "@/lib/services/finance";
@@ -276,6 +276,7 @@ export default async function HubPage() {
         </p>
         <ul className="flex flex-col gap-0.5">
           <ToolLink href="/app/calendar" icon={<CalendarIcon />} label="Calendar" hint="The week, shaped on purpose." />
+          <ToolLink href="/app/do" icon={<ConnectionIcon />} label="Do" hint="Tasks with estimates, suggestions, and actuals." />
           <ToolLink href="/app/time" icon={<ClockIcon />} label="Time" hint="Sessions logged. Where the week actually went." />
           {financeVisible && (
             <ToolLink href="/app/finance" icon={<WalletIcon />} label="Finance" hint="Net worth, monthly pace, the category to watch." />

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { getRunningEntry, listCompletedSince } from "@/lib/services/time";
 import { listAccounts } from "@/lib/services/finance";
+import { listSuggestedDoItems } from "@/lib/services/do";
 import { listCalendarItems } from "@/lib/services/calendar";
 import {
   resolveActiveUserId,
@@ -173,6 +174,11 @@ function CalendarItemCard({
               <form action={startTimerFromCalendarItemAction}>
                 <input type="hidden" name="id" value={item.id} />
                 <input type="hidden" name="title" value={item.title} />
+                <input
+                  type="hidden"
+                  name="doItemId"
+                  value={item.sourceTool === "do" ? (item.sourceRefId ?? "") : ""}
+                />
                 <button
                   className="btn-ghost h-8 px-2.5 text-[0.75rem]"
                   type="submit"
@@ -349,11 +355,12 @@ export default async function CalendarPage() {
   const todayStart = startOfDay(now);
   const todayEnd = endOfDay(now);
 
-  const [weekItems, runningEntry, completedWeek, accounts] = await Promise.all([
+  const [weekItems, runningEntry, completedWeek, accounts, suggestedTasks] = await Promise.all([
     listCalendarItems(userId, { from: weekStart, to: weekEnd }),
     getRunningEntry(userId),
     listCompletedSince(userId, startOfWeek()),
     context.financeVisible ? listAccounts(userId) : Promise.resolve([]),
+    listSuggestedDoItems(userId, { limit: 5 }),
   ]);
 
   const todayItems = weekItems.filter(
@@ -660,7 +667,14 @@ export default async function CalendarPage() {
         </div>
       </details>
 
-      <CalendarQuickAddModal todayDateValue={todayDateValue} />
+      <CalendarQuickAddModal
+        todayDateValue={todayDateValue}
+        suggestedTasks={suggestedTasks.map((task) => ({
+          id: task.id,
+          title: task.title,
+          estimatedMinutes: task.estimatedMinutes,
+        }))}
+      />
     </div>
   );
 }

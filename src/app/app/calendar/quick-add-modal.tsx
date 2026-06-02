@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatMinutes } from "@/lib/do";
 import { createCalendarBlockAction } from "./actions";
 
 const QUICK_TEMPLATES = [
@@ -12,11 +13,18 @@ const QUICK_TEMPLATES = [
 
 export function CalendarQuickAddModal({
   todayDateValue,
+  suggestedTasks = [],
 }: {
   todayDateValue: string;
+  suggestedTasks?: Array<{
+    id: string;
+    title: string;
+    estimatedMinutes: number | null;
+  }>;
 }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
+  const [doItemId, setDoItemId] = useState("");
   const [date, setDate] = useState(todayDateValue);
   const [start, setStart] = useState("09:00");
   const [end, setEnd] = useState("10:00");
@@ -25,12 +33,33 @@ export function CalendarQuickAddModal({
 
   function applyTemplate(template: (typeof QUICK_TEMPLATES)[number]) {
     setTitle(template.title);
+    setDoItemId("");
     setStart(template.start);
     setEnd(template.end);
   }
 
+  function applySuggestedTask(task: {
+    id: string;
+    title: string;
+    estimatedMinutes: number | null;
+  }) {
+    setDoItemId(task.id);
+    setTitle(task.title);
+    if (task.estimatedMinutes && start) {
+      const [rawHour = 9, rawMinute = 0] = start.split(":").map(Number);
+      const hour = Number.isFinite(rawHour) ? rawHour : 9;
+      const minute = Number.isFinite(rawMinute) ? rawMinute : 0;
+      const next = new Date();
+      next.setHours(hour, minute, 0, 0);
+      next.setMinutes(next.getMinutes() + task.estimatedMinutes);
+      const endValue = `${String(next.getHours()).padStart(2, "0")}:${String(next.getMinutes()).padStart(2, "0")}`;
+      setEnd(endValue);
+    }
+  }
+
   function resetForm() {
     setTitle("");
+    setDoItemId("");
     setDate(todayDateValue);
     setStart("09:00");
     setEnd("10:00");
@@ -109,6 +138,30 @@ export function CalendarQuickAddModal({
               ))}
             </div>
 
+            {suggestedTasks.length > 0 ? (
+              <div className="mt-4">
+                <p
+                  className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+                  style={{ color: "var(--text-faint)" }}
+                >
+                  From your do list
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {suggestedTasks.map((task) => (
+                    <button
+                      key={task.id}
+                      type="button"
+                      className="pill cursor-pointer"
+                      onClick={() => applySuggestedTask(task)}
+                    >
+                      {task.title}
+                      {task.estimatedMinutes ? ` · ${formatMinutes(task.estimatedMinutes)}` : ""}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             <form
               action={createCalendarBlockAction}
               className="mt-5 space-y-4"
@@ -118,6 +171,7 @@ export function CalendarQuickAddModal({
               }}
             >
               <div className="space-y-1.5">
+                <input type="hidden" name="doItemId" value={doItemId} />
                 <label
                   className="block text-[0.75rem] font-medium"
                   style={{ color: "var(--text-muted)" }}

@@ -45,7 +45,7 @@ export async function listCompletedSince(
 
 export async function startEntry(
   userId: string,
-  input: { label: string; category?: string | null },
+  input: { label: string; category?: string | null; doItemId?: string | null },
 ): Promise<TimeEntry> {
   requireCan(userId, "time", "write");
   await prisma.timeEntry.updateMany({
@@ -57,6 +57,7 @@ export async function startEntry(
       userId,
       label: input.label,
       category: input.category ?? null,
+      doItemId: input.doItemId ?? null,
       startedAt: new Date(),
     },
   });
@@ -65,7 +66,7 @@ export async function startEntry(
     tool: "time",
     type: "time.started",
     refId: entry.id,
-    meta: { label: entry.label, category: entry.category },
+    meta: { label: entry.label, category: entry.category, doItemId: entry.doItemId },
   });
   return entry;
 }
