@@ -63,7 +63,10 @@ export async function createProjectAction(
   revalidateProjects();
 }
 
-export async function updateProjectAction(formData: FormData) {
+export async function updateProjectAction(
+  _prev: ProjectState,
+  formData: FormData,
+): Promise<ProjectState> {
   const userId = await requireUserId();
   const id = String(formData.get("id") ?? "");
   const parsed = projectSchema.safeParse({
@@ -76,7 +79,7 @@ export async function updateProjectAction(formData: FormData) {
     notes: nullableString(formData, "notes"),
   });
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? "Invalid project.");
+    return { error: parsed.error.issues[0]?.message ?? "Invalid project." };
   }
 
   await updateProject(userId, id, parsed.data);
