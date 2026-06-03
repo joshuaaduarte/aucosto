@@ -1,4 +1,5 @@
 import { daysUntil, formatUSDFromCents } from "@/lib/money";
+import type { DoItemSummary } from "@/lib/services/do";
 import type {
   CalendarItem,
   FinanceAccount,
@@ -17,6 +18,92 @@ export type CalendarTodayBuckets = {
   later: CalendarItem[];
   needsAttention: CalendarItem[];
 };
+
+export type CalendarGapSuggestion = {
+  taskId: string;
+  title: string;
+  estimateMinutes: number | null;
+  gapStart: Date;
+  gapEnd: Date;
+  gapMinutes: number;
+  fit: "tight" | "comfortable";
+  reason: string;
+};
+
+function scoreTaskForGap(task: DoItemSummary, gapMinutes: number, now: Date) {
+  const estimate = task.estimatedMinutes ?? 30;
+  const fitPenalty = Math.abs(gapMinutes - estimate);
+  let score = 0;
+
+  switch (task.lane) {
+    case "today":
+      score += 36;
+      break;
+    case "next":
+      score += 20;
+      break;
+    case "later":
+      score += 10;
+      break;
+    case "someday":
+      score += 4;
+      break;
+  }
+
+  switch (task.status) {
+    case "in_progress":
+      score += 18;
+      break;
+    case "ready":
+      score += 12;
+      break;
+    case "scheduled":
+      score += 6;
+      break;
+    case "waiting":
+      score -= 100;
+      break;
+    case "done":
+      score -= 100;
+      break;
+  }
+
+  if (task.scheduledMinutes === 0 && task.lane === "today") {
+    score += 10;
+  }
+
+  if (task.trackedMinutes > 0) {
+    score += Math.min(12, Math.round(task.trackedMinutes / 15) * 2);
+  }
+
+  const anchor = task.lastWorkedAt ?? task.updatedAt ?? task.createdAt;
+  const staleHours = Math.max(
+    0,
+    Math.round((now.getTime() - anchor.getTime()) / (60 * 60 * 1000)),
+  );
+  score += Math.min(10, Math.floor(staleHours / 12) * 2);
+  score += Math.max(0, 16 - Math.min(16, fitPenalty));
+
+  return score;
+}
+
+function describeGapReason(task: DoItemSummary, gapMinutes: number) {
+  const estimate = task.estimatedMinutes ?? 30;
+
+  if (task.status === "in_progress") {
+    return "Already in motion, so it is easier to resume.";
+  }
+  if (task.lane === "today" && task.scheduledMinutes === 0) {
+    return "Today task still needs protected time.";
+  }
+  if (Math.abs(gapMinutes - estimate) <= 10) {
+    return "Estimate fits this opening closely.";
+  }
+  if (task.trackedMinutes > 0) {
+    return "You already put time into it, so momentum is real.";
+  }
+  return "Fits the gap without blowing up the rest of the day.";
+}
 
 export function startOfDay(date: Date): Date {
   const value = new Date(date);
@@ -175,4 +262,82 @@ export function deriveCalendarSignals(input: {
   }
 
   return signals.slice(0, 4);
+}
+
+export function deriveGapSuggestions(input: {
+  now?: Date;
+  todayItems: CalendarItem[];
+  suggestedTasks: DoItemSummary[];
+  limit?: number;
+}): CalendarGapSuggestion[] {
+  const now = input.now ?? new Date();
+  const dayEnd = endOfDay(now);
+  const sorted = [...input.todayItems]
+    .filter((item) => item.status !== "cancelled")
+    .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+
+  const gaps: Array<{ start: Date; end: Date; minutes: number }> = [];
+  let cursor = new Date(now);
+
+  for (const item of sorted) {
+    if (item.endsAt <= now) continue;
+    const gapStart = new Date(cursor);
+    const gapEnd = item.startsAt > now ? item.startsAt : now;
+    const gapMinutes = Math.max(
+      0,
+      Math.round((gapEnd.getTime() - gapStart.getTime()) / 60000),
+    );
+    if (gapMinutes >= 20) {
+      gaps.push({ start: gapStart, end: gapEnd, minutes: gapMinutes });
+    }
+    if (item.endsAt > cursor) {
+      cursor = new Date(item.endsAt);
+    }
+  }
+
+  if (cursor < dayEnd) {
+    const gapMinutes = Math.max(
+      0,
+      Math.round((dayEnd.getTime() - cursor.getTime()) / 60000),
+    );
+    if (gapMinutes >= 20) {
+      gaps.push({ start: new Date(cursor), end: dayEnd, minutes: gapMinutes });
+    }
+  }
+
+  const suggestions: CalendarGapSuggestion[] = [];
+  const usedTaskIds = new Set<string>();
+  for (const gap of gaps) {
+    const candidate = input.suggestedTasks
+      .filter((task) => {
+        const estimate = task.estimatedMinutes ?? 30;
+        return (
+          !usedTaskIds.has(task.id) &&
+          task.status !== "waiting" &&
+          task.status !== "done" &&
+          estimate <= gap.minutes
+        );
+      })
+      .sort(
+        (a, b) => scoreTaskForGap(b, gap.minutes, now) - scoreTaskForGap(a, gap.minutes, now),
+      )[0];
+
+    if (!candidate) continue;
+
+    const estimate = candidate.estimatedMinutes;
+    usedTaskIds.add(candidate.id);
+    suggestions.push({
+      taskId: candidate.id,
+      title: candidate.title,
+      estimateMinutes: estimate,
+      gapStart: gap.start,
+      gapEnd: gap.end,
+      gapMinutes: gap.minutes,
+      fit:
+        estimate && gap.minutes - estimate <= 15 ? "tight" : "comfortable",
+      reason: describeGapReason(candidate, gap.minutes),
+    });
+  }
+
+  return suggestions.slice(0, input.limit ?? 3);
 }

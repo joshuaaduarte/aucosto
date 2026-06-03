@@ -3,7 +3,6 @@
 import { useActionState, useEffect, useRef } from "react";
 import { formatMinutes } from "@/lib/do";
 import { startEntry, type StartState } from "./actions";
-import { startDoItemTimerAction } from "../do/actions";
 
 const initialState: StartState = undefined;
 
@@ -24,10 +23,15 @@ export function StartForm({
   );
   const formRef = useRef<HTMLFormElement>(null);
   const categoryRef = useRef<HTMLInputElement>(null);
+  const labelRef = useRef<HTMLInputElement>(null);
+  const doItemIdRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!pending && !state?.error) {
       formRef.current?.reset();
+      if (doItemIdRef.current) {
+        doItemIdRef.current.value = "";
+      }
     }
   }, [pending, state]);
 
@@ -55,6 +59,8 @@ export function StartForm({
       </header>
 
       <form ref={formRef} action={formAction} className="space-y-4">
+        <input ref={doItemIdRef} type="hidden" name="doItemId" />
+
         <div className="grid gap-4 md:grid-cols-[1.6fr_1fr]">
           <div className="space-y-1.5">
             <label
@@ -65,6 +71,7 @@ export function StartForm({
               Session
             </label>
             <input
+              ref={labelRef}
               id="label"
               name="label"
               type="text"
@@ -86,7 +93,7 @@ export function StartForm({
               id="category"
               name="category"
               type="text"
-              placeholder="deep work, errands…"
+              placeholder="deep work, errands..."
               className="field"
             />
           </div>
@@ -105,8 +112,9 @@ export function StartForm({
                 key={suggestion}
                 type="button"
                 onClick={() => {
-                  if (categoryRef.current)
+                  if (categoryRef.current) {
                     categoryRef.current.value = suggestion;
+                  }
                 }}
                 className="inline-flex items-center rounded px-1.5 py-0.5 text-[0.75rem] font-medium transition-colors"
                 style={{
@@ -130,22 +138,31 @@ export function StartForm({
             </p>
             <div className="flex flex-wrap gap-1.5">
               {suggestedTasks.map((task) => (
-                <form key={task.id} action={startDoItemTimerAction}>
-                  <input type="hidden" name="id" value={task.id} />
-                  <button
-                    type="submit"
-                    className="inline-flex items-center rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
-                    style={{
-                      background: "var(--bg-tint)",
-                      color: "var(--text-muted)",
-                    }}
-                  >
-                    {task.title}
-                    {task.estimatedMinutes
-                      ? ` · ${formatMinutes(task.estimatedMinutes)}`
-                      : ""}
-                  </button>
-                </form>
+                <button
+                  key={task.id}
+                  type="button"
+                  onClick={() => {
+                    if (labelRef.current) {
+                      labelRef.current.value = task.title;
+                    }
+                    if (categoryRef.current) {
+                      categoryRef.current.value = "do";
+                    }
+                    if (doItemIdRef.current) {
+                      doItemIdRef.current.value = task.id;
+                    }
+                  }}
+                  className="inline-flex items-center rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
+                  style={{
+                    background: "var(--bg-tint)",
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  {task.title}
+                  {task.estimatedMinutes
+                    ? ` · ${formatMinutes(task.estimatedMinutes)}`
+                    : ""}
+                </button>
               ))}
             </div>
           </div>
@@ -166,7 +183,7 @@ export function StartForm({
 
         <div className="flex items-center justify-end pt-1">
           <button type="submit" disabled={pending} className="btn-ink">
-            {pending ? "Starting…" : "Start session"}
+            {pending ? "Starting..." : "Start session"}
           </button>
         </div>
       </form>

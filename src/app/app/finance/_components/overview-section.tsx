@@ -22,25 +22,28 @@ export function OverviewSection({ data }: { data: FinanceDashboard }) {
   return (
     <>
       {/* Page header */}
-      <header className="fade-in">
+      <header className="fade-in flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p
+            className="text-[0.75rem] font-medium uppercase tracking-wider"
+            style={{ color: "var(--text-faint)" }}
+          >
+            Finance
+          </p>
+          <h1
+            className="mt-1 text-[1.5rem] font-bold tracking-tight sm:text-[1.875rem]"
+            style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
+          >
+            Ledger
+          </h1>
+        </div>
         <p
-          className="text-[0.75rem] font-medium uppercase tracking-wider"
-          style={{ color: "var(--text-faint)" }}
-        >
-          Finance
-        </p>
-        <h1
-          className="mt-1 text-[2rem] font-bold tracking-tight sm:text-[2.5rem]"
-          style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
-        >
-          Ledger
-        </h1>
-        <p
-          className="mt-2 text-[0.9375rem]"
+          className="text-[0.8125rem] sm:max-w-[38rem] sm:text-right"
           style={{ color: "var(--text-muted)" }}
         >
-          What&apos;s on hand, what&apos;s owed, what&apos;s pacing where. Reconciled at the close
-          of each post.
+          {count > 0
+            ? `${count} transaction${count === 1 ? "" : "s"} loaded · ${alerts.length} alert${alerts.length === 1 ? "" : "s"} in view`
+            : "No ledger data loaded yet"}
         </p>
       </header>
 

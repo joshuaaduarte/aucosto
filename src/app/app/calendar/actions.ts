@@ -7,6 +7,7 @@ import {
   deleteCalendarItem,
   updateCalendarItem,
 } from "@/lib/services/calendar";
+import { updateDoItem } from "@/lib/services/do";
 import { requireViewerContext } from "@/lib/viewer-context";
 
 function revalidateCalendar() {
@@ -49,6 +50,9 @@ export async function createCalendarBlockAction(formData: FormData) {
     sourceTool: doItemId ? "do" : null,
     sourceRefId: doItemId,
   });
+  if (doItemId) {
+    await updateDoItem(userId, doItemId, { status: "scheduled" });
+  }
 
   revalidateCalendar();
 }
@@ -103,6 +107,9 @@ export async function startTimerFromCalendarItemAction(formData: FormData) {
   const doItemId = parseOptionalString(formData.get("doItemId"));
 
   await timeService.startEntry(userId, { label: title, doItemId });
+  if (doItemId) {
+    await updateDoItem(userId, doItemId, { status: "in_progress" });
+  }
   await updateCalendarItem(userId, id, { status: "confirmed" });
   revalidateCalendar();
   revalidatePath("/app/time");

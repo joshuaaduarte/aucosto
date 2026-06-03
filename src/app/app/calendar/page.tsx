@@ -14,6 +14,7 @@ import {
   addDays,
   buildWeekDays,
   deriveCalendarSignals,
+  deriveGapSuggestions,
   deriveTodayBuckets,
   endOfDay,
   formatCalendarTimeRange,
@@ -393,29 +394,40 @@ export default async function CalendarPage() {
   const showNextSection = buckets.next.length > 0;
   const showAttentionSection = buckets.needsAttention.length > 0;
   const showLaterSection = buckets.later.length > 0;
+  const gapSuggestions = deriveGapSuggestions({
+    now,
+    todayItems,
+    suggestedTasks,
+    limit: 3,
+  });
 
   return (
     <div className="space-y-8 pb-28 sm:space-y-10 sm:pb-8">
       <header className="fade-in">
-        <p
-          className="text-[0.75rem] font-medium uppercase tracking-wider"
-          style={{ color: "var(--text-faint)" }}
-        >
-          Calendar
-        </p>
-        <h1
-          className="mt-1 text-[1.75rem] font-bold tracking-tight sm:text-[2.5rem]"
-          style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
-        >
-          Know today fast
-        </h1>
-        <p
-          className="mt-2 max-w-2xl text-[0.9375rem] hidden sm:block"
-          style={{ color: "var(--text-muted)" }}
-        >
-          See what matters now, rescue what slipped, and shape the rest of the
-          week without digging through clutter.
-        </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p
+              className="text-[0.75rem] font-medium uppercase tracking-wider"
+              style={{ color: "var(--text-faint)" }}
+            >
+              Calendar
+            </p>
+            <h1
+              className="mt-1 text-[1.5rem] font-bold tracking-tight sm:text-[1.875rem]"
+              style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
+            >
+              Today
+            </h1>
+          </div>
+          <p
+            className="text-[0.8125rem] sm:max-w-[38rem] sm:text-right"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {todayItems.length} item{todayItems.length === 1 ? "" : "s"} today
+            {gapSuggestions.length > 0 ? ` · ${gapSuggestions.length} open-slot suggestion${gapSuggestions.length === 1 ? "" : "s"}` : ""}
+            {slippedCount > 0 ? ` · ${slippedCount} need attention` : ""}
+          </p>
+        </div>
 
         <div className="mt-4 grid gap-2 sm:grid-cols-3">
           <div className="rounded-md border px-3 py-2.5" style={{ borderColor: "var(--border-faint)", background: "var(--bg-page)" }}>
@@ -490,6 +502,60 @@ export default async function CalendarPage() {
               +{signals.length - 2} more inferences. Keep this section short and useful.
             </p>
           ) : null}
+        </section>
+      ) : null}
+
+      {gapSuggestions.length > 0 ? (
+        <section
+          className="rounded-md border p-4 sm:p-5"
+          style={{ borderColor: "var(--border-soft)", background: "var(--bg-page)" }}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p
+                className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+                style={{ color: "var(--text-faint)" }}
+              >
+                Open time
+              </p>
+              <h2
+                className="mt-1 text-[1rem] font-semibold tracking-tight"
+                style={{ color: "var(--text)" }}
+              >
+                Tasks that fit the day you already have
+              </h2>
+            </div>
+            <p className="text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+              {gapSuggestions.length} suggestion{gapSuggestions.length === 1 ? "" : "s"}
+            </p>
+          </div>
+          <ol className="mt-4 space-y-3">
+            {gapSuggestions.map((suggestion) => (
+              <li
+                key={`${suggestion.taskId}-${suggestion.gapStart.toISOString()}`}
+                className="rounded-md border p-3"
+                style={{ borderColor: "var(--border-faint)" }}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-[0.9375rem] font-medium" style={{ color: "var(--text)" }}>
+                    {suggestion.title}
+                  </p>
+                  <span className="pill">
+                    {suggestion.fit === "tight" ? "tight fit" : "comfortable fit"}
+                  </span>
+                </div>
+                <p className="mt-1 text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+                  {`${formatShortTime(suggestion.gapStart)}-${formatShortTime(suggestion.gapEnd)} open`}
+                  {suggestion.estimateMinutes
+                    ? ` · estimate ${suggestion.estimateMinutes}m`
+                    : ""}
+                </p>
+                <p className="mt-1.5 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
+                  {suggestion.reason}
+                </p>
+              </li>
+            ))}
+          </ol>
         </section>
       ) : null}
 
@@ -673,6 +739,21 @@ export default async function CalendarPage() {
           id: task.id,
           title: task.title,
           estimatedMinutes: task.estimatedMinutes,
+        }))}
+        gapSuggestions={gapSuggestions.map((suggestion) => ({
+          taskId: suggestion.taskId,
+          title: suggestion.title,
+          estimateMinutes: suggestion.estimateMinutes,
+          gapLabel: `${formatShortTime(suggestion.gapStart)}-${formatShortTime(suggestion.gapEnd)}`,
+          start: formatTimeValue(suggestion.gapStart),
+          end: formatTimeValue(
+            suggestion.estimateMinutes
+              ? new Date(
+                  suggestion.gapStart.getTime() +
+                    suggestion.estimateMinutes * 60000,
+                )
+              : suggestion.gapEnd,
+          ),
         }))}
       />
     </div>

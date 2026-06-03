@@ -1,5 +1,20 @@
 export const DO_LANES = ["today", "next", "later", "someday"] as const;
-export const DO_STATUSES = ["open", "done"] as const;
+export const DO_STATUSES = [
+  "ready",
+  "scheduled",
+  "in_progress",
+  "waiting",
+  "done",
+] as const;
+export const DO_BUCKET_SUGGESTIONS = [
+  "work",
+  "business",
+  "wedding",
+  "personal",
+  "health",
+  "home",
+  "admin",
+] as const;
 
 export type DoLane = (typeof DO_LANES)[number];
 export type DoStatus = (typeof DO_STATUSES)[number];
@@ -17,6 +32,29 @@ export const DO_LANE_DESCRIPTIONS: Record<DoLane, string> = {
   later: "Not urgent yet.",
   someday: "Hold without pressure.",
 };
+
+export const DO_STATUS_LABELS: Record<DoStatus, string> = {
+  ready: "Ready",
+  scheduled: "Scheduled",
+  in_progress: "In progress",
+  waiting: "Waiting",
+  done: "Done",
+};
+
+export function normalizeDoStatus(status: string | null | undefined): DoStatus {
+  switch (status) {
+    case "open":
+      return "ready";
+    case "ready":
+    case "scheduled":
+    case "in_progress":
+    case "waiting":
+    case "done":
+      return status;
+    default:
+      return "ready";
+  }
+}
 
 export function parseMinutes(input: string | number | null | undefined): number | null {
   if (input === null || input === undefined || input === "") return null;

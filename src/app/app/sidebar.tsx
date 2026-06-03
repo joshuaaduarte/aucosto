@@ -45,6 +45,16 @@ function ClockIcon() {
     </svg>
   );
 }
+function ListIcon() {
+  return (
+    <svg {...ip}>
+      <path d="M5 4h8M5 7.5h8M5 11h5" />
+      <circle cx="2.5" cy="4" r="0.6" fill="currentColor" />
+      <circle cx="2.5" cy="7.5" r="0.6" fill="currentColor" />
+      <circle cx="2.5" cy="11" r="0.6" fill="currentColor" />
+    </svg>
+  );
+}
 function WalletIcon() {
   return (
     <svg {...ip}>
@@ -114,14 +124,15 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: "/app", label: "Today", match: (p) => p === "/app", finance: false, icon: <HomeIcon /> },
   { href: "/app/calendar", label: "Calendar", match: (p) => p.startsWith("/app/calendar"), finance: false, icon: <CalendarIcon /> },
+  { href: "/app/do", label: "Do List", match: (p) => p.startsWith("/app/do"), finance: false, icon: <ListIcon /> },
   { href: "/app/time", label: "Time", match: (p) => p.startsWith("/app/time"), finance: false, icon: <ClockIcon /> },
+  { href: "/app/projects", label: "Projects", match: (p) => p.startsWith("/app/projects"), finance: false, icon: <ProjectsIcon /> },
   { href: "/app/finance", label: "Finance", match: (p) => p.startsWith("/app/finance"), finance: true, icon: <WalletIcon /> },
 ];
 
 const comingSoon: Array<{ label: string; icon: React.ReactNode }> = [
   { label: "Calories", icon: <PlateIcon /> },
   { label: "Fitness", icon: <PulseIcon /> },
-  { label: "Projects", icon: <ProjectsIcon /> },
 ];
 
 /* ──────────────────────────────────────────────────────────────────

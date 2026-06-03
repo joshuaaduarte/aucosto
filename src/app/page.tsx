@@ -150,6 +150,13 @@ const tools: Tool[] = [
     href: "/app/calendar",
   },
   {
+    title: "Do List",
+    body: "Capture tasks, bucket them by area, and see estimates collide with reality.",
+    status: "live",
+    Icon: ListIcon,
+    href: "/app/do",
+  },
+  {
     title: "Time",
     body: "Start a session when you begin, then close it when you switch tasks.",
     status: "live",
@@ -183,9 +190,10 @@ const tools: Tool[] = [
   },
   {
     title: "Projects",
-    body: "Tasks and milestones, linked to the hours actually spent. No estimating theatre.",
-    status: "soon",
+    body: "Outcomes, milestones, and linked Do items. Plan the work without turning it into office cosplay.",
+    status: "live",
     Icon: ProjectsIcon,
+    href: "/app/projects",
   },
   {
     title: "Signals",
@@ -258,6 +266,8 @@ function WorkspacePreview() {
             </p>
             <PreviewItem icon={<HomeIcon />} label="Today" active />
             <PreviewItem icon={<CalendarIcon />} label="Calendar" />
+            <PreviewItem icon={<ListIcon />} label="Do List" />
+            <PreviewItem icon={<ProjectsIcon />} label="Projects" />
             <PreviewItem icon={<ClockIcon />} label="Time" />
             <PreviewItem icon={<WalletIcon />} label="Finance" />
 
@@ -460,12 +470,12 @@ function PreviewRow({
             {title}
           </p>
         </div>
-        <p
-          className="mt-0.5 text-[0.6875rem]"
-          style={{ color: "var(--text-faint)" }}
-        >
+            <p
+              className="mt-0.5 text-[0.6875rem]"
+              style={{ color: "var(--text-faint)" }}
+            >
           {meta}
-        </p>
+            </p>
       </div>
       <span
         className="font-mono text-[0.75rem] tabular"
@@ -532,9 +542,9 @@ export default function LandingPage() {
             className="fade-in-delay-1 mt-5 max-w-2xl text-base leading-[1.6] sm:mt-6 sm:text-[1.0625rem]"
             style={{ color: "var(--text-muted)" }}
           >
-            Aucosto brings time, money, calendar, calories, and projects into
-            one workspace. The goal is fewer tabs, clearer context, and less
-            manual stitching between tools.
+            Aucosto brings calendar, do, projects, time, and money into one
+            workspace. The goal is fewer tabs, clearer context, and less manual
+            stitching between planning and real life.
           </p>
           <div className="fade-in-delay-2 mt-7 flex flex-wrap items-center gap-3">
             <Link href="/login" className="btn-ink">

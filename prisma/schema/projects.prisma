@@ -1,0 +1,21 @@
+// Lightweight project planning.
+// Projects stay above tasks: clear outcome, next milestone, linked Do items.
+
+model Project {
+  id            String    @id @default(cuid())
+  userId        String
+  name          String
+  status        String    @default("active")
+  bucket        String?
+  summary       String?
+  nextMilestone String?
+  targetDate    DateTime?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  doItems       DoItem[]
+
+  @@index([userId, status, updatedAt])
+  @@index([userId, targetDate])
+}

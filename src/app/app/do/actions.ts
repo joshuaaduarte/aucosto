@@ -2,20 +2,25 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { DO_LANES } from "@/lib/do";
+import { DO_LANES, DO_STATUSES } from "@/lib/do";
 import {
   createDoItem,
   deleteDoItem,
+  reflectOnDoItemSession,
   startTimerForDoItem,
   updateDoItem,
 } from "@/lib/services/do";
 import { requireViewerContext } from "@/lib/viewer-context";
 
 const laneEnum = z.enum(DO_LANES);
+const statusEnum = z.enum(DO_STATUSES);
 
 const doSchema = z.object({
   title: z.string().trim().min(1, "Title is required").max(200),
+  bucket: z.string().trim().max(80).nullable(),
+  projectId: z.string().trim().max(80).nullable(),
   lane: laneEnum.default("next"),
+  status: statusEnum.default("ready"),
   estimatedMinutes: z.coerce.number().int().positive().max(24 * 60).nullable(),
   actualMinutes: z.coerce.number().int().positive().max(24 * 60).nullable(),
   notes: z.string().trim().max(600).nullable(),
@@ -54,7 +59,10 @@ export async function createDoItemAction(
   const userId = await requireUserId();
   const parsed = doSchema.safeParse({
     title: formData.get("title") ?? "",
+    bucket: nullableString(formData, "bucket"),
+    projectId: nullableString(formData, "projectId"),
     lane: formData.get("lane") ?? "next",
+    status: "ready",
     estimatedMinutes: nullableNumber(formData, "estimatedMinutes"),
     actualMinutes: null,
     notes: nullableString(formData, "notes"),
@@ -72,7 +80,10 @@ export async function updateDoItemAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const parsed = doSchema.safeParse({
     title: formData.get("title") ?? "",
+    bucket: nullableString(formData, "bucket"),
+    projectId: nullableString(formData, "projectId"),
     lane: formData.get("lane") ?? "next",
+    status: (formData.get("status") as string) ?? "ready",
     estimatedMinutes: nullableNumber(formData, "estimatedMinutes"),
     actualMinutes: nullableNumber(formData, "actualMinutes"),
     notes: nullableString(formData, "notes"),
@@ -96,7 +107,7 @@ export async function completeDoItemAction(formData: FormData) {
 export async function reopenDoItemAction(formData: FormData) {
   const userId = await requireUserId();
   const id = String(formData.get("id") ?? "");
-  await updateDoItem(userId, id, { status: "open" });
+  await updateDoItem(userId, id, { status: "ready" });
   revalidateDo();
 }
 
@@ -111,5 +122,21 @@ export async function startDoItemTimerAction(formData: FormData) {
   const userId = await requireUserId();
   const id = String(formData.get("id") ?? "");
   await startTimerForDoItem(userId, id);
+  revalidateDo();
+}
+
+export async function reflectDoItemSessionAction(formData: FormData) {
+  const userId = await requireUserId();
+  const id = String(formData.get("id") ?? "");
+  const outcome = String(formData.get("outcome") ?? "continue");
+  if (outcome !== "done" && outcome !== "continue" && outcome !== "waiting") {
+    throw new Error("Invalid reflection outcome.");
+  }
+  await reflectOnDoItemSession(userId, id, {
+    outcome,
+    actualMinutes: nullableNumber(formData, "actualMinutes"),
+    remainingMinutes: nullableNumber(formData, "remainingMinutes"),
+    notes: nullableString(formData, "notes"),
+  });
   revalidateDo();
 }

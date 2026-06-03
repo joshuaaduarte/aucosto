@@ -14,12 +14,21 @@ const QUICK_TEMPLATES = [
 export function CalendarQuickAddModal({
   todayDateValue,
   suggestedTasks = [],
+  gapSuggestions = [],
 }: {
   todayDateValue: string;
   suggestedTasks?: Array<{
     id: string;
     title: string;
     estimatedMinutes: number | null;
+  }>;
+  gapSuggestions?: Array<{
+    taskId: string;
+    title: string;
+    estimateMinutes: number | null;
+    gapLabel: string;
+    start: string;
+    end: string;
   }>;
 }) {
   const [open, setOpen] = useState(false);
@@ -55,6 +64,19 @@ export function CalendarQuickAddModal({
       const endValue = `${String(next.getHours()).padStart(2, "0")}:${String(next.getMinutes()).padStart(2, "0")}`;
       setEnd(endValue);
     }
+  }
+
+  function applyGapSuggestion(task: {
+    taskId: string;
+    title: string;
+    estimateMinutes: number | null;
+    start: string;
+    end: string;
+  }) {
+    setDoItemId(task.taskId);
+    setTitle(task.title);
+    setStart(task.start);
+    setEnd(task.end);
   }
 
   function resetForm() {
@@ -156,6 +178,33 @@ export function CalendarQuickAddModal({
                     >
                       {task.title}
                       {task.estimatedMinutes ? ` · ${formatMinutes(task.estimatedMinutes)}` : ""}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {gapSuggestions.length > 0 ? (
+              <div className="mt-4">
+                <p
+                  className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+                  style={{ color: "var(--text-faint)" }}
+                >
+                  Fits your open time
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {gapSuggestions.map((suggestion) => (
+                    <button
+                      key={`${suggestion.taskId}-${suggestion.start}`}
+                      type="button"
+                      className="pill cursor-pointer"
+                      onClick={() => applyGapSuggestion(suggestion)}
+                    >
+                      {suggestion.title}
+                      {suggestion.estimateMinutes
+                        ? ` · ${formatMinutes(suggestion.estimateMinutes)}`
+                        : ""}
+                      {` · ${suggestion.gapLabel}`}
                     </button>
                   ))}
                 </div>

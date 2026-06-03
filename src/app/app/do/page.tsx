@@ -1,12 +1,16 @@
 import type { ReactNode } from "react";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import {
+  DO_BUCKET_SUGGESTIONS,
   DO_LANE_DESCRIPTIONS,
   DO_LANE_LABELS,
   DO_LANES,
+  DO_STATUSES,
+  DO_STATUS_LABELS,
   formatMinutes,
 } from "@/lib/do";
 import { listDoItems, type DoItemSummary } from "@/lib/services/do";
+import { listProjects } from "@/lib/services/projects";
 import {
   completeDoItemAction,
   deleteDoItemAction,
@@ -52,7 +56,13 @@ function SectionCard({
   );
 }
 
-function DoItemCard({ item }: { item: DoItemSummary }) {
+function DoItemCard({
+  item,
+  projects,
+}: {
+  item: DoItemSummary;
+  projects: Array<{ id: string; name: string }>;
+}) {
   return (
     <li
       className="rounded-md border p-3 sm:p-3.5"
@@ -68,22 +78,31 @@ function DoItemCard({ item }: { item: DoItemSummary }) {
               >
                 {item.title}
               </p>
-              <span className="pill">{DO_LANE_LABELS[item.lane as keyof typeof DO_LANE_LABELS] ?? item.lane}</span>
-              {item.status === "done" ? <span className="pill">done</span> : null}
+              {item.bucket ? <span className="pill">{item.bucket}</span> : null}
+              {item.projectName ? <span className="pill">{item.projectName}</span> : null}
+              <span className="pill">
+                {DO_LANE_LABELS[item.lane as keyof typeof DO_LANE_LABELS] ?? item.lane}
+              </span>
+              <span className="pill">{DO_STATUS_LABELS[item.status]}</span>
             </div>
             <p
               className="mt-1 text-[0.75rem]"
               style={{ color: "var(--text-faint)" }}
             >
               Est. {formatMinutes(item.estimatedMinutes)}
+              {item.scheduledMinutes > 0
+                ? ` · Scheduled ${formatMinutes(item.scheduledMinutes)}`
+                : ""}
+              {item.trackedMinutes > 0
+                ? ` · Tracked ${formatMinutes(item.trackedMinutes)}`
+                : ""}
               {item.effectiveActualMinutes
                 ? ` · Actual ${formatMinutes(item.effectiveActualMinutes)}`
                 : ""}
-              {item.trackedMinutes > 0 ? ` · Tracked ${formatMinutes(item.trackedMinutes)}` : ""}
             </p>
             {item.notes ? (
               <p
-                className="mt-1.5 text-[0.8125rem]"
+                className="mt-1.5 whitespace-pre-line text-[0.8125rem]"
                 style={{ color: "var(--text-muted)" }}
               >
                 {item.notes}
@@ -183,7 +202,7 @@ function DoItemCard({ item }: { item: DoItemSummary }) {
               />
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-5">
               <div className="space-y-1.5">
                 <label
                   className="block text-[0.75rem] font-medium"
@@ -196,6 +215,22 @@ function DoItemCard({ item }: { item: DoItemSummary }) {
                   {DO_LANES.map((lane) => (
                     <option key={lane} value={lane}>
                       {DO_LANE_LABELS[lane]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label
+                  className="block text-[0.75rem] font-medium"
+                  htmlFor={`status-${item.id}`}
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Status
+                </label>
+                <select id={`status-${item.id}`} name="status" defaultValue={item.status} className="field">
+                  {DO_STATUSES.map((status) => (
+                    <option key={status} value={status}>
+                      {DO_STATUS_LABELS[status]}
                     </option>
                   ))}
                 </select>
@@ -221,6 +256,27 @@ function DoItemCard({ item }: { item: DoItemSummary }) {
               <div className="space-y-1.5">
                 <label
                   className="block text-[0.75rem] font-medium"
+                  htmlFor={`bucket-${item.id}`}
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Bucket
+                </label>
+                <input
+                  id={`bucket-${item.id}`}
+                  name="bucket"
+                  list={`bucket-suggestions-${item.id}`}
+                  defaultValue={item.bucket ?? ""}
+                  className="field"
+                />
+                <datalist id={`bucket-suggestions-${item.id}`}>
+                  {DO_BUCKET_SUGGESTIONS.map((suggestion) => (
+                    <option key={suggestion} value={suggestion} />
+                  ))}
+                </datalist>
+              </div>
+              <div className="space-y-1.5">
+                <label
+                  className="block text-[0.75rem] font-medium"
                   htmlFor={`learned-${item.id}`}
                   style={{ color: "var(--text-muted)" }}
                 >
@@ -238,20 +294,62 @@ function DoItemCard({ item }: { item: DoItemSummary }) {
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label
-                className="block text-[0.75rem] font-medium"
-                htmlFor={`notes-${item.id}`}
-                style={{ color: "var(--text-muted)" }}
-              >
-                Notes
-              </label>
-              <input
-                id={`notes-${item.id}`}
-                name="notes"
-                defaultValue={item.notes ?? ""}
-                className="field"
-              />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label
+                  className="block text-[0.75rem] font-medium"
+                  htmlFor={`project-${item.id}`}
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Project
+                </label>
+                <select
+                  id={`project-${item.id}`}
+                  name="projectId"
+                  defaultValue={item.projectId ?? ""}
+                  className="field"
+                >
+                  <option value="">No project</option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label
+                  className="block text-[0.75rem] font-medium"
+                  htmlFor={`notes-${item.id}`}
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Notes
+                </label>
+                <input
+                  id={`notes-${item.id}`}
+                  name="notes"
+                  defaultValue={item.notes ?? ""}
+                  className="field"
+                />
+              </div>
+              <div className="rounded-md border px-3 py-2.5" style={{ borderColor: "var(--border-faint)" }}>
+                <p
+                  className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+                  style={{ color: "var(--text-faint)" }}
+                >
+                  Planned vs actual
+                </p>
+                <p className="mt-1 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
+                  {item.scheduledCount > 0
+                    ? `${item.scheduledCount} block${item.scheduledCount === 1 ? "" : "s"} scheduled`
+                    : "Not on calendar yet"}
+                </p>
+                <p className="mt-1 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
+                  {item.trackedMinutes > 0
+                    ? `${formatMinutes(item.trackedMinutes)} tracked so far`
+                    : "Timer has not touched this yet"}
+                </p>
+              </div>
             </div>
 
             <div className="flex justify-end">
@@ -268,59 +366,99 @@ function DoItemCard({ item }: { item: DoItemSummary }) {
 
 export default async function DoPage() {
   const userId = await resolveActiveUserId();
-  const items = await listDoItems(userId, { includeDone: true });
+  const [items, projects] = await Promise.all([
+    listDoItems(userId, { includeDone: true }),
+    listProjects(userId),
+  ]);
 
-  const openItems = items.filter((item) => item.status === "open");
+  const activeItems = items.filter((item) => item.status !== "done");
   const doneItems = items.filter((item) => item.status === "done").slice(0, 8);
   const byLane = Object.fromEntries(
-    DO_LANES.map((lane) => [lane, openItems.filter((item) => item.lane === lane)]),
+    DO_LANES.map((lane) => [lane, activeItems.filter((item) => item.lane === lane)]),
   ) as Record<(typeof DO_LANES)[number], DoItemSummary[]>;
 
-  const estimatedOpenMinutes = openItems.reduce(
+  const estimatedOpenMinutes = activeItems.reduce(
     (total, item) => total + (item.estimatedMinutes ?? 0),
     0,
   );
-  const completedWithLearned = doneItems.filter((item) => item.effectiveActualMinutes && item.estimatedMinutes);
+  const scheduledOpenMinutes = activeItems.reduce(
+    (total, item) => total + item.scheduledMinutes,
+    0,
+  );
+  const trackedOpenMinutes = activeItems.reduce(
+    (total, item) => total + item.trackedMinutes,
+    0,
+  );
+  const completedWithLearned = doneItems.filter(
+    (item) => item.effectiveActualMinutes && item.estimatedMinutes,
+  );
   const averageAccuracy = completedWithLearned.length
     ? Math.round(
         completedWithLearned.reduce((total, item) => {
-          return total + (item.effectiveActualMinutes! / Math.max(1, item.estimatedMinutes!)) * 100;
+          return (
+            total +
+            (item.effectiveActualMinutes! / Math.max(1, item.estimatedMinutes!)) *
+              100
+          );
         }, 0) / completedWithLearned.length,
       )
     : null;
+  const waitingCount = activeItems.filter((item) => item.status === "waiting").length;
+  const inProgressCount = activeItems.filter((item) => item.status === "in_progress").length;
+  const scheduledCount = activeItems.filter((item) => item.status === "scheduled").length;
+  const unscheduledTodayCount = activeItems.filter(
+    (item) => item.lane === "today" && item.scheduledMinutes === 0 && item.status !== "waiting",
+  ).length;
+  const overEstimateCount = activeItems.filter(
+    (item) =>
+      item.estimatedMinutes !== null &&
+      item.estimatedMinutes !== undefined &&
+      item.trackedMinutes > item.estimatedMinutes,
+  ).length;
+  const activeProjectCount = new Set(
+    activeItems.map((item) => item.projectId).filter(Boolean),
+  ).size;
 
   return (
     <div className="space-y-10">
-      <header className="fade-in">
+      <header className="fade-in flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p
+            className="text-[0.75rem] font-medium uppercase tracking-wider"
+            style={{ color: "var(--text-faint)" }}
+          >
+            Do List
+          </p>
+          <h1
+            className="mt-1 text-[1.5rem] font-bold tracking-tight sm:text-[1.875rem]"
+            style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
+          >
+            Do List
+          </h1>
+        </div>
         <p
-          className="text-[0.75rem] font-medium uppercase tracking-wider"
-          style={{ color: "var(--text-faint)" }}
-        >
-          Do
-        </p>
-        <h1
-          className="mt-1 text-[2rem] font-bold tracking-tight sm:text-[2.5rem]"
-          style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
-        >
-          The Do List
-        </h1>
-        <p
-          className="mt-2 text-[0.9375rem]"
+          className="text-[0.8125rem] sm:max-w-[38rem] sm:text-right"
           style={{ color: "var(--text-muted)" }}
         >
-          A task list that learns how long things really take, nudges the next best move, and feeds both your calendar and timer.
+          {activeItems.length} active
+          {unscheduledTodayCount > 0
+            ? ` · ${unscheduledTodayCount} unscheduled today`
+            : " · today is covered"}
+          {activeProjectCount > 0 ? ` · ${activeProjectCount} linked project${activeProjectCount === 1 ? "" : "s"}` : ""}
         </p>
       </header>
 
       <section
-        className="fade-in-delay-1 grid grid-cols-3 gap-px overflow-hidden rounded-md border"
+        className="fade-in-delay-1 grid gap-px overflow-hidden rounded-md border sm:grid-cols-2 xl:grid-cols-5"
         style={{
           borderColor: "var(--border-faint)",
           background: "var(--border-faint)",
         }}
       >
-        <MetricCard label="Open" value={String(openItems.length)} hint="tasks still in motion" />
-        <MetricCard label="Estimated" value={formatMinutes(estimatedOpenMinutes)} hint="remaining if the estimates hold" />
+        <MetricCard label="Open" value={String(activeItems.length)} hint="tasks still in motion" />
+        <MetricCard label="Estimated" value={formatMinutes(estimatedOpenMinutes)} hint="remaining if estimates hold" />
+        <MetricCard label="Scheduled" value={formatMinutes(scheduledOpenMinutes)} hint="time already protected" />
+        <MetricCard label="Tracked" value={formatMinutes(trackedOpenMinutes)} hint="time already spent" />
         <MetricCard
           label="Learning"
           value={averageAccuracy ? `${averageAccuracy}%` : "Waiting"}
@@ -328,7 +466,32 @@ export default async function DoPage() {
         />
       </section>
 
-      <DoCreateForm />
+      <section className="grid gap-3 lg:grid-cols-2">
+        <SectionCard eyebrow="Attention" title="Where the loop still needs help.">
+          <ul className="space-y-2 text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
+            <li>
+              {unscheduledTodayCount > 0
+                ? `${unscheduledTodayCount} Today task${unscheduledTodayCount === 1 ? "" : "s"} still need calendar time.`
+                : "Today tasks are either scheduled, done, or intentionally waiting."}
+            </li>
+            <li>
+              {overEstimateCount > 0
+                ? `${overEstimateCount} active task${overEstimateCount === 1 ? "" : "s"} have already run past their estimate.`
+                : "No active tasks have blown past their estimate yet."}
+            </li>
+          </ul>
+        </SectionCard>
+
+        <SectionCard eyebrow="States" title="What the work is actually doing.">
+          <ul className="space-y-2 text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
+            <li>{inProgressCount} in progress right now or recently resumed.</li>
+            <li>{scheduledCount} already scheduled before they are done.</li>
+            <li>{waitingCount} waiting on someone or something else.</li>
+          </ul>
+        </SectionCard>
+      </section>
+
+      <DoCreateForm projects={projects.map((project) => ({ id: project.id, name: project.name }))} />
 
       <section className="grid gap-6 lg:grid-cols-2">
         {DO_LANES.map((lane) => (
@@ -344,7 +507,7 @@ export default async function DoPage() {
             ) : (
               <ol className="space-y-3">
                 {byLane[lane].map((item) => (
-                  <DoItemCard key={item.id} item={item} />
+                  <DoItemCard key={item.id} item={item} projects={projects} />
                 ))}
               </ol>
             )}
@@ -360,7 +523,7 @@ export default async function DoPage() {
         ) : (
           <ol className="space-y-3">
             {doneItems.map((item) => (
-              <DoItemCard key={item.id} item={item} />
+              <DoItemCard key={item.id} item={item} projects={projects} />
             ))}
           </ol>
         )}

@@ -4,7 +4,7 @@ import {
   listCompletedSince,
   listRecentEntries,
 } from "@/lib/services/time";
-import { listSuggestedDoItems } from "@/lib/services/do";
+import { getDoItemSummary, listSuggestedDoItems } from "@/lib/services/do";
 import {
   formatDuration,
   formatHM,
@@ -40,13 +40,13 @@ export default async function TimePage() {
 
   const todayStart = startOfToday();
   const weekStart = startOfWeek();
-
-  const [running, recent, completedToday, completedWeek, suggestedTasks] = await Promise.all([
-    getRunningEntry(userId),
+  const running = await getRunningEntry(userId);
+  const [recent, completedToday, completedWeek, suggestedTasks, runningDoSummary] = await Promise.all([
     listRecentEntries(userId, { limit: 30 }),
     listCompletedSince(userId, todayStart),
     listCompletedSince(userId, weekStart),
     listSuggestedDoItems(userId, { limit: 4 }),
+    running?.doItem ? getDoItemSummary(userId, running.doItem.id) : Promise.resolve(null),
   ]);
 
   const todayTotalMs = sumDurations(completedToday);
@@ -70,29 +70,34 @@ export default async function TimePage() {
     groups.push({ label, items: [entry] });
     return groups;
   }, []);
+  const hasArchive = recent.length > 0;
 
   return (
     <div className="space-y-10">
-      {/* Page header */}
-      <header className="fade-in">
+      <header className="fade-in flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p
+            className="text-[0.75rem] font-medium uppercase tracking-wider"
+            style={{ color: "var(--text-faint)" }}
+          >
+            Time
+          </p>
+          <h1
+            className="mt-1 text-[1.5rem] font-bold tracking-tight sm:text-[1.875rem]"
+            style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
+          >
+            Sessions
+          </h1>
+        </div>
         <p
-          className="text-[0.75rem] font-medium uppercase tracking-wider"
-          style={{ color: "var(--text-faint)" }}
-        >
-          Time
-        </p>
-        <h1
-          className="mt-1 text-[2rem] font-bold tracking-tight sm:text-[2.5rem]"
-          style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
-        >
-          Sessions
-        </h1>
-        <p
-          className="mt-2 text-[0.9375rem]"
+          className="text-[0.8125rem] sm:max-w-[38rem] sm:text-right"
           style={{ color: "var(--text-muted)" }}
         >
-          Open a session when you start, close it when you switch. The archive
-          builds itself.
+          {running
+            ? `1 running now · ${formatHM(weekTotalMs)} logged this week`
+            : hasArchive
+              ? `${completedToday.length} closed today · ${formatHM(weekTotalMs)} this week`
+              : "No session running yet"}
         </p>
       </header>
 
@@ -103,6 +108,17 @@ export default async function TimePage() {
             label={running.label}
             category={running.category}
             startedAtIso={running.startedAt.toISOString()}
+            doItem={
+              running.doItem
+                ? {
+                    id: running.doItem.id,
+                    title: running.doItem.title,
+                    estimatedMinutes:
+                      runningDoSummary?.estimatedMinutes ?? running.doItem.estimatedMinutes,
+                    trackedMinutes: runningDoSummary?.trackedMinutes ?? 0,
+                  }
+                : null
+            }
           />
         ) : (
           <StartForm

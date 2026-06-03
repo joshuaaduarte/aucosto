@@ -26,7 +26,7 @@ export const widgets: WidgetDescriptor[] = [
   },
   {
     id: "do",
-    name: "Do",
+    name: "Do List",
     href: "/app/do",
     Widget: DoWidget,
   },

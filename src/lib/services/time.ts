@@ -9,14 +9,28 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { requireCan } from "@/lib/auth/can";
 import { recordEvent } from "@/lib/services/events";
-import type { TimeEntry } from "@/generated/prisma/client";
+import type { DoItem, TimeEntry } from "@/generated/prisma/client";
+
+export type RunningTimeEntry = TimeEntry & {
+  doItem: Pick<DoItem, "id" | "title" | "estimatedMinutes" | "actualMinutes"> | null;
+};
 
 export async function getRunningEntry(
   userId: string,
-): Promise<TimeEntry | null> {
+): Promise<RunningTimeEntry | null> {
   requireCan(userId, "time", "read");
   return prisma.timeEntry.findFirst({
     where: { userId, endedAt: null },
+    include: {
+      doItem: {
+        select: {
+          id: true,
+          title: true,
+          estimatedMinutes: true,
+          actualMinutes: true,
+        },
+      },
+    },
     orderBy: { startedAt: "desc" },
   });
 }

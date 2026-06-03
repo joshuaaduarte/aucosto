@@ -9,7 +9,7 @@ export async function DoWidget() {
   const next = items[0] ?? null;
 
   return (
-    <WidgetCard name="Do" href="/app/do">
+    <WidgetCard name="Do List" href="/app/do">
       {!next ? (
         <div className="space-y-2">
           <p
