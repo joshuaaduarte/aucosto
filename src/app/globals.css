@@ -432,6 +432,8 @@ body > * {
 }
 
 .calendar-modal {
+  position: relative;
+  z-index: 1;
   width: min(100%, 34rem);
   max-height: min(88vh, 50rem);
   overflow-y: auto;

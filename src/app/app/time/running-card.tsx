@@ -42,6 +42,7 @@ export function RunningCard({
     Math.round((now - startedAt) / 60000 / 5) * 5,
   );
   const trackedIfStoppedNow = (doItem?.trackedMinutes ?? 0) + elapsedMinutes;
+  const [reflectionPending, startReflectionTransition] = useTransition();
 
   return (
     <>
@@ -193,9 +194,13 @@ export function RunningCard({
             </div>
 
             <form
-              action={stopEntryWithReflection}
+              action={(formData) => {
+                startReflectionTransition(async () => {
+                  await stopEntryWithReflection(formData);
+                  setReflectOpen(false);
+                });
+              }}
               className="mt-5 space-y-4"
-              onSubmit={() => setReflectOpen(false)}
             >
               <input type="hidden" name="doItemId" value={doItem.id} />
 
@@ -277,16 +282,23 @@ export function RunningCard({
                 />
               </div>
 
-              <div className="flex items-center justify-between gap-3 pt-1">
+              <div
+                className="sticky bottom-0 -mx-4 mt-2 flex items-center justify-between gap-3 border-t px-4 pb-1 pt-3 sm:-mx-5 sm:px-5"
+                style={{
+                  background: "var(--bg-page)",
+                  borderColor: "var(--border-faint)",
+                }}
+              >
                 <button
                   type="button"
                   className="btn-ghost"
+                  disabled={reflectionPending}
                   onClick={() => setReflectOpen(false)}
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn-ink">
-                  Stop session
+                <button type="submit" disabled={reflectionPending} className="btn-ink">
+                  {reflectionPending ? "Stopping..." : "Stop session"}
                 </button>
               </div>
             </form>
