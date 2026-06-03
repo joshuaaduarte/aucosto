@@ -1,13 +1,12 @@
 "use client";
 
-import { useRef, useState, useTransition, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useActionState, useEffect, useRef, useState } from "react";
 import {
   PROJECT_STATUSES,
   PROJECT_STATUS_LABELS,
   type ProjectStatus,
 } from "@/lib/projects";
-import { updateProjectAction, type ProjectState } from "./actions";
+import { updateProjectAction } from "./actions";
 
 export function ProjectEditForm({
   project,
@@ -23,28 +22,32 @@ export function ProjectEditForm({
     notes: string | null;
   };
 }) {
-  const router = useRouter();
-  const detailsRef = useRef<HTMLDetailsElement>(null);
+  const [state, formAction, pending] = useActionState(
+    updateProjectAction,
+    undefined,
+  );
+  const formRef = useRef<HTMLFormElement>(null);
+  const submittedRef = useRef(false);
   const [open, setOpen] = useState(false);
-  const [state, setState] = useState<ProjectState>(undefined);
-  const [pending, startTransition] = useTransition();
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    startTransition(async () => {
-      const result = await updateProjectAction(undefined, formData);
-      setState(result);
-      if (!result?.error) {
+  useEffect(() => {
+    if (pending) {
+      submittedRef.current = true;
+      return;
+    }
+
+    if (submittedRef.current && !state?.error) {
+      submittedRef.current = false;
+      const timer = window.setTimeout(() => {
+        formRef.current?.reset();
         setOpen(false);
-        router.refresh();
-      }
-    });
-  }
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+  }, [pending, state]);
 
   return (
     <details
-      ref={detailsRef}
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
       className="rounded-md border"
@@ -56,7 +59,7 @@ export function ProjectEditForm({
       >
         Edit project
       </summary>
-      <form onSubmit={handleSubmit} className="space-y-3 px-3 pb-3">
+      <form ref={formRef} action={formAction} className="space-y-3 px-3 pb-3">
         <input type="hidden" name="id" value={project.id} />
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">

@@ -2,9 +2,36 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { requireCan } from "@/lib/auth/can";
+import { normalizeDoStatus } from "@/lib/do";
 import { recordEvent } from "@/lib/services/events";
 import { normalizeProjectStatus, type ProjectStatus } from "@/lib/projects";
 import type { Project } from "@/generated/prisma/client";
+
+export type ProjectLinkedTaskSummary = {
+  id: string;
+  title: string;
+  lane: string;
+  status: ReturnType<typeof normalizeDoStatus>;
+  estimatedMinutes: number | null;
+  trackedMinutes: number;
+  scheduledMinutes: number;
+  scheduledCount: number;
+  lastWorkedAt: Date | null;
+  updatedAt: Date;
+};
+
+export type ProjectBlockSummary = {
+  id: string;
+  title: string;
+  startsAt: Date;
+  endsAt: Date;
+  doItemId: string | null;
+};
+
+export type ProjectHealthFlag = {
+  tone: "warning" | "muted";
+  message: string;
+};
 
 export type ProjectSummary = Project & {
   status: ProjectStatus;
@@ -12,6 +39,16 @@ export type ProjectSummary = Project & {
   doneTaskCount: number;
   trackedMinutes: number;
   scheduledMinutes: number;
+  scheduledThisWeekMinutes: number;
+  todayTaskCount: number;
+  waitingTaskCount: number;
+  readyTaskCount: number;
+  inProgressTaskCount: number;
+  lastWorkedAt: Date | null;
+  nextScheduledAt: Date | null;
+  linkedTasks: ProjectLinkedTaskSummary[];
+  upcomingBlocks: ProjectBlockSummary[];
+  healthFlags: ProjectHealthFlag[];
 };
 
 export type SaveProjectInput = {
@@ -24,32 +61,183 @@ export type SaveProjectInput = {
   notes?: string | null;
 };
 
-function summarize(
-  project: Project & {
-    doItems: Array<{
-      status: string;
-      timeEntries: Array<{ startedAt: Date; endedAt: Date | null }>;
-    }>;
-  },
-  scheduledMinutes: number,
-): ProjectSummary {
-  const openTaskCount = project.doItems.filter((item) => item.status !== "done").length;
-  const doneTaskCount = project.doItems.length - openTaskCount;
-  const trackedMinutes = project.doItems.reduce((total, item) => {
+type ProjectRow = Project & {
+  doItems: Array<{
+    id: string;
+    title: string;
+    lane: string;
+    status: string;
+    estimatedMinutes: number | null;
+    lastWorkedAt: Date | null;
+    updatedAt: Date;
+    timeEntries: Array<{ startedAt: Date; endedAt: Date | null }>;
+  }>;
+};
+
+function cleanString(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function startOfWeek(value: Date) {
+  const next = new Date(value);
+  next.setHours(0, 0, 0, 0);
+  const day = next.getDay();
+  const offset = (day + 6) % 7;
+  next.setDate(next.getDate() - offset);
+  return next;
+}
+
+function endOfWeek(value: Date) {
+  const next = startOfWeek(value);
+  next.setDate(next.getDate() + 7);
+  return next;
+}
+
+function summarizeTrackedMinutes(entries: Array<{ startedAt: Date; endedAt: Date | null }>) {
+  return entries.reduce((total, entry) => {
+    if (!entry.endedAt) return total;
     return (
       total +
-      item.timeEntries.reduce((entryTotal, entry) => {
-        if (!entry.endedAt) return entryTotal;
-        return (
-          entryTotal +
-          Math.max(
-            0,
-            Math.round((entry.endedAt.getTime() - entry.startedAt.getTime()) / 60000),
-          )
-        );
-      }, 0)
+      Math.max(
+        0,
+        Math.round((entry.endedAt.getTime() - entry.startedAt.getTime()) / 60000),
+      )
     );
   }, 0);
+}
+
+function buildHealthFlags(
+  project: Project,
+  taskSummaries: ProjectLinkedTaskSummary[],
+  upcomingBlocks: ProjectBlockSummary[],
+  scheduledThisWeekMinutes: number,
+  lastWorkedAt: Date | null,
+  now: Date,
+): ProjectHealthFlag[] {
+  const flags: ProjectHealthFlag[] = [];
+  const activeTasks = taskSummaries.filter((task) => task.status !== "done");
+  const executableTasks = activeTasks.filter((task) => task.status !== "waiting");
+  const todayTasks = executableTasks.filter((task) => task.lane === "today");
+  const waitingTasks = activeTasks.filter((task) => task.status === "waiting");
+
+  if (project.status !== "done" && executableTasks.length === 0) {
+    flags.push({ tone: "warning", message: "No next task is ready yet." });
+  }
+
+  if (project.status === "active" && todayTasks.length === 0) {
+    flags.push({ tone: "muted", message: "Nothing is marked for today yet." });
+  }
+
+  if (waitingTasks.length >= 3) {
+    flags.push({
+      tone: "warning",
+      message: `${waitingTasks.length} tasks are stuck waiting.`,
+    });
+  }
+
+  if (project.status !== "done" && scheduledThisWeekMinutes === 0) {
+    flags.push({ tone: "warning", message: "No calendar time is protected this week." });
+  }
+
+  if (project.targetDate && project.targetDate.getTime() < now.getTime() && project.status !== "done") {
+    flags.push({ tone: "warning", message: "Target date has passed." });
+  } else if (project.targetDate && project.status !== "done") {
+    const hasBlockBeforeTarget = upcomingBlocks.some(
+      (block) => block.startsAt.getTime() <= project.targetDate!.getTime(),
+    );
+    if (!hasBlockBeforeTarget) {
+      flags.push({
+        tone: "warning",
+        message: "Target date is set, but no work is scheduled before it.",
+      });
+    }
+  }
+
+  if (project.status !== "done") {
+    if (!lastWorkedAt) {
+      flags.push({ tone: "muted", message: "No time has been tracked on this yet." });
+    } else {
+      const staleDays = Math.floor(
+        (now.getTime() - lastWorkedAt.getTime()) / (1000 * 60 * 60 * 24),
+      );
+      if (staleDays >= 7) {
+        flags.push({
+          tone: "warning",
+          message: `No progress has been tracked for ${staleDays} days.`,
+        });
+      }
+    }
+  }
+
+  return flags.slice(0, 4);
+}
+
+function summarize(
+  project: ProjectRow,
+  options: {
+    scheduledByTask: Map<string, { scheduledMinutes: number; scheduledCount: number }>;
+    blocksByProject: Map<string, ProjectBlockSummary[]>;
+    now: Date;
+  },
+): ProjectSummary {
+  const linkedTasks = project.doItems.map((item) => {
+    const scheduled = options.scheduledByTask.get(item.id);
+    return {
+      id: item.id,
+      title: item.title,
+      lane: item.lane,
+      status: normalizeDoStatus(item.status),
+      estimatedMinutes: item.estimatedMinutes,
+      trackedMinutes: summarizeTrackedMinutes(item.timeEntries),
+      scheduledMinutes: scheduled?.scheduledMinutes ?? 0,
+      scheduledCount: scheduled?.scheduledCount ?? 0,
+      lastWorkedAt: item.lastWorkedAt,
+      updatedAt: item.updatedAt,
+    };
+  });
+
+  linkedTasks.sort((a, b) => {
+    if (a.status === "done" && b.status !== "done") return 1;
+    if (a.status !== "done" && b.status === "done") return -1;
+    if (a.status === "waiting" && b.status !== "waiting") return 1;
+    if (a.status !== "waiting" && b.status === "waiting") return -1;
+    if (a.lane === "today" && b.lane !== "today") return -1;
+    if (a.lane !== "today" && b.lane === "today") return 1;
+    return b.updatedAt.getTime() - a.updatedAt.getTime();
+  });
+
+  const upcomingBlocks = (options.blocksByProject.get(project.id) ?? [])
+    .slice()
+    .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+
+  const trackedMinutes = linkedTasks.reduce((total, task) => total + task.trackedMinutes, 0);
+  const scheduledMinutes = linkedTasks.reduce((total, task) => total + task.scheduledMinutes, 0);
+  const scheduledThisWeekMinutes = upcomingBlocks.reduce((total, block) => {
+    const weekStart = startOfWeek(options.now);
+    const weekEnd = endOfWeek(options.now);
+    if (block.startsAt < weekStart || block.startsAt >= weekEnd) return total;
+    return total + Math.max(0, Math.round((block.endsAt.getTime() - block.startsAt.getTime()) / 60000));
+  }, 0);
+
+  const openTaskCount = linkedTasks.filter((task) => task.status !== "done").length;
+  const doneTaskCount = linkedTasks.length - openTaskCount;
+  const todayTaskCount = linkedTasks.filter(
+    (task) => task.status !== "done" && task.status !== "waiting" && task.lane === "today",
+  ).length;
+  const waitingTaskCount = linkedTasks.filter((task) => task.status === "waiting").length;
+  const readyTaskCount = linkedTasks.filter(
+    (task) => task.status === "ready" || task.status === "scheduled",
+  ).length;
+  const inProgressTaskCount = linkedTasks.filter((task) => task.status === "in_progress").length;
+  const lastWorkedAt = linkedTasks.reduce<Date | null>((latest, task) => {
+    if (!task.lastWorkedAt) return latest;
+    if (!latest || task.lastWorkedAt.getTime() > latest.getTime()) {
+      return task.lastWorkedAt;
+    }
+    return latest;
+  }, null);
+  const nextScheduledAt = upcomingBlocks[0]?.startsAt ?? null;
 
   return {
     ...project,
@@ -58,23 +246,42 @@ function summarize(
     doneTaskCount,
     trackedMinutes,
     scheduledMinutes,
+    scheduledThisWeekMinutes,
+    todayTaskCount,
+    waitingTaskCount,
+    readyTaskCount,
+    inProgressTaskCount,
+    lastWorkedAt,
+    nextScheduledAt,
+    linkedTasks,
+    upcomingBlocks: upcomingBlocks.slice(0, 4),
+    healthFlags: buildHealthFlags(
+      project,
+      linkedTasks,
+      upcomingBlocks,
+      scheduledThisWeekMinutes,
+      lastWorkedAt,
+      options.now,
+    ),
   };
-}
-
-function cleanString(value: string | null | undefined) {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
 }
 
 export async function listProjects(userId: string): Promise<ProjectSummary[]> {
   requireCan(userId, "do", "read");
+  const now = new Date();
 
   const projects = await prisma.project.findMany({
     where: { userId },
     include: {
       doItems: {
         select: {
+          id: true,
+          title: true,
+          lane: true,
           status: true,
+          estimatedMinutes: true,
+          lastWorkedAt: true,
+          updatedAt: true,
           timeEntries: {
             where: { endedAt: { not: null } },
             select: { startedAt: true, endedAt: true },
@@ -85,53 +292,70 @@ export async function listProjects(userId: string): Promise<ProjectSummary[]> {
     orderBy: [{ updatedAt: "desc" }],
   });
 
-  const projectIds = projects.map((project) => project.id);
-  const scheduledMinutesByProject = new Map<string, number>();
+  const allDoItemIds = projects.flatMap((project) => project.doItems.map((item) => item.id));
+  const scheduledByTask = new Map<string, { scheduledMinutes: number; scheduledCount: number }>();
+  const blocksByProject = new Map<string, ProjectBlockSummary[]>();
+  const projectByDoId = new Map<string, string>();
 
-  if (projectIds.length > 0) {
-    const scheduled = await prisma.calendarItem.findMany({
+  for (const project of projects) {
+    for (const task of project.doItems) {
+      projectByDoId.set(task.id, project.id);
+    }
+  }
+
+  if (allDoItemIds.length > 0) {
+    const calendarItems = await prisma.calendarItem.findMany({
       where: {
         userId,
         sourceTool: "do",
+        sourceRefId: { in: allDoItemIds },
         status: { not: "cancelled" },
-        sourceRefId: {
-          in: (
-            await prisma.doItem.findMany({
-              where: { userId, projectId: { in: projectIds } },
-              select: { id: true, projectId: true },
-            })
-          ).map((item) => item.id),
-        },
+        endsAt: { gte: now },
       },
       select: {
+        id: true,
+        title: true,
         startsAt: true,
         endsAt: true,
         sourceRefId: true,
       },
+      orderBy: { startsAt: "asc" },
     });
 
-    const doItems = await prisma.doItem.findMany({
-      where: { userId, projectId: { in: projectIds } },
-      select: { id: true, projectId: true },
-    });
-    const projectByDoId = new Map(doItems.map((item) => [item.id, item.projectId]));
-
-    for (const block of scheduled) {
-      const projectId = block.sourceRefId ? projectByDoId.get(block.sourceRefId) : null;
-      if (!projectId) continue;
+    for (const block of calendarItems) {
+      if (!block.sourceRefId) continue;
       const duration = Math.max(
         0,
         Math.round((block.endsAt.getTime() - block.startsAt.getTime()) / 60000),
       );
-      scheduledMinutesByProject.set(
-        projectId,
-        (scheduledMinutesByProject.get(projectId) ?? 0) + duration,
-      );
+      const currentTask = scheduledByTask.get(block.sourceRefId) ?? {
+        scheduledMinutes: 0,
+        scheduledCount: 0,
+      };
+      currentTask.scheduledMinutes += duration;
+      currentTask.scheduledCount += 1;
+      scheduledByTask.set(block.sourceRefId, currentTask);
+
+      const projectId = projectByDoId.get(block.sourceRefId);
+      if (!projectId) continue;
+      const blocks = blocksByProject.get(projectId) ?? [];
+      blocks.push({
+        id: block.id,
+        title: block.title,
+        startsAt: block.startsAt,
+        endsAt: block.endsAt,
+        doItemId: block.sourceRefId,
+      });
+      blocksByProject.set(projectId, blocks);
     }
   }
 
   return projects.map((project) =>
-    summarize(project, scheduledMinutesByProject.get(project.id) ?? 0),
+    summarize(project, {
+      scheduledByTask,
+      blocksByProject,
+      now,
+    }),
   );
 }
 
@@ -157,7 +381,13 @@ export async function createProject(
     include: {
       doItems: {
         select: {
+          id: true,
+          title: true,
+          lane: true,
           status: true,
+          estimatedMinutes: true,
+          lastWorkedAt: true,
+          updatedAt: true,
           timeEntries: {
             where: { endedAt: { not: null } },
             select: { startedAt: true, endedAt: true },
@@ -175,7 +405,11 @@ export async function createProject(
     meta: { name: project.name, status: project.status },
   });
 
-  return summarize(project, 0);
+  return summarize(project, {
+    scheduledByTask: new Map(),
+    blocksByProject: new Map(),
+    now: new Date(),
+  });
 }
 
 export async function updateProject(
@@ -202,7 +436,13 @@ export async function updateProject(
     include: {
       doItems: {
         select: {
+          id: true,
+          title: true,
+          lane: true,
           status: true,
+          estimatedMinutes: true,
+          lastWorkedAt: true,
+          updatedAt: true,
           timeEntries: {
             where: { endedAt: { not: null } },
             select: { startedAt: true, endedAt: true },
@@ -220,27 +460,55 @@ export async function updateProject(
     meta: { name: project.name, status: project.status },
   });
 
-  const linkedDoItems = await prisma.doItem.findMany({
-    where: { userId, projectId: project.id },
-    select: { id: true },
-  });
-  const schedule = linkedDoItems.length
-    ? await prisma.calendarItem.findMany({
-        where: {
-          userId,
-          sourceTool: "do",
-          sourceRefId: { in: linkedDoItems.map((item) => item.id) },
-          status: { not: "cancelled" },
-        },
-        select: { startsAt: true, endsAt: true },
-      })
-    : [];
-  const scheduledMinutes = schedule.reduce((total, item) => {
-    return (
-      total +
-      Math.max(0, Math.round((item.endsAt.getTime() - item.startsAt.getTime()) / 60000))
-    );
-  }, 0);
+  const now = new Date();
+  const linkedTaskIds = project.doItems.map((item) => item.id);
+  const scheduledByTask = new Map<string, { scheduledMinutes: number; scheduledCount: number }>();
+  const blocksByProject = new Map<string, ProjectBlockSummary[]>();
 
-  return summarize(project, scheduledMinutes);
+  if (linkedTaskIds.length > 0) {
+    const schedule = await prisma.calendarItem.findMany({
+      where: {
+        userId,
+        sourceTool: "do",
+        sourceRefId: { in: linkedTaskIds },
+        status: { not: "cancelled" },
+        endsAt: { gte: now },
+      },
+      select: {
+        id: true,
+        title: true,
+        startsAt: true,
+        endsAt: true,
+        sourceRefId: true,
+      },
+      orderBy: { startsAt: "asc" },
+    });
+
+    for (const block of schedule) {
+      if (!block.sourceRefId) continue;
+      const duration = Math.max(
+        0,
+        Math.round((block.endsAt.getTime() - block.startsAt.getTime()) / 60000),
+      );
+      const currentTask = scheduledByTask.get(block.sourceRefId) ?? {
+        scheduledMinutes: 0,
+        scheduledCount: 0,
+      };
+      currentTask.scheduledMinutes += duration;
+      currentTask.scheduledCount += 1;
+      scheduledByTask.set(block.sourceRefId, currentTask);
+
+      const blocks = blocksByProject.get(project.id) ?? [];
+      blocks.push({
+        id: block.id,
+        title: block.title,
+        startsAt: block.startsAt,
+        endsAt: block.endsAt,
+        doItemId: block.sourceRefId,
+      });
+      blocksByProject.set(project.id, blocks);
+    }
+  }
+
+  return summarize(project, { scheduledByTask, blocksByProject, now });
 }
