@@ -65,7 +65,10 @@ export function LinkedConnectionsPanel({
   const [scriptReady, setScriptReady] = useState(false);
 
   const sortedConnections = useMemo(
-    () => [...connections].sort((a, b) => (a.institutionName ?? "").localeCompare(b.institutionName ?? "")),
+    () =>
+      [...connections].sort((a, b) =>
+        (a.institutionName ?? "").localeCompare(b.institutionName ?? ""),
+      ),
     [connections],
   );
 
@@ -83,13 +86,17 @@ export function LinkedConnectionsPanel({
       selectAccount: "multiple",
       ...(enrollmentId ? { enrollmentId } : {}),
       onSuccess: (enrollment) => {
-        setStatusMessage("Linking account and syncing fresh data…");
+        setStatusMessage("Linking account and syncing fresh data...");
         startTransition(async () => {
           const result = await linkTellerConnection(
             enrollment.accessToken,
             enrollment.enrollmentId ?? enrollmentId,
           );
-          setStatusMessage(result?.ok ? result.message : result?.error ?? "Could not link Teller connection.");
+          setStatusMessage(
+            result?.ok
+              ? result.message
+              : result?.error ?? "Could not link Teller connection.",
+          );
         });
       },
       onExit: () => {
@@ -129,7 +136,8 @@ export function LinkedConnectionsPanel({
             onClick={() => launchConnect()}
             className="btn-ink shrink-0"
           >
-            {pending ? "Connecting…" : "Connect bank  →"}
+            {pending ? "Connecting..." : "Connect bank"}{" "}
+            {!pending ? "->" : null}
           </button>
         </div>
 
@@ -140,7 +148,7 @@ export function LinkedConnectionsPanel({
         ) : null}
         {enabled && !scriptReady ? (
           <p className="mt-4 font-serif text-sm italic text-ink-fade">
-            Loading Teller Connect…
+            Loading Teller Connect...
           </p>
         ) : null}
         {statusMessage ? (
@@ -150,7 +158,7 @@ export function LinkedConnectionsPanel({
 
       {sortedConnections.length === 0 ? (
         <p className="rule-t rule-b border-rule px-2 py-10 text-center font-serif italic text-ink-fade">
-          ❦ No banks are wired in yet. ❦
+          No banks are wired in yet.
         </p>
       ) : (
         <ul>
@@ -163,7 +171,7 @@ export function LinkedConnectionsPanel({
                       {connection.institutionName ?? "Linked institution"}
                     </p>
                     <span className="font-mono text-[0.625rem] uppercase tracking-[0.2em] text-ink-fade">
-                      — {connection.provider}
+                      - {connection.provider}
                     </span>
                     <span
                       className={`font-mono text-[0.625rem] uppercase tracking-[0.2em] ${
@@ -199,7 +207,7 @@ export function LinkedConnectionsPanel({
                     type="button"
                     disabled={pending}
                     onClick={() => {
-                      setStatusMessage("Syncing linked bank data…");
+                      setStatusMessage("Syncing linked bank data...");
                       startTransition(async () => {
                         const result = await syncLinkedFinanceConnection(connection.id);
                         setStatusMessage(
@@ -211,7 +219,7 @@ export function LinkedConnectionsPanel({
                     }}
                     className="font-serif text-sm italic text-ink-fade transition-colors hover:text-ink disabled:opacity-50"
                   >
-                    Sync now ↻
+                    Sync now {"->"}
                   </button>
                   <button
                     type="button"
@@ -219,21 +227,25 @@ export function LinkedConnectionsPanel({
                     onClick={() => launchConnect(connection.enrollmentId)}
                     className="font-serif text-sm italic text-ink-fade transition-colors hover:text-ink disabled:opacity-50"
                   >
-                    Repair ⚒
+                    Repair
                   </button>
                   <button
                     type="button"
                     disabled={pending}
                     onClick={() => {
-                      setStatusMessage("Disconnecting linked bank sync…");
+                      setStatusMessage("Disconnecting linked bank sync...");
                       startTransition(async () => {
                         const result = await disconnectLinkedFinanceConnection(connection.id);
-                        setStatusMessage(result?.ok ? result.message : result?.error ?? "Could not disconnect linked account.");
+                        setStatusMessage(
+                          result?.ok
+                            ? result.message
+                            : result?.error ?? "Could not disconnect linked account.",
+                        );
                       });
                     }}
                     className="font-serif text-sm italic text-oxblood transition-colors hover:underline disabled:opacity-50"
                   >
-                    Disconnect ✕
+                    Disconnect x
                   </button>
                 </div>
               </div>

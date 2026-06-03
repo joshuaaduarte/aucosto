@@ -129,7 +129,6 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
   return (
     <div className="space-y-6">
       <div className="rule-t rule-b border-ink/40 py-5 space-y-6">
-        {/* Range pills as proper tabs with hairline underline */}
         <div className="flex flex-wrap items-baseline justify-between gap-4">
           <div className="flex flex-wrap items-baseline gap-x-7 gap-y-2">
             <span className="font-mono text-[0.625rem] uppercase tracking-[0.24em] text-ink-fade">
@@ -158,14 +157,14 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
             })}
           </div>
           <div className="flex items-baseline gap-x-7 font-mono text-[0.625rem] uppercase tracking-[0.22em] text-ink-fade">
-            <span>
-              View:
-            </span>
+            <span>View:</span>
             <button
               type="button"
               onClick={() => setView("compact")}
               className={`font-display normal-case text-base italic tracking-normal transition-colors ${
-                view === "compact" ? "text-ink underline underline-offset-4 decoration-rule" : "text-ink-fade hover:text-ink"
+                view === "compact"
+                  ? "text-ink underline underline-offset-4 decoration-rule"
+                  : "text-ink-fade hover:text-ink"
               }`}
             >
               Compact
@@ -174,7 +173,9 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
               type="button"
               onClick={() => setView("cards")}
               className={`font-display normal-case text-base italic tracking-normal transition-colors ${
-                view === "cards" ? "text-ink underline underline-offset-4 decoration-rule" : "text-ink-fade hover:text-ink"
+                view === "cards"
+                  ? "text-ink underline underline-offset-4 decoration-rule"
+                  : "text-ink-fade hover:text-ink"
               }`}
             >
               Cards
@@ -182,7 +183,6 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
           </div>
         </div>
 
-        {/* Tally row */}
         <div className="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-4">
           <div className="rule-l border-rule pl-4">
             <p className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-ink-fade">
@@ -215,21 +215,16 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
               <option value="smallest">Smallest first</option>
             </select>
           </label>
-          <button
-            type="button"
-            onClick={resetFilters}
-            className="rule-l border-rule pl-4 text-left"
-          >
+          <button type="button" onClick={resetFilters} className="rule-l border-rule pl-4 text-left">
             <span className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-ink-fade">
               Filters
             </span>
             <span className="mt-1 block font-display text-base italic text-ink-fade hover:text-ink">
-              Reset all ↺
+              Reset all {"->"}
             </span>
           </button>
         </div>
 
-        {/* Filters */}
         <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-3">
           <label className="space-y-1">
             <span className="font-mono text-[0.625rem] uppercase tracking-[0.22em] text-ink-fade">
@@ -271,9 +266,7 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
             </span>
             <select
               value={type}
-              onChange={(event) =>
-                setType(event.target.value as FinanceTransactionType | "all")
-              }
+              onChange={(event) => setType(event.target.value as FinanceTransactionType | "all")}
               className="field font-display text-base italic"
             >
               <option value="all">All movement</option>
@@ -289,11 +282,10 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
 
       {filtered.length === 0 ? (
         <p className="rule-t rule-b border-rule px-2 py-10 text-center font-serif italic text-ink-fade">
-          ❦ No entries match these filters. ❦
+          No entries match these filters.
         </p>
       ) : view === "compact" ? (
         <>
-          {/* Mobile cards */}
           <ul className="md:hidden">
             {filtered.map((transaction) => {
               const transactionType = classifyTransaction(transaction);
@@ -315,7 +307,9 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
                       </p>
                     </div>
                     <span
-                      className={`shrink-0 font-mono text-sm tabular ${transaction.amount < 0 ? "text-oxblood" : "text-verdigris"}`}
+                      className={`shrink-0 font-mono text-sm tabular ${
+                        transaction.amount < 0 ? "text-oxblood" : "text-verdigris"
+                      }`}
                     >
                       {formatUSDFromCents(transaction.amount)}
                     </span>
@@ -338,7 +332,6 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
             })}
           </ul>
 
-          {/* Desktop ledger table */}
           <div className="hidden md:block">
             <div className="rule-b border-ink/60 grid grid-cols-[110px_minmax(220px,1.6fr)_150px_140px_180px_120px] gap-4 py-2 font-mono text-[0.625rem] uppercase tracking-[0.22em] text-ink-fade">
               <span>Date</span>
@@ -368,7 +361,7 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
                       {transaction.description}
                     </p>
                     <span className="truncate font-serif text-sm italic text-ink-fade">
-                      {transaction.account ?? "—"}
+                      {transaction.account ?? "-"}
                     </span>
                     <span
                       className={`inline-flex w-fit border px-2 py-0.5 font-mono text-[0.625rem] uppercase tracking-[0.18em] ${typeTone(transactionType)}`}
@@ -382,7 +375,9 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
                       account={transaction.account}
                     />
                     <span
-                      className={`text-right font-mono text-sm tabular ${transaction.amount < 0 ? "text-oxblood" : "text-verdigris"}`}
+                      className={`text-right font-mono text-sm tabular ${
+                        transaction.amount < 0 ? "text-oxblood" : "text-verdigris"
+                      }`}
                     >
                       {formatUSDFromCents(transaction.amount)}
                     </span>
@@ -398,10 +393,7 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
             const transactionType = classifyTransaction(transaction);
             const resolvedCategory = (transaction.category ?? "Other") as FinanceCategory;
             return (
-              <li
-                key={transaction.id}
-                className="rule-t border-ink/30 pt-4"
-              >
+              <li key={transaction.id} className="rule-t border-ink/30 pt-4">
                 <div className="flex items-baseline justify-between gap-3">
                   <span
                     className={`inline-flex border px-2 py-0.5 font-mono text-[0.625rem] uppercase tracking-[0.18em] ${typeTone(transactionType)}`}
@@ -409,14 +401,14 @@ export function TransactionsReview({ transactions }: { transactions: Transaction
                     {formatTransactionType(transactionType)}
                   </span>
                   <span
-                    className={`font-mono text-sm tabular ${transaction.amount < 0 ? "text-oxblood" : "text-verdigris"}`}
+                    className={`font-mono text-sm tabular ${
+                      transaction.amount < 0 ? "text-oxblood" : "text-verdigris"
+                    }`}
                   >
                     {formatUSDFromCents(transaction.amount)}
                   </span>
                 </div>
-                <p className="mt-3 font-display text-lg text-ink">
-                  {transaction.description}
-                </p>
+                <p className="mt-3 font-display text-lg text-ink">{transaction.description}</p>
                 <p className="mt-1 font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-ink-fade">
                   {new Date(transaction.date).toLocaleDateString([], {
                     year: "numeric",

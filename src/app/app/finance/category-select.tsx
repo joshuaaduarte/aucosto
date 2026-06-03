@@ -70,7 +70,7 @@ export function CategorySelect({
           </button>
           {bulkMessage ? (
             <span className="font-serif text-[0.7rem] italic text-ink-fade">
-              — {bulkMessage}
+              - {bulkMessage}
             </span>
           ) : null}
         </div>
