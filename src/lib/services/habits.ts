@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { requireCan } from "@/lib/auth/can";
+import type { DoLane } from "@/lib/do";
 import {
   type HabitCadence,
   type HabitGoalUnit,
@@ -34,6 +35,8 @@ export type HabitSummary = Habit & {
   trackedMinutesToday: number;
   progressToday: number;
   completedToday: boolean;
+  progressThisWeek: number;
+  completedThisWeek: boolean;
   dueToday: boolean;
   currentStreak: number;
   longestStreak: number;
@@ -47,6 +50,10 @@ export type HabitSummary = Habit & {
   }>;
   cadenceLabel: string;
   targetLabel: string;
+};
+
+export type HabitTaskSummary = HabitSummary & {
+  taskLane: DoLane;
 };
 
 function startOfDay(date: Date) {
@@ -116,6 +123,20 @@ function progressForWindow(
     return Math.max(manual, minutesFromEntries(timeEntries));
   }
   return manual;
+}
+
+function progressForRange(
+  habit: Pick<Habit, "goalUnit">,
+  entries: HabitEntry[],
+  timeEntries: TimeEntry[],
+  start: Date,
+  end: Date,
+) {
+  return progressForWindow(
+    habit,
+    entries.filter((entry) => entry.loggedAt >= start && entry.loggedAt < end),
+    timeEntries.filter((entry) => entry.startedAt >= start && entry.startedAt < end),
+  );
 }
 
 function buildDailyWindows(now: Date, count: number) {
@@ -195,13 +216,17 @@ function streakForHabit(habit: HabitWithRelations, now: Date) {
 function summarizeHabit(habit: HabitWithRelations, now: Date): HabitSummary {
   const todayStart = startOfDay(now);
   const tomorrow = endOfDay(now);
+  const weekStart = startOfWeek(now);
+  const weekEnd = endOfWeek(now);
   const todayEntries = habit.entries.filter((entry) => entry.loggedAt >= todayStart && entry.loggedAt < tomorrow);
   const todayTimeEntries = habit.timeEntries.filter((entry) => entry.startedAt >= todayStart && entry.startedAt < tomorrow);
   const entriesToday = todayEntries.reduce((sum, entry) => sum + entry.quantity, 0);
   const trackedMinutesToday = minutesFromEntries(todayTimeEntries);
   const progressToday = progressForWindow(habit, todayEntries, todayTimeEntries);
+  const progressThisWeek = progressForRange(habit, habit.entries, habit.timeEntries, weekStart, weekEnd);
   const dueToday = isDueOnDate(habit, now);
   const completedToday = progressToday >= habit.targetCount;
+  const completedThisWeek = progressThisWeek >= habit.targetCount;
   const { currentStreak, longestStreak } = streakForHabit(habit, now);
 
   const recentDays = buildDailyWindows(now, 14).map((day) => {
@@ -234,6 +259,8 @@ function summarizeHabit(habit: HabitWithRelations, now: Date): HabitSummary {
     trackedMinutesToday,
     progressToday,
     completedToday,
+    progressThisWeek,
+    completedThisWeek,
     dueToday,
     currentStreak,
     longestStreak,
@@ -256,6 +283,16 @@ function summarizeHabit(habit: HabitWithRelations, now: Date): HabitSummary {
           : `${habit.targetCount} checks`
         : `${formatHabitQuantity(habit.targetCount, habit.goalUnit as HabitGoalUnit)} target`,
   };
+}
+
+function resolveHabitTaskLane(habit: HabitSummary): DoLane | null {
+  if (habit.archivedAt) return null;
+  if (habit.cadence === "weekly") {
+    if (habit.completedThisWeek) return null;
+    return habit.dueToday ? "today" : "next";
+  }
+  if (!habit.dueToday || habit.completedToday) return null;
+  return "today";
 }
 
 export async function listHabits(
@@ -302,6 +339,29 @@ export async function listSuggestedHabits(
       return b.updatedAt.getTime() - a.updatedAt.getTime();
     })
     .slice(0, options.limit ?? 4);
+}
+
+export async function listHabitTaskItems(
+  userId: string,
+  options: { limit?: number } = {},
+): Promise<HabitTaskSummary[]> {
+  const habits = await listHabits(userId);
+  return habits
+    .map((habit) => {
+      const taskLane = resolveHabitTaskLane(habit);
+      return taskLane ? { ...habit, taskLane } : null;
+    })
+    .filter((habit): habit is HabitTaskSummary => Boolean(habit))
+    .sort((a, b) => {
+      if (a.taskLane !== b.taskLane) return a.taskLane === "today" ? -1 : 1;
+      if (a.dueToday !== b.dueToday) return a.dueToday ? -1 : 1;
+      if ((a.reminderTime ?? "") !== (b.reminderTime ?? "")) {
+        return (a.reminderTime ?? "").localeCompare(b.reminderTime ?? "");
+      }
+      if (a.currentStreak !== b.currentStreak) return b.currentStreak - a.currentStreak;
+      return b.updatedAt.getTime() - a.updatedAt.getTime();
+    })
+    .slice(0, options.limit ?? 100);
 }
 
 export async function createHabit(userId: string, input: SaveHabitInput) {

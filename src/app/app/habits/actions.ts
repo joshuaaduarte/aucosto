@@ -8,6 +8,7 @@ import { createDoItem } from "@/lib/services/do";
 import {
   archiveHabit,
   createHabit,
+  listHabits,
   logHabitProgress,
   startTimerForHabit,
   updateHabit,
@@ -167,4 +168,25 @@ export async function scheduleHabitAction(formData: FormData) {
     sourceRefId: habitId || null,
   });
   revalidateHabits();
+}
+
+export async function quickLogHabitFromDoAction(formData: FormData) {
+  const userId = await requireUserId();
+  const id = String(formData.get("id") ?? "");
+  const habits = await listHabits(userId, { includeArchived: true });
+  const habit = habits.find((item) => item.id === id && !item.archivedAt);
+  if (!habit) return;
+
+  const remaining =
+    habit.cadence === "weekly"
+      ? Math.max(1, habit.targetCount - habit.progressThisWeek)
+      : Math.max(1, habit.targetCount - habit.progressToday);
+
+  await logHabitProgress(userId, id, {
+    quantity: habit.goalUnit === "minutes" ? Math.max(5, remaining) : remaining,
+    notes: "Quick-completed from Do List.",
+  });
+
+  revalidateHabits();
+  revalidatePath("/app/do");
 }

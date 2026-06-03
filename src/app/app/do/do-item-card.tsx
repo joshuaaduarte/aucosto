@@ -14,9 +14,9 @@ import {
   completeDoItemAction,
   deleteDoItemAction,
   reopenDoItemAction,
-  startDoItemTimerAction,
   updateDoItemAction,
 } from "./actions";
+import { DoStartTimerButton } from "./start-timer-button";
 
 function DetailRow({
   label,
@@ -212,12 +212,7 @@ export function DoItemCard({
 
             <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:justify-end">
               {item.status !== "done" ? (
-                <form action={startDoItemTimerAction} className="contents sm:block">
-                  <input type="hidden" name="id" value={item.id} />
-                  <button className="btn-ghost h-8 w-full px-2.5 text-[0.75rem]" type="submit">
-                    Start timer
-                  </button>
-                </form>
+                <DoStartTimerButton id={item.id} />
               ) : null}
 
               {item.status !== "done" ? (

@@ -17,9 +17,9 @@ import {
   createDoFromHabitAction,
   logHabitAction,
   scheduleHabitAction,
-  startHabitTimerAction,
   updateHabitAction,
 } from "./actions";
+import { HabitStartTimerButton } from "./start-timer-button";
 
 function MetricTile({ label, value }: { label: string; value: string }) {
   return (
@@ -211,12 +211,7 @@ export function HabitCard({ habit }: { habit: HabitSummary }) {
               <button type="button" className="btn-ink h-8 w-full px-2.5 text-[0.75rem]" onClick={() => setLogOpen(true)}>
                 {habit.goalUnit === "check" ? "Done" : "Log"}
               </button>
-              <form action={startHabitTimerAction} className="contents sm:block">
-                <input type="hidden" name="id" value={habit.id} />
-                <button className="btn-ghost h-8 w-full px-2.5 text-[0.75rem]" type="submit">
-                  Start timer
-                </button>
-              </form>
+              <HabitStartTimerButton id={habit.id} />
               <button type="button" className="btn-ghost h-8 w-full px-2.5 text-[0.75rem]" onClick={() => setScheduleOpen(true)}>
                 Schedule
               </button>
@@ -225,7 +220,7 @@ export function HabitCard({ habit }: { habit: HabitSummary }) {
                 <input type="hidden" name="bucket" value={habit.bucket ?? ""} />
                 <input type="hidden" name="estimatedMinutes" value={habit.defaultDurationMinutes ?? ""} />
                 <button className="btn-ghost h-8 w-full px-2.5 text-[0.75rem]" type="submit">
-                  Make task
+                  Spin out task
                 </button>
               </form>
             </div>

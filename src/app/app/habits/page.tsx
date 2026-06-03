@@ -51,6 +51,33 @@ function MetricCard({ label, value, hint }: { label: string; value: string; hint
   );
 }
 
+function OverflowList({
+  children,
+  count,
+  initialCount = 4,
+}: {
+  children: ReactNode[];
+  count: number;
+  initialCount?: number;
+}) {
+  const visible = children.slice(0, initialCount);
+  const overflow = children.slice(initialCount);
+
+  return (
+    <div className="space-y-3">
+      <ol className="space-y-3">{visible}</ol>
+      {overflow.length > 0 ? (
+        <details className="rounded-md border px-3 py-2.5" style={{ borderColor: "var(--border-faint)" }}>
+          <summary className="cursor-pointer list-none text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
+            Show {count - initialCount} more
+          </summary>
+          <ol className="mt-3 space-y-3">{overflow}</ol>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
 export default async function HabitsPage() {
   const userId = await resolveActiveUserId();
   const habits = await listHabits(userId, { includeArchived: true });
@@ -112,9 +139,9 @@ export default async function HabitsPage() {
 
         <SectionCard eyebrow="Connections" title="How habits can feed the rest of the system.">
           <ul className="space-y-2 text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
-            <li>Start a habit timer and the Time tool will carry it forward.</li>
-            <li>Schedule a habit into Calendar when it needs protected time.</li>
-            <li>Turn a habit into a Do List item when it needs a more concrete execution pass.</li>
+            <li>Due habits now surface inside Do List as recurring task work.</li>
+            <li>Start a habit timer and you land straight in Time so the session is visible.</li>
+            <li>Schedule a habit into Calendar or spin out a one-off task when it needs a deeper execution pass.</li>
           </ul>
         </SectionCard>
       </section>
@@ -123,32 +150,32 @@ export default async function HabitsPage() {
 
       <section className="grid gap-6 lg:grid-cols-2">
         <SectionCard eyebrow="Due today" title="Keep these alive before the day slips.">
-          {dueToday.length === 0 ? (
-            <p className="text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
-              Nothing urgent right now.
-            </p>
-          ) : (
-            <ol className="space-y-3">
-              {dueToday.map((habit) => (
-                <HabitCard key={habit.id} habit={habit} />
-              ))}
-            </ol>
-          )}
-        </SectionCard>
+        {dueToday.length === 0 ? (
+          <p className="text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
+            Nothing urgent right now.
+          </p>
+        ) : (
+          <OverflowList count={dueToday.length}>
+            {dueToday.map((habit) => (
+              <HabitCard key={habit.id} habit={habit} />
+            ))}
+          </OverflowList>
+        )}
+      </SectionCard>
 
         <SectionCard eyebrow="Keep warm" title="Not urgent, but still part of the rhythm.">
-          {keepWarm.length === 0 ? (
-            <p className="text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
-              No extra habits sitting in the middle right now.
-            </p>
-          ) : (
-            <ol className="space-y-3">
-              {keepWarm.map((habit) => (
-                <HabitCard key={habit.id} habit={habit} />
-              ))}
-            </ol>
-          )}
-        </SectionCard>
+        {keepWarm.length === 0 ? (
+          <p className="text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
+            No extra habits sitting in the middle right now.
+          </p>
+        ) : (
+          <OverflowList count={keepWarm.length}>
+            {keepWarm.map((habit) => (
+              <HabitCard key={habit.id} habit={habit} />
+            ))}
+          </OverflowList>
+        )}
+      </SectionCard>
       </section>
 
       <SectionCard eyebrow="Completed" title="Already landed today.">
@@ -157,21 +184,21 @@ export default async function HabitsPage() {
             Nothing closed yet today.
           </p>
         ) : (
-          <ol className="space-y-3">
+          <OverflowList count={completedToday.length}>
             {completedToday.map((habit) => (
               <HabitCard key={habit.id} habit={habit} />
             ))}
-          </ol>
+          </OverflowList>
         )}
       </SectionCard>
 
       {archivedHabits.length > 0 ? (
         <SectionCard eyebrow="Archived" title="Paused or retired habits.">
-          <ol className="space-y-3">
+          <OverflowList count={archivedHabits.length}>
             {archivedHabits.map((habit) => (
               <HabitCard key={habit.id} habit={habit} />
             ))}
-          </ol>
+          </OverflowList>
         </SectionCard>
       ) : null}
     </div>

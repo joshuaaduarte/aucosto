@@ -7,9 +7,14 @@ import {
   formatMinutes,
 } from "@/lib/do";
 import { listDoItems, type DoItemSummary } from "@/lib/services/do";
+import {
+  listHabitTaskItems,
+  type HabitTaskSummary,
+} from "@/lib/services/habits";
 import { listProjects } from "@/lib/services/projects";
 import { DoCreateForm } from "./create-form";
 import { DoItemCard } from "./do-item-card";
+import { HabitTaskCard } from "./habit-task-card";
 
 export const dynamic = "force-dynamic";
 
@@ -47,18 +52,62 @@ function SectionCard({
   );
 }
 
+function OverflowList<T>({
+  items,
+  renderItem,
+  initialCount = 4,
+}: {
+  items: T[];
+  renderItem: (item: T) => ReactNode;
+  initialCount?: number;
+}) {
+  const visible = items.slice(0, initialCount);
+  const overflow = items.slice(initialCount);
+
+  return (
+    <div className="space-y-3">
+      <ol className="space-y-3">{visible.map(renderItem)}</ol>
+      {overflow.length > 0 ? (
+        <details
+          className="rounded-md border px-3 py-2.5"
+          style={{ borderColor: "var(--border-faint)" }}
+        >
+          <summary
+            className="cursor-pointer list-none text-[0.75rem] font-medium"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Show {overflow.length} more
+          </summary>
+          <ol className="mt-3 space-y-3">{overflow.map(renderItem)}</ol>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
 export default async function DoPage() {
   const userId = await resolveActiveUserId();
-  const [items, projects] = await Promise.all([
+  const [items, habitTasks, projects] = await Promise.all([
     listDoItems(userId, { includeDone: true }),
+    listHabitTaskItems(userId),
     listProjects(userId),
   ]);
 
   const activeItems = items.filter((item) => item.status !== "done");
-  const doneItems = items.filter((item) => item.status === "done").slice(0, 8);
+  const doneItems = items.filter((item) => item.status === "done");
+  const activeFeedCount = activeItems.length + habitTasks.length;
   const byLane = Object.fromEntries(
-    DO_LANES.map((lane) => [lane, activeItems.filter((item) => item.lane === lane)]),
-  ) as Record<(typeof DO_LANES)[number], DoItemSummary[]>;
+    DO_LANES.map((lane) => [
+      lane,
+      {
+        tasks: activeItems.filter((item) => item.lane === lane),
+        habits: habitTasks.filter((habit) => habit.taskLane === lane),
+      },
+    ]),
+  ) as Record<
+    (typeof DO_LANES)[number],
+    { tasks: DoItemSummary[]; habits: HabitTaskSummary[] }
+  >;
 
   const estimatedOpenMinutes = activeItems.reduce(
     (total, item) => total + (item.estimatedMinutes ?? 0),
@@ -80,16 +129,27 @@ export default async function DoPage() {
         completedWithLearned.reduce((total, item) => {
           return (
             total +
-            (item.effectiveActualMinutes! / Math.max(1, item.estimatedMinutes!)) * 100
+            (item.effectiveActualMinutes! /
+              Math.max(1, item.estimatedMinutes!)) *
+              100
           );
         }, 0) / completedWithLearned.length,
       )
     : null;
-  const waitingCount = activeItems.filter((item) => item.status === "waiting").length;
-  const inProgressCount = activeItems.filter((item) => item.status === "in_progress").length;
-  const scheduledCount = activeItems.filter((item) => item.status === "scheduled").length;
+  const waitingCount = activeItems.filter(
+    (item) => item.status === "waiting",
+  ).length;
+  const inProgressCount = activeItems.filter(
+    (item) => item.status === "in_progress",
+  ).length;
+  const scheduledCount = activeItems.filter(
+    (item) => item.status === "scheduled",
+  ).length;
   const unscheduledTodayCount = activeItems.filter(
-    (item) => item.lane === "today" && item.scheduledMinutes === 0 && item.status !== "waiting",
+    (item) =>
+      item.lane === "today" &&
+      item.scheduledMinutes === 0 &&
+      item.status !== "waiting",
   ).length;
   const overEstimateCount = activeItems.filter(
     (item) =>
@@ -122,52 +182,101 @@ export default async function DoPage() {
           className="text-[0.8125rem] sm:max-w-[38rem] sm:text-right"
           style={{ color: "var(--text-muted)" }}
         >
-          {activeItems.length} active
+          {activeFeedCount} active
           {unscheduledTodayCount > 0
             ? ` · ${unscheduledTodayCount} unscheduled today`
             : " · today is covered"}
+          {habitTasks.length > 0
+            ? ` · ${habitTasks.length} recurring habit task${
+                habitTasks.length === 1 ? "" : "s"
+              } in the flow`
+            : ""}
           {activeProjectCount > 0
-            ? ` · ${activeProjectCount} linked project${activeProjectCount === 1 ? "" : "s"}`
+            ? ` · ${activeProjectCount} linked project${
+                activeProjectCount === 1 ? "" : "s"
+              }`
             : ""}
         </p>
       </header>
 
       <section
-        className="fade-in-delay-1 grid gap-px overflow-hidden rounded-md border sm:grid-cols-2 xl:grid-cols-5"
+        className="fade-in-delay-1 grid gap-px overflow-hidden rounded-md border sm:grid-cols-2 xl:grid-cols-3"
         style={{
           borderColor: "var(--border-faint)",
           background: "var(--border-faint)",
         }}
       >
-        <MetricCard label="Open" value={String(activeItems.length)} hint="tasks still in motion" />
-        <MetricCard label="Estimated" value={formatMinutes(estimatedOpenMinutes)} hint="remaining if estimates hold" />
-        <MetricCard label="Scheduled" value={formatMinutes(scheduledOpenMinutes)} hint="time already protected" />
-        <MetricCard label="Tracked" value={formatMinutes(trackedOpenMinutes)} hint="time already spent" />
+        <MetricCard
+          label="Open"
+          value={String(activeItems.length)}
+          hint="one-off tasks still in motion"
+        />
+        <MetricCard
+          label="Recurring"
+          value={String(habitTasks.length)}
+          hint="habit tasks showing up right now"
+        />
+        <MetricCard
+          label="Estimated"
+          value={formatMinutes(estimatedOpenMinutes)}
+          hint="remaining if estimates hold"
+        />
+        <MetricCard
+          label="Scheduled"
+          value={formatMinutes(scheduledOpenMinutes)}
+          hint="time already protected"
+        />
+        <MetricCard
+          label="Tracked"
+          value={formatMinutes(trackedOpenMinutes)}
+          hint="time already spent"
+        />
         <MetricCard
           label="Learning"
           value={averageAccuracy ? `${averageAccuracy}%` : "Waiting"}
-          hint={averageAccuracy ? "actual vs estimate on recent completions" : "complete a few tasks to calibrate"}
+          hint={
+            averageAccuracy
+              ? "actual vs estimate on recent completions"
+              : "complete a few tasks to calibrate"
+          }
         />
       </section>
 
       <section className="grid gap-3 lg:grid-cols-2">
         <SectionCard eyebrow="Attention" title="Where the loop still needs help.">
-          <ul className="space-y-2 text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
+          <ul
+            className="space-y-2 text-[0.875rem]"
+            style={{ color: "var(--text-muted)" }}
+          >
             <li>
               {unscheduledTodayCount > 0
-                ? `${unscheduledTodayCount} Today task${unscheduledTodayCount === 1 ? "" : "s"} still need calendar time.`
+                ? `${unscheduledTodayCount} Today task${
+                    unscheduledTodayCount === 1 ? "" : "s"
+                  } still need calendar time.`
                 : "Today tasks are either scheduled, done, or intentionally waiting."}
             </li>
             <li>
+              {habitTasks.length > 0
+                ? `${habitTasks.length} recurring habit task${
+                    habitTasks.length === 1 ? "" : "s"
+                  } are now flowing through Do List too.`
+                : "No recurring habits are landing in the task flow right now."}
+            </li>
+            <li>
               {overEstimateCount > 0
-                ? `${overEstimateCount} active task${overEstimateCount === 1 ? "" : "s"} have already run past their estimate.`
+                ? `${overEstimateCount} active task${
+                    overEstimateCount === 1 ? "" : "s"
+                  } have already run past their estimate.`
                 : "No active tasks have blown past their estimate yet."}
             </li>
           </ul>
         </SectionCard>
 
         <SectionCard eyebrow="States" title="What the work is actually doing.">
-          <ul className="space-y-2 text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
+          <ul
+            className="space-y-2 text-[0.875rem]"
+            style={{ color: "var(--text-muted)" }}
+          >
             <li>{inProgressCount} in progress right now or recently resumed.</li>
             <li>{scheduledCount} already scheduled before they are done.</li>
             <li>{waitingCount} waiting on someone or something else.</li>
@@ -175,7 +284,9 @@ export default async function DoPage() {
         </SectionCard>
       </section>
 
-      <DoCreateForm projects={projects.map((project) => ({ id: project.id, name: project.name }))} />
+      <DoCreateForm
+        projects={projects.map((project) => ({ id: project.id, name: project.name }))}
+      />
 
       <section className="grid gap-6 lg:grid-cols-2">
         {DO_LANES.map((lane) => (
@@ -184,16 +295,49 @@ export default async function DoPage() {
             eyebrow={DO_LANE_LABELS[lane]}
             title={DO_LANE_DESCRIPTIONS[lane]}
           >
-            {byLane[lane].length === 0 ? (
-              <p className="text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
+            {byLane[lane].tasks.length === 0 && byLane[lane].habits.length === 0 ? (
+              <p
+                className="text-[0.875rem]"
+                style={{ color: "var(--text-muted)" }}
+              >
                 Nothing here yet.
               </p>
             ) : (
-              <ol className="space-y-3">
-                {byLane[lane].map((item) => (
-                  <DoItemCard key={item.id} item={item} projects={projects} />
-                ))}
-              </ol>
+              <div className="space-y-4">
+                {byLane[lane].habits.length > 0 ? (
+                  <div className="space-y-3">
+                    <p
+                      className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+                      style={{ color: "var(--text-faint)" }}
+                    >
+                      Recurring habit tasks
+                    </p>
+                    <OverflowList
+                      items={byLane[lane].habits}
+                      renderItem={(habit) => (
+                        <HabitTaskCard key={habit.id} habit={habit} />
+                      )}
+                    />
+                  </div>
+                ) : null}
+
+                {byLane[lane].tasks.length > 0 ? (
+                  <div className="space-y-3">
+                    <p
+                      className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+                      style={{ color: "var(--text-faint)" }}
+                    >
+                      One-off tasks
+                    </p>
+                    <OverflowList
+                      items={byLane[lane].tasks}
+                      renderItem={(item) => (
+                        <DoItemCard key={item.id} item={item} projects={projects} />
+                      )}
+                    />
+                  </div>
+                ) : null}
+              </div>
             )}
           </SectionCard>
         ))}
@@ -205,11 +349,12 @@ export default async function DoPage() {
             Nothing completed yet.
           </p>
         ) : (
-          <ol className="space-y-3">
-            {doneItems.map((item) => (
+          <OverflowList
+            items={doneItems}
+            renderItem={(item) => (
               <DoItemCard key={item.id} item={item} projects={projects} />
-            ))}
-          </ol>
+            )}
+          />
         )}
       </SectionCard>
     </div>
@@ -239,7 +384,10 @@ function MetricCard({
       >
         {value}
       </p>
-      <p className="mt-0.5 text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+      <p
+        className="mt-0.5 text-[0.75rem]"
+        style={{ color: "var(--text-faint)" }}
+      >
         {hint}
       </p>
     </div>

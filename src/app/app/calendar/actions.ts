@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import * as timeService from "@/lib/services/time";
 import {
   createCalendarItem,
@@ -120,6 +121,7 @@ export async function startTimerFromCalendarItemAction(formData: FormData) {
   await updateCalendarItem(userId, id, { status: "confirmed" });
   revalidateCalendar();
   revalidatePath("/app/time");
+  redirect("/app/time");
 }
 
 export async function deleteCalendarItemAction(formData: FormData) {
