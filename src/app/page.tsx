@@ -144,28 +144,28 @@ const tools: Tool[] = [
   },
   {
     title: "Calendar",
-    body: "Fixed commitments and intentional blocks. Shape the week before it happens to you.",
+    body: "Fixed commitments and planned blocks.",
     status: "live",
     Icon: CalendarIcon,
     href: "/app/calendar",
   },
   {
     title: "Do List",
-    body: "Capture tasks, bucket them by area, and see estimates collide with reality.",
+    body: "Capture tasks, sort them by area, and compare plan vs. reality.",
     status: "live",
     Icon: ListIcon,
     href: "/app/do",
   },
   {
     title: "Time",
-    body: "Start a session when you begin, then close it when you switch tasks.",
+    body: "Track sessions as you work.",
     status: "live",
     Icon: ClockIcon,
     href: "/app/time",
   },
   {
     title: "Finance",
-    body: "True spend separated from transfers. Net worth, monthly pace, the category pulling hardest.",
+    body: "Track spend, net worth, and monthly pace.",
     status: "live",
     Icon: WalletIcon,
     href: "/app/finance",
@@ -190,7 +190,7 @@ const tools: Tool[] = [
   },
   {
     title: "Projects",
-    body: "Outcomes, milestones, and linked Do items. Plan the work without turning it into office cosplay.",
+    body: "Outcomes, milestones, and linked Do List items.",
     status: "live",
     Icon: ProjectsIcon,
     href: "/app/projects",
@@ -207,22 +207,22 @@ const intersections: Array<{ a: string; b: string; line: string }> = [
   {
     a: "Time",
     b: "Finance",
-    line: "See earnings next to logged hours without doing the math yourself.",
+    line: "See earnings next to logged hours.",
   },
   {
     a: "Calendar",
     b: "Time",
-    line: "Open gaps and unfilled blocks become focus suggestions, not guilt.",
+    line: "Open gaps turn into focus suggestions.",
   },
   {
     a: "Finance",
     b: "Meals",
-    line: "Compare meal plans with what you actually bought.",
+    line: "Compare meal plans with what you bought.",
   },
   {
     a: "Fitness",
     b: "Signals",
-    line: "View sleep and intake together in one place.",
+    line: "View sleep and intake together.",
   },
 ];
 

@@ -11,6 +11,7 @@ export type ViewerContext = {
   ownerUserId: string;
   effectiveUserId: string;
   displayName: string;
+  timezone: string;
   financeVisible: boolean;
   appLockEnabled: boolean;
   isUnlocked: boolean;
@@ -29,6 +30,7 @@ export async function getViewerContext(): Promise<ViewerContext | null> {
       id: true,
       name: true,
       email: true,
+      timezone: true,
       financeVisible: true,
       appLockEnabled: true,
       demoWorkspace: { select: { id: true } },
@@ -44,6 +46,7 @@ export async function getViewerContext(): Promise<ViewerContext | null> {
     ownerUserId: owner.id,
     effectiveUserId,
     displayName: owner.name ?? owner.email,
+    timezone: owner.timezone,
     financeVisible: owner.financeVisible,
     appLockEnabled: owner.appLockEnabled,
     isUnlocked: !owner.appLockEnabled || cookieStore.get(APP_UNLOCK_COOKIE)?.value === "1",

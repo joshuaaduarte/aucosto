@@ -180,8 +180,8 @@ export default async function ProjectsPage() {
           Project notes
         </summary>
         <div className="mt-3 space-y-2 text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
-          <p>Use a project when the work needs an outcome, a next milestone, and multiple linked tasks.</p>
-          <p>Skip it when a standalone Do item is enough. This page should stay lean, not turn into office software.</p>
+          <p>Use a project when the work needs an outcome, a next milestone, and linked tasks.</p>
+          <p>Skip it when a single Do List item is enough.</p>
         </div>
       </details>
 
@@ -190,7 +190,7 @@ export default async function ProjectsPage() {
       <SectionCard eyebrow="In motion" title="Current project stack.">
         {active.length === 0 ? (
           <p className="text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
-            No projects yet. Open one when the work needs an outcome, not just a checklist.
+            No projects yet. Create one when the work needs more than a checklist.
           </p>
         ) : (
           <ol className="space-y-3">

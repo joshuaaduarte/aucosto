@@ -64,7 +64,7 @@ export function parseMinutes(input: string | number | null | undefined): number 
 }
 
 export function formatMinutes(minutes: number | null | undefined): string {
-  if (!minutes || minutes <= 0) return "No estimate";
+  if (!minutes || minutes <= 0) return "N/A";
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
   if (hours === 0) return `${mins}m`;

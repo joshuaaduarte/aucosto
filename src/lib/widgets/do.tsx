@@ -22,7 +22,7 @@ export async function DoWidget() {
             className="text-[0.8125rem] leading-relaxed"
             style={{ color: "var(--text-muted)" }}
           >
-            Add one task with an estimate and the timer and calendar will have something to suggest.
+            Add one task and the timer and calendar can start helping.
           </p>
         </div>
       ) : (

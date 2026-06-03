@@ -80,6 +80,7 @@ export default async function HubPage() {
   const session = await auth();
   const context = await getViewerContext();
   const firstName = session?.user?.name?.split(" ")[0];
+  const timezone = resolveViewerTimeZone(context?.timezone);
 
   const userId = context?.effectiveUserId;
   const financeVisible = context?.financeVisible ?? false;
@@ -127,13 +128,14 @@ export default async function HubPage() {
       financeVisible && !financeLocked ? lastMonthSpentCents : undefined,
   });
 
-  const todayLong = new Date().toLocaleDateString([], {
+  const todayLong = new Intl.DateTimeFormat([], {
     weekday: "long",
     month: "long",
     day: "numeric",
-  });
+    timeZone: timezone,
+  }).format(new Date());
 
-  const greeting = hourOfDayGreeting();
+  const greeting = hourOfDayGreeting(timezone);
 
   return (
     <div className="space-y-10">
@@ -275,12 +277,12 @@ export default async function HubPage() {
           Your workspace
         </p>
         <ul className="flex flex-col gap-0.5">
-          <ToolLink href="/app/calendar" icon={<CalendarIcon />} label="Calendar" hint="The week, shaped on purpose." />
-          <ToolLink href="/app/do" icon={<ConnectionIcon />} label="Do List" hint="Tasks with estimates, suggestions, and actuals." />
-          <ToolLink href="/app/projects" icon={<ConnectionIcon />} label="Projects" hint="Outcomes, milestones, and linked execution." />
-          <ToolLink href="/app/time" icon={<ClockIcon />} label="Time" hint="Sessions logged. Where the week actually went." />
+          <ToolLink href="/app/calendar" icon={<CalendarIcon />} label="Calendar" hint="Planned time for the week." />
+          <ToolLink href="/app/do" icon={<ConnectionIcon />} label="Do List" hint="Tasks, estimates, and actuals." />
+          <ToolLink href="/app/projects" icon={<ConnectionIcon />} label="Projects" hint="Outcomes, milestones, and linked work." />
+          <ToolLink href="/app/time" icon={<ClockIcon />} label="Time" hint="Logged sessions and where the week went." />
           {financeVisible && (
-            <ToolLink href="/app/finance" icon={<WalletIcon />} label="Finance" hint="Net worth, monthly pace, the category to watch." />
+            <ToolLink href="/app/finance" icon={<WalletIcon />} label="Finance" hint="Net worth, spend, and monthly pace." />
           )}
         </ul>
       </section>
@@ -479,14 +481,25 @@ function CrossToolCallout({
    Server Components, so they avoid the react-hooks/purity gotcha)
    ────────────────────────────────────────────────────────────────── */
 
-function hourOfDayGreeting(): string {
-  // Server-rendered greeting — fine to call at request time
-  const hour = new Date().getHours();
+function hourOfDayGreeting(timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    hour12: false,
+    timeZone,
+  }).formatToParts(new Date());
+  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "12");
   if (hour < 5) return "Still up";
   if (hour < 12) return "Good morning";
   if (hour < 17) return "Good afternoon";
   if (hour < 21) return "Good evening";
   return "Good night";
+}
+
+function resolveViewerTimeZone(timeZone: string | null | undefined): string {
+  if (!timeZone || timeZone === "UTC") {
+    return "America/Los_Angeles";
+  }
+  return timeZone;
 }
 
 function composeSubline({
