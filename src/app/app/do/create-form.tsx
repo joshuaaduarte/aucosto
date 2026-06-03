@@ -149,7 +149,14 @@ export function DoCreateForm({
               ))}
             </div>
 
-            <form ref={formRef} action={formAction} className="mt-5 space-y-4">
+            <form
+              ref={formRef}
+              action={formAction}
+              className="mt-5 space-y-4"
+              onSubmit={() => {
+                submittedRef.current = true;
+              }}
+            >
               <div className="space-y-1.5">
                 <label
                   htmlFor="do-title"

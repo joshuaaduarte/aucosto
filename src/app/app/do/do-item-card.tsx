@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import {
   DO_BUCKET_SUGGESTIONS,
   DO_LANE_LABELS,
@@ -50,6 +50,8 @@ function CompletionModal({
   item: DoItemSummary;
   onClose: () => void;
 }) {
+  const [isPending, startTransition] = useTransition();
+
   return (
     <div
       className="calendar-modal-backdrop"
@@ -110,9 +112,13 @@ function CompletionModal({
         </div>
 
         <form
-          action={completeDoItemAction}
+          action={(formData) => {
+            startTransition(async () => {
+              await completeDoItemAction(formData);
+              onClose();
+            });
+          }}
           className="mt-5 space-y-4"
-          onSubmit={onClose}
         >
           <input type="hidden" name="id" value={item.id} />
           <div className="space-y-1.5">
@@ -143,8 +149,8 @@ function CompletionModal({
             <button type="button" className="btn-ghost w-full sm:w-auto" onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="btn-ink w-full sm:w-auto">
-              Mark done
+            <button type="submit" disabled={isPending} className="btn-ink w-full sm:w-auto">
+              {isPending ? "Saving..." : "Mark done"}
             </button>
           </div>
         </form>
