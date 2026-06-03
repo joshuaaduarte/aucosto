@@ -21,6 +21,56 @@ import {
 } from "./actions";
 import { HabitStartTimerButton } from "./start-timer-button";
 
+function clampPercent(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function periodLabel(habit: HabitSummary) {
+  return habit.cadence === "weekly" ? "this week" : "today";
+}
+
+function progressValue(habit: HabitSummary) {
+  return habit.cadence === "weekly" ? habit.progressThisWeek : habit.progressToday;
+}
+
+function progressRatio(habit: HabitSummary) {
+  return clampPercent((progressValue(habit) / Math.max(1, habit.targetCount)) * 100);
+}
+
+function recentWindowSummary(habit: HabitSummary) {
+  const dueDays = habit.recentDays.filter((day) => day.due);
+  const hitDays = dueDays.filter((day) => day.completed);
+  return {
+    dueCount: dueDays.length,
+    hitCount: hitDays.length,
+    missCount: Math.max(0, dueDays.length - hitDays.length),
+  };
+}
+
+function detailTone(completed: boolean, due: boolean) {
+  if (completed) {
+    return {
+      background: "var(--text)",
+      color: "var(--bg-page)",
+      borderColor: "var(--text)",
+    };
+  }
+
+  if (due) {
+    return {
+      background: "var(--accent-tint)",
+      color: "var(--text)",
+      borderColor: "var(--border-faint)",
+    };
+  }
+
+  return {
+    background: "var(--bg-tint)",
+    color: "var(--text-faint)",
+    borderColor: "var(--border-faint)",
+  };
+}
+
 function MetricTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border px-3 py-2.5" style={{ borderColor: "var(--border-faint)" }}>
@@ -179,6 +229,11 @@ function ScheduleModal({ habit, onClose }: { habit: HabitSummary; onClose: () =>
 export function HabitCard({ habit }: { habit: HabitSummary }) {
   const [logOpen, setLogOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const progress = progressValue(habit);
+  const progressPercent = progressRatio(habit);
+  const period = periodLabel(habit);
+  const last7 = habit.recentDays.slice(-7);
+  const windowSummary = recentWindowSummary(habit);
 
   return (
     <>
@@ -193,7 +248,9 @@ export function HabitCard({ habit }: { habit: HabitSummary }) {
                 {habit.bucket ? <span className="pill">{habit.bucket}</span> : null}
                 <span className="pill">{habit.cadenceLabel}</span>
                 <span className="pill">{habit.targetLabel}</span>
-                {habit.completedToday ? <span className="pill-accent">hit today</span> : null}
+                {(habit.cadence === "weekly" ? habit.completedThisWeek : habit.completedToday) ? (
+                  <span className="pill-accent">complete {period}</span>
+                ) : null}
               </div>
               <p className="mt-1 text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
                 {habit.currentStreak} streak
@@ -226,43 +283,113 @@ export function HabitCard({ habit }: { habit: HabitSummary }) {
             </div>
           </div>
 
+          <div className="rounded-md border p-3" style={{ borderColor: "var(--border-faint)", background: "var(--bg-tint)" }}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[0.6875rem] font-semibold uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>
+                  Progress
+                </p>
+                <p className="mt-1 text-[1rem] font-semibold tracking-tight" style={{ color: "var(--text)" }}>
+                  {`${formatHabitQuantity(progress, habit.goalUnit as HabitGoalUnit)} / ${formatHabitQuantity(habit.targetCount, habit.goalUnit as HabitGoalUnit)}`}
+                </p>
+                <p className="mt-0.5 text-[0.75rem]" style={{ color: "var(--text-muted)" }}>
+                  {habit.cadence === "weekly"
+                    ? "Close the weekly target before Sunday slips."
+                    : habit.completedToday
+                      ? "Done for today."
+                      : "Keep the entry friction low and finish it fast."}
+                </p>
+              </div>
+              <div className="min-w-[4rem] text-right">
+                <p className="text-[1.25rem] font-semibold tracking-tight" style={{ color: "var(--text)" }}>
+                  {progressPercent}%
+                </p>
+                <p className="text-[0.6875rem] uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>
+                  {period}
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full" style={{ background: "var(--border-faint)" }}>
+              <div className="h-full rounded-full" style={{ width: `${progressPercent}%`, background: "var(--text)" }} />
+            </div>
+          </div>
+
           <div className="grid gap-3 sm:grid-cols-3">
-            <MetricTile
-              label="Today"
-              value={`${formatHabitQuantity(habit.progressToday, habit.goalUnit as HabitGoalUnit)} / ${formatHabitQuantity(habit.targetCount, habit.goalUnit as HabitGoalUnit)}`}
-            />
-            <MetricTile label="Longest streak" value={`${habit.longestStreak}`} />
+            <MetricTile label="Live streak" value={`${habit.currentStreak}`} />
+            <MetricTile label="Best run" value={`${habit.longestStreak}`} />
             <MetricTile
               label="Tracked today"
               value={habit.trackedMinutesToday > 0 ? formatHabitQuantity(habit.trackedMinutesToday, "minutes") : "N/A"}
             />
           </div>
 
-          <div>
-            <p className="text-[0.6875rem] font-semibold uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>
-              Last 14 days
-            </p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {habit.recentDays.map((day) => (
-                <span
-                  key={day.dateKey}
-                  title={`${day.dateKey}: ${day.completed ? "hit" : day.due ? "missed" : "not due"}`}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded text-[0.625rem] font-medium"
-                  style={{
-                    background: day.completed
-                      ? "var(--text)"
-                      : day.due
-                        ? "var(--accent-tint)"
-                        : "var(--bg-tint)",
-                    color: day.completed ? "var(--bg-page)" : "var(--text-muted)",
-                    border: "1px solid var(--border-faint)",
-                  }}
-                >
-                  {day.label}
-                </span>
-              ))}
+          <div className="rounded-md border p-3" style={{ borderColor: "var(--border-faint)" }}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-[0.6875rem] font-semibold uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>
+                  Recent rhythm
+                </p>
+                <p className="mt-1 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
+                  {windowSummary.hitCount} hit{windowSummary.hitCount === 1 ? "" : "s"} in the last {windowSummary.dueCount} due window{windowSummary.dueCount === 1 ? "" : "s"}
+                  {windowSummary.missCount > 0 ? ` · ${windowSummary.missCount} miss${windowSummary.missCount === 1 ? "" : "es"}` : ""}
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {last7.map((day) => {
+                  const tone = detailTone(day.completed, day.due);
+                  return (
+                    <span
+                      key={day.dateKey}
+                      title={`${day.dateKey}: ${day.completed ? "hit" : day.due ? "missed" : "not due"}`}
+                      className="inline-flex h-2.5 w-6 rounded-full border"
+                      style={tone}
+                    />
+                  );
+                })}
+              </div>
             </div>
           </div>
+
+          <details className="rounded-md border" style={{ borderColor: "var(--border-faint)" }}>
+            <summary className="cursor-pointer list-none px-3 py-2 text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
+              View details
+            </summary>
+            <div className="space-y-4 px-3 pb-3">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <MetricTile label="30-day hit rate" value={`${habit.completionRate30d}%`} />
+                <MetricTile label="Misses lately" value={`${windowSummary.missCount}`} />
+                <MetricTile label="Due windows" value={`${windowSummary.dueCount}`} />
+              </div>
+
+              <div>
+                <p className="text-[0.6875rem] font-semibold uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>
+                  Last 14 days
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+                  {habit.recentDays.map((day) => {
+                    const tone = detailTone(day.completed, day.due);
+                    return (
+                      <div
+                        key={day.dateKey}
+                        className="rounded-md border px-2.5 py-2"
+                        style={{
+                          borderColor: tone.borderColor,
+                          background: tone.background,
+                          color: tone.color,
+                        }}
+                      >
+                        <p className="text-[0.625rem] font-semibold uppercase tracking-wider">{day.label}</p>
+                        <p className="mt-1 text-[0.75rem] font-medium">{day.completed ? "Hit" : day.due ? "Missed" : "Off"}</p>
+                        <p className="mt-0.5 text-[0.6875rem] opacity-80">
+                          {day.due ? formatHabitQuantity(day.progress, habit.goalUnit as HabitGoalUnit) : "Not due"}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </details>
 
           <details className="rounded-md border" style={{ borderColor: "var(--border-faint)" }}>
             <summary className="cursor-pointer list-none px-3 py-2 text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>

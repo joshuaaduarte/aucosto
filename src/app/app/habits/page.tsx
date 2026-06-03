@@ -92,6 +92,7 @@ export default async function HabitsPage() {
     : 0;
   const bestStreak = activeHabits.reduce((best, habit) => Math.max(best, habit.currentStreak), 0);
   const minutesCommitted = activeHabits.reduce((sum, habit) => sum + (habit.defaultDurationMinutes ?? 0), 0);
+  const weeklyTargetsOpen = activeHabits.filter((habit) => habit.cadence === "weekly" && !habit.completedThisWeek).length;
 
   return (
     <div className="space-y-10">
@@ -122,7 +123,7 @@ export default async function HabitsPage() {
       </section>
 
       <section className="grid gap-3 lg:grid-cols-2">
-        <SectionCard eyebrow="Today" title="What still matters today.">
+        <SectionCard eyebrow="Focus" title="What still matters now.">
           <ul className="space-y-2 text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
             <li>
               {dueToday.length > 0
@@ -130,26 +131,26 @@ export default async function HabitsPage() {
                 : "Everything due today is either done or intentionally off the board."}
             </li>
             <li>
-              {completedToday.length > 0
-                ? `${completedToday.length} habit${completedToday.length === 1 ? "" : "s"} already got done today.`
-                : "No habits have been closed yet today."}
+              {weeklyTargetsOpen > 0
+                ? `${weeklyTargetsOpen} weekly target${weeklyTargetsOpen === 1 ? "" : "s"} still need to be closed.`
+                : "No weekly carryover is hanging around."}
             </li>
+            <li>{bestStreak > 0 ? `Best live streak right now is ${bestStreak}.` : "No streak has started building yet."}</li>
           </ul>
         </SectionCard>
 
-        <SectionCard eyebrow="Connections" title="How habits can feed the rest of the system.">
+        <SectionCard eyebrow="Flow" title="Keep the next action obvious.">
           <ul className="space-y-2 text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
-            <li>Due habits now surface inside Do List as recurring task work.</li>
-            <li>Start a habit timer and you land straight in Time so the session is visible.</li>
-            <li>Schedule a habit into Calendar or spin out a one-off task when it needs a deeper execution pass.</li>
+            <li>Use `Done` or `Log` when the habit should take seconds, not setup.</li>
+            <li>Use `Start timer` when the habit needs protected focus and should show up in Time.</li>
+            <li>Use `Schedule` or `Spin out task` only when a habit needs more space than a quick mark.</li>
           </ul>
         </SectionCard>
       </section>
 
       <HabitCreateForm />
 
-      <section className="grid gap-6 lg:grid-cols-2">
-        <SectionCard eyebrow="Due today" title="Keep these alive before the day slips.">
+      <SectionCard eyebrow="Due today" title="Keep these alive before the day slips.">
         {dueToday.length === 0 ? (
           <p className="text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
             Nothing urgent right now.
@@ -163,7 +164,7 @@ export default async function HabitsPage() {
         )}
       </SectionCard>
 
-        <SectionCard eyebrow="Keep warm" title="Not urgent, but still part of the rhythm.">
+      <SectionCard eyebrow="Still active" title="Not due right now, but still worth keeping visible.">
         {keepWarm.length === 0 ? (
           <p className="text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
             No extra habits sitting in the middle right now.
@@ -175,21 +176,21 @@ export default async function HabitsPage() {
             ))}
           </OverflowList>
         )}
-      </SectionCard>
-      </section>
 
-      <SectionCard eyebrow="Completed" title="Already landed today.">
-        {completedToday.length === 0 ? (
-          <p className="text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
-            Nothing closed yet today.
-          </p>
-        ) : (
-          <OverflowList count={completedToday.length}>
-            {completedToday.map((habit) => (
-              <HabitCard key={habit.id} habit={habit} />
-            ))}
-          </OverflowList>
-        )}
+        {completedToday.length > 0 ? (
+          <details className="mt-4 rounded-md border" style={{ borderColor: "var(--border-faint)" }}>
+            <summary className="cursor-pointer list-none px-3 py-2 text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
+              {completedToday.length} completed today
+            </summary>
+            <div className="px-3 pb-3">
+              <OverflowList count={completedToday.length} initialCount={3}>
+                {completedToday.map((habit) => (
+                  <HabitCard key={habit.id} habit={habit} />
+                ))}
+              </OverflowList>
+            </div>
+          </details>
+        ) : null}
       </SectionCard>
 
       {archivedHabits.length > 0 ? (
