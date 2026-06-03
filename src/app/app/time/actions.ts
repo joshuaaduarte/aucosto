@@ -55,6 +55,27 @@ export async function stopEntry() {
   revalidatePath("/app/time");
 }
 
+export async function stopEntryAndCompleteDoItem(formData: FormData) {
+  const userId = await resolveActiveUserId();
+  const doItemId = String(formData.get("doItemId") ?? "").trim();
+  const actualRaw = String(formData.get("actualMinutes") ?? "").trim();
+
+  if (!doItemId) {
+    throw new Error("Missing task id.");
+  }
+
+  await timeService.stopRunning(userId);
+  await reflectOnDoItemSession(userId, doItemId, {
+    outcome: "done",
+    actualMinutes: actualRaw ? Number(actualRaw) : undefined,
+  });
+
+  revalidatePath("/app");
+  revalidatePath("/app/do");
+  revalidatePath("/app/time");
+  revalidatePath("/app/calendar");
+}
+
 export async function stopEntryWithReflection(formData: FormData) {
   const userId = await resolveActiveUserId();
   const doItemId = String(formData.get("doItemId") ?? "").trim();

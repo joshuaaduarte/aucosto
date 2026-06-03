@@ -6,10 +6,12 @@ import { DO_LANES, DO_STATUSES } from "@/lib/do";
 import {
   createDoItem,
   deleteDoItem,
+  getDoItemSummary,
   reflectOnDoItemSession,
   startTimerForDoItem,
   updateDoItem,
 } from "@/lib/services/do";
+import { getRunningEntry, stopRunning } from "@/lib/services/time";
 import { requireViewerContext } from "@/lib/viewer-context";
 
 const laneEnum = z.enum(DO_LANES);
@@ -100,6 +102,25 @@ export async function completeDoItemAction(formData: FormData) {
   const userId = await requireUserId();
   const id = String(formData.get("id") ?? "");
   const actualMinutes = nullableNumber(formData, "actualMinutes");
+  const running = await getRunningEntry(userId);
+
+  if (running?.doItem?.id === id) {
+    const summary = await getDoItemSummary(userId, id);
+    const startedAtMs = running.startedAt.getTime();
+    const elapsedMinutes = Math.max(
+      5,
+      Math.round((Date.now() - startedAtMs) / 60000 / 5) * 5,
+    );
+    await stopRunning(userId);
+    await updateDoItem(userId, id, {
+      status: "done",
+      actualMinutes:
+        actualMinutes ?? (summary ? summary.trackedMinutes + elapsedMinutes : elapsedMinutes),
+    });
+    revalidateDo();
+    return;
+  }
+
   await updateDoItem(userId, id, { status: "done", actualMinutes });
   revalidateDo();
 }

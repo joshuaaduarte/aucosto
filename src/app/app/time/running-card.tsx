@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { formatMinutes } from "@/lib/do";
-import { stopEntry, stopEntryWithReflection } from "./actions";
+import { stopEntry, stopEntryAndCompleteDoItem, stopEntryWithReflection } from "./actions";
 import { formatDuration } from "@/lib/time";
 
 export function RunningCard({
@@ -121,13 +121,22 @@ export function RunningCard({
           </div>
           <div className="flex shrink-0 flex-wrap justify-end gap-2">
             {doItem ? (
-              <button
-                type="button"
-                onClick={() => setReflectOpen(true)}
-                className="btn-ghost"
-              >
-                Stop and reflect
-              </button>
+              <>
+                <form action={stopEntryAndCompleteDoItem}>
+                  <input type="hidden" name="doItemId" value={doItem.id} />
+                  <input type="hidden" name="actualMinutes" value={trackedIfStoppedNow} />
+                  <button type="submit" className="btn-ink">
+                    Done and stop
+                  </button>
+                </form>
+                <button
+                  type="button"
+                  onClick={() => setReflectOpen(true)}
+                  className="btn-ghost"
+                >
+                  Stop and reflect
+                </button>
+              </>
             ) : (
               <button
                 type="button"
