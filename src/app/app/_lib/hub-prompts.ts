@@ -7,8 +7,8 @@
 import { summarizeBalances } from "@/lib/finance-accounts";
 import {
   daysUntil,
-  formatSignedUSDFromCents,
   formatUSDFromCents,
+  formatSignedUSDFromCents,
 } from "@/lib/money";
 import type { FinanceAccount, TimeEntry } from "@/generated/prisma/client";
 
@@ -83,7 +83,7 @@ export function deriveHubPrompts(input: HubPromptInput): HubPrompt[] {
         text:
           delta > 0
             ? `Spend pace is ${formatSignedUSDFromCents(delta)} vs last month (+${pct}%). Worth a peek.`
-            : `Spend pace is ${formatSignedUSDFromCents(delta)} vs last month (${pct}%). Calmer than last month.`,
+            : `Spend pace is ${formatUSDFromCents(Math.abs(delta))} lower than last month (${pct}%). Calmer than last month.`,
         tone: delta > 0 ? "amber" : "emerald",
       });
     }
