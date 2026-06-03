@@ -55,6 +55,8 @@ function nullableNumber(formData: FormData, key: string) {
 }
 
 export type HabitState = { error?: string } | undefined;
+export type HabitLogState = { error?: string } | undefined;
+export type HabitScheduleState = { error?: string } | undefined;
 
 export async function createHabitAction(
   _prev: HabitState,
@@ -107,7 +109,10 @@ export async function updateHabitAction(formData: FormData) {
   revalidateHabits();
 }
 
-export async function logHabitAction(formData: FormData) {
+export async function logHabitAction(
+  _prev: HabitLogState,
+  formData: FormData,
+): Promise<HabitLogState> {
   const userId = await requireUserId();
   const id = String(formData.get("id") ?? "");
   const quantity = Number(formData.get("quantity") ?? "1");
@@ -117,6 +122,7 @@ export async function logHabitAction(formData: FormData) {
     notes,
   });
   revalidateHabits();
+  return undefined;
 }
 
 export async function archiveHabitAction(formData: FormData) {
@@ -151,7 +157,10 @@ export async function createDoFromHabitAction(formData: FormData) {
   revalidatePath("/app/do");
 }
 
-export async function scheduleHabitAction(formData: FormData) {
+export async function scheduleHabitAction(
+  _prev: HabitScheduleState,
+  formData: FormData,
+): Promise<HabitScheduleState> {
   const userId = await requireUserId();
   const habitId = String(formData.get("habitId") ?? "");
   const title = String(formData.get("title") ?? "").trim();
@@ -168,6 +177,7 @@ export async function scheduleHabitAction(formData: FormData) {
     sourceRefId: habitId || null,
   });
   revalidateHabits();
+  return undefined;
 }
 
 export async function quickLogHabitFromDoAction(formData: FormData) {
