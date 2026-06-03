@@ -48,7 +48,14 @@ export function ProjectTaskCreateForm({
   }, [pending, state]);
 
   return (
-    <form ref={formRef} action={formAction} className="space-y-3">
+    <form
+      ref={formRef}
+      action={formAction}
+      className="space-y-3"
+      onSubmit={() => {
+        submittedRef.current = true;
+      }}
+    >
       <input type="hidden" name="projectId" value={projectId} />
       <div className="space-y-1.5">
         <label
@@ -237,7 +244,14 @@ export function ProjectScheduleForm({
   }
 
   return (
-    <form ref={formRef} action={formAction} className="space-y-3">
+    <form
+      ref={formRef}
+      action={formAction}
+      className="space-y-3"
+      onSubmit={() => {
+        submittedRef.current = true;
+      }}
+    >
       <input type="hidden" name="projectId" value={projectId} />
 
       <div className="space-y-1.5">
