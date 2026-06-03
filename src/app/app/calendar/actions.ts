@@ -8,8 +8,8 @@ import {
   deleteCalendarItem,
   updateCalendarItem,
 } from "@/lib/services/calendar";
-import { startTimerForHabit } from "@/lib/services/habits";
 import { updateDoItem } from "@/lib/services/do";
+import { listHabits, logHabitProgress, startTimerForHabit } from "@/lib/services/habits";
 import { requireViewerContext } from "@/lib/viewer-context";
 
 function revalidateCalendar() {
@@ -63,7 +63,29 @@ export async function createCalendarBlockAction(formData: FormData) {
 export async function completeCalendarItemAction(formData: FormData) {
   const userId = await requireUserId();
   const id = String(formData.get("id") ?? "");
-  await updateCalendarItem(userId, id, { status: "done" });
+  const item = await updateCalendarItem(userId, id, { status: "done" });
+  if (item?.sourceTool === "do" && item.sourceRefId) {
+    await updateDoItem(userId, item.sourceRefId, { status: "done" });
+  }
+  if (item?.sourceTool === "habit" && item.sourceRefId) {
+    const habits = await listHabits(userId, { includeArchived: true });
+    const habit = habits.find(
+      (candidate) => candidate.id === item.sourceRefId && !candidate.archivedAt,
+    );
+    if (habit) {
+      const remaining =
+        habit.cadence === "weekly"
+          ? Math.max(0, habit.targetCount - habit.progressThisWeek)
+          : Math.max(0, habit.targetCount - habit.progressToday);
+
+      if (remaining > 0) {
+        await logHabitProgress(userId, item.sourceRefId, {
+          quantity: habit.goalUnit === "minutes" ? Math.max(5, remaining) : remaining,
+          notes: "Completed from Calendar.",
+        });
+      }
+    }
+  }
   revalidateCalendar();
 }
 
