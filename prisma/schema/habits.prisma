@@ -1,0 +1,38 @@
+model Habit {
+  id                     String      @id @default(cuid())
+  userId                 String
+  title                  String
+  bucket                 String?
+  notes                  String?
+  cadence                String      @default("daily")
+  daysOfWeek             String?
+  targetCount            Int         @default(1)
+  goalUnit               String      @default("check")
+  defaultDurationMinutes Int?
+  reminderTime           String?
+  archivedAt             DateTime?
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+  user                   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries                HabitEntry[]
+  timeEntries            TimeEntry[]
+
+  @@index([userId, archivedAt, updatedAt])
+  @@index([userId, cadence, updatedAt])
+  @@index([userId, bucket, updatedAt])
+}
+
+model HabitEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  habitId   String
+  quantity  Int      @default(1)
+  notes     String?
+  loggedAt   DateTime @default(now())
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+
+  @@index([userId, loggedAt])
+  @@index([habitId, loggedAt])
+}

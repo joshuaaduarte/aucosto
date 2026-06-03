@@ -9,12 +9,18 @@ const initialState: StartState = undefined;
 export function StartForm({
   suggestedCategories = [],
   suggestedTasks = [],
+  suggestedHabits = [],
 }: {
   suggestedCategories?: string[];
   suggestedTasks?: Array<{
     id: string;
     title: string;
     estimatedMinutes: number | null;
+  }>;
+  suggestedHabits?: Array<{
+    id: string;
+    title: string;
+    targetLabel: string;
   }>;
 }) {
   const [state, formAction, pending] = useActionState(
@@ -25,12 +31,16 @@ export function StartForm({
   const categoryRef = useRef<HTMLInputElement>(null);
   const labelRef = useRef<HTMLInputElement>(null);
   const doItemIdRef = useRef<HTMLInputElement>(null);
+  const habitIdRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!pending && !state?.error) {
       formRef.current?.reset();
       if (doItemIdRef.current) {
         doItemIdRef.current.value = "";
+      }
+      if (habitIdRef.current) {
+        habitIdRef.current.value = "";
       }
     }
   }, [pending, state]);
@@ -60,6 +70,7 @@ export function StartForm({
 
       <form ref={formRef} action={formAction} className="space-y-4">
         <input ref={doItemIdRef} type="hidden" name="doItemId" />
+        <input ref={habitIdRef} type="hidden" name="habitId" />
 
         <div className="grid gap-4 md:grid-cols-[1.6fr_1fr]">
           <div className="space-y-1.5">
@@ -151,6 +162,9 @@ export function StartForm({
                     if (doItemIdRef.current) {
                       doItemIdRef.current.value = task.id;
                     }
+                    if (habitIdRef.current) {
+                      habitIdRef.current.value = "";
+                    }
                   }}
                   className="inline-flex items-center rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
                   style={{
@@ -162,6 +176,47 @@ export function StartForm({
                   {task.estimatedMinutes
                     ? ` · ${formatMinutes(task.estimatedMinutes)}`
                     : ""}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {suggestedHabits.length > 0 && (
+          <div className="space-y-2">
+            <p
+              className="text-[0.6875rem] font-medium uppercase tracking-wider"
+              style={{ color: "var(--text-faint)" }}
+            >
+              Suggested habits
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {suggestedHabits.map((habit) => (
+                <button
+                  key={habit.id}
+                  type="button"
+                  onClick={() => {
+                    if (labelRef.current) {
+                      labelRef.current.value = habit.title;
+                    }
+                    if (categoryRef.current) {
+                      categoryRef.current.value = "habit";
+                    }
+                    if (doItemIdRef.current) {
+                      doItemIdRef.current.value = "";
+                    }
+                    if (habitIdRef.current) {
+                      habitIdRef.current.value = habit.id;
+                    }
+                  }}
+                  className="inline-flex items-center rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
+                  style={{
+                    background: "var(--bg-tint)",
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  {habit.title}
+                  {` · ${habit.targetLabel}`}
                 </button>
               ))}
             </div>

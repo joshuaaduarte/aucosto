@@ -14,6 +14,7 @@ const QUICK_TEMPLATES = [
 export function CalendarQuickAddModal({
   todayDateValue,
   suggestedTasks = [],
+  suggestedHabits = [],
   gapSuggestions = [],
 }: {
   todayDateValue: string;
@@ -21,6 +22,11 @@ export function CalendarQuickAddModal({
     id: string;
     title: string;
     estimatedMinutes: number | null;
+  }>;
+  suggestedHabits?: Array<{
+    id: string;
+    title: string;
+    defaultDurationMinutes: number | null;
   }>;
   gapSuggestions?: Array<{
     taskId: string;
@@ -34,6 +40,7 @@ export function CalendarQuickAddModal({
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [doItemId, setDoItemId] = useState("");
+  const [habitId, setHabitId] = useState("");
   const [date, setDate] = useState(todayDateValue);
   const [start, setStart] = useState("09:00");
   const [end, setEnd] = useState("10:00");
@@ -43,6 +50,7 @@ export function CalendarQuickAddModal({
   function applyTemplate(template: (typeof QUICK_TEMPLATES)[number]) {
     setTitle(template.title);
     setDoItemId("");
+    setHabitId("");
     setStart(template.start);
     setEnd(template.end);
   }
@@ -53,6 +61,7 @@ export function CalendarQuickAddModal({
     estimatedMinutes: number | null;
   }) {
     setDoItemId(task.id);
+    setHabitId("");
     setTitle(task.title);
     if (task.estimatedMinutes && start) {
       const [rawHour = 9, rawMinute = 0] = start.split(":").map(Number);
@@ -66,6 +75,23 @@ export function CalendarQuickAddModal({
     }
   }
 
+  function applySuggestedHabit(habit: {
+    id: string;
+    title: string;
+    defaultDurationMinutes: number | null;
+  }) {
+    setHabitId(habit.id);
+    setDoItemId("");
+    setTitle(habit.title);
+    if (habit.defaultDurationMinutes && start) {
+      const [rawHour = 9, rawMinute = 0] = start.split(":").map(Number);
+      const next = new Date();
+      next.setHours(rawHour, rawMinute, 0, 0);
+      next.setMinutes(next.getMinutes() + habit.defaultDurationMinutes);
+      setEnd(`${String(next.getHours()).padStart(2, "0")}:${String(next.getMinutes()).padStart(2, "0")}`);
+    }
+  }
+
   function applyGapSuggestion(task: {
     taskId: string;
     title: string;
@@ -74,6 +100,7 @@ export function CalendarQuickAddModal({
     end: string;
   }) {
     setDoItemId(task.taskId);
+    setHabitId("");
     setTitle(task.title);
     setStart(task.start);
     setEnd(task.end);
@@ -82,6 +109,7 @@ export function CalendarQuickAddModal({
   function resetForm() {
     setTitle("");
     setDoItemId("");
+    setHabitId("");
     setDate(todayDateValue);
     setStart("09:00");
     setEnd("10:00");
@@ -184,6 +212,30 @@ export function CalendarQuickAddModal({
               </div>
             ) : null}
 
+            {suggestedHabits.length > 0 ? (
+              <div className="mt-4">
+                <p
+                  className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+                  style={{ color: "var(--text-faint)" }}
+                >
+                  From your habits
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {suggestedHabits.map((habit) => (
+                    <button
+                      key={habit.id}
+                      type="button"
+                      className="pill cursor-pointer"
+                      onClick={() => applySuggestedHabit(habit)}
+                    >
+                      {habit.title}
+                      {habit.defaultDurationMinutes ? ` · ${formatMinutes(habit.defaultDurationMinutes)}` : ""}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             {gapSuggestions.length > 0 ? (
               <div className="mt-4">
                 <p
@@ -221,6 +273,7 @@ export function CalendarQuickAddModal({
             >
               <div className="space-y-1.5">
                 <input type="hidden" name="doItemId" value={doItemId} />
+                <input type="hidden" name="habitId" value={habitId} />
                 <label
                   className="block text-[0.75rem] font-medium"
                   style={{ color: "var(--text-muted)" }}

@@ -41,6 +41,14 @@ const EVENT_LABELS: Record<string, string> = {
   "do.deleted": "deleted a do item",
   "do.timer_started": "started a timer from a do item",
 
+  // habits
+  "habit.created": "added a habit",
+  "habit.updated": "updated a habit",
+  "habit.logged": "logged habit progress",
+  "habit.archived": "archived a habit",
+  "habit.reopened": "reopened a habit",
+  "habit.timer_started": "started a timer from a habit",
+
   // user
   "user.privacy_updated": "updated privacy settings",
 };

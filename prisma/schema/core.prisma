@@ -32,6 +32,8 @@ model User {
   timeEntries         TimeEntry[]
   doItems             DoItem[]
   projects            Project[]
+  habits              Habit[]
+  habitEntries        HabitEntry[]
   financeConnections  FinanceConnection[]
   financeAccounts     FinanceAccount[]
   financeGoals        FinanceGoal[]

@@ -10,6 +10,7 @@ export function RunningCard({
   category,
   startedAtIso,
   doItem,
+  habit,
 }: {
   label: string;
   category: string | null;
@@ -19,6 +20,11 @@ export function RunningCard({
     title: string;
     estimatedMinutes: number | null;
     trackedMinutes: number;
+  } | null;
+  habit?: {
+    id: string;
+    title: string;
+    targetLabel: string;
   } | null;
 }) {
   const startedAt = new Date(startedAtIso).getTime();
@@ -85,6 +91,14 @@ export function RunningCard({
                 Linked to Do List: {doItem.title}
               </p>
             ) : null}
+            {!doItem && habit ? (
+              <p
+                className="mt-2 text-[0.8125rem]"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Linked to Habit: {habit.title}
+              </p>
+            ) : null}
             {doItem ? (
               <p
                 className="mt-1 text-[0.75rem]"
@@ -94,6 +108,14 @@ export function RunningCard({
                 {doItem.estimatedMinutes
                   ? ` · estimate ${formatMinutes(doItem.estimatedMinutes)}`
                   : ""}
+              </p>
+            ) : null}
+            {!doItem && habit ? (
+              <p
+                className="mt-1 text-[0.75rem]"
+                style={{ color: "var(--text-faint)" }}
+              >
+                {`Target: ${habit.targetLabel}`}
               </p>
             ) : null}
           </div>

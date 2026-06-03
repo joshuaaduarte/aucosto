@@ -7,6 +7,7 @@ import {
   deleteCalendarItem,
   updateCalendarItem,
 } from "@/lib/services/calendar";
+import { startTimerForHabit } from "@/lib/services/habits";
 import { updateDoItem } from "@/lib/services/do";
 import { requireViewerContext } from "@/lib/viewer-context";
 
@@ -36,6 +37,7 @@ export async function createCalendarBlockAction(formData: FormData) {
   const start = String(formData.get("start") ?? "");
   const end = String(formData.get("end") ?? "");
   const doItemId = parseOptionalString(formData.get("doItemId"));
+  const habitId = parseOptionalString(formData.get("habitId"));
   const notes = parseOptionalString(formData.get("notes"));
   const location = parseOptionalString(formData.get("location"));
 
@@ -47,8 +49,8 @@ export async function createCalendarBlockAction(formData: FormData) {
     location,
     kind: "block",
     status: "confirmed",
-    sourceTool: doItemId ? "do" : null,
-    sourceRefId: doItemId,
+    sourceTool: doItemId ? "do" : habitId ? "habit" : null,
+    sourceRefId: doItemId ?? habitId,
   });
   if (doItemId) {
     await updateDoItem(userId, doItemId, { status: "scheduled" });
@@ -105,8 +107,13 @@ export async function startTimerFromCalendarItemAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const title = String(formData.get("title") ?? "");
   const doItemId = parseOptionalString(formData.get("doItemId"));
+  const habitId = parseOptionalString(formData.get("habitId"));
 
-  await timeService.startEntry(userId, { label: title, doItemId });
+  if (habitId) {
+    await startTimerForHabit(userId, habitId);
+  } else {
+    await timeService.startEntry(userId, { label: title, doItemId });
+  }
   if (doItemId) {
     await updateDoItem(userId, doItemId, { status: "in_progress" });
   }

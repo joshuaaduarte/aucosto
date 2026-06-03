@@ -9,10 +9,11 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { requireCan } from "@/lib/auth/can";
 import { recordEvent } from "@/lib/services/events";
-import type { DoItem, TimeEntry } from "@/generated/prisma/client";
+import type { DoItem, Habit, TimeEntry } from "@/generated/prisma/client";
 
 export type RunningTimeEntry = TimeEntry & {
   doItem: Pick<DoItem, "id" | "title" | "estimatedMinutes" | "actualMinutes"> | null;
+  habit: Pick<Habit, "id" | "title" | "goalUnit" | "targetCount"> | null;
 };
 
 export async function getRunningEntry(
@@ -28,6 +29,14 @@ export async function getRunningEntry(
           title: true,
           estimatedMinutes: true,
           actualMinutes: true,
+        },
+      },
+      habit: {
+        select: {
+          id: true,
+          title: true,
+          goalUnit: true,
+          targetCount: true,
         },
       },
     },
@@ -59,7 +68,7 @@ export async function listCompletedSince(
 
 export async function startEntry(
   userId: string,
-  input: { label: string; category?: string | null; doItemId?: string | null },
+  input: { label: string; category?: string | null; doItemId?: string | null; habitId?: string | null },
 ): Promise<TimeEntry> {
   requireCan(userId, "time", "write");
   await prisma.timeEntry.updateMany({
@@ -72,6 +81,7 @@ export async function startEntry(
       label: input.label,
       category: input.category ?? null,
       doItemId: input.doItemId ?? null,
+      habitId: input.habitId ?? null,
       startedAt: new Date(),
     },
   });
@@ -80,7 +90,7 @@ export async function startEntry(
     tool: "time",
     type: "time.started",
     refId: entry.id,
-    meta: { label: entry.label, category: entry.category, doItemId: entry.doItemId },
+    meta: { label: entry.label, category: entry.category, doItemId: entry.doItemId, habitId: entry.habitId },
   });
   return entry;
 }

@@ -55,6 +55,16 @@ function ListIcon() {
     </svg>
   );
 }
+function RepeatIcon() {
+  return (
+    <svg {...ip}>
+      <path d="M3 4.5h6.5a2.5 2.5 0 0 1 0 5H8.5" />
+      <path d="M9.5 2.75 11.25 4.5 9.5 6.25" />
+      <path d="M6.5 10.5H4a2.5 2.5 0 0 1 0-5h1" />
+      <path d="M3.5 8.75 1.75 10.5 3.5 12.25" />
+    </svg>
+  );
+}
 function WalletIcon() {
   return (
     <svg {...ip}>
@@ -125,6 +135,7 @@ const navItems: NavItem[] = [
   { href: "/app", label: "Today", match: (p) => p === "/app", finance: false, icon: <HomeIcon /> },
   { href: "/app/calendar", label: "Calendar", match: (p) => p.startsWith("/app/calendar"), finance: false, icon: <CalendarIcon /> },
   { href: "/app/do", label: "Do List", match: (p) => p.startsWith("/app/do"), finance: false, icon: <ListIcon /> },
+  { href: "/app/habits", label: "Habits", match: (p) => p.startsWith("/app/habits"), finance: false, icon: <RepeatIcon /> },
   { href: "/app/time", label: "Time", match: (p) => p.startsWith("/app/time"), finance: false, icon: <ClockIcon /> },
   { href: "/app/projects", label: "Projects", match: (p) => p.startsWith("/app/projects"), finance: false, icon: <ProjectsIcon /> },
   { href: "/app/finance", label: "Finance", match: (p) => p.startsWith("/app/finance"), finance: true, icon: <WalletIcon /> },

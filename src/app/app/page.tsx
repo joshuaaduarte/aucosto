@@ -279,6 +279,7 @@ export default async function HubPage() {
         <ul className="flex flex-col gap-0.5">
           <ToolLink href="/app/calendar" icon={<CalendarIcon />} label="Calendar" hint="Planned time for the week." />
           <ToolLink href="/app/do" icon={<ConnectionIcon />} label="Do List" hint="Tasks, estimates, and actuals." />
+          <ToolLink href="/app/habits" icon={<ConnectionIcon />} label="Habits" hint="Repeatable behaviors, streaks, and due-today rhythm." />
           <ToolLink href="/app/projects" icon={<ConnectionIcon />} label="Projects" hint="Outcomes, milestones, and linked work." />
           <ToolLink href="/app/time" icon={<ClockIcon />} label="Time" hint="Logged sessions and where the week went." />
           {financeVisible && (

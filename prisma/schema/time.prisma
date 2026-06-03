@@ -4,6 +4,7 @@ model TimeEntry {
   id        String    @id @default(cuid())
   userId    String
   doItemId  String?
+  habitId   String?
   label     String
   category  String?
   startedAt DateTime
@@ -12,7 +13,9 @@ model TimeEntry {
   createdAt DateTime  @default(now())
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   doItem    DoItem?   @relation(fields: [doItemId], references: [id], onDelete: SetNull)
+  habit     Habit?    @relation(fields: [habitId], references: [id], onDelete: SetNull)
 
   @@index([userId, startedAt])
   @@index([doItemId, startedAt])
+  @@index([habitId, startedAt])
 }

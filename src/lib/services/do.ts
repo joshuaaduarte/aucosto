@@ -208,6 +208,7 @@ export async function listDoItems(
           category: true,
           notes: true,
           doItemId: true,
+          habitId: true,
         },
       },
     },

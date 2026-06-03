@@ -1,6 +1,7 @@
 import { ActivityWidget } from "./activity";
 import { CalendarWidget } from "./calendar";
 import { DoWidget } from "./do";
+import { HabitsWidget } from "./habits";
 import { TimeTrackerWidget } from "./time-tracker";
 import { FinanceWidget } from "./finance";
 
@@ -29,6 +30,12 @@ export const widgets: WidgetDescriptor[] = [
     name: "Do List",
     href: "/app/do",
     Widget: DoWidget,
+  },
+  {
+    id: "habits",
+    name: "Habits",
+    href: "/app/habits",
+    Widget: HabitsWidget,
   },
   {
     id: "finance",

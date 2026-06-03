@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { getRunningEntry, listCompletedSince } from "@/lib/services/time";
 import { listAccounts } from "@/lib/services/finance";
 import { listSuggestedDoItems } from "@/lib/services/do";
+import { listSuggestedHabits } from "@/lib/services/habits";
 import { listCalendarItems } from "@/lib/services/calendar";
 import {
   resolveActiveUserId,
@@ -180,6 +181,11 @@ function CalendarItemCard({
                   name="doItemId"
                   value={item.sourceTool === "do" ? (item.sourceRefId ?? "") : ""}
                 />
+                <input
+                  type="hidden"
+                  name="habitId"
+                  value={item.sourceTool === "habit" ? (item.sourceRefId ?? "") : ""}
+                />
                 <button
                   className="btn-ghost h-8 px-2.5 text-[0.75rem]"
                   type="submit"
@@ -356,12 +362,13 @@ export default async function CalendarPage() {
   const todayStart = startOfDay(now);
   const todayEnd = endOfDay(now);
 
-  const [weekItems, runningEntry, completedWeek, accounts, suggestedTasks] = await Promise.all([
+  const [weekItems, runningEntry, completedWeek, accounts, suggestedTasks, suggestedHabits] = await Promise.all([
     listCalendarItems(userId, { from: weekStart, to: weekEnd }),
     getRunningEntry(userId),
     listCompletedSince(userId, startOfWeek()),
     context.financeVisible ? listAccounts(userId) : Promise.resolve([]),
     listSuggestedDoItems(userId, { limit: 5 }),
+    listSuggestedHabits(userId, { limit: 4 }),
   ]);
 
   const todayItems = weekItems.filter(
@@ -739,6 +746,11 @@ export default async function CalendarPage() {
           id: task.id,
           title: task.title,
           estimatedMinutes: task.estimatedMinutes,
+        }))}
+        suggestedHabits={suggestedHabits.map((habit) => ({
+          id: habit.id,
+          title: habit.title,
+          defaultDurationMinutes: habit.defaultDurationMinutes,
         }))}
         gapSuggestions={gapSuggestions.map((suggestion) => ({
           taskId: suggestion.taskId,

@@ -5,6 +5,7 @@ import {
   listRecentEntries,
 } from "@/lib/services/time";
 import { getDoItemSummary, listSuggestedDoItems } from "@/lib/services/do";
+import { listSuggestedHabits } from "@/lib/services/habits";
 import {
   formatDuration,
   formatHM,
@@ -41,11 +42,12 @@ export default async function TimePage() {
   const todayStart = startOfToday();
   const weekStart = startOfWeek();
   const running = await getRunningEntry(userId);
-  const [recent, completedToday, completedWeek, suggestedTasks, runningDoSummary] = await Promise.all([
+  const [recent, completedToday, completedWeek, suggestedTasks, suggestedHabits, runningDoSummary] = await Promise.all([
     listRecentEntries(userId, { limit: 30 }),
     listCompletedSince(userId, todayStart),
     listCompletedSince(userId, weekStart),
     listSuggestedDoItems(userId, { limit: 4 }),
+    listSuggestedHabits(userId, { limit: 4 }),
     running?.doItem ? getDoItemSummary(userId, running.doItem.id) : Promise.resolve(null),
   ]);
 
@@ -119,6 +121,22 @@ export default async function TimePage() {
                   }
                 : null
             }
+            habit={
+              running.habit
+                ? {
+                    id: running.habit.id,
+                    title: running.habit.title,
+                    targetLabel:
+                      running.habit.goalUnit === "minutes"
+                        ? `${running.habit.targetCount}m target`
+                        : running.habit.goalUnit === "count"
+                          ? `${running.habit.targetCount}x target`
+                          : running.habit.targetCount === 1
+                            ? "Complete once"
+                            : `${running.habit.targetCount} checks`
+                  }
+                : null
+            }
           />
         ) : (
           <StartForm
@@ -127,6 +145,11 @@ export default async function TimePage() {
               id: task.id,
               title: task.title,
               estimatedMinutes: task.estimatedMinutes,
+            }))}
+            suggestedHabits={suggestedHabits.map((habit) => ({
+              id: habit.id,
+              title: habit.title,
+              targetLabel: habit.targetLabel,
             }))}
           />
         )}
