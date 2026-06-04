@@ -81,7 +81,9 @@ function CompletionModal({
               Close the loop on {item.title}
             </h2>
             <p className="mt-2 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
-              Capture how long it actually took so future estimates get smarter.
+              {item.habitTitle
+                ? `Capture how long it actually took. This task is linked to ${item.habitTitle}, so marking it done will also give the habit credit if it still needs it.`
+                : "Capture how long it actually took so future estimates get smarter."}
             </p>
           </div>
 
@@ -186,6 +188,7 @@ export function DoItemCard({
                 </p>
                 {item.bucket ? <span className="pill">{item.bucket}</span> : null}
                 {item.projectName ? <span className="pill">{item.projectName}</span> : null}
+                {item.habitTitle ? <span className="pill">Linked habit</span> : null}
                 <span className="pill">
                   {DO_LANE_LABELS[item.lane as keyof typeof DO_LANE_LABELS] ?? item.lane}
                 </span>
@@ -196,6 +199,7 @@ export function DoItemCard({
                 style={{ color: "var(--text-faint)" }}
               >
                 Est. {formatMinutes(item.estimatedMinutes)}
+                {item.habitTitle ? ` · From ${item.habitTitle}` : ""}
                 {item.scheduledMinutes > 0
                   ? ` · Scheduled ${formatMinutes(item.scheduledMinutes)}`
                   : ""}
@@ -244,6 +248,11 @@ export function DoItemCard({
                   Delete
                 </button>
               </form>
+              {item.habitId ? (
+                <a href="/app/habits" className="btn-ghost col-span-2 h-8 w-full px-2.5 text-[0.75rem] sm:col-span-1">
+                  Open habit
+                </a>
+              ) : null}
             </div>
           </div>
 

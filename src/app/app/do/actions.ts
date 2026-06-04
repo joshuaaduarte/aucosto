@@ -33,6 +33,7 @@ export type DoState = { error?: string } | undefined;
 function revalidateDo() {
   revalidatePath("/app");
   revalidatePath("/app/do");
+  revalidatePath("/app/habits");
   revalidatePath("/app/calendar");
   revalidatePath("/app/time");
 }
@@ -112,8 +113,8 @@ export async function completeDoItemAction(formData: FormData) {
       Math.round((Date.now() - startedAtMs) / 60000 / 5) * 5,
     );
     await stopRunning(userId);
-    await updateDoItem(userId, id, {
-      status: "done",
+    await reflectOnDoItemSession(userId, id, {
+      outcome: "done",
       actualMinutes:
         actualMinutes ?? (summary ? summary.trackedMinutes + elapsedMinutes : elapsedMinutes),
     });
@@ -121,7 +122,7 @@ export async function completeDoItemAction(formData: FormData) {
     return;
   }
 
-  await updateDoItem(userId, id, { status: "done", actualMinutes });
+  await reflectOnDoItemSession(userId, id, { outcome: "done", actualMinutes });
   revalidateDo();
 }
 

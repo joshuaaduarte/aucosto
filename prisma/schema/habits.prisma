@@ -18,6 +18,7 @@ model Habit {
   updatedAt              DateTime    @updatedAt
   user                   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   entries                HabitEntry[]
+  doItems                DoItem[]
   timeEntries            TimeEntry[]
 
   @@index([userId, archivedAt, updatedAt])

@@ -177,12 +177,14 @@ export async function startHabitTimerAction(formData: FormData) {
 
 export async function createDoFromHabitAction(formData: FormData) {
   const userId = await requireUserId();
+  const habitId = String(formData.get("habitId") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
   const bucket = nullableString(formData, "bucket");
   const estimatedMinutes = nullableNumber(formData, "estimatedMinutes");
   await createDoItem(userId, {
     title,
     bucket,
+    habitId: habitId || null,
     lane: "today",
     status: "ready",
     estimatedMinutes,

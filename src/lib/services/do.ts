@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireCan } from "@/lib/auth/can";
 import { recordEvent } from "@/lib/services/events";
 import { startEntry } from "@/lib/services/time";
+import { listHabits, logHabitProgress } from "@/lib/services/habits";
 import {
   type DoLane,
   type DoStatus,
@@ -16,6 +17,7 @@ import type { DoItem, TimeEntry } from "@/generated/prisma/client";
 type DoItemWithEntries = DoItem & {
   timeEntries: TimeEntry[];
   project: { id: string; name: string } | null;
+  habit: { id: string; title: string } | null;
 };
 
 export type DoItemSummary = DoItem & {
@@ -25,12 +27,14 @@ export type DoItemSummary = DoItem & {
   scheduledMinutes: number;
   scheduledCount: number;
   projectName: string | null;
+  habitTitle: string | null;
 };
 
 export type SaveDoItemInput = {
   title: string;
   bucket?: string | null;
   projectId?: string | null;
+  habitId?: string | null;
   lane?: DoLane;
   status?: DoStatus;
   estimatedMinutes?: number | null;
@@ -88,6 +92,7 @@ function summarize(
     scheduledMinutes,
     scheduledCount,
     projectName: item.project?.name ?? null,
+    habitTitle: item.habit?.title ?? null,
     effectiveActualMinutes:
       item.actualMinutes ?? (trackedMinutes > 0 ? trackedMinutes : null),
   };
@@ -195,6 +200,9 @@ export async function listDoItems(
     include: {
       project: {
         select: { id: true, name: true },
+      },
+      habit: {
+        select: { id: true, title: true },
       },
       timeEntries: {
         where: { endedAt: { not: null } },
@@ -314,6 +322,14 @@ export async function createDoItem(
         })
       )?.id ?? null
     : null;
+  const habitId = input.habitId
+    ? (
+        await prisma.habit.findFirst({
+          where: { userId, id: input.habitId, archivedAt: null },
+          select: { id: true },
+        })
+      )?.id ?? null
+    : null;
 
   const item = await prisma.doItem.create({
     data: {
@@ -321,6 +337,7 @@ export async function createDoItem(
       title,
       bucket: sanitizeOptionalString(input.bucket),
       projectId,
+      habitId,
       lane: sanitizeLane(input.lane),
       status: sanitizeStatus(input.status),
       notes: input.notes?.trim() || null,
@@ -329,6 +346,7 @@ export async function createDoItem(
     },
     include: {
       project: { select: { id: true, name: true } },
+      habit: { select: { id: true, title: true } },
       timeEntries: true,
     },
   });
@@ -354,6 +372,7 @@ export async function updateDoItem(
     where: { userId, id },
     include: {
       project: { select: { id: true, name: true } },
+      habit: { select: { id: true, title: true } },
       timeEntries: true,
     },
   });
@@ -401,6 +420,7 @@ export async function updateDoItem(
     },
     include: {
       project: { select: { id: true, name: true } },
+      habit: { select: { id: true, title: true } },
       timeEntries: {
         where: { endedAt: { not: null } },
       },
@@ -476,6 +496,7 @@ export async function startTimerForDoItem(
     label: item.title,
     category: "do",
     doItemId: item.id,
+    habitId: item.habitId,
   });
 
   await prisma.doItem.update({
@@ -496,6 +517,23 @@ export async function startTimerForDoItem(
   });
 
   return entry;
+}
+
+async function syncLinkedHabitIfNeeded(userId: string, item: DoItemSummary | null) {
+  if (!item?.habitId) return;
+
+  const habits = await listHabits(userId, { includeArchived: true });
+  const habit = habits.find((candidate) => candidate.id === item.habitId && !candidate.archivedAt);
+  if (!habit) return;
+  const progress = habit.cadence === "weekly" ? habit.progressThisWeek : habit.progressToday;
+  if (progress >= habit.targetCount) return;
+
+  const remaining = Math.max(1, habit.targetCount - progress);
+  await logHabitProgress(userId, habit.id, {
+    quantity: remaining,
+    notes: `Completed from linked Do item "${item.title}".`,
+    mode: "full",
+  });
 }
 
 export async function reflectOnDoItemSession(
@@ -547,6 +585,10 @@ export async function reflectOnDoItemSession(
       remainingMinutes: parseMinutes(input.remainingMinutes),
     },
   });
+
+  if (input.outcome === "done") {
+    await syncLinkedHabitIfNeeded(userId, updated);
+  }
 
   return updated;
 }

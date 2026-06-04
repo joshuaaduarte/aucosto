@@ -423,6 +423,7 @@ export function HabitCard({ habit }: { habit: HabitSummary }) {
                 Schedule
               </button>
               <form action={createDoFromHabitAction} className="hidden sm:block">
+                <input type="hidden" name="habitId" value={habit.id} />
                 <input type="hidden" name="title" value={habit.title} />
                 <input type="hidden" name="bucket" value={habit.bucket ?? ""} />
                 <input type="hidden" name="estimatedMinutes" value={habit.defaultDurationMinutes ?? ""} />
@@ -508,6 +509,7 @@ export function HabitCard({ habit }: { habit: HabitSummary }) {
                   Schedule
                 </button>
                 <form action={createDoFromHabitAction}>
+                  <input type="hidden" name="habitId" value={habit.id} />
                   <input type="hidden" name="title" value={habit.title} />
                   <input type="hidden" name="bucket" value={habit.bucket ?? ""} />
                   <input type="hidden" name="estimatedMinutes" value={habit.defaultDurationMinutes ?? ""} />
