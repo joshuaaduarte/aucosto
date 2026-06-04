@@ -730,7 +730,7 @@ export function HabitCard({ habit }: { habit: HabitSummary }) {
               <input type="hidden" name="id" value={habit.id} />
               <input type="hidden" name="archived" value={habit.archivedAt ? "false" : "true"} />
               <button type="submit" className="btn-ghost h-8 px-2.5 text-[0.75rem]">
-                {habit.archivedAt ? "Reopen habit" : "Pause habit"}
+                {habit.archivedAt ? "Restore habit" : "Pause / archive"}
               </button>
             </form>
           </div>

@@ -10,6 +10,10 @@ function pluralize(count: number, singular: string, plural = `${singular}s`) {
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
+function formatArchivedSummary(count: number) {
+  return count === 1 ? "1 archived habit is waiting for cleanup." : `${count} archived habits are waiting for cleanup.`;
+}
+
 function SectionCard({
   eyebrow,
   title,
@@ -295,16 +299,39 @@ export default async function HabitsPage() {
       </SectionCard>
 
       {archivedHabits.length > 0 ? (
-        <SectionCard eyebrow="Archived" title="Paused or retired habits.">
+        <SectionCard eyebrow="Cleanup" title={formatArchivedSummary(archivedHabits.length)} tone="accent">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
+              Paused habits and test clutter land in your archive. Review them here when you want to restore something or clear it out for good.
+            </p>
+            <a
+              href="#habit-archive"
+              className="inline-flex h-9 items-center justify-center rounded-full border px-3 text-[0.75rem] font-medium"
+              style={{
+                borderColor: "var(--accent-tint-strong)",
+                background: "var(--bg-page)",
+                color: "var(--accent-strong)",
+              }}
+            >
+              Review archive
+            </a>
+          </div>
+        </SectionCard>
+      ) : null}
+
+      {archivedHabits.length > 0 ? (
+        <section id="habit-archive">
+          <SectionCard eyebrow="Archived" title="Archive and cleanup.">
           <p className="mb-4 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
-            Reopen anything you paused by mistake. Delete permanently when you want to clear out old tests or retired habits.
+            Restore anything you paused by mistake. Delete permanently when you want to clear out old tests or retired habits.
           </p>
           <OverflowList count={archivedHabits.length}>
             {archivedHabits.map((habit) => (
               <HabitCard key={habit.id} habit={habit} />
             ))}
           </OverflowList>
-        </SectionCard>
+          </SectionCard>
+        </section>
       ) : null}
     </div>
   );
