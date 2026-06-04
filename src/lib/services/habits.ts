@@ -18,10 +18,14 @@ type HabitWithRelations = Habit & {
   timeEntries: TimeEntry[];
 };
 
+type HabitEntryMode = "full" | "fallback" | "recovery";
+
 export type SaveHabitInput = {
   title: string;
   bucket?: string | null;
   notes?: string | null;
+  fallbackTitle?: string | null;
+  rescuePrompt?: string | null;
   cadence?: HabitCadence;
   daysOfWeek?: string | null;
   targetCount?: number;
@@ -39,13 +43,22 @@ export type HabitSummary = Habit & {
   completedThisWeek: boolean;
   dueToday: boolean;
   currentStreak: number;
+  keptAliveStreak: number;
   longestStreak: number;
   completionRate30d: number;
+  keptAliveRate30d: number;
+  fallbackLoggedToday: boolean;
+  recoveryLoggedToday: boolean;
+  keptAliveToday: boolean;
+  needsSaveToday: boolean;
+  salvageLabel: string | null;
   recentDays: Array<{
     dateKey: string;
     label: string;
     completed: boolean;
     due: boolean;
+    keptAlive: boolean;
+    mode: HabitEntryMode | null;
     progress: number;
   }>;
   cadenceLabel: string;
@@ -113,12 +126,16 @@ function isDueOnDate(habit: Pick<Habit, "cadence" | "daysOfWeek">, date: Date) {
   }
 }
 
+function fullEntries(entries: HabitEntry[]) {
+  return entries.filter((entry) => entry.mode !== "fallback" && entry.mode !== "recovery");
+}
+
 function progressForWindow(
   habit: Pick<Habit, "goalUnit">,
   entries: HabitEntry[],
   timeEntries: TimeEntry[],
 ) {
-  const manual = entries.reduce((sum, entry) => sum + entry.quantity, 0);
+  const manual = fullEntries(entries).reduce((sum, entry) => sum + entry.quantity, 0);
   if (habit.goalUnit === "minutes") {
     return Math.max(manual, minutesFromEntries(timeEntries));
   }
@@ -145,6 +162,22 @@ function buildDailyWindows(now: Date, count: number) {
     day.setDate(day.getDate() - (count - 1 - index));
     return day;
   });
+}
+
+function modeForWindow(entries: HabitEntry[], completed: boolean): HabitEntryMode | null {
+  if (completed) return "full";
+  if (entries.some((entry) => entry.mode === "recovery")) return "recovery";
+  if (entries.some((entry) => entry.mode === "fallback")) return "fallback";
+  return null;
+}
+
+function keptAliveForWindow(habit: HabitWithRelations, start: Date, end: Date) {
+  const entries = habit.entries.filter((entry) => entry.loggedAt >= start && entry.loggedAt < end);
+  const timeEntries = habit.timeEntries.filter((entry) => entry.startedAt >= start && entry.startedAt < end);
+  const progress = progressForWindow(habit, entries, timeEntries);
+  const completed = progress >= habit.targetCount;
+  const keptAlive = completed || entries.some((entry) => entry.mode === "fallback" || entry.mode === "recovery");
+  return { completed, keptAlive, mode: modeForWindow(entries, completed) };
 }
 
 function streakForHabit(habit: HabitWithRelations, now: Date) {
@@ -213,6 +246,35 @@ function streakForHabit(habit: HabitWithRelations, now: Date) {
   return { currentStreak: current, longestStreak: longest };
 }
 
+function keptAliveStreakForHabit(habit: HabitWithRelations, now: Date) {
+  if (habit.cadence === "weekly") {
+    let streak = 0;
+    const cursor = startOfWeek(now);
+    while (streak < 104) {
+      const weekEnd = endOfWeek(cursor);
+      const { keptAlive } = keptAliveForWindow(habit, cursor, weekEnd);
+      if (!keptAlive) break;
+      streak += 1;
+      cursor.setDate(cursor.getDate() - 7);
+    }
+    return streak;
+  }
+
+  const windows = buildDailyWindows(now, 60).filter((date) => isDueOnDate(habit, date));
+  let current = 0;
+  for (let i = windows.length - 1; i >= 0; i -= 1) {
+    const day = windows[i]!;
+    const nextDay = endOfDay(day);
+    const { keptAlive } = keptAliveForWindow(habit, day, nextDay);
+    if (keptAlive) {
+      current += 1;
+    } else {
+      break;
+    }
+  }
+  return current;
+}
+
 function summarizeHabit(habit: HabitWithRelations, now: Date): HabitSummary {
   const todayStart = startOfDay(now);
   const tomorrow = endOfDay(now);
@@ -220,7 +282,7 @@ function summarizeHabit(habit: HabitWithRelations, now: Date): HabitSummary {
   const weekEnd = endOfWeek(now);
   const todayEntries = habit.entries.filter((entry) => entry.loggedAt >= todayStart && entry.loggedAt < tomorrow);
   const todayTimeEntries = habit.timeEntries.filter((entry) => entry.startedAt >= todayStart && entry.startedAt < tomorrow);
-  const entriesToday = todayEntries.reduce((sum, entry) => sum + entry.quantity, 0);
+  const entriesToday = fullEntries(todayEntries).reduce((sum, entry) => sum + entry.quantity, 0);
   const trackedMinutesToday = minutesFromEntries(todayTimeEntries);
   const progressToday = progressForWindow(habit, todayEntries, todayTimeEntries);
   const progressThisWeek = progressForRange(habit, habit.entries, habit.timeEntries, weekStart, weekEnd);
@@ -228,6 +290,11 @@ function summarizeHabit(habit: HabitWithRelations, now: Date): HabitSummary {
   const completedToday = progressToday >= habit.targetCount;
   const completedThisWeek = progressThisWeek >= habit.targetCount;
   const { currentStreak, longestStreak } = streakForHabit(habit, now);
+  const keptAliveStreak = keptAliveStreakForHabit(habit, now);
+  const fallbackLoggedToday = todayEntries.some((entry) => entry.mode === "fallback");
+  const recoveryLoggedToday = todayEntries.some((entry) => entry.mode === "recovery");
+  const keptAliveToday = completedToday || fallbackLoggedToday || recoveryLoggedToday;
+  const needsSaveToday = dueToday && !completedToday && !keptAliveToday;
 
   const recentDays = buildDailyWindows(now, 14).map((day) => {
     const nextDay = endOfDay(day);
@@ -235,12 +302,16 @@ function summarizeHabit(habit: HabitWithRelations, now: Date): HabitSummary {
     const entries = habit.entries.filter((entry) => entry.loggedAt >= day && entry.loggedAt < nextDay);
     const timeEntries = habit.timeEntries.filter((entry) => entry.startedAt >= day && entry.startedAt < nextDay);
     const progress = progressForWindow(habit, entries, timeEntries);
+    const completed = due ? progress >= habit.targetCount : progress > 0;
+    const keptAlive = due ? completed || entries.some((entry) => entry.mode === "fallback" || entry.mode === "recovery") : completed;
     return {
       dateKey: day.toISOString().slice(0, 10),
       label: day.toLocaleDateString([], { weekday: "short" }).slice(0, 2),
       due,
       progress,
-      completed: due ? progress >= habit.targetCount : progress > 0,
+      completed,
+      keptAlive,
+      mode: modeForWindow(entries, completed),
     };
   });
 
@@ -251,6 +322,13 @@ function summarizeHabit(habit: HabitWithRelations, now: Date): HabitSummary {
     const timeEntries = habit.timeEntries.filter((entry) => entry.startedAt >= day && entry.startedAt < nextDay);
     const progress = progressForWindow(habit, entries, timeEntries);
     return progress >= habit.targetCount;
+  }).length;
+  const keptAliveCount = last30Due.filter((day) => {
+    const nextDay = endOfDay(day);
+    const entries = habit.entries.filter((entry) => entry.loggedAt >= day && entry.loggedAt < nextDay);
+    const timeEntries = habit.timeEntries.filter((entry) => entry.startedAt >= day && entry.startedAt < nextDay);
+    const progress = progressForWindow(habit, entries, timeEntries);
+    return progress >= habit.targetCount || entries.some((entry) => entry.mode === "fallback" || entry.mode === "recovery");
   }).length;
 
   return {
@@ -263,8 +341,15 @@ function summarizeHabit(habit: HabitWithRelations, now: Date): HabitSummary {
     completedThisWeek,
     dueToday,
     currentStreak,
+    keptAliveStreak,
     longestStreak,
     completionRate30d: last30Due.length > 0 ? Math.round((completedCount / last30Due.length) * 100) : 0,
+    keptAliveRate30d: last30Due.length > 0 ? Math.round((keptAliveCount / last30Due.length) * 100) : 0,
+    fallbackLoggedToday,
+    recoveryLoggedToday,
+    keptAliveToday,
+    needsSaveToday,
+    salvageLabel: habit.fallbackTitle ?? (habit.rescuePrompt ? "Run recovery" : null),
     recentDays,
     cadenceLabel:
       habit.cadence === "custom"
@@ -288,10 +373,10 @@ function summarizeHabit(habit: HabitWithRelations, now: Date): HabitSummary {
 function resolveHabitTaskLane(habit: HabitSummary): DoLane | null {
   if (habit.archivedAt) return null;
   if (habit.cadence === "weekly") {
-    if (habit.completedThisWeek) return null;
+    if (habit.completedThisWeek || habit.keptAliveToday) return null;
     return habit.dueToday ? "today" : "next";
   }
-  if (!habit.dueToday || habit.completedToday) return null;
+  if (!habit.dueToday || habit.completedToday || habit.keptAliveToday) return null;
   return "today";
 }
 
@@ -319,6 +404,7 @@ export async function listHabits(
     .sort((a, b) => {
       if (a.archivedAt && !b.archivedAt) return 1;
       if (!a.archivedAt && b.archivedAt) return -1;
+      if (a.needsSaveToday !== b.needsSaveToday) return a.needsSaveToday ? -1 : 1;
       if (a.completedToday !== b.completedToday) return a.completedToday ? 1 : -1;
       if (a.dueToday !== b.dueToday) return a.dueToday ? -1 : 1;
       return b.updatedAt.getTime() - a.updatedAt.getTime();
@@ -333,9 +419,10 @@ export async function listSuggestedHabits(
   return habits
     .filter((habit) => !habit.archivedAt)
     .sort((a, b) => {
+      if (a.needsSaveToday !== b.needsSaveToday) return a.needsSaveToday ? -1 : 1;
       if (a.completedToday !== b.completedToday) return a.completedToday ? 1 : -1;
       if (a.dueToday !== b.dueToday) return a.dueToday ? -1 : 1;
-      if (a.currentStreak !== b.currentStreak) return b.currentStreak - a.currentStreak;
+      if (a.keptAliveStreak !== b.keptAliveStreak) return b.keptAliveStreak - a.keptAliveStreak;
       return b.updatedAt.getTime() - a.updatedAt.getTime();
     })
     .slice(0, options.limit ?? 4);
@@ -358,7 +445,7 @@ export async function listHabitTaskItems(
       if ((a.reminderTime ?? "") !== (b.reminderTime ?? "")) {
         return (a.reminderTime ?? "").localeCompare(b.reminderTime ?? "");
       }
-      if (a.currentStreak !== b.currentStreak) return b.currentStreak - a.currentStreak;
+      if (a.keptAliveStreak !== b.keptAliveStreak) return b.keptAliveStreak - a.keptAliveStreak;
       return b.updatedAt.getTime() - a.updatedAt.getTime();
     })
     .slice(0, options.limit ?? 100);
@@ -375,6 +462,8 @@ export async function createHabit(userId: string, input: SaveHabitInput) {
       title,
       bucket: sanitizeOptionalString(input.bucket),
       notes: sanitizeOptionalString(input.notes),
+      fallbackTitle: sanitizeOptionalString(input.fallbackTitle),
+      rescuePrompt: sanitizeOptionalString(input.rescuePrompt),
       cadence: input.cadence ?? "daily",
       daysOfWeek: sanitizeOptionalString(input.daysOfWeek),
       targetCount: Math.max(1, input.targetCount ?? 1),
@@ -418,6 +507,8 @@ export async function updateHabit(userId: string, id: string, input: Partial<Sav
       title: input.title === undefined ? undefined : sanitizeTitle(input.title),
       bucket: input.bucket === undefined ? undefined : sanitizeOptionalString(input.bucket),
       notes: input.notes === undefined ? undefined : sanitizeOptionalString(input.notes),
+      fallbackTitle: input.fallbackTitle === undefined ? undefined : sanitizeOptionalString(input.fallbackTitle),
+      rescuePrompt: input.rescuePrompt === undefined ? undefined : sanitizeOptionalString(input.rescuePrompt),
       cadence: input.cadence ?? undefined,
       daysOfWeek: input.daysOfWeek === undefined ? undefined : sanitizeOptionalString(input.daysOfWeek),
       targetCount: input.targetCount === undefined ? undefined : Math.max(1, input.targetCount),
@@ -471,7 +562,7 @@ export async function archiveHabit(userId: string, id: string, archived: boolean
 export async function logHabitProgress(
   userId: string,
   habitId: string,
-  input: { quantity: number; notes?: string | null; loggedAt?: Date },
+  input: { quantity: number; notes?: string | null; loggedAt?: Date; mode?: HabitEntryMode },
 ) {
   requireCan(userId, "habit", "write");
   const habit = await prisma.habit.findFirst({
@@ -485,11 +576,13 @@ export async function logHabitProgress(
   });
   if (!habit) return null;
 
+  const mode = input.mode ?? "full";
   await prisma.habitEntry.create({
     data: {
       userId,
       habitId,
-      quantity: Math.max(1, input.quantity),
+      mode,
+      quantity: mode === "full" ? Math.max(1, input.quantity) : Math.max(0, input.quantity),
       notes: sanitizeOptionalString(input.notes),
       loggedAt: input.loggedAt ?? new Date(),
     },
@@ -510,7 +603,7 @@ export async function logHabitProgress(
     tool: "habit",
     type: "habit.logged",
     refId: habitId,
-    meta: { title: refreshed.title, quantity: input.quantity },
+    meta: { title: refreshed.title, quantity: input.quantity, mode },
   });
 
   return summarizeHabit(refreshed, new Date());

@@ -4,6 +4,8 @@ model Habit {
   title                  String
   bucket                 String?
   notes                  String?
+  fallbackTitle          String?
+  rescuePrompt           String?
   cadence                String      @default("daily")
   daysOfWeek             String?
   targetCount            Int         @default(1)
@@ -26,6 +28,7 @@ model HabitEntry {
   id        String   @id @default(cuid())
   userId    String
   habitId   String
+  mode      String   @default("full")
   quantity  Int      @default(1)
   notes     String?
   loggedAt   DateTime @default(now())

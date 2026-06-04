@@ -186,6 +186,31 @@ export function HabitCreateForm() {
                 <input id="habit-notes" name="notes" className="field" placeholder="Why this matters, what good looks like, constraints..." />
               </div>
 
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label htmlFor="habit-fallback" className="block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
+                    Fallback save
+                  </label>
+                  <input
+                    id="habit-fallback"
+                    name="fallbackTitle"
+                    className="field"
+                    placeholder="10-minute Arlo walk, 3-minute shutdown, 10-minute starter block"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="habit-rescue" className="block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
+                    Rescue prompt
+                  </label>
+                  <input
+                    id="habit-rescue"
+                    name="rescuePrompt"
+                    className="field"
+                    placeholder="You are late, not cooked. Protect tomorrow now."
+                  />
+                </div>
+              </div>
+
               {state?.error ? (
                 <p className="rounded-md px-3 py-2 text-[0.8125rem]" style={{ background: "var(--accent-tint)", color: "var(--accent-strong)", border: "1px solid var(--accent-tint-strong)" }}>
                   {state.error}

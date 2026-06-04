@@ -22,6 +22,8 @@ const habitSchema = z.object({
   title: z.string().trim().min(1, "Habit title is required").max(200),
   bucket: z.string().trim().max(80).nullable(),
   notes: z.string().trim().max(600).nullable(),
+  fallbackTitle: z.string().trim().max(200).nullable(),
+  rescuePrompt: z.string().trim().max(280).nullable(),
   cadence: cadenceEnum.default("daily"),
   targetCount: z.coerce.number().int().positive().max(500).default(1),
   goalUnit: goalUnitEnum.default("check"),
@@ -67,6 +69,8 @@ export async function createHabitAction(
     title: formData.get("title") ?? "",
     bucket: nullableString(formData, "bucket"),
     notes: nullableString(formData, "notes"),
+    fallbackTitle: nullableString(formData, "fallbackTitle"),
+    rescuePrompt: nullableString(formData, "rescuePrompt"),
     cadence: formData.get("cadence") ?? "daily",
     targetCount: formData.get("targetCount") ?? "1",
     goalUnit: formData.get("goalUnit") ?? "check",
@@ -92,6 +96,8 @@ export async function updateHabitAction(formData: FormData) {
     title: formData.get("title") ?? "",
     bucket: nullableString(formData, "bucket"),
     notes: nullableString(formData, "notes"),
+    fallbackTitle: nullableString(formData, "fallbackTitle"),
+    rescuePrompt: nullableString(formData, "rescuePrompt"),
     cadence: formData.get("cadence") ?? "daily",
     targetCount: formData.get("targetCount") ?? "1",
     goalUnit: formData.get("goalUnit") ?? "check",
@@ -117,12 +123,29 @@ export async function logHabitAction(
   const id = String(formData.get("id") ?? "");
   const quantity = Number(formData.get("quantity") ?? "1");
   const notes = nullableString(formData, "notes");
+  const modeRaw = String(formData.get("mode") ?? "full");
+  const mode = modeRaw === "fallback" || modeRaw === "recovery" ? modeRaw : "full";
   await logHabitProgress(userId, id, {
-    quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+    quantity: Number.isFinite(quantity) && quantity >= 0 ? quantity : mode === "full" ? 1 : 0,
     notes,
+    mode,
   });
   revalidateHabits();
   return undefined;
+}
+
+export async function salvageHabitAction(formData: FormData) {
+  const userId = await requireUserId();
+  const id = String(formData.get("id") ?? "");
+  const modeRaw = String(formData.get("mode") ?? "fallback");
+  const mode = modeRaw === "recovery" ? "recovery" : "fallback";
+  const notes = nullableString(formData, "notes");
+  await logHabitProgress(userId, id, {
+    quantity: 0,
+    notes,
+    mode,
+  });
+  revalidateHabits();
 }
 
 export async function archiveHabitAction(formData: FormData) {
@@ -195,6 +218,7 @@ export async function quickLogHabitFromDoAction(formData: FormData) {
   await logHabitProgress(userId, id, {
     quantity: habit.goalUnit === "minutes" ? Math.max(5, remaining) : remaining,
     notes: "Quick-completed from Do List.",
+    mode: "full",
   });
 
   revalidateHabits();

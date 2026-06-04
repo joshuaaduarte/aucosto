@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter_Tight, JetBrains_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 const interTight = Inter_Tight({
@@ -31,11 +32,9 @@ export default function RootLayout({
       className={`${interTight.variable} ${jetbrains.variable} h-full antialiased`}
     >
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem("aucosto-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}`,
-          }}
-        />
+        <Script id="aucosto-theme-init" strategy="beforeInteractive">
+          {`try{var t=localStorage.getItem("aucosto-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}`}
+        </Script>
       </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

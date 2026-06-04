@@ -22,13 +22,21 @@ export async function HabitsWidget() {
         <div className="space-y-3">
           <div>
             <p className="text-[0.6875rem] font-medium uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>
-              {next.completedToday ? "Already hit" : next.dueToday ? "Still due today" : "Worth keeping warm"}
+              {next.needsSaveToday
+                ? "Needs a save"
+                : next.completedToday
+                  ? "Already hit"
+                  : next.keptAliveToday
+                    ? "Kept alive"
+                    : next.dueToday
+                      ? "Still due today"
+                      : "Worth keeping warm"}
             </p>
             <p className="mt-0.5 text-[1rem] font-semibold tracking-tight" style={{ color: "var(--text)" }}>
               {next.title}
             </p>
             <p className="mt-0.5 text-[0.75rem]" style={{ color: "var(--text-muted)" }}>
-              {next.targetLabel} · {next.currentStreak} streak
+              {next.targetLabel} · {next.keptAliveStreak} kept alive
             </p>
           </div>
 
@@ -40,7 +48,7 @@ export async function HabitsWidget() {
                     {habit.title}
                   </span>
                   <span className="shrink-0 text-[0.6875rem]" style={{ color: "var(--text-faint)" }}>
-                    {habit.currentStreak} streak
+                    {habit.keptAliveStreak} kept alive
                   </span>
                 </li>
               ))}
