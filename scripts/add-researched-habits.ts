@@ -7,6 +7,7 @@ type HabitSeed = {
   notes: string;
   fallbackTitle?: string;
   rescuePrompt?: string;
+  dayPart: "morning" | "day" | "evening" | "anytime";
   cadence: "daily" | "weekdays" | "weekly" | "custom";
   daysOfWeek?: string | null;
   targetCount: number;
@@ -34,6 +35,7 @@ const habits: HabitSeed[] = [
       "Wake inside the target window to protect the whole day. Best paired with immediate water and getting outside.",
     fallbackTitle: "Run recovery morning mode",
     rescuePrompt: "Late is not dead. Water, light, one physical win, one work win before noon.",
+    dayPart: "morning",
     cadence: "daily",
     targetCount: 1,
     goalUnit: "check",
@@ -46,6 +48,7 @@ const habits: HabitSeed[] = [
       "Start landing on time so tomorrow is easier. Close with clothes out, phone away, and tomorrow's top 1 picked.",
     fallbackTitle: "3-minute shutdown",
     rescuePrompt: "Protect tomorrow now: clothes out, phone away, top 1 chosen.",
+    dayPart: "evening",
     cadence: "daily",
     targetCount: 1,
     goalUnit: "check",
@@ -59,6 +62,7 @@ const habits: HabitSeed[] = [
       "Get outside within 30 to 60 minutes of waking. Tie this to Arlo so the habit starts itself.",
     fallbackTitle: "10-minute outside walk",
     rescuePrompt: "Get outside now, even if the full run is gone.",
+    dayPart: "morning",
     cadence: "daily",
     targetCount: 1,
     goalUnit: "check",
@@ -72,6 +76,7 @@ const habits: HabitSeed[] = [
       "Hit the minimum every day so momentum survives imperfect days. Intentional movement matters more than perfection.",
     fallbackTitle: "10-minute walk",
     rescuePrompt: "Keep the habit alive with ten minutes instead of skipping the day.",
+    dayPart: "day",
     cadence: "daily",
     targetCount: 20,
     goalUnit: "minutes",
@@ -85,6 +90,7 @@ const habits: HabitSeed[] = [
       "Complete the planned run, lift, or conditioning sessions for the week. This is the real training system, not random effort.",
     fallbackTitle: "20-minute training save",
     rescuePrompt: "The full session can slip, but the week does not have to. Save it with a shorter session.",
+    dayPart: "evening",
     cadence: "weekly",
     targetCount: 4,
     goalUnit: "check",
@@ -98,6 +104,7 @@ const habits: HabitSeed[] = [
       "Choose the next meaningful task ahead of time and define the if-then trigger so the evening starts with action instead of drift.",
     fallbackTitle: "Pick the smallest next step",
     rescuePrompt: "Write the one next move before YouTube gets the night.",
+    dayPart: "evening",
     cadence: "daily",
     targetCount: 1,
     goalUnit: "check",
@@ -111,6 +118,7 @@ const habits: HabitSeed[] = [
       "Put the phone out of reach during the drift window so the night stops getting stolen by default behavior.",
     fallbackTitle: "Park phone for 10 minutes",
     rescuePrompt: "Protect tomorrow now. Phone away, even if the night already slipped a bit.",
+    dayPart: "evening",
     cadence: "daily",
     targetCount: 1,
     goalUnit: "check",
@@ -123,6 +131,7 @@ const habits: HabitSeed[] = [
       "Use this after a bad morning, stressful workday, or before an evening build block to stop the spiral early.",
     fallbackTitle: "1-minute reset",
     rescuePrompt: "Pause, breathe, and reset before the spiral decides the rest of the day.",
+    dayPart: "day",
     cadence: "daily",
     targetCount: 5,
     goalUnit: "minutes",
@@ -160,6 +169,7 @@ async function main() {
           notes: habit.notes,
           fallbackTitle: habit.fallbackTitle ?? null,
           rescuePrompt: habit.rescuePrompt ?? null,
+          dayPart: habit.dayPart,
           cadence: habit.cadence,
           daysOfWeek: habit.daysOfWeek ?? null,
           targetCount: habit.targetCount,
@@ -181,6 +191,7 @@ async function main() {
         notes: habit.notes,
         fallbackTitle: habit.fallbackTitle ?? null,
         rescuePrompt: habit.rescuePrompt ?? null,
+        dayPart: habit.dayPart,
         cadence: habit.cadence,
         daysOfWeek: habit.daysOfWeek ?? null,
         targetCount: habit.targetCount,

@@ -4,10 +4,13 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import {
   HABIT_CADENCE_LABELS,
   HABIT_CADENCES,
+  HABIT_DAY_PART_LABELS,
+  HABIT_DAY_PARTS,
   HABIT_GOAL_UNIT_LABELS,
   HABIT_GOAL_UNITS,
   HABIT_WEEKDAY_OPTIONS,
   type HabitCadence,
+  type HabitDayPart,
   type HabitGoalUnit,
 } from "@/lib/habits";
 import { createHabitAction, type HabitState } from "./actions";
@@ -18,6 +21,7 @@ export function HabitCreateForm() {
   const [state, formAction, pending] = useActionState(createHabitAction, initialState);
   const [open, setOpen] = useState(false);
   const [cadence, setCadence] = useState<HabitCadence>("daily");
+  const [dayPart, setDayPart] = useState<HabitDayPart>("anytime");
   const [goalUnit, setGoalUnit] = useState<HabitGoalUnit>("check");
   const formRef = useRef<HTMLFormElement>(null);
   const submittedRef = useRef(false);
@@ -33,6 +37,7 @@ export function HabitCreateForm() {
       const timer = window.setTimeout(() => {
         formRef.current?.reset();
         setCadence("daily");
+        setDayPart("anytime");
         setGoalUnit("check");
         setOpen(false);
       }, 0);
@@ -95,7 +100,7 @@ export function HabitCreateForm() {
             >
               <div className="space-y-1.5">
                 <label htmlFor="habit-title" className="block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
-                  Habit
+                  Habit title
                 </label>
                 <input id="habit-title" name="title" required className="field" placeholder="Morning run, read 20 pages, no phone after 10" />
               </div>
@@ -108,10 +113,22 @@ export function HabitCreateForm() {
                   <input id="habit-bucket" name="bucket" className="field" placeholder="health, work, marriage" />
                 </div>
                 <div className="space-y-1.5">
-                  <label htmlFor="habit-reminder" className="block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
-                    Reminder time
+                  <label htmlFor="habit-dayPart" className="block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
+                    Best fit
                   </label>
-                  <input id="habit-reminder" name="reminderTime" type="time" className="field" />
+                  <select
+                    id="habit-dayPart"
+                    name="dayPart"
+                    className="field"
+                    value={dayPart}
+                    onChange={(event) => setDayPart(event.target.value as HabitDayPart)}
+                  >
+                    {HABIT_DAY_PARTS.map((option) => (
+                      <option key={option} value={option}>
+                        {HABIT_DAY_PART_LABELS[option]}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -178,6 +195,21 @@ export function HabitCreateForm() {
                   placeholder={goalUnit === "minutes" ? "30" : "45"}
                 />
               </div>
+
+              <details className="rounded-[0.9rem] border px-3 py-2.5" style={{ borderColor: "var(--border-faint)" }}>
+                <summary className="cursor-pointer list-none text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
+                  Optional precise timing
+                </summary>
+                <div className="mt-3 space-y-1.5">
+                  <label htmlFor="habit-reminder" className="block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
+                    Exact reminder time
+                  </label>
+                  <input id="habit-reminder" name="reminderTime" type="time" className="field" />
+                  <p className="text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+                    Optional. Leave blank if this habit should stay flexible inside its day part.
+                  </p>
+                </div>
+              </details>
 
               <div className="space-y-1.5">
                 <label htmlFor="habit-notes" className="block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>

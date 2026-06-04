@@ -4,11 +4,14 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import {
   HABIT_CADENCE_LABELS,
   HABIT_CADENCES,
+  HABIT_DAY_PART_LABELS,
+  HABIT_DAY_PARTS,
   HABIT_GOAL_UNIT_LABELS,
   HABIT_GOAL_UNITS,
   HABIT_WEEKDAY_OPTIONS,
   formatHabitQuantity,
   parseHabitDays,
+  type HabitDayPart,
   type HabitGoalUnit,
 } from "@/lib/habits";
 import type { HabitSummary } from "@/lib/services/habits";
@@ -152,6 +155,15 @@ function topStatusLabel(habit: HabitSummary, period: string) {
   return "in rhythm";
 }
 
+function defaultScheduleStart(habit: HabitSummary) {
+  if (habit.reminderTime) return habit.reminderTime;
+  const dayPart = (habit.dayPart ?? "anytime") as HabitDayPart;
+  if (dayPart === "morning") return "07:30";
+  if (dayPart === "day") return "13:00";
+  if (dayPart === "evening") return "19:00";
+  return "09:00";
+}
+
 function LogProgressModal({ habit, onClose }: { habit: HabitSummary; onClose: () => void }) {
   const [state, formAction, pending] = useActionState<HabitLogState, FormData>(logHabitAction, undefined);
   const formRef = useRef<HTMLFormElement>(null);
@@ -256,7 +268,7 @@ function ScheduleModal({ habit, onClose }: { habit: HabitSummary; onClose: () =>
   const formRef = useRef<HTMLFormElement>(null);
   const submittedRef = useRef(false);
   const today = new Date().toLocaleDateString("en-CA");
-  const start = habit.reminderTime ?? "08:00";
+  const start = defaultScheduleStart(habit);
   const duration = habit.defaultDurationMinutes ?? (habit.goalUnit === "minutes" ? habit.targetCount : 30);
   const base = new Date(`${today}T${start}`);
   base.setMinutes(base.getMinutes() + duration);
@@ -370,9 +382,9 @@ export function HabitCard({ habit }: { habit: HabitSummary }) {
               </div>
 
               <div className="mt-2 flex flex-wrap gap-1.5">
+                <span className="pill">{habit.dayPartLabel}</span>
                 <span className="pill">{habit.cadenceLabel}</span>
                 <span className="pill">{habit.targetLabel}</span>
-                {habit.reminderTime ? <span className="pill">reminder {habit.reminderTime}</span> : null}
               </div>
 
               <p className="mt-2 text-[0.8125rem] leading-relaxed" style={{ color: "var(--text-muted)" }}>
@@ -565,7 +577,7 @@ export function HabitCard({ habit }: { habit: HabitSummary }) {
               <input type="hidden" name="id" value={habit.id} />
               <div className="space-y-1.5">
                 <label htmlFor={`title-${habit.id}`} className="block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
-                  Title
+                  Habit title
                 </label>
                 <input id={`title-${habit.id}`} name="title" defaultValue={habit.title} className="field" required />
               </div>
@@ -630,6 +642,18 @@ export function HabitCard({ habit }: { habit: HabitSummary }) {
                   <input id={`bucket-${habit.id}`} name="bucket" defaultValue={habit.bucket ?? ""} className="field" />
                 </div>
                 <div className="space-y-1.5">
+                  <label htmlFor={`dayPart-${habit.id}`} className="block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
+                    Best fit
+                  </label>
+                  <select id={`dayPart-${habit.id}`} name="dayPart" defaultValue={habit.dayPart} className="field">
+                    {HABIT_DAY_PARTS.map((option) => (
+                      <option key={`${habit.id}-${option}`} value={option}>
+                        {HABIT_DAY_PART_LABELS[option]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
                   <label htmlFor={`duration-${habit.id}`} className="block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
                     Default block
                   </label>
@@ -643,12 +667,16 @@ export function HabitCard({ habit }: { habit: HabitSummary }) {
                     className="field"
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <label htmlFor={`reminder-${habit.id}`} className="block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
-                    Reminder
-                  </label>
-                  <input id={`reminder-${habit.id}`} name="reminderTime" type="time" defaultValue={habit.reminderTime ?? ""} className="field" />
-                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor={`reminder-${habit.id}`} className="block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
+                  Exact reminder time
+                </label>
+                <input id={`reminder-${habit.id}`} name="reminderTime" type="time" defaultValue={habit.reminderTime ?? ""} className="field" />
+                <p className="text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+                  Optional. Leave blank if this habit should stay flexible inside its day part.
+                </p>
               </div>
 
               <div className="space-y-1.5">
@@ -685,7 +713,7 @@ export function HabitCard({ habit }: { habit: HabitSummary }) {
             <input type="hidden" name="id" value={habit.id} />
             <input type="hidden" name="archived" value={habit.archivedAt ? "false" : "true"} />
             <button type="submit" className="btn-ghost h-8 px-2.5 text-[0.75rem]">
-              {habit.archivedAt ? "Reopen" : "Archive"}
+              {habit.archivedAt ? "Reopen habit" : "Pause habit"}
             </button>
           </form>
         </div>

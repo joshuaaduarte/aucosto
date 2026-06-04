@@ -5,7 +5,9 @@ import { requireCan } from "@/lib/auth/can";
 import type { DoLane } from "@/lib/do";
 import {
   type HabitCadence,
+  type HabitDayPart,
   type HabitGoalUnit,
+  HABIT_DAY_PART_LABELS,
   formatHabitQuantity,
   parseHabitDays,
 } from "@/lib/habits";
@@ -26,6 +28,7 @@ export type SaveHabitInput = {
   notes?: string | null;
   fallbackTitle?: string | null;
   rescuePrompt?: string | null;
+  dayPart?: HabitDayPart;
   cadence?: HabitCadence;
   daysOfWeek?: string | null;
   targetCount?: number;
@@ -63,6 +66,7 @@ export type HabitSummary = Habit & {
   }>;
   cadenceLabel: string;
   targetLabel: string;
+  dayPartLabel: string;
 };
 
 export type HabitTaskSummary = HabitSummary & {
@@ -119,6 +123,30 @@ function minutesSinceMidnight(date: Date) {
   return date.getHours() * 60 + date.getMinutes();
 }
 
+function normalizeDayPart(value: string | null | undefined): HabitDayPart {
+  if (value === "morning" || value === "day" || value === "evening") return value;
+  return "anytime";
+}
+
+function currentDayPart(now: Date): HabitDayPart {
+  const hour = now.getHours();
+  if (hour >= 4 && hour < 11) return "morning";
+  if (hour >= 11 && hour < 17) return "day";
+  if (hour >= 17 && hour < 24) return "evening";
+  return "anytime";
+}
+
+function dayPartPriority(dayPart: HabitDayPart, now: Date) {
+  const current = currentDayPart(now);
+  const priorities: Record<HabitDayPart, HabitDayPart[]> = {
+    morning: ["morning", "day", "anytime", "evening"],
+    day: ["day", "anytime", "evening", "morning"],
+    evening: ["evening", "anytime", "day", "morning"],
+    anytime: ["anytime", "morning", "day", "evening"],
+  };
+  return priorities[current].indexOf(dayPart);
+}
+
 function compareReminderUrgency(a: HabitSummary, b: HabitSummary, now: Date) {
   const nowMinutes = minutesSinceMidnight(now);
   const aReminder = parseReminderMinutes(a.reminderTime);
@@ -143,6 +171,12 @@ function compareHabitDisplayOrder(a: HabitSummary, b: HabitSummary, now: Date) {
   if (a.needsSaveToday !== b.needsSaveToday) return a.needsSaveToday ? -1 : 1;
   if (a.completedToday !== b.completedToday) return a.completedToday ? 1 : -1;
   if (a.dueToday !== b.dueToday) return a.dueToday ? -1 : 1;
+
+  const aDayPart = normalizeDayPart(a.dayPart);
+  const bDayPart = normalizeDayPart(b.dayPart);
+  const aDayPartPriority = dayPartPriority(aDayPart, now);
+  const bDayPartPriority = dayPartPriority(bDayPart, now);
+  if (aDayPartPriority !== bDayPartPriority) return aDayPartPriority - bDayPartPriority;
 
   const reminderUrgency = compareReminderUrgency(a, b, now);
   if (reminderUrgency !== 0) return reminderUrgency;
@@ -398,6 +432,7 @@ function summarizeHabit(habit: HabitWithRelations, now: Date): HabitSummary {
     needsSaveToday,
     salvageLabel: habit.fallbackTitle ?? (habit.rescuePrompt ? "Run recovery" : null),
     recentDays,
+    dayPartLabel: HABIT_DAY_PART_LABELS[normalizeDayPart(habit.dayPart)],
     cadenceLabel:
       habit.cadence === "custom"
         ? parseHabitDays(habit.daysOfWeek)
@@ -503,6 +538,7 @@ export async function createHabit(userId: string, input: SaveHabitInput) {
       notes: sanitizeOptionalString(input.notes),
       fallbackTitle: sanitizeOptionalString(input.fallbackTitle),
       rescuePrompt: sanitizeOptionalString(input.rescuePrompt),
+      dayPart: input.dayPart ?? "anytime",
       cadence: input.cadence ?? "daily",
       daysOfWeek: sanitizeOptionalString(input.daysOfWeek),
       targetCount: Math.max(1, input.targetCount ?? 1),
@@ -548,6 +584,7 @@ export async function updateHabit(userId: string, id: string, input: Partial<Sav
       notes: input.notes === undefined ? undefined : sanitizeOptionalString(input.notes),
       fallbackTitle: input.fallbackTitle === undefined ? undefined : sanitizeOptionalString(input.fallbackTitle),
       rescuePrompt: input.rescuePrompt === undefined ? undefined : sanitizeOptionalString(input.rescuePrompt),
+      dayPart: input.dayPart ?? undefined,
       cadence: input.cadence ?? undefined,
       daysOfWeek: input.daysOfWeek === undefined ? undefined : sanitizeOptionalString(input.daysOfWeek),
       targetCount: input.targetCount === undefined ? undefined : Math.max(1, input.targetCount),

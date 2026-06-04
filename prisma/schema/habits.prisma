@@ -6,6 +6,7 @@ model Habit {
   notes                  String?
   fallbackTitle          String?
   rescuePrompt           String?
+  dayPart                String      @default("anytime")
   cadence                String      @default("daily")
   daysOfWeek             String?
   targetCount            Int         @default(1)

@@ -1,5 +1,6 @@
 export const HABIT_CADENCES = ["daily", "weekdays", "weekly", "custom"] as const;
 export const HABIT_GOAL_UNITS = ["check", "count", "minutes"] as const;
+export const HABIT_DAY_PARTS = ["morning", "day", "evening", "anytime"] as const;
 export const HABIT_WEEKDAY_OPTIONS = [
   { value: 0, short: "Sun", label: "Sunday" },
   { value: 1, short: "Mon", label: "Monday" },
@@ -12,6 +13,7 @@ export const HABIT_WEEKDAY_OPTIONS = [
 
 export type HabitCadence = (typeof HABIT_CADENCES)[number];
 export type HabitGoalUnit = (typeof HABIT_GOAL_UNITS)[number];
+export type HabitDayPart = (typeof HABIT_DAY_PARTS)[number];
 
 export const HABIT_CADENCE_LABELS: Record<HabitCadence, string> = {
   daily: "Daily",
@@ -24,6 +26,13 @@ export const HABIT_GOAL_UNIT_LABELS: Record<HabitGoalUnit, string> = {
   check: "Check",
   count: "Count",
   minutes: "Minutes",
+};
+
+export const HABIT_DAY_PART_LABELS: Record<HabitDayPart, string> = {
+  morning: "Morning",
+  day: "Throughout day",
+  evening: "Evening",
+  anytime: "Anytime",
 };
 
 export function formatHabitQuantity(value: number, unit: HabitGoalUnit) {

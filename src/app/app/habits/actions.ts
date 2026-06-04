@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { HABIT_CADENCES, HABIT_GOAL_UNITS, serializeHabitDays } from "@/lib/habits";
+import { HABIT_CADENCES, HABIT_DAY_PARTS, HABIT_GOAL_UNITS, serializeHabitDays } from "@/lib/habits";
 import { createCalendarItem } from "@/lib/services/calendar";
 import { createDoItem } from "@/lib/services/do";
 import {
@@ -16,6 +16,7 @@ import {
 import { requireViewerContext } from "@/lib/viewer-context";
 
 const cadenceEnum = z.enum(HABIT_CADENCES);
+const dayPartEnum = z.enum(HABIT_DAY_PARTS);
 const goalUnitEnum = z.enum(HABIT_GOAL_UNITS);
 
 const habitSchema = z.object({
@@ -24,6 +25,7 @@ const habitSchema = z.object({
   notes: z.string().trim().max(600).nullable(),
   fallbackTitle: z.string().trim().max(200).nullable(),
   rescuePrompt: z.string().trim().max(280).nullable(),
+  dayPart: dayPartEnum.default("anytime"),
   cadence: cadenceEnum.default("daily"),
   targetCount: z.coerce.number().int().positive().max(500).default(1),
   goalUnit: goalUnitEnum.default("check"),
@@ -71,6 +73,7 @@ export async function createHabitAction(
     notes: nullableString(formData, "notes"),
     fallbackTitle: nullableString(formData, "fallbackTitle"),
     rescuePrompt: nullableString(formData, "rescuePrompt"),
+    dayPart: formData.get("dayPart") ?? "anytime",
     cadence: formData.get("cadence") ?? "daily",
     targetCount: formData.get("targetCount") ?? "1",
     goalUnit: formData.get("goalUnit") ?? "check",
@@ -98,6 +101,7 @@ export async function updateHabitAction(formData: FormData) {
     notes: nullableString(formData, "notes"),
     fallbackTitle: nullableString(formData, "fallbackTitle"),
     rescuePrompt: nullableString(formData, "rescuePrompt"),
+    dayPart: formData.get("dayPart") ?? "anytime",
     cadence: formData.get("cadence") ?? "daily",
     targetCount: formData.get("targetCount") ?? "1",
     goalUnit: formData.get("goalUnit") ?? "check",
