@@ -15,6 +15,8 @@ import type { FinanceAccount, TimeEntry } from "@/generated/prisma/client";
 export type HubPrompt = {
   text: string;
   tone: "sky" | "amber" | "emerald" | "zinc";
+  ctaLabel: string;
+  href: string;
 };
 
 export type HubPromptInput = {
@@ -27,12 +29,16 @@ export type HubPromptInput = {
 
 const FALLBACK_PROMPTS: HubPrompt[] = [
   {
-    text: "Protect one block of focused work early in the day.",
+    text: "No plan is protected yet. Add one real block before the day gets noisy.",
     tone: "sky",
+    ctaLabel: "Plan today",
+    href: "/app/calendar",
   },
   {
-    text: "Use the hub to catch problems earlier.",
+    text: "Nothing is asking for attention yet. Use that quiet moment to line up the next move.",
     tone: "zinc",
+    ctaLabel: "Open workspace",
+    href: "/app/do",
   },
 ];
 
@@ -47,14 +53,18 @@ export function deriveHubPrompts(input: HubPromptInput): HubPrompt[] {
     );
     const suffix = ranMinutes > 0 ? `, running ${ranMinutes}m` : "";
     prompts.push({
-      text: `Currently tracking: ${input.runningEntry.label}${suffix}.`,
+      text: `Timer has been running on ${input.runningEntry.label}${suffix}. Stop and reflect while it is still fresh.`,
       tone: "sky",
+      ctaLabel: "Review session",
+      href: "/app/time",
     });
   } else if (input.weekTotalMs > 0) {
     const hours = input.weekTotalMs / (1000 * 60 * 60);
     prompts.push({
-      text: `${hours.toFixed(1)}h tracked this week so far.`,
+      text: `${hours.toFixed(1)}h is already logged this week. Protect the next block before the day drifts.`,
       tone: "sky",
+      ctaLabel: "Plan next block",
+      href: "/app/calendar",
     });
   }
 
@@ -64,8 +74,10 @@ export function deriveHubPrompts(input: HubPromptInput): HubPrompt[] {
       const days = daysUntil(dueSoon.dueDate);
       if (days <= 7) {
         prompts.push({
-          text: `${dueSoon.name} is due in ${days} day${days === 1 ? "" : "s"}, ${formatUSDFromCents(dueSoon.balanceCents)} owed.`,
+          text: `Card due ${days === 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`}: ${formatUSDFromCents(dueSoon.balanceCents)} on ${dueSoon.name}.`,
           tone: days <= 3 ? "amber" : "zinc",
+          ctaLabel: "Review finance",
+          href: "/app/finance",
         });
       }
     }
@@ -82,9 +94,11 @@ export function deriveHubPrompts(input: HubPromptInput): HubPrompt[] {
       prompts.push({
         text:
           delta > 0
-            ? `Spend pace is ${formatSignedUSDFromCents(delta)} vs last month (+${pct}%). Worth a peek.`
-            : `Spend pace is ${formatUSDFromCents(Math.abs(delta))} lower than last month (${pct}%). Calmer than last month.`,
+            ? `Spend pace is ${formatSignedUSDFromCents(delta)} vs last month (+${pct}%). Worth reviewing before it spreads.`
+            : `Spend pace is ${formatUSDFromCents(Math.abs(delta))} lower than last month (${pct}%). Check whether that calm is real or just timing.`,
         tone: delta > 0 ? "amber" : "emerald",
+        ctaLabel: "Open finance",
+        href: "/app/finance",
       });
     }
   }
