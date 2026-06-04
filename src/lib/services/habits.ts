@@ -104,6 +104,53 @@ function sanitizeOptionalString(value: string | null | undefined) {
   return trimmed ? trimmed : null;
 }
 
+function parseReminderMinutes(reminderTime: string | null | undefined) {
+  if (!reminderTime) return null;
+  const match = /^(\d{1,2}):(\d{2})$/.exec(reminderTime.trim());
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
+function minutesSinceMidnight(date: Date) {
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+function compareReminderUrgency(a: HabitSummary, b: HabitSummary, now: Date) {
+  const nowMinutes = minutesSinceMidnight(now);
+  const aReminder = parseReminderMinutes(a.reminderTime);
+  const bReminder = parseReminderMinutes(b.reminderTime);
+
+  if (aReminder !== null && bReminder !== null) {
+    const aDistance = Math.abs(aReminder - nowMinutes);
+    const bDistance = Math.abs(bReminder - nowMinutes);
+    if (aDistance !== bDistance) return aDistance - bDistance;
+    if (aReminder !== bReminder) return aReminder - bReminder;
+    return 0;
+  }
+
+  if (aReminder !== null) return -1;
+  if (bReminder !== null) return 1;
+  return 0;
+}
+
+function compareHabitDisplayOrder(a: HabitSummary, b: HabitSummary, now: Date) {
+  if (a.archivedAt && !b.archivedAt) return 1;
+  if (!a.archivedAt && b.archivedAt) return -1;
+  if (a.needsSaveToday !== b.needsSaveToday) return a.needsSaveToday ? -1 : 1;
+  if (a.completedToday !== b.completedToday) return a.completedToday ? 1 : -1;
+  if (a.dueToday !== b.dueToday) return a.dueToday ? -1 : 1;
+
+  const reminderUrgency = compareReminderUrgency(a, b, now);
+  if (reminderUrgency !== 0) return reminderUrgency;
+
+  if (a.keptAliveToday !== b.keptAliveToday) return a.keptAliveToday ? 1 : -1;
+  return b.updatedAt.getTime() - a.updatedAt.getTime();
+}
+
 function minutesFromEntries(entries: TimeEntry[]) {
   return entries.reduce((total, entry) => {
     if (!entry.endedAt) return total;
@@ -401,14 +448,7 @@ export async function listHabits(
   const now = new Date();
   return habits
     .map((habit) => summarizeHabit(habit, now))
-    .sort((a, b) => {
-      if (a.archivedAt && !b.archivedAt) return 1;
-      if (!a.archivedAt && b.archivedAt) return -1;
-      if (a.needsSaveToday !== b.needsSaveToday) return a.needsSaveToday ? -1 : 1;
-      if (a.completedToday !== b.completedToday) return a.completedToday ? 1 : -1;
-      if (a.dueToday !== b.dueToday) return a.dueToday ? -1 : 1;
-      return b.updatedAt.getTime() - a.updatedAt.getTime();
-    });
+    .sort((a, b) => compareHabitDisplayOrder(a, b, now));
 }
 
 export async function listSuggestedHabits(
@@ -419,9 +459,8 @@ export async function listSuggestedHabits(
   return habits
     .filter((habit) => !habit.archivedAt)
     .sort((a, b) => {
-      if (a.needsSaveToday !== b.needsSaveToday) return a.needsSaveToday ? -1 : 1;
-      if (a.completedToday !== b.completedToday) return a.completedToday ? 1 : -1;
-      if (a.dueToday !== b.dueToday) return a.dueToday ? -1 : 1;
+      const displayOrder = compareHabitDisplayOrder(a, b, new Date());
+      if (displayOrder !== 0) return displayOrder;
       if (a.keptAliveStreak !== b.keptAliveStreak) return b.keptAliveStreak - a.keptAliveStreak;
       return b.updatedAt.getTime() - a.updatedAt.getTime();
     })
