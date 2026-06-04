@@ -8,6 +8,7 @@ import { createDoItem } from "@/lib/services/do";
 import {
   archiveHabit,
   createHabit,
+  deleteHabit,
   listHabits,
   logHabitProgress,
   startTimerForHabit,
@@ -157,6 +158,13 @@ export async function archiveHabitAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const archived = String(formData.get("archived") ?? "true") === "true";
   await archiveHabit(userId, id, archived);
+  revalidateHabits();
+}
+
+export async function deleteHabitAction(formData: FormData) {
+  const userId = await requireUserId();
+  const id = String(formData.get("id") ?? "");
+  await deleteHabit(userId, id);
   revalidateHabits();
 }
 

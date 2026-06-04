@@ -296,6 +296,9 @@ export default async function HabitsPage() {
 
       {archivedHabits.length > 0 ? (
         <SectionCard eyebrow="Archived" title="Paused or retired habits.">
+          <p className="mb-4 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
+            Reopen anything you paused by mistake. Delete permanently when you want to clear out old tests or retired habits.
+          </p>
           <OverflowList count={archivedHabits.length}>
             {archivedHabits.map((habit) => (
               <HabitCard key={habit.id} habit={habit} />

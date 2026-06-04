@@ -18,6 +18,7 @@ import type { HabitSummary } from "@/lib/services/habits";
 import {
   archiveHabitAction,
   createDoFromHabitAction,
+  deleteHabitAction,
   type HabitLogState,
   type HabitScheduleState,
   logHabitAction,
@@ -709,13 +710,30 @@ export function HabitCard({ habit }: { habit: HabitSummary }) {
             </form>
           </details>
 
-          <form action={archiveHabitAction} className="flex justify-end">
-            <input type="hidden" name="id" value={habit.id} />
-            <input type="hidden" name="archived" value={habit.archivedAt ? "false" : "true"} />
-            <button type="submit" className="btn-ghost h-8 px-2.5 text-[0.75rem]">
-              {habit.archivedAt ? "Reopen habit" : "Pause habit"}
-            </button>
-          </form>
+          <div className="flex flex-wrap justify-end gap-2">
+            {habit.archivedAt ? (
+              <form
+                action={deleteHabitAction}
+                onSubmit={(event) => {
+                  if (!window.confirm(`Delete "${habit.title}" permanently?`)) {
+                    event.preventDefault();
+                  }
+                }}
+              >
+                <input type="hidden" name="id" value={habit.id} />
+                <button type="submit" className="btn-ghost h-8 px-2.5 text-[0.75rem]" style={{ color: "var(--accent-strong)" }}>
+                  Delete permanently
+                </button>
+              </form>
+            ) : null}
+            <form action={archiveHabitAction}>
+              <input type="hidden" name="id" value={habit.id} />
+              <input type="hidden" name="archived" value={habit.archivedAt ? "false" : "true"} />
+              <button type="submit" className="btn-ghost h-8 px-2.5 text-[0.75rem]">
+                {habit.archivedAt ? "Reopen habit" : "Pause habit"}
+              </button>
+            </form>
+          </div>
         </div>
       </li>
 

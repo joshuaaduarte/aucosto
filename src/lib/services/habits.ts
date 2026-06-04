@@ -635,6 +635,32 @@ export async function archiveHabit(userId: string, id: string, archived: boolean
   return summarizeHabit(habit, new Date());
 }
 
+export async function deleteHabit(userId: string, id: string) {
+  requireCan(userId, "habit", "write");
+  const habit = await prisma.habit.findFirst({
+    where: { userId, id },
+    select: { id: true, title: true, archivedAt: true },
+  });
+  if (!habit) return null;
+  if (!habit.archivedAt) {
+    throw new Error("Pause the habit before deleting it.");
+  }
+
+  await prisma.habit.delete({
+    where: { id: habit.id },
+  });
+
+  await recordEvent({
+    userId,
+    tool: "habit",
+    type: "habit.deleted",
+    refId: habit.id,
+    meta: { title: habit.title },
+  });
+
+  return habit;
+}
+
 export async function logHabitProgress(
   userId: string,
   habitId: string,
