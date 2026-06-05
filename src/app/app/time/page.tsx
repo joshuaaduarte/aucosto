@@ -126,6 +126,11 @@ export default async function TimePage() {
                 ? {
                     id: running.habit.id,
                     title: running.habit.title,
+                    goalUnit: running.habit.goalUnit,
+                    suggestedQuantity:
+                      running.habit.goalUnit === "minutes"
+                        ? running.habit.targetCount
+                        : 1,
                     targetLabel:
                       running.habit.goalUnit === "minutes"
                         ? `${running.habit.targetCount}m target`

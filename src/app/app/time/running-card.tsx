@@ -1,8 +1,14 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { formatMinutes } from "@/lib/do";
-import { stopEntry, stopEntryAndCompleteDoItem, stopEntryWithReflection } from "./actions";
+import {
+  stopEntry,
+  stopEntryAndCompleteDoItem,
+  stopEntryWithHabitReflection,
+  stopEntryWithReflection,
+} from "./actions";
 import { formatDuration } from "@/lib/time";
 
 export function RunningCard({
@@ -25,8 +31,11 @@ export function RunningCard({
     id: string;
     title: string;
     targetLabel: string;
+    goalUnit: string;
+    suggestedQuantity: number;
   } | null;
 }) {
+  const router = useRouter();
   const startedAt = new Date(startedAtIso).getTime();
   const [now, setNow] = useState(() => Date.now());
   const [pending, startTransition] = useTransition();
@@ -43,6 +52,7 @@ export function RunningCard({
   );
   const trackedIfStoppedNow = (doItem?.trackedMinutes ?? 0) + elapsedMinutes;
   const [reflectionPending, startReflectionTransition] = useTransition();
+  const isMinuteHabit = habit?.goalUnit === "minutes";
 
   return (
     <>
@@ -116,7 +126,9 @@ export function RunningCard({
                 className="mt-1 text-[0.75rem]"
                 style={{ color: "var(--text-faint)" }}
               >
-                {`Target: ${habit.targetLabel}`}
+                {isMinuteHabit
+                  ? `Tracked if you stop now: ${formatMinutes(elapsedMinutes)} · target ${habit.targetLabel}`
+                  : `Target: ${habit.targetLabel}`}
               </p>
             ) : null}
           </div>
@@ -138,10 +150,44 @@ export function RunningCard({
                   Stop and reflect
                 </button>
               </>
+            ) : habit ? (
+              <>
+                {!isMinuteHabit ? (
+                  <button
+                    type="button"
+                    onClick={() => setReflectOpen(true)}
+                    className="btn-ink"
+                  >
+                    Log and stop
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() =>
+                    startTransition(async () => {
+                      await stopEntry();
+                      router.refresh();
+                    })
+                  }
+                  disabled={pending}
+                  className="btn-ghost"
+                >
+                  {pending
+                    ? "Stopping..."
+                    : isMinuteHabit
+                      ? "Stop and keep progress"
+                      : "Stop only"}
+                </button>
+              </>
             ) : (
               <button
                 type="button"
-                onClick={() => startTransition(() => stopEntry())}
+                onClick={() =>
+                  startTransition(async () => {
+                    await stopEntry();
+                    router.refresh();
+                  })
+                }
                 disabled={pending}
                 className="btn-ghost"
               >
@@ -197,6 +243,7 @@ export function RunningCard({
               action={(formData) => {
                 startReflectionTransition(async () => {
                   await stopEntryWithReflection(formData);
+                  router.refresh();
                   setReflectOpen(false);
                 });
               }}
@@ -299,6 +346,124 @@ export function RunningCard({
                 </button>
                 <button type="submit" disabled={reflectionPending} className="btn-ink">
                   {reflectionPending ? "Stopping..." : "Stop session"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {reflectOpen && !doItem && habit && !isMinuteHabit ? (
+        <div
+          className="calendar-modal-backdrop"
+          role="presentation"
+          onClick={() => setReflectOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="habit-reflection-title"
+            className="calendar-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p
+                  className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+                  style={{ color: "var(--text-faint)" }}
+                >
+                  Stop session
+                </p>
+                <h2
+                  id="habit-reflection-title"
+                  className="mt-1 text-[1.125rem] font-semibold tracking-tight"
+                  style={{ color: "var(--text)" }}
+                >
+                  Count this habit session
+                </h2>
+                <p
+                  className="mt-2 text-[0.8125rem]"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Timed habit sessions for check/count habits need an explicit log so the habit gets credit.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="btn-icon h-8 w-8 rounded-full border"
+                style={{ borderColor: "var(--border-faint)" }}
+                onClick={() => setReflectOpen(false)}
+                aria-label="Close habit reflection modal"
+              >
+                x
+              </button>
+            </div>
+
+            <form
+              action={(formData) => {
+                startReflectionTransition(async () => {
+                  await stopEntryWithHabitReflection(formData);
+                  router.refresh();
+                  setReflectOpen(false);
+                });
+              }}
+              className="mt-5 space-y-4"
+            >
+              <input type="hidden" name="habitId" value={habit.id} />
+
+              <div className="space-y-1.5">
+                <label
+                  className="block text-[0.75rem] font-medium"
+                  style={{ color: "var(--text-muted)" }}
+                  htmlFor="habit-reflection-quantity"
+                >
+                  Quantity to log
+                </label>
+                <input
+                  id="habit-reflection-quantity"
+                  name="quantity"
+                  type="number"
+                  min={1}
+                  step={1}
+                  defaultValue={habit.suggestedQuantity}
+                  className="field"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label
+                  className="block text-[0.75rem] font-medium"
+                  style={{ color: "var(--text-muted)" }}
+                  htmlFor="habit-reflection-notes"
+                >
+                  Notes
+                </label>
+                <input
+                  id="habit-reflection-notes"
+                  name="notes"
+                  className="field"
+                  placeholder="What did you finish or learn?"
+                />
+              </div>
+
+              <div
+                className="sticky bottom-0 -mx-4 mt-2 flex items-center justify-between gap-3 border-t px-4 pb-1 pt-3 sm:-mx-5 sm:px-5"
+                style={{
+                  background: "var(--bg-page)",
+                  borderColor: "var(--border-faint)",
+                }}
+              >
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  disabled={reflectionPending}
+                  onClick={() => setReflectOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" disabled={reflectionPending} className="btn-ink">
+                  {reflectionPending ? "Stopping..." : "Log and stop"}
                 </button>
               </div>
             </form>

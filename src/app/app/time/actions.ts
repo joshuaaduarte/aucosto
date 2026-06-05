@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import * as timeService from "@/lib/services/time";
 import { reflectOnDoItemSession } from "@/lib/services/do";
+import { logHabitProgress } from "@/lib/services/habits";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 
 const startSchema = z.object({
@@ -44,6 +45,8 @@ export async function startEntry(
   });
 
   revalidatePath("/app");
+  revalidatePath("/app/do");
+  revalidatePath("/app/habits");
   revalidatePath("/app/time");
 }
 
@@ -52,7 +55,10 @@ export async function stopEntry() {
   await timeService.stopRunning(userId);
 
   revalidatePath("/app");
+  revalidatePath("/app/do");
+  revalidatePath("/app/habits");
   revalidatePath("/app/time");
+  revalidatePath("/app/calendar");
 }
 
 export async function stopEntryAndCompleteDoItem(formData: FormData) {
@@ -72,6 +78,7 @@ export async function stopEntryAndCompleteDoItem(formData: FormData) {
 
   revalidatePath("/app");
   revalidatePath("/app/do");
+  revalidatePath("/app/habits");
   revalidatePath("/app/time");
   revalidatePath("/app/calendar");
 }
@@ -100,6 +107,38 @@ export async function stopEntryWithReflection(formData: FormData) {
 
   revalidatePath("/app");
   revalidatePath("/app/do");
+  revalidatePath("/app/habits");
+  revalidatePath("/app/time");
+  revalidatePath("/app/calendar");
+}
+
+export async function stopEntryWithHabitReflection(formData: FormData) {
+  const userId = await resolveActiveUserId();
+  const habitId = String(formData.get("habitId") ?? "").trim();
+  const quantityRaw = String(formData.get("quantity") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim();
+
+  if (!habitId) {
+    throw new Error("Missing habit id.");
+  }
+
+  await timeService.stopRunning(userId);
+
+  if (quantityRaw) {
+    const quantity = Number(quantityRaw);
+    if (!Number.isFinite(quantity) || quantity < 1) {
+      throw new Error("Invalid habit quantity.");
+    }
+    await logHabitProgress(userId, habitId, {
+      quantity,
+      notes: notes || "Completed from timed habit session.",
+      mode: "full",
+    });
+  }
+
+  revalidatePath("/app");
+  revalidatePath("/app/do");
+  revalidatePath("/app/habits");
   revalidatePath("/app/time");
   revalidatePath("/app/calendar");
 }
