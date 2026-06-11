@@ -512,3 +512,17 @@ export async function updateProject(
 
   return summarize(project, { scheduledByTask, blocksByProject, now });
 }
+
+/** Delete a project. Linked tasks survive — DoItem.projectId is SetNull. */
+export async function deleteProject(userId: string, id: string): Promise<void> {
+  requireCan(userId, "projects", "write");
+  const { count } = await prisma.project.deleteMany({ where: { id, userId } });
+  if (count > 0) {
+    await recordEvent({
+      userId,
+      tool: "projects",
+      type: "project.deleted",
+      refId: id,
+    });
+  }
+}

@@ -17,6 +17,7 @@ import {
 } from "@/lib/time-insights";
 import { PRESET_TIME_CATEGORIES, categoryColor } from "@/lib/time-categories";
 import { EntryDeleteButton } from "./entry-row";
+import { AddEntryButton, EntryEditButton } from "./entry-editor";
 import { GapBackfillCard } from "./gap-backfill-card";
 import { InsightsSection } from "./insights-section";
 import { QuickStartChips } from "./quick-start-chips";
@@ -292,12 +293,15 @@ export default async function TimePage() {
 
       {/* Recent entries */}
       <section className="fade-in-delay-4">
-        <p
-          className="mb-3 text-[0.6875rem] font-semibold uppercase tracking-wider"
-          style={{ color: "var(--text-faint)" }}
-        >
-          Recent sessions
-        </p>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <p
+            className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+            style={{ color: "var(--text-faint)" }}
+          >
+            Recent sessions
+          </p>
+          <AddEntryButton />
+        </div>
 
         {recent.length === 0 ? (
           <p
@@ -325,7 +329,7 @@ export default async function TimePage() {
                     return (
                       <li
                         key={entry.id}
-                        className="group grid grid-cols-[1fr_auto_24px] items-baseline gap-3 rounded-md px-2 py-2 transition-colors hover:bg-bg-hover"
+                        className="group grid grid-cols-[1fr_auto_24px_24px] items-baseline gap-3 rounded-md px-2 py-2 transition-colors hover:bg-bg-hover"
                         style={{
                           borderTop: "1px solid var(--border-faint)",
                         }}
@@ -375,6 +379,15 @@ export default async function TimePage() {
                         >
                           {formatDuration(duration)}
                         </span>
+                        <EntryEditButton
+                          entry={{
+                            id: entry.id,
+                            label: entry.label,
+                            category: entry.category,
+                            startedAtIso: entry.startedAt.toISOString(),
+                            endedAtIso: entry.endedAt!.toISOString(),
+                          }}
+                        />
                         <EntryDeleteButton id={entry.id} />
                       </li>
                     );

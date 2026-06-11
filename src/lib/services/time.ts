@@ -153,6 +153,52 @@ export async function startEntry(
   return entry;
 }
 
+/** Edit a logged entry's label, category, or times (fix tracker mistakes). */
+export async function updateEntry(
+  userId: string,
+  id: string,
+  input: {
+    label?: string;
+    category?: string | null;
+    startedAt?: Date;
+    endedAt?: Date;
+  },
+): Promise<TimeEntry | null> {
+  requireCan(userId, "time", "write");
+  const existing = await prisma.timeEntry.findFirst({ where: { id, userId } });
+  if (!existing) return null;
+
+  const startedAt = input.startedAt ?? existing.startedAt;
+  const endedAt = input.endedAt ?? existing.endedAt;
+  if (Number.isNaN(startedAt.getTime()) || (endedAt && Number.isNaN(endedAt.getTime()))) {
+    throw new Error("Entry times are invalid.");
+  }
+  if (endedAt && endedAt <= startedAt) {
+    throw new Error("End time must be after start time.");
+  }
+  if (endedAt && endedAt.getTime() - startedAt.getTime() > 24 * 60 * 60 * 1000) {
+    throw new Error("Entries are capped at 24 hours.");
+  }
+
+  const entry = await prisma.timeEntry.update({
+    where: { id },
+    data: {
+      label: input.label === undefined ? undefined : input.label,
+      category: input.category === undefined ? undefined : input.category,
+      startedAt: input.startedAt === undefined ? undefined : input.startedAt,
+      endedAt: input.endedAt === undefined ? undefined : input.endedAt,
+    },
+  });
+  await recordEvent({
+    userId,
+    tool: "time",
+    type: "time.updated",
+    refId: entry.id,
+    meta: { label: entry.label, category: entry.category },
+  });
+  return entry;
+}
+
 export async function stopRunning(userId: string): Promise<void> {
   requireCan(userId, "time", "write");
   const { count } = await prisma.timeEntry.updateMany({

@@ -6,7 +6,7 @@ import {
   PROJECT_STATUS_LABELS,
   type ProjectStatus,
 } from "@/lib/projects";
-import { updateProjectAction } from "./actions";
+import { deleteProjectAction, updateProjectAction } from "./actions";
 
 export function ProjectEditForm({
   project,
@@ -124,6 +124,31 @@ export function ProjectEditForm({
           </button>
         </div>
       </form>
+      <div
+        className="flex items-center justify-between gap-3 border-t px-3 py-2.5"
+        style={{ borderColor: "var(--border-faint)" }}
+      >
+        <p className="text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+          Deleting keeps the linked tasks — they just lose the project.
+        </p>
+        <form
+          action={deleteProjectAction}
+          onSubmit={(event) => {
+            if (!window.confirm(`Delete "${project.name}" permanently?`)) {
+              event.preventDefault();
+            }
+          }}
+        >
+          <input type="hidden" name="id" value={project.id} />
+          <button
+            type="submit"
+            className="btn-ghost"
+            style={{ color: "var(--accent-strong)" }}
+          >
+            Delete project
+          </button>
+        </form>
+      </div>
     </details>
   );
 }

@@ -81,6 +81,95 @@ export async function quickStartEntry(formData: FormData) {
   revalidatePath("/app/calendar");
 }
 
+export type EntryFormState = { error?: string } | { ok: true } | undefined;
+
+const entryFormSchema = z.object({
+  id: z.string().trim().optional(),
+  label: z.string().trim().min(1, "Label is required").max(200),
+  category: z.string().trim().max(80).optional(),
+  date: z.string().trim().min(1, "Date is required"),
+  start: z.string().trim().min(1, "Start time is required"),
+  end: z.string().trim().min(1, "End time is required"),
+});
+
+function parseEntryWindow(date: string, start: string, end: string) {
+  const startedAt = new Date(`${date}T${start}`);
+  let endedAt = new Date(`${date}T${end}`);
+  if (Number.isNaN(startedAt.getTime()) || Number.isNaN(endedAt.getTime())) {
+    return null;
+  }
+  // End before start means the entry crossed midnight.
+  if (endedAt <= startedAt) {
+    endedAt = new Date(endedAt.getTime() + 24 * 60 * 60 * 1000);
+  }
+  return { startedAt, endedAt };
+}
+
+// Edit an existing completed entry, or manually add one (no id).
+// Used by the entry editor modal on the time page.
+export async function saveEntryAction(
+  _prev: EntryFormState,
+  formData: FormData,
+): Promise<EntryFormState> {
+  let userId: string;
+  try {
+    userId = await resolveActiveUserId();
+  } catch {
+    return { error: "Not signed in." };
+  }
+
+  const parsed = entryFormSchema.safeParse({
+    id: (formData.get("id") as string) || undefined,
+    label: formData.get("label") ?? "",
+    category: (formData.get("category") as string) || undefined,
+    date: formData.get("date") ?? "",
+    start: formData.get("start") ?? "",
+    end: formData.get("end") ?? "",
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+
+  const window = parseEntryWindow(
+    parsed.data.date,
+    parsed.data.start,
+    parsed.data.end,
+  );
+  if (!window) {
+    return { error: "Date and time are required." };
+  }
+
+  try {
+    if (parsed.data.id) {
+      const updated = await timeService.updateEntry(userId, parsed.data.id, {
+        label: parsed.data.label,
+        category: parsed.data.category ?? null,
+        startedAt: window.startedAt,
+        endedAt: window.endedAt,
+      });
+      if (!updated) {
+        return { error: "Entry not found." };
+      }
+    } else {
+      await timeService.createPastEntry(userId, {
+        label: parsed.data.label,
+        category: parsed.data.category ?? null,
+        startedAt: window.startedAt,
+        endedAt: window.endedAt,
+      });
+    }
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Could not save entry.",
+    };
+  }
+
+  revalidatePath("/app");
+  revalidatePath("/app/time");
+  revalidatePath("/app/calendar");
+  return { ok: true };
+}
+
 const backfillSchema = z.object({
   label: z.string().trim().min(1, "Label is required").max(200),
   category: z.string().trim().max(80).optional(),

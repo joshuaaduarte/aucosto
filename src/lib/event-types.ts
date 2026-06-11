@@ -10,6 +10,7 @@ const EVENT_LABELS: Record<string, string> = {
   "time.stopped": "stopped a timer",
   "time.deleted": "deleted a time entry",
   "time.logged": "backfilled a time entry",
+  "time.updated": "edited a time entry",
 
   // finance — manual edits
   "finance.account_created": "added a finance account",
@@ -53,6 +54,7 @@ const EVENT_LABELS: Record<string, string> = {
   // projects
   "project.created": "added a project",
   "project.updated": "updated a project",
+  "project.deleted": "deleted a project",
 
   // user
   "user.privacy_updated": "updated privacy settings",

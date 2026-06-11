@@ -6,7 +6,11 @@ import { DO_LANES } from "@/lib/do";
 import { PROJECT_STATUSES } from "@/lib/projects";
 import { createCalendarItem } from "@/lib/services/calendar";
 import { createDoItem, updateDoItem } from "@/lib/services/do";
-import { createProject, updateProject } from "@/lib/services/projects";
+import {
+  createProject,
+  deleteProject,
+  updateProject,
+} from "@/lib/services/projects";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 
 const projectSchema = z.object({
@@ -115,6 +119,17 @@ export async function updateProjectAction(
   }
 
   await updateProject(userId, id, parsed.data);
+  revalidateProjects();
+}
+
+// Deleting a project leaves its tasks in place (they just lose the link).
+export async function deleteProjectAction(formData: FormData) {
+  const userId = await resolveActiveUserId();
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) {
+    throw new Error("Missing project id.");
+  }
+  await deleteProject(userId, id);
   revalidateProjects();
 }
 
