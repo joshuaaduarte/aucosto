@@ -14,7 +14,7 @@ import {
   startTimerForHabit,
   updateHabit,
 } from "@/lib/services/habits";
-import { requireViewerContext } from "@/lib/viewer-context";
+import { resolveActiveUserId } from "@/lib/viewer-context";
 
 const cadenceEnum = z.enum(HABIT_CADENCES);
 const dayPartEnum = z.enum(HABIT_DAY_PARTS);
@@ -42,11 +42,6 @@ function revalidateHabits() {
   revalidatePath("/app/time");
 }
 
-async function requireUserId() {
-  const context = await requireViewerContext();
-  return context.effectiveUserId;
-}
-
 function nullableString(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
   return value.length > 0 ? value : null;
@@ -67,7 +62,7 @@ export async function createHabitAction(
   _prev: HabitState,
   formData: FormData,
 ): Promise<HabitState> {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const parsed = habitSchema.safeParse({
     title: formData.get("title") ?? "",
     bucket: nullableString(formData, "bucket"),
@@ -94,7 +89,7 @@ export async function createHabitAction(
 }
 
 export async function updateHabitAction(formData: FormData) {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "");
   const parsed = habitSchema.safeParse({
     title: formData.get("title") ?? "",
@@ -124,7 +119,7 @@ export async function logHabitAction(
   _prev: HabitLogState,
   formData: FormData,
 ): Promise<HabitLogState> {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "");
   const quantity = Number(formData.get("quantity") ?? "1");
   const notes = nullableString(formData, "notes");
@@ -140,7 +135,7 @@ export async function logHabitAction(
 }
 
 export async function salvageHabitAction(formData: FormData) {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "");
   const modeRaw = String(formData.get("mode") ?? "fallback");
   const mode = modeRaw === "recovery" ? "recovery" : "fallback";
@@ -154,7 +149,7 @@ export async function salvageHabitAction(formData: FormData) {
 }
 
 export async function archiveHabitAction(formData: FormData) {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "");
   const archived = String(formData.get("archived") ?? "true") === "true";
   await archiveHabit(userId, id, archived);
@@ -162,21 +157,21 @@ export async function archiveHabitAction(formData: FormData) {
 }
 
 export async function deleteHabitAction(formData: FormData) {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "");
   await deleteHabit(userId, id);
   revalidateHabits();
 }
 
 export async function startHabitTimerAction(formData: FormData) {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "");
   await startTimerForHabit(userId, id);
   revalidateHabits();
 }
 
 export async function createDoFromHabitAction(formData: FormData) {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const habitId = String(formData.get("habitId") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
   const bucket = nullableString(formData, "bucket");
@@ -198,7 +193,7 @@ export async function scheduleHabitAction(
   _prev: HabitScheduleState,
   formData: FormData,
 ): Promise<HabitScheduleState> {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const habitId = String(formData.get("habitId") ?? "");
   const title = String(formData.get("title") ?? "").trim();
   const date = String(formData.get("date") ?? "");
@@ -218,7 +213,7 @@ export async function scheduleHabitAction(
 }
 
 export async function quickLogHabitFromDoAction(formData: FormData) {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "");
   const habits = await listHabits(userId, { includeArchived: true });
   const habit = habits.find((item) => item.id === id && !item.archivedAt);

@@ -12,7 +12,7 @@ import {
   updateDoItem,
 } from "@/lib/services/do";
 import { getRunningEntry, stopRunning } from "@/lib/services/time";
-import { requireViewerContext } from "@/lib/viewer-context";
+import { resolveActiveUserId } from "@/lib/viewer-context";
 
 const laneEnum = z.enum(DO_LANES);
 const statusEnum = z.enum(DO_STATUSES);
@@ -38,11 +38,6 @@ function revalidateDo() {
   revalidatePath("/app/time");
 }
 
-async function requireUserId() {
-  const context = await requireViewerContext();
-  return context.effectiveUserId;
-}
-
 function nullableString(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
   return value.length > 0 ? value : null;
@@ -59,7 +54,7 @@ export async function createDoItemAction(
   _prev: DoState,
   formData: FormData,
 ): Promise<DoState> {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const parsed = doSchema.safeParse({
     title: formData.get("title") ?? "",
     bucket: nullableString(formData, "bucket"),
@@ -79,7 +74,7 @@ export async function createDoItemAction(
 }
 
 export async function updateDoItemAction(formData: FormData) {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "");
   const parsed = doSchema.safeParse({
     title: formData.get("title") ?? "",
@@ -100,7 +95,7 @@ export async function updateDoItemAction(formData: FormData) {
 }
 
 export async function completeDoItemAction(formData: FormData) {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "");
   const actualMinutes = nullableNumber(formData, "actualMinutes");
   const running = await getRunningEntry(userId);
@@ -127,28 +122,28 @@ export async function completeDoItemAction(formData: FormData) {
 }
 
 export async function reopenDoItemAction(formData: FormData) {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "");
   await updateDoItem(userId, id, { status: "ready" });
   revalidateDo();
 }
 
 export async function deleteDoItemAction(formData: FormData) {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "");
   await deleteDoItem(userId, id);
   revalidateDo();
 }
 
 export async function startDoItemTimerAction(formData: FormData) {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "");
   await startTimerForDoItem(userId, id);
   revalidateDo();
 }
 
 export async function reflectDoItemSessionAction(formData: FormData) {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "");
   const outcome = String(formData.get("outcome") ?? "continue");
   if (outcome !== "done" && outcome !== "continue" && outcome !== "waiting") {

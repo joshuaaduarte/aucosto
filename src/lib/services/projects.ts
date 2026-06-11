@@ -267,7 +267,7 @@ function summarize(
 }
 
 export async function listProjects(userId: string): Promise<ProjectSummary[]> {
-  requireCan(userId, "do", "read");
+  requireCan(userId, "projects", "read");
   const now = new Date();
 
   const projects = await prisma.project.findMany({
@@ -363,7 +363,7 @@ export async function createProject(
   userId: string,
   input: SaveProjectInput,
 ): Promise<ProjectSummary> {
-  requireCan(userId, "do", "write");
+  requireCan(userId, "projects", "write");
   const name = input.name.trim();
   if (!name) throw new Error("Project name is required.");
 
@@ -399,7 +399,7 @@ export async function createProject(
 
   await recordEvent({
     userId,
-    tool: "do",
+    tool: "projects",
     type: "project.created",
     refId: project.id,
     meta: { name: project.name, status: project.status },
@@ -417,7 +417,7 @@ export async function updateProject(
   id: string,
   input: Partial<SaveProjectInput>,
 ): Promise<ProjectSummary | null> {
-  requireCan(userId, "do", "write");
+  requireCan(userId, "projects", "write");
   const existing = await prisma.project.findFirst({ where: { userId, id } });
   if (!existing) return null;
 
@@ -454,7 +454,7 @@ export async function updateProject(
 
   await recordEvent({
     userId,
-    tool: "do",
+    tool: "projects",
     type: "project.updated",
     refId: project.id,
     meta: { name: project.name, status: project.status },

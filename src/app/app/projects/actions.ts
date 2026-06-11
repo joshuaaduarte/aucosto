@@ -7,7 +7,7 @@ import { PROJECT_STATUSES } from "@/lib/projects";
 import { createCalendarItem } from "@/lib/services/calendar";
 import { createDoItem, updateDoItem } from "@/lib/services/do";
 import { createProject, updateProject } from "@/lib/services/projects";
-import { requireViewerContext } from "@/lib/viewer-context";
+import { resolveActiveUserId } from "@/lib/viewer-context";
 
 const projectSchema = z.object({
   name: z.string().trim().min(1, "Project name is required").max(120),
@@ -73,16 +73,11 @@ function revalidateProjects() {
   revalidatePath("/app/time");
 }
 
-async function requireUserId() {
-  const context = await requireViewerContext();
-  return context.effectiveUserId;
-}
-
 export async function createProjectAction(
   _prev: ProjectState,
   formData: FormData,
 ): Promise<ProjectState> {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const parsed = projectSchema.safeParse({
     name: formData.get("name") ?? "",
     status: (formData.get("status") as string) ?? "active",
@@ -104,7 +99,7 @@ export async function updateProjectAction(
   _prev: ProjectState,
   formData: FormData,
 ): Promise<ProjectState> {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "");
   const parsed = projectSchema.safeParse({
     name: formData.get("name") ?? "",
@@ -127,7 +122,7 @@ export async function createProjectTaskAction(
   _prev: ProjectTaskState,
   formData: FormData,
 ): Promise<ProjectTaskState> {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const parsed = projectTaskSchema.safeParse({
     projectId: formData.get("projectId") ?? "",
     title: formData.get("title") ?? "",
@@ -154,7 +149,7 @@ export async function createProjectScheduleAction(
   _prev: ProjectScheduleState,
   formData: FormData,
 ): Promise<ProjectScheduleState> {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const parsed = projectScheduleSchema.safeParse({
     projectId: formData.get("projectId") ?? "",
     doItemId: formData.get("doItemId") ?? "",

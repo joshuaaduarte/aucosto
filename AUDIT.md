@@ -4,6 +4,37 @@ A running record of structural audits. Each entry records the snapshot at the
 time of the audit and the follow-ups that came out of it — useful for catching
 drift, not for prescribing what to do next.
 
+## 2026-06-10 — navigation + cleanup pass
+
+Convention sweep found zero violations (service-layer rule, requireCan,
+recordEvent, zod-validated actions, integer-cents money all held). The drift
+was in the docs, not the code. Shipped:
+
+- CLAUDE.md rewritten around a per-tool file map (schema → service → UI →
+  widget → helpers) covering all seven tools; README product shape and repo
+  layout updated to match. Branch note fixed: `main` is the live app.
+- `"projects"` added to the `Tool` union in `can.ts`; `services/projects.ts`
+  no longer borrows `"do"` for requireCan/recordEvent. `project.*` event
+  labels added to `event-types.ts`.
+- `withFinanceUser` generalized: `server-action.ts` now exports a
+  tool-agnostic `withViewer` sharing the same core; the four per-file
+  `requireUserId()` helpers in calendar/do/projects/habits actions replaced
+  with `resolveActiveUserId()` from viewer-context.
+- Duplicate do/habits start-timer buttons collapsed into
+  `app/_components/start-timer-button.tsx` (server action passed as a prop).
+- `services/habits.ts` (733) and `services/do.ts` (594) split into folders
+  with barrels, following the finance template.
+- Hub `page.tsx` 1154 → ~200 lines (icons, derive, formatters, and section
+  components extracted under `_components/`); `calendar/page.tsx` 773 → 120;
+  `habits/habit-card.tsx` 746 → ~210.
+- New "Today in review" hub digest (`_lib/daily-digest.ts`, pure + tested):
+  time tracked today, due habits hit, month-to-date spend pace (gated on
+  finance visibility).
+- First DB-backed integration test: `npm run test:integration` exercises
+  finance import dedup end-to-end against the dev DB with a throwaway user.
+- Repo root screenshots moved to `docs/`; stale `origin/nextjs-rewrite`
+  branch deleted.
+
 ## 2026-05-16 — refactor pass
 
 Architecture remains sound; the work in this pass was about reducing tax on

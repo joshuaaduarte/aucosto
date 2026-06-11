@@ -54,7 +54,7 @@ describe("deriveHubPrompts", () => {
       weekTotalMs: 2 * 60 * 60 * 1000, // 2h
     });
 
-    expect(prompts[0]?.text).toMatch(/^2\.0h tracked/);
+    expect(prompts[0]?.text).toMatch(/^2\.0h is already logged this week/);
   });
 
   it("surfaces an amber due-soon prompt for cards due in <=3 days", () => {

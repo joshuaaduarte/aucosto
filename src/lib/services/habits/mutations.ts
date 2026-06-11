@@ -1,0 +1,243 @@
+// Mutations: create/update/archive/delete habits, log progress entries, and
+// start timers. Every write records an event after the DB write succeeds.
+
+import "server-only";
+
+import { prisma } from "@/lib/prisma";
+import { requireCan } from "@/lib/auth/can";
+import type { HabitCadence, HabitDayPart, HabitGoalUnit } from "@/lib/habits";
+import { recordEvent } from "@/lib/services/events";
+import { startEntry } from "@/lib/services/time";
+import { summarizeHabit } from "./derive";
+import type { HabitEntryMode } from "./shared";
+
+export type SaveHabitInput = {
+  title: string;
+  bucket?: string | null;
+  notes?: string | null;
+  fallbackTitle?: string | null;
+  rescuePrompt?: string | null;
+  dayPart?: HabitDayPart;
+  cadence?: HabitCadence;
+  daysOfWeek?: string | null;
+  targetCount?: number;
+  goalUnit?: HabitGoalUnit;
+  defaultDurationMinutes?: number | null;
+  reminderTime?: string | null;
+};
+
+function sanitizeTitle(title: string) {
+  return title.trim();
+}
+
+function sanitizeOptionalString(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+export async function createHabit(userId: string, input: SaveHabitInput) {
+  requireCan(userId, "habit", "write");
+  const title = sanitizeTitle(input.title);
+  if (!title) throw new Error("Habit title is required.");
+
+  const habit = await prisma.habit.create({
+    data: {
+      userId,
+      title,
+      bucket: sanitizeOptionalString(input.bucket),
+      notes: sanitizeOptionalString(input.notes),
+      fallbackTitle: sanitizeOptionalString(input.fallbackTitle),
+      rescuePrompt: sanitizeOptionalString(input.rescuePrompt),
+      dayPart: input.dayPart ?? "anytime",
+      cadence: input.cadence ?? "daily",
+      daysOfWeek: sanitizeOptionalString(input.daysOfWeek),
+      targetCount: Math.max(1, input.targetCount ?? 1),
+      goalUnit: input.goalUnit ?? "check",
+      defaultDurationMinutes: input.defaultDurationMinutes ?? null,
+      reminderTime: sanitizeOptionalString(input.reminderTime),
+    },
+    include: {
+      entries: true,
+      timeEntries: true,
+    },
+  });
+
+  await recordEvent({
+    userId,
+    tool: "habit",
+    type: "habit.created",
+    refId: habit.id,
+    meta: { title: habit.title, cadence: habit.cadence },
+  });
+
+  return summarizeHabit(habit, new Date());
+}
+
+export async function updateHabit(userId: string, id: string, input: Partial<SaveHabitInput>) {
+  requireCan(userId, "habit", "write");
+  const existing = await prisma.habit.findFirst({
+    where: { userId, id },
+    include: {
+      entries: true,
+      timeEntries: {
+        where: { endedAt: { not: null } },
+      },
+    },
+  });
+  if (!existing) return null;
+
+  const habit = await prisma.habit.update({
+    where: { id },
+    data: {
+      title: input.title === undefined ? undefined : sanitizeTitle(input.title),
+      bucket: input.bucket === undefined ? undefined : sanitizeOptionalString(input.bucket),
+      notes: input.notes === undefined ? undefined : sanitizeOptionalString(input.notes),
+      fallbackTitle: input.fallbackTitle === undefined ? undefined : sanitizeOptionalString(input.fallbackTitle),
+      rescuePrompt: input.rescuePrompt === undefined ? undefined : sanitizeOptionalString(input.rescuePrompt),
+      dayPart: input.dayPart ?? undefined,
+      cadence: input.cadence ?? undefined,
+      daysOfWeek: input.daysOfWeek === undefined ? undefined : sanitizeOptionalString(input.daysOfWeek),
+      targetCount: input.targetCount === undefined ? undefined : Math.max(1, input.targetCount),
+      goalUnit: input.goalUnit ?? undefined,
+      defaultDurationMinutes:
+        input.defaultDurationMinutes === undefined ? undefined : input.defaultDurationMinutes,
+      reminderTime:
+        input.reminderTime === undefined ? undefined : sanitizeOptionalString(input.reminderTime),
+    },
+    include: {
+      entries: true,
+      timeEntries: {
+        where: { endedAt: { not: null } },
+      },
+    },
+  });
+
+  await recordEvent({
+    userId,
+    tool: "habit",
+    type: "habit.updated",
+    refId: habit.id,
+    meta: { title: habit.title },
+  });
+
+  return summarizeHabit(habit, new Date());
+}
+
+export async function archiveHabit(userId: string, id: string, archived: boolean) {
+  requireCan(userId, "habit", "write");
+  const habit = await prisma.habit.update({
+    where: { id },
+    data: { archivedAt: archived ? new Date() : null },
+    include: {
+      entries: true,
+      timeEntries: {
+        where: { endedAt: { not: null } },
+      },
+    },
+  });
+  await recordEvent({
+    userId,
+    tool: "habit",
+    type: archived ? "habit.archived" : "habit.reopened",
+    refId: habit.id,
+    meta: { title: habit.title },
+  });
+  return summarizeHabit(habit, new Date());
+}
+
+export async function deleteHabit(userId: string, id: string) {
+  requireCan(userId, "habit", "write");
+  const habit = await prisma.habit.findFirst({
+    where: { userId, id },
+    select: { id: true, title: true, archivedAt: true },
+  });
+  if (!habit) return null;
+  if (!habit.archivedAt) {
+    throw new Error("Pause the habit before deleting it.");
+  }
+
+  await prisma.habit.delete({
+    where: { id: habit.id },
+  });
+
+  await recordEvent({
+    userId,
+    tool: "habit",
+    type: "habit.deleted",
+    refId: habit.id,
+    meta: { title: habit.title },
+  });
+
+  return habit;
+}
+
+export async function logHabitProgress(
+  userId: string,
+  habitId: string,
+  input: { quantity: number; notes?: string | null; loggedAt?: Date; mode?: HabitEntryMode },
+) {
+  requireCan(userId, "habit", "write");
+  const habit = await prisma.habit.findFirst({
+    where: { userId, id: habitId },
+    include: {
+      entries: true,
+      timeEntries: {
+        where: { endedAt: { not: null } },
+      },
+    },
+  });
+  if (!habit) return null;
+
+  const mode = input.mode ?? "full";
+  await prisma.habitEntry.create({
+    data: {
+      userId,
+      habitId,
+      mode,
+      quantity: mode === "full" ? Math.max(1, input.quantity) : Math.max(0, input.quantity),
+      notes: sanitizeOptionalString(input.notes),
+      loggedAt: input.loggedAt ?? new Date(),
+    },
+  });
+
+  const refreshed = await prisma.habit.findFirstOrThrow({
+    where: { id: habitId, userId },
+    include: {
+      entries: true,
+      timeEntries: {
+        where: { endedAt: { not: null } },
+      },
+    },
+  });
+
+  await recordEvent({
+    userId,
+    tool: "habit",
+    type: "habit.logged",
+    refId: habitId,
+    meta: { title: refreshed.title, quantity: input.quantity, mode },
+  });
+
+  return summarizeHabit(refreshed, new Date());
+}
+
+export async function startTimerForHabit(userId: string, habitId: string) {
+  requireCan(userId, "habit", "write");
+  const habit = await prisma.habit.findFirst({
+    where: { userId, id: habitId, archivedAt: null },
+  });
+  if (!habit) return null;
+  const entry = await startEntry(userId, {
+    label: habit.title,
+    category: "habit",
+    habitId: habit.id,
+  });
+  await recordEvent({
+    userId,
+    tool: "habit",
+    type: "habit.timer_started",
+    refId: habit.id,
+    meta: { title: habit.title },
+  });
+  return entry;
+}

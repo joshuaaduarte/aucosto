@@ -2,10 +2,13 @@
 
 aucosto is a personal daily dashboard: a hub for tools that help Joshua run day-to-day life with less friction.
 
-Right now it is centered on two practical tools:
+Current tools:
 - **calendar / planning blocks**
 - **time tracking**
-- **finance imports and review**
+- **finance** (CSV/PDF imports, Teller bank linking, goals, review)
+- **do** (task list, linkable to projects and habits)
+- **habits** (day-part workflow, recovery-first logging, spawns linked tasks)
+- **projects** (planning layer over do + calendar)
 
 Under the hood, it is being shaped to grow into a broader personal operations system with:
 - a shared event log
@@ -34,10 +37,16 @@ Under the hood, it is being shaped to grow into a broader personal operations sy
 - money stored as integer cents
 - foundation for monthly summaries and safer import workflows
 
+### Do / Habits / Projects
+- tasks ("do items") with optional project and habit links
+- habits organized by day part with quick logging and timer support
+- projects tie planning to tasks and calendar blocks
+
 ### Hub
 - widget-based dashboard under `/app`
 - each tool registers a widget
-- intended to become the daily command center
+- contextual prompts derived from cross-tool state (`hub-prompts`)
+- privacy lock + demo mode for showing the app without exposing real data
 
 ## Tech stack
 
@@ -80,36 +89,29 @@ The repo is being prepared for future external/agent access, but that surface sh
 ```text
 src/
   app/
-    app/
-      finance/
-      calendar/
-      time/
+    app/                  # authed app shell (hub, sidebar, privacy lock)
+      calendar/  do/  finance/  habits/  projects/  time/  settings/
     api/auth/[...nextauth]/
+    api/teller/webhook/
     login/
   lib/
-    auth/
-    services/
-    widgets/
-  auth.ts
-  auth.config.ts
-  proxy.ts
+    auth/                 # can.ts permission chokepoint
+    services/             # ALL Prisma access lives here (finance/ is split)
+    widgets/              # dashboard widget registry
+    statement-import/     # CSV + PDF statement parsers
+    <tool>.ts             # pure helpers (no DB) — same basename as service
+  auth.ts / auth.config.ts / proxy.ts
 
 prisma/
-  schema/
-    core.prisma
-    events.prisma
-    finance.prisma
-    calendar.prisma
-    time.prisma
+  schema/                 # one .prisma file per tool + core.prisma
   migrations/
   seed.ts
 
-scripts/
-  smoke.ts
-
-tests/
-  csv.test.ts
+scripts/                  # smoke.ts + one-off maintenance scripts
+tests/                    # vitest, pure-logic coverage
 ```
+
+See `CLAUDE.md` for the full per-tool file map and architecture rules.
 
 ## Getting started
 

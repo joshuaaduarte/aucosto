@@ -10,6 +10,9 @@ export default defineConfig({
   },
   test: {
     include: ["tests/**/*.test.ts"],
+    // DB-backed tests live in tests/integration/ and run via
+    // `npm run test:integration` (vitest.integration.config.ts).
+    exclude: ["tests/integration/**", "**/node_modules/**"],
     environment: "node",
   },
 });

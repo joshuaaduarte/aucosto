@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { formatHabitQuantity, type HabitGoalUnit } from "@/lib/habits";
 import type { HabitTaskSummary } from "@/lib/services/habits";
-import { quickLogHabitFromDoAction } from "../habits/actions";
-import { HabitStartTimerButton } from "../habits/start-timer-button";
+import { quickLogHabitFromDoAction, startHabitTimerAction } from "../habits/actions";
+import { StartTimerButton } from "../_components/start-timer-button";
 
 export function HabitTaskCard({ habit }: { habit: HabitTaskSummary }) {
   const progress =
@@ -65,7 +65,7 @@ export function HabitTaskCard({ habit }: { habit: HabitTaskSummary }) {
 
           <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:justify-end">
             <div className="contents sm:block">
-              <HabitStartTimerButton id={habit.id} />
+              <StartTimerButton id={habit.id} action={startHabitTimerAction} />
             </div>
 
             <form action={quickLogHabitFromDoAction} className="contents sm:block">

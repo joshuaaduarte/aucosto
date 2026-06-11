@@ -2,9 +2,17 @@
 
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import { startHabitTimerAction } from "./actions";
 
-export function HabitStartTimerButton({ id }: { id: string }) {
+// Shared "start a timer from X" button. The caller passes the tool-specific
+// server action (e.g. startDoItemTimerAction, startHabitTimerAction); the
+// button handles pending state and the hop to /app/time.
+export function StartTimerButton({
+  id,
+  action,
+}: {
+  id: string;
+  action: (formData: FormData) => Promise<unknown>;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -17,7 +25,7 @@ export function HabitStartTimerButton({ id }: { id: string }) {
         startTransition(async () => {
           const formData = new FormData();
           formData.set("id", id);
-          await startHabitTimerAction(formData);
+          await action(formData);
           router.push("/app/time");
           router.refresh();
         });

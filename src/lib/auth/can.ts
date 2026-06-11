@@ -8,7 +8,14 @@
 // of the abstraction is that adding partner-with-finance-read-only later is a
 // single edit here, not a sweep across every route.
 
-export type Tool = "time" | "finance" | "calendar" | "events" | "do" | "habit";
+export type Tool =
+  | "time"
+  | "finance"
+  | "calendar"
+  | "events"
+  | "do"
+  | "habit"
+  | "projects";
 export type Action = "read" | "write";
 
 export function can(

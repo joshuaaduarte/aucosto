@@ -147,6 +147,36 @@ export function buildWeekDays(anchor: Date = new Date()) {
   });
 }
 
+export function itemTone(kind: string, status: string) {
+  if (status === "done") return "var(--text-faint)";
+  if (kind === "suggestion") return "var(--accent)";
+  if (kind === "external") return "var(--text-faint)";
+  return "var(--text)";
+}
+
+export function formatDateValue(date: Date) {
+  return date.toLocaleDateString("en-CA");
+}
+
+export function formatTimeValue(date: Date) {
+  return date.toLocaleTimeString("en-CA", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+export function formatShortTime(date: Date) {
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+export function groupForDay(items: CalendarItem[], day: Date) {
+  return items.filter((item) => isSameDay(item.startsAt, day));
+}
+
 export function isSameDay(a: Date, b: Date) {
   return startOfDay(a).getTime() === startOfDay(b).getTime();
 }

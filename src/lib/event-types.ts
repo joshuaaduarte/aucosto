@@ -49,6 +49,10 @@ const EVENT_LABELS: Record<string, string> = {
   "habit.reopened": "reopened a habit",
   "habit.timer_started": "started a timer from a habit",
 
+  // projects
+  "project.created": "added a project",
+  "project.updated": "updated a project",
+
   // user
   "user.privacy_updated": "updated privacy settings",
 };

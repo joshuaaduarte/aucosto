@@ -10,16 +10,11 @@ import {
 } from "@/lib/services/calendar";
 import { updateDoItem } from "@/lib/services/do";
 import { listHabits, logHabitProgress, startTimerForHabit } from "@/lib/services/habits";
-import { requireViewerContext } from "@/lib/viewer-context";
+import { resolveActiveUserId } from "@/lib/viewer-context";
 
 function revalidateCalendar() {
   revalidatePath("/app");
   revalidatePath("/app/calendar");
-}
-
-async function requireUserId() {
-  const context = await requireViewerContext();
-  return context.effectiveUserId;
 }
 
 function parseDateTime(date: string, time: string) {
@@ -32,7 +27,7 @@ function parseOptionalString(value: FormDataEntryValue | null) {
 }
 
 export async function createCalendarBlockAction(formData: FormData) {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const title = String(formData.get("title") ?? "");
   const date = String(formData.get("date") ?? "");
   const start = String(formData.get("start") ?? "");
@@ -61,7 +56,7 @@ export async function createCalendarBlockAction(formData: FormData) {
 }
 
 export async function completeCalendarItemAction(formData: FormData) {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "");
   const item = await updateCalendarItem(userId, id, { status: "done" });
   if (item?.sourceTool === "do" && item.sourceRefId) {
@@ -90,7 +85,7 @@ export async function completeCalendarItemAction(formData: FormData) {
 }
 
 export async function updateCalendarBlockAction(formData: FormData) {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "");
   const title = String(formData.get("title") ?? "");
   const date = String(formData.get("date") ?? "");
@@ -111,7 +106,7 @@ export async function updateCalendarBlockAction(formData: FormData) {
 }
 
 export async function moveCalendarItemAction(formData: FormData) {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "");
   const date = String(formData.get("date") ?? "");
   const start = String(formData.get("start") ?? "");
@@ -126,7 +121,7 @@ export async function moveCalendarItemAction(formData: FormData) {
 }
 
 export async function startTimerFromCalendarItemAction(formData: FormData) {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "");
   const title = String(formData.get("title") ?? "");
   const doItemId = parseOptionalString(formData.get("doItemId"));
@@ -147,7 +142,7 @@ export async function startTimerFromCalendarItemAction(formData: FormData) {
 }
 
 export async function deleteCalendarItemAction(formData: FormData) {
-  const userId = await requireUserId();
+  const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "");
   await deleteCalendarItem(userId, id);
   revalidateCalendar();
