@@ -3,6 +3,7 @@
 // All positioning math lives in ../_lib/timeline.ts (pure, tested).
 
 import type { DayTimelineModel, TimelineBlock } from "../_lib/timeline";
+import { TimelineNowLine } from "./timeline-now-line";
 
 const PX_PER_HOUR = 44;
 
@@ -111,16 +112,10 @@ function TimelineLane({
         />
       ))}
 
-      {model.nowPct !== null ? (
-        <div
-          className="absolute inset-x-0 z-10"
-          style={{
-            top: `${model.nowPct}%`,
-            borderTop: "1px dashed var(--accent)",
-          }}
-          aria-hidden
-        />
-      ) : null}
+      <TimelineNowLine
+        windowStartIso={model.windowStart.toISOString()}
+        windowEndIso={model.windowEnd.toISOString()}
+      />
 
       {blocks.map((block) => (
         <article
