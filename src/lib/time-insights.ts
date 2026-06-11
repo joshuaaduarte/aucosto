@@ -149,6 +149,41 @@ export function trackedCoverage(
   return { trackedMs, windowMs, pct };
 }
 
+export type LabeledEntry = Pick<TimeEntry, "startedAt" | "category" | "label">;
+
+/**
+ * Recent distinct labels used within a category, most recent first —
+ * powers "what specifically?" suggestions after a one-tap category start.
+ * Labels that just repeat the category name are skipped.
+ */
+export function recentLabelsForCategory(
+  entries: LabeledEntry[],
+  category: string | null | undefined,
+  options: { limit?: number } = {},
+): string[] {
+  const key = normalizeCategory(category);
+  if (!key) return [];
+  const limit = options.limit ?? 4;
+  const seen = new Set<string>();
+  const labels: string[] = [];
+  const sorted = [...entries].sort(
+    (a, b) => b.startedAt.getTime() - a.startedAt.getTime(),
+  );
+  for (const entry of sorted) {
+    if (normalizeCategory(entry.category) !== key) continue;
+    const label = entry.label.trim();
+    const dedupeKey = label.toLowerCase();
+    if (!label || dedupeKey === key || dedupeKey === categoryLabel(category).toLowerCase()) {
+      continue;
+    }
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    labels.push(label);
+    if (labels.length >= limit) break;
+  }
+  return labels;
+}
+
 export type UntrackedGap = {
   start: Date;
   end: Date;

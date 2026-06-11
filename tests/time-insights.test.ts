@@ -3,6 +3,7 @@ import {
   buildDailyStacks,
   clippedDurationMs,
   findUntrackedGap,
+  recentLabelsForCategory,
   summarizeCategoriesWindow,
   trackedCoverage,
 } from "@/lib/time-insights";
@@ -171,6 +172,44 @@ describe("trackedCoverage", () => {
     const coverage = trackedCoverage(entries, { now });
     expect(coverage.windowMs).toBe(17 * 3_600_000);
     expect(coverage.pct).toBe(100);
+  });
+});
+
+describe("recentLabelsForCategory", () => {
+  const entry = (label: string, category: string | null, hour: number) => ({
+    label,
+    category,
+    startedAt: new Date(2026, 5, 10, hour, 0, 0),
+  });
+
+  it("returns distinct labels for the category, most recent first", () => {
+    const labels = recentLabelsForCategory(
+      [
+        entry("aucosto refactor", "work", 8),
+        entry("client deck", "Work", 10),
+        entry("aucosto refactor", "work", 12),
+        entry("dinner", "eating", 13),
+      ],
+      "work",
+    );
+    expect(labels).toEqual(["aucosto refactor", "client deck"]);
+  });
+
+  it("skips labels that just repeat the category name", () => {
+    const labels = recentLabelsForCategory(
+      [entry("Work", "work", 8), entry("work", "work", 9), entry("standup", "work", 10)],
+      "work",
+    );
+    expect(labels).toEqual(["standup"]);
+  });
+
+  it("respects the limit and handles empty categories", () => {
+    const entries = ["a", "b", "c", "d", "e"].map((label, index) =>
+      entry(label, "reading", index + 6),
+    );
+    expect(recentLabelsForCategory(entries, "reading", { limit: 3 })).toHaveLength(3);
+    expect(recentLabelsForCategory(entries, null)).toEqual([]);
+    expect(recentLabelsForCategory(entries, "work")).toEqual([]);
   });
 });
 

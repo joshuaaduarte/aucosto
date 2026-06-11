@@ -10,19 +10,24 @@ import {
   stopEntryWithReflection,
 } from "./actions";
 import { formatDuration } from "@/lib/time";
+import { DescribeRow } from "./describe-row";
 
 export function RunningCard({
+  entryId,
   label,
   category,
   startedAtIso,
   doItem,
   habit,
   switchPanel,
+  recentLabels = [],
 }: {
+  entryId: string;
   label: string;
   category: string | null;
   startedAtIso: string;
   switchPanel?: React.ReactNode;
+  recentLabels?: string[];
   doItem?: {
     id: string;
     title: string;
@@ -132,6 +137,13 @@ export function RunningCard({
                   ? `Tracked if you stop now: ${formatMinutes(elapsedMinutes)} · target ${habit.targetLabel}`
                   : `Target: ${habit.targetLabel}`}
               </p>
+            ) : null}
+            {!doItem && !habit ? (
+              <DescribeRow
+                entryId={entryId}
+                currentLabel={label}
+                recentLabels={recentLabels}
+              />
             ) : null}
           </div>
           <div className="flex shrink-0 flex-wrap justify-end gap-2">

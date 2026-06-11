@@ -81,6 +81,21 @@ export async function quickStartEntry(formData: FormData) {
   revalidatePath("/app/calendar");
 }
 
+// Rename the running entry without touching the clock — used by the
+// "what specifically?" row after a one-tap category start.
+export async function describeEntryAction(formData: FormData) {
+  const userId = await resolveActiveUserId();
+  const id = String(formData.get("id") ?? "").trim();
+  const label = String(formData.get("label") ?? "").trim().slice(0, 200);
+  if (!id || !label) return;
+
+  await timeService.updateEntry(userId, id, { label });
+
+  revalidatePath("/app");
+  revalidatePath("/app/time");
+  revalidatePath("/app/calendar");
+}
+
 export type EntryFormState = { error?: string } | { ok: true } | undefined;
 
 const entryFormSchema = z.object({

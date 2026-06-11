@@ -12,6 +12,7 @@ import {
   buildDailyStacks,
   clippedDurationMs,
   findUntrackedGap,
+  recentLabelsForCategory,
   summarizeCategoriesWindow,
   trackedCoverage,
 } from "@/lib/time-insights";
@@ -147,6 +148,14 @@ export default async function TimePage() {
     ? null
     : findUntrackedGap({ lastEndedAt, now, minMinutes: 10 });
 
+  // "What specifically?" suggestions: labels recently used in the running
+  // entry's category (looks across the last 7 days and the recent archive).
+  const runningRecentLabels = running
+    ? recentLabelsForCategory([...windowEntries, ...recent], running.category, {
+        limit: 5,
+      }).filter((label) => label !== running.label)
+    : [];
+
   const quickStart = (
     <QuickStartChips
       categories={quickStartCategories}
@@ -222,10 +231,12 @@ export default async function TimePage() {
       <section className="fade-in-delay-1">
         {running ? (
           <RunningCard
+            entryId={running.id}
             label={running.label}
             category={running.category}
             startedAtIso={running.startedAt.toISOString()}
             switchPanel={quickStart}
+            recentLabels={runningRecentLabels}
             doItem={
               running.doItem
                 ? {

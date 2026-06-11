@@ -475,6 +475,12 @@ body > * {
   line-height: 1.25;
   transition: border-color 0.12s ease, box-shadow 0.12s ease;
 
+  /* iOS Safari zooms into inputs under 16px — keep fields ≥1rem on touch
+     screens so quick describe-and-go entry doesn't bounce the viewport. */
+  @media (max-width: 640px) {
+    font-size: 1rem;
+  }
+
   &::placeholder { color: var(--text-faint); }
   &:focus {
     outline: none;
