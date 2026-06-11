@@ -1,27 +1,16 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
-import { formatMinutes } from "@/lib/do";
 import { startEntry, type StartState } from "./actions";
 
 const initialState: StartState = undefined;
 
 export function StartForm({
   suggestedCategories = [],
-  suggestedTasks = [],
-  suggestedHabits = [],
+  quickStart,
 }: {
   suggestedCategories?: string[];
-  suggestedTasks?: Array<{
-    id: string;
-    title: string;
-    estimatedMinutes: number | null;
-  }>;
-  suggestedHabits?: Array<{
-    id: string;
-    title: string;
-    targetLabel: string;
-  }>;
+  quickStart?: React.ReactNode;
 }) {
   const [state, formAction, pending] = useActionState(
     startEntry,
@@ -30,18 +19,10 @@ export function StartForm({
   const formRef = useRef<HTMLFormElement>(null);
   const categoryRef = useRef<HTMLInputElement>(null);
   const labelRef = useRef<HTMLInputElement>(null);
-  const doItemIdRef = useRef<HTMLInputElement>(null);
-  const habitIdRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!pending && !state?.error) {
       formRef.current?.reset();
-      if (doItemIdRef.current) {
-        doItemIdRef.current.value = "";
-      }
-      if (habitIdRef.current) {
-        habitIdRef.current.value = "";
-      }
     }
   }, [pending, state]);
 
@@ -64,14 +45,26 @@ export function StartForm({
           className="mt-1 text-[1rem] font-semibold tracking-tight"
           style={{ color: "var(--text)" }}
         >
-          What are you working on?
+          What are you doing right now?
         </h2>
       </header>
 
-      <form ref={formRef} action={formAction} className="space-y-4">
-        <input ref={doItemIdRef} type="hidden" name="doItemId" />
-        <input ref={habitIdRef} type="hidden" name="habitId" />
+      {quickStart ? (
+        <>
+          <div className="mb-4">{quickStart}</div>
+          <p
+            className="mb-3 border-t pt-3 text-[0.6875rem] font-medium uppercase tracking-wider"
+            style={{
+              color: "var(--text-faint)",
+              borderColor: "var(--border-faint)",
+            }}
+          >
+            Or type your own
+          </p>
+        </>
+      ) : null}
 
+      <form ref={formRef} action={formAction} className="space-y-4">
         <div className="grid gap-4 md:grid-cols-[1.6fr_1fr]">
           <div className="space-y-1.5">
             <label
@@ -136,90 +129,6 @@ export function StartForm({
                 {suggestion}
               </button>
             ))}
-          </div>
-        )}
-
-        {suggestedTasks.length > 0 && (
-          <div className="space-y-2">
-            <p
-              className="text-[0.6875rem] font-medium uppercase tracking-wider"
-              style={{ color: "var(--text-faint)" }}
-            >
-              Suggested from Do
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {suggestedTasks.map((task) => (
-                <button
-                  key={task.id}
-                  type="button"
-                  onClick={() => {
-                    if (labelRef.current) {
-                      labelRef.current.value = task.title;
-                    }
-                    if (categoryRef.current) {
-                      categoryRef.current.value = "do";
-                    }
-                    if (doItemIdRef.current) {
-                      doItemIdRef.current.value = task.id;
-                    }
-                    if (habitIdRef.current) {
-                      habitIdRef.current.value = "";
-                    }
-                  }}
-                  className="inline-flex items-center rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
-                  style={{
-                    background: "var(--bg-tint)",
-                    color: "var(--text-muted)",
-                  }}
-                >
-                  {task.title}
-                  {task.estimatedMinutes
-                    ? ` · ${formatMinutes(task.estimatedMinutes)}`
-                    : ""}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {suggestedHabits.length > 0 && (
-          <div className="space-y-2">
-            <p
-              className="text-[0.6875rem] font-medium uppercase tracking-wider"
-              style={{ color: "var(--text-faint)" }}
-            >
-              Suggested habits
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {suggestedHabits.map((habit) => (
-                <button
-                  key={habit.id}
-                  type="button"
-                  onClick={() => {
-                    if (labelRef.current) {
-                      labelRef.current.value = habit.title;
-                    }
-                    if (categoryRef.current) {
-                      categoryRef.current.value = "habit";
-                    }
-                    if (doItemIdRef.current) {
-                      doItemIdRef.current.value = "";
-                    }
-                    if (habitIdRef.current) {
-                      habitIdRef.current.value = habit.id;
-                    }
-                  }}
-                  className="inline-flex items-center rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
-                  style={{
-                    background: "var(--bg-tint)",
-                    color: "var(--text-muted)",
-                  }}
-                >
-                  {habit.title}
-                  {` · ${habit.targetLabel}`}
-                </button>
-              ))}
-            </div>
           </div>
         )}
 

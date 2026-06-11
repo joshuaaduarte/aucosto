@@ -1,4 +1,8 @@
-import { getRunningEntry, listCompletedSince } from "@/lib/services/time";
+import {
+  getRunningEntry,
+  listCompletedSince,
+  listEntriesBetween,
+} from "@/lib/services/time";
 import { listAccounts } from "@/lib/services/finance";
 import { listSuggestedDoItems } from "@/lib/services/do";
 import { listSuggestedHabits } from "@/lib/services/habits";
@@ -22,7 +26,9 @@ import {
   startOfCalendarWeek,
   startOfDay,
 } from "./_lib/derive";
+import { buildDayTimeline } from "./_lib/timeline";
 import { CalendarHeader } from "./_components/calendar-header";
+import { DayTimeline } from "./_components/day-timeline";
 import { OpenTimeSection } from "./_components/open-time-section";
 import { SignalsSection } from "./_components/signals-section";
 import { TodayBucketSections } from "./_components/today-sections";
@@ -41,10 +47,11 @@ export default async function CalendarPage() {
   const todayStart = startOfDay(now);
   const todayEnd = endOfDay(now);
 
-  const [weekItems, runningEntry, completedWeek, accounts, suggestedTasks, suggestedHabits] = await Promise.all([
+  const [weekItems, runningEntry, completedWeek, todayEntries, accounts, suggestedTasks, suggestedHabits] = await Promise.all([
     listCalendarItems(userId, { from: weekStart, to: weekEnd }),
     getRunningEntry(userId),
     listCompletedSince(userId, startOfWeek()),
+    listEntriesBetween(userId, { from: todayStart, to: todayEnd }),
     context.financeVisible ? listAccounts(userId) : Promise.resolve([]),
     listSuggestedDoItems(userId, { limit: 5 }),
     listSuggestedHabits(userId, { limit: 4 }),
@@ -69,6 +76,12 @@ export default async function CalendarPage() {
     suggestedTasks,
     limit: 3,
   });
+  const timeline = buildDayTimeline({
+    items: todayItems,
+    entries: todayEntries,
+    day: now,
+    now,
+  });
 
   return (
     <div className="space-y-8 pb-28 sm:space-y-10 sm:pb-8">
@@ -80,6 +93,8 @@ export default async function CalendarPage() {
       />
 
       <SignalsSection signals={signals} />
+
+      <DayTimeline model={timeline} />
 
       <OpenTimeSection gapSuggestions={gapSuggestions} />
 

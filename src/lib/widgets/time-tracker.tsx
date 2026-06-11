@@ -1,5 +1,6 @@
 import { getRunningEntry, listCompletedSince } from "@/lib/services/time";
 import { formatHM, startOfToday, startOfWeek } from "@/lib/time";
+import { categoryColor, categoryLabel } from "@/lib/time-categories";
 import { sumDurations } from "@/lib/time-summary";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import { WidgetCard } from "./widget-card";
@@ -34,9 +35,20 @@ export async function TimeTrackerWidget() {
               {running.label}
             </p>
             <p
-              className="mt-0.5 text-[0.75rem]"
+              className="mt-0.5 flex items-center gap-1.5 text-[0.75rem]"
               style={{ color: "var(--text-faint)" }}
             >
+              {running.category ? (
+                <>
+                  <span
+                    className="inline-block h-1.5 w-1.5 rounded-full"
+                    style={{ background: categoryColor(running.category) }}
+                    aria-hidden
+                  />
+                  {categoryLabel(running.category)}
+                  {" · "}
+                </>
+              ) : null}
               started{" "}
               {running.startedAt.toLocaleTimeString([], {
                 hour: "numeric",

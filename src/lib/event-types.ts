@@ -9,6 +9,7 @@ const EVENT_LABELS: Record<string, string> = {
   "time.started": "started a timer",
   "time.stopped": "stopped a timer",
   "time.deleted": "deleted a time entry",
+  "time.logged": "backfilled a time entry",
 
   // finance — manual edits
   "finance.account_created": "added a finance account",

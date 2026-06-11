@@ -17,10 +17,12 @@ export function RunningCard({
   startedAtIso,
   doItem,
   habit,
+  switchPanel,
 }: {
   label: string;
   category: string | null;
   startedAtIso: string;
+  switchPanel?: React.ReactNode;
   doItem?: {
     id: string;
     title: string;
@@ -196,6 +198,21 @@ export function RunningCard({
             )}
           </div>
         </div>
+
+        {switchPanel ? (
+          <div
+            className="mt-5 border-t pt-4"
+            style={{ borderColor: "var(--accent-tint-strong)" }}
+          >
+            <p
+              className="mb-3 text-[0.6875rem] font-semibold uppercase tracking-wider"
+              style={{ color: "var(--accent-strong)" }}
+            >
+              Switch — one tap stops this and starts the next
+            </p>
+            {switchPanel}
+          </div>
+        ) : null}
       </article>
 
       {reflectOpen && doItem ? (

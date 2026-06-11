@@ -48,6 +48,70 @@ export async function startEntry(
   revalidatePath("/app/do");
   revalidatePath("/app/habits");
   revalidatePath("/app/time");
+  revalidatePath("/app/calendar");
+}
+
+// One-tap start used by the quick-start chips and the switch panel.
+// Starting auto-stops any running entry (service behavior), so a single tap
+// rolls straight from one activity into the next.
+export async function quickStartEntry(formData: FormData) {
+  const userId = await resolveActiveUserId();
+
+  const parsed = startSchema.safeParse({
+    label: formData.get("label") ?? "",
+    category: (formData.get("category") as string) || undefined,
+    doItemId: (formData.get("doItemId") as string) || undefined,
+    habitId: (formData.get("habitId") as string) || undefined,
+  });
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? "Invalid input.");
+  }
+
+  await timeService.startEntry(userId, {
+    label: parsed.data.label,
+    category: parsed.data.category ?? null,
+    doItemId: parsed.data.doItemId ?? null,
+    habitId: parsed.data.habitId ?? null,
+  });
+
+  revalidatePath("/app");
+  revalidatePath("/app/do");
+  revalidatePath("/app/habits");
+  revalidatePath("/app/time");
+  revalidatePath("/app/calendar");
+}
+
+const backfillSchema = z.object({
+  label: z.string().trim().min(1, "Label is required").max(200),
+  category: z.string().trim().max(80).optional(),
+  startedAt: z.string().min(1),
+  endedAt: z.string().min(1),
+});
+
+// Retroactively log the untracked gap since the last entry.
+export async function backfillEntry(formData: FormData) {
+  const userId = await resolveActiveUserId();
+
+  const parsed = backfillSchema.safeParse({
+    label: formData.get("label") ?? "",
+    category: (formData.get("category") as string) || undefined,
+    startedAt: formData.get("startedAt") ?? "",
+    endedAt: formData.get("endedAt") ?? "",
+  });
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? "Invalid input.");
+  }
+
+  await timeService.createPastEntry(userId, {
+    label: parsed.data.label,
+    category: parsed.data.category ?? null,
+    startedAt: new Date(parsed.data.startedAt),
+    endedAt: new Date(parsed.data.endedAt),
+  });
+
+  revalidatePath("/app");
+  revalidatePath("/app/time");
+  revalidatePath("/app/calendar");
 }
 
 export async function stopEntry() {

@@ -16,7 +16,7 @@ Seven tools, one row each. Every tool follows the same shape: schema → service
 
 | Tool | Schema (`prisma/schema/`) | Service (`src/lib/services/`) | UI (`src/app/app/`) | Widget (`src/lib/widgets/`) | Pure helpers (`src/lib/`) |
 |---|---|---|---|---|---|
-| time | `time.prisma` (TimeEntry) | `time.ts` | `time/` | `time-tracker.tsx` | `time.ts`, `time-summary.ts` |
+| time | `time.prisma` (TimeEntry) | `time.ts` | `time/` | `time-tracker.tsx` | `time.ts`, `time-summary.ts`, `time-categories.ts` (preset category taxonomy + colors), `time-insights.ts` (windowed summaries, daily stacks, coverage, gap detection) |
 | finance | `finance.prisma` (FinanceConnection, FinanceAccount, FinanceGoal, FinanceTransaction) | `finance/` (split: `accounts`, `connections`, `goals`, `transactions`, `teller-sync`, `webhooks`, `shared`, re-exported via `index.ts`) | `finance/` (sections under `_components/`, derive logic in `_lib/derive.ts`) | `finance.tsx` | `money.ts`, `csv.ts`, `finance-*.ts`, `statement-import/` |
 | calendar | `calendar.prisma` (CalendarItem) | `calendar.ts` | `calendar/` (derive logic in `_lib/derive.ts`) | `calendar.tsx` | — |
 | do (tasks) | `do.prisma` (DoItem) | `do/` (split: `reads`, `mutations`, `shared`, barrel `index.ts`) | `do/` | `do.tsx` | `do.ts` |

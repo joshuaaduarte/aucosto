@@ -66,6 +66,64 @@ export async function listCompletedSince(
   });
 }
 
+/** Entries overlapping [from, to) — completed and running — for timeline views. */
+export async function listEntriesBetween(
+  userId: string,
+  range: { from: Date; to: Date },
+): Promise<TimeEntry[]> {
+  requireCan(userId, "time", "read");
+  return prisma.timeEntry.findMany({
+    where: {
+      userId,
+      startedAt: { lt: range.to },
+      OR: [{ endedAt: null }, { endedAt: { gt: range.from } }],
+    },
+    orderBy: { startedAt: "asc" },
+  });
+}
+
+/** Retroactively log a completed entry (untracked-gap backfill). */
+export async function createPastEntry(
+  userId: string,
+  input: {
+    label: string;
+    category?: string | null;
+    startedAt: Date;
+    endedAt: Date;
+  },
+): Promise<TimeEntry> {
+  requireCan(userId, "time", "write");
+  if (
+    Number.isNaN(input.startedAt.getTime()) ||
+    Number.isNaN(input.endedAt.getTime())
+  ) {
+    throw new Error("Entry times are invalid.");
+  }
+  if (input.endedAt <= input.startedAt) {
+    throw new Error("End time must be after start time.");
+  }
+  if (input.endedAt.getTime() - input.startedAt.getTime() > 24 * 60 * 60 * 1000) {
+    throw new Error("Backfilled entries are capped at 24 hours.");
+  }
+  const entry = await prisma.timeEntry.create({
+    data: {
+      userId,
+      label: input.label,
+      category: input.category ?? null,
+      startedAt: input.startedAt,
+      endedAt: input.endedAt,
+    },
+  });
+  await recordEvent({
+    userId,
+    tool: "time",
+    type: "time.logged",
+    refId: entry.id,
+    meta: { label: entry.label, category: entry.category },
+  });
+  return entry;
+}
+
 export async function startEntry(
   userId: string,
   input: { label: string; category?: string | null; doItemId?: string | null; habitId?: string | null },

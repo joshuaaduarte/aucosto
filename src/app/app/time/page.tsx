@@ -1,19 +1,25 @@
-﻿import { resolveActiveUserId } from "@/lib/viewer-context";
+import { resolveActiveUserId } from "@/lib/viewer-context";
 import {
   getRunningEntry,
-  listCompletedSince,
+  listEntriesBetween,
   listRecentEntries,
 } from "@/lib/services/time";
 import { getDoItemSummary, listSuggestedDoItems } from "@/lib/services/do";
 import { listSuggestedHabits } from "@/lib/services/habits";
+import { listCalendarItems } from "@/lib/services/calendar";
+import { formatDuration, formatHM, startOfToday, startOfWeek } from "@/lib/time";
 import {
-  formatDuration,
-  formatHM,
-  startOfToday,
-  startOfWeek,
-} from "@/lib/time";
-import { summarizeCategories, sumDurations } from "@/lib/time-summary";
+  buildDailyStacks,
+  clippedDurationMs,
+  findUntrackedGap,
+  summarizeCategoriesWindow,
+  trackedCoverage,
+} from "@/lib/time-insights";
+import { PRESET_TIME_CATEGORIES, categoryColor } from "@/lib/time-categories";
 import { EntryDeleteButton } from "./entry-row";
+import { GapBackfillCard } from "./gap-backfill-card";
+import { InsightsSection } from "./insights-section";
+import { QuickStartChips } from "./quick-start-chips";
 import { RunningCard } from "./running-card";
 import { StartForm } from "./start-form";
 
@@ -36,29 +42,126 @@ function formatDayLabel(date: Date) {
   });
 }
 
+function formatShortTime(date: Date) {
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
 export default async function TimePage() {
   const userId = await resolveActiveUserId();
 
+  const now = new Date();
   const todayStart = startOfToday();
   const weekStart = startOfWeek();
-  const running = await getRunningEntry(userId);
-  const [recent, completedToday, completedWeek, suggestedTasks, suggestedHabits, runningDoSummary] = await Promise.all([
-    listRecentEntries(userId, { limit: 30 }),
-    listCompletedSince(userId, todayStart),
-    listCompletedSince(userId, weekStart),
-    listSuggestedDoItems(userId, { limit: 4 }),
-    listSuggestedHabits(userId, { limit: 4 }),
-    running?.doItem ? getDoItemSummary(userId, running.doItem.id) : Promise.resolve(null),
-  ]);
+  const sevenDaysAgo = new Date(todayStart);
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+  const tomorrow = new Date(todayStart);
+  tomorrow.setDate(tomorrow.getDate() + 1);
 
-  const todayTotalMs = sumDurations(completedToday);
-  const weekTotalMs = sumDurations(completedWeek);
-  const topCategories = summarizeCategories(completedWeek, { limit: 4 });
-  const suggestedCategories = topCategories
+  const running = await getRunningEntry(userId);
+  const [recent, windowEntries, todayCalendarItems, suggestedTasks, suggestedHabits, runningDoSummary] =
+    await Promise.all([
+      listRecentEntries(userId, { limit: 30 }),
+      listEntriesBetween(userId, { from: sevenDaysAgo, to: tomorrow }),
+      listCalendarItems(userId, { from: todayStart, to: tomorrow }),
+      listSuggestedDoItems(userId, { limit: 4 }),
+      listSuggestedHabits(userId, { limit: 4 }),
+      running?.doItem
+        ? getDoItemSummary(userId, running.doItem.id)
+        : Promise.resolve(null),
+    ]);
+
+  // Insights windows (live: running entry counts up to render time).
+  const todayCategories = summarizeCategoriesWindow(windowEntries, {
+    from: todayStart,
+    to: tomorrow,
+    now,
+    limit: 8,
+  });
+  const weekCategories = summarizeCategoriesWindow(windowEntries, {
+    from: weekStart,
+    to: tomorrow,
+    now,
+    limit: 8,
+  });
+  const todayTotalMs = todayCategories.reduce((sum, c) => sum + c.totalMs, 0);
+  const weekTotalMs = weekCategories.reduce((sum, c) => sum + c.totalMs, 0);
+  const dailyStacks = buildDailyStacks(windowEntries, { days: 7, now });
+  const coverage = trackedCoverage(
+    windowEntries.filter(
+      (entry) => clippedDurationMs(entry, todayStart, tomorrow, now) > 0,
+    ),
+    { now },
+  );
+  const closedTodayCount = windowEntries.filter(
+    (entry) => entry.endedAt && entry.startedAt >= todayStart,
+  ).length;
+
+  // Quick-start chips: presets ordered by how much they were used this week.
+  const weekUsage = new Map(
+    weekCategories.map((item) => [item.category, item.totalMs]),
+  );
+  const quickStartCategories = [...PRESET_TIME_CATEGORIES]
+    .sort(
+      (a, b) => (weekUsage.get(b.id) ?? 0) - (weekUsage.get(a.id) ?? 0),
+    )
+    .map(({ id, label, color }) => ({ id, label, color }));
+
+  // Custom categories (non-preset) used this week still prefill the form.
+  const presetIds = new Set(PRESET_TIME_CATEGORIES.map((preset) => preset.id));
+  const suggestedCategories = weekCategories
     .map((item) => item.category)
     .filter(
-      (category) => category && category.toLowerCase() !== "uncategorized",
+      (category) =>
+        category !== "uncategorized" &&
+        !presetIds.has(category) &&
+        !["do", "habit", "calendar"].includes(category),
     );
+
+  // Calendar suggestions: what's happening now, then what's next.
+  const calendarSuggestions = todayCalendarItems
+    .filter(
+      (item) =>
+        item.status !== "done" &&
+        item.status !== "cancelled" &&
+        !item.allDay &&
+        item.endsAt > now,
+    )
+    .slice(0, 2)
+    .map((item) => ({
+      id: item.id,
+      title: item.title,
+      timeLabel: `${formatShortTime(item.startsAt)}–${formatShortTime(item.endsAt)}`,
+      live: item.startsAt <= now,
+    }));
+
+  // Untracked gap since the last completed entry (only when idle).
+  const lastEndedAt = windowEntries.reduce<Date | null>(
+    (latest, entry) =>
+      entry.endedAt && (!latest || entry.endedAt > latest)
+        ? entry.endedAt
+        : latest,
+    null,
+  );
+  const gap = running
+    ? null
+    : findUntrackedGap({ lastEndedAt, now, minMinutes: 10 });
+
+  const quickStart = (
+    <QuickStartChips
+      categories={quickStartCategories}
+      calendarItems={calendarSuggestions}
+      tasks={suggestedTasks.map((task) => ({
+        id: task.id,
+        title: task.title,
+        estimatedMinutes: task.estimatedMinutes,
+      }))}
+      habits={suggestedHabits.map((habit) => ({
+        id: habit.id,
+        title: habit.title,
+        targetLabel: habit.targetLabel,
+      }))}
+    />
+  );
 
   const groupedEntries = recent.reduce<
     Array<{ label: string; items: typeof recent }>
@@ -98,10 +201,21 @@ export default async function TimePage() {
           {running
             ? `1 running now · ${formatHM(weekTotalMs)} logged this week`
             : hasArchive
-              ? `${completedToday.length} closed today · ${formatHM(weekTotalMs)} this week`
+              ? `${closedTodayCount} closed today · ${formatHM(weekTotalMs)} this week`
               : "No session running yet"}
         </p>
       </header>
+
+      {/* Untracked gap backfill */}
+      {gap ? (
+        <section className="fade-in">
+          <GapBackfillCard
+            gapStartIso={gap.start.toISOString()}
+            gapMinutes={gap.minutes}
+            categories={quickStartCategories}
+          />
+        </section>
+      ) : null}
 
       {/* Running session or start form */}
       <section className="fade-in-delay-1">
@@ -110,6 +224,7 @@ export default async function TimePage() {
             label={running.label}
             category={running.category}
             startedAtIso={running.startedAt.toISOString()}
+            switchPanel={quickStart}
             doItem={
               running.doItem
                 ? {
@@ -146,175 +261,129 @@ export default async function TimePage() {
         ) : (
           <StartForm
             suggestedCategories={suggestedCategories}
-            suggestedTasks={suggestedTasks.map((task) => ({
-              id: task.id,
-              title: task.title,
-              estimatedMinutes: task.estimatedMinutes,
-            }))}
-            suggestedHabits={suggestedHabits.map((habit) => ({
-              id: habit.id,
-              title: habit.title,
-              targetLabel: habit.targetLabel,
-            }))}
+            quickStart={quickStart}
           />
         )}
       </section>
 
       {/* Quick stats */}
-      <section className="fade-in-delay-2 grid grid-cols-2 gap-px overflow-hidden rounded-md"
+      <section className="fade-in-delay-2 grid grid-cols-3 gap-px overflow-hidden rounded-md"
                style={{ background: "var(--border-faint)", border: "1px solid var(--border-faint)" }}>
-        <Stat label="Today" value={formatHM(todayTotalMs)} hint={completedToday.length === 1 ? "1 session closed" : `${completedToday.length} sessions closed`} />
+        <Stat label="Today" value={formatHM(todayTotalMs)} hint={closedTodayCount === 1 ? "1 session closed" : `${closedTodayCount} sessions closed`} />
         <Stat label="This week" value={formatHM(weekTotalMs)} hint="since Monday" />
+        <Stat
+          label="Coverage"
+          value={coverage.windowMs > 0 ? `${coverage.pct}%` : "—"}
+          hint="of waking hours today"
+        />
       </section>
 
-      {/* Category breakdown + recent entries side-by-side */}
-      <section className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:gap-12">
-        {/* Category breakdown */}
-        <div className="fade-in-delay-3">
-          <p
-            className="mb-3 text-[0.6875rem] font-semibold uppercase tracking-wider"
-            style={{ color: "var(--text-faint)" }}
-          >
-            Where the week went
-          </p>
+      {/* Insights */}
+      <section className="fade-in-delay-3">
+        <InsightsSection
+          todayCategories={todayCategories}
+          weekCategories={weekCategories}
+          todayTotalMs={todayTotalMs}
+          weekTotalMs={weekTotalMs}
+          dailyStacks={dailyStacks}
+          coverage={coverage}
+        />
+      </section>
 
-          {topCategories.length === 0 ? (
-            <p
-              className="text-[0.875rem]"
-              style={{ color: "var(--text-muted)" }}
-            >
-              No sessions filed yet this week.
-            </p>
-          ) : (
-            <ul className="space-y-3">
-              {topCategories.map((item) => {
-                const share =
-                  weekTotalMs > 0
-                    ? Math.max(4, Math.round((item.totalMs / weekTotalMs) * 100))
-                    : 0;
-                return (
-                  <li key={item.category}>
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span
-                        className="truncate text-[0.875rem] font-medium"
-                        style={{ color: "var(--text)" }}
-                      >
-                        {item.category}
-                      </span>
-                      <span
-                        className="text-[0.75rem] tabular"
-                        style={{ color: "var(--text-muted)" }}
-                      >
-                        {formatHM(item.totalMs)}
-                      </span>
-                    </div>
-                    <div
-                      className="mt-1.5 h-[3px] rounded-full"
-                      style={{ background: "var(--bg-tint-strong)" }}
-                    >
-                      <div
-                        className="h-[3px] rounded-full"
+      {/* Recent entries */}
+      <section className="fade-in-delay-4">
+        <p
+          className="mb-3 text-[0.6875rem] font-semibold uppercase tracking-wider"
+          style={{ color: "var(--text-faint)" }}
+        >
+          Recent sessions
+        </p>
+
+        {recent.length === 0 ? (
+          <p
+            className="text-[0.875rem]"
+            style={{ color: "var(--text-muted)" }}
+          >
+            The archive is empty. Open a session above.
+          </p>
+        ) : (
+          <div className="space-y-5">
+            {groupedEntries.map((group) => (
+              <div key={group.label}>
+                <h3
+                  className="px-1 pb-1 text-[0.6875rem] font-semibold uppercase tracking-wider"
+                  style={{ color: "var(--text-faint)" }}
+                >
+                  {group.label}
+                </h3>
+                <ul>
+                  {group.items.map((entry) => {
+                    const duration =
+                      (entry.endedAt!.getTime() -
+                        entry.startedAt.getTime()) |
+                      0;
+                    return (
+                      <li
+                        key={entry.id}
+                        className="group grid grid-cols-[1fr_auto_24px] items-baseline gap-3 rounded-md px-2 py-2 transition-colors hover:bg-bg-hover"
                         style={{
-                          width: `${share}%`,
-                          background: "var(--text)",
+                          borderTop: "1px solid var(--border-faint)",
                         }}
-                      />
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-
-        {/* Recent entries */}
-        <div className="fade-in-delay-4">
-          <p
-            className="mb-3 text-[0.6875rem] font-semibold uppercase tracking-wider"
-            style={{ color: "var(--text-faint)" }}
-          >
-            Recent sessions
-          </p>
-
-          {recent.length === 0 ? (
-            <p
-              className="text-[0.875rem]"
-              style={{ color: "var(--text-muted)" }}
-            >
-              The archive is empty. Open a session above.
-            </p>
-          ) : (
-            <div className="space-y-5">
-              {groupedEntries.map((group) => (
-                <div key={group.label}>
-                  <h3
-                    className="px-1 pb-1 text-[0.6875rem] font-semibold uppercase tracking-wider"
-                    style={{ color: "var(--text-faint)" }}
-                  >
-                    {group.label}
-                  </h3>
-                  <ul>
-                    {group.items.map((entry) => {
-                      const duration =
-                        (entry.endedAt!.getTime() -
-                          entry.startedAt.getTime()) |
-                        0;
-                      return (
-                        <li
-                          key={entry.id}
-                          className="group grid grid-cols-[1fr_auto_24px] items-baseline gap-3 rounded-md px-2 py-2 transition-colors hover:bg-bg-hover"
-                          style={{
-                            borderTop: "1px solid var(--border-faint)",
-                          }}
-                        >
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-baseline gap-2">
-                              <p
-                                className="truncate text-[0.9375rem] font-medium"
-                                style={{ color: "var(--text)" }}
-                              >
-                                {entry.label}
-                              </p>
-                              {entry.category && (
-                                <span
-                                  className="inline-flex items-center rounded px-1.5 py-0.5 text-[0.625rem] font-medium"
-                                  style={{
-                                    background: "var(--bg-tint)",
-                                    color: "var(--text-muted)",
-                                  }}
-                                >
-                                  {entry.category}
-                                </span>
-                              )}
-                            </div>
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-baseline gap-2">
                             <p
-                              className="mt-0.5 text-[0.75rem]"
-                              style={{ color: "var(--text-faint)" }}
+                              className="truncate text-[0.9375rem] font-medium"
+                              style={{ color: "var(--text)" }}
                             >
-                              {entry.startedAt.toLocaleString([], {
-                                month: "short",
-                                day: "numeric",
-                                hour: "numeric",
-                                minute: "2-digit",
-                              })}
+                              {entry.label}
                             </p>
+                            {entry.category && (
+                              <span
+                                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.625rem] font-medium"
+                                style={{
+                                  background: "var(--bg-tint)",
+                                  color: "var(--text-muted)",
+                                }}
+                              >
+                                <span
+                                  className="h-1.5 w-1.5 rounded-full"
+                                  style={{
+                                    background: categoryColor(entry.category),
+                                  }}
+                                  aria-hidden
+                                />
+                                {entry.category}
+                              </span>
+                            )}
                           </div>
-                          <span
-                            className="text-[0.8125rem] tabular font-medium"
-                            style={{ color: "var(--text)" }}
+                          <p
+                            className="mt-0.5 text-[0.75rem]"
+                            style={{ color: "var(--text-faint)" }}
                           >
-                            {formatDuration(duration)}
-                          </span>
-                          <EntryDeleteButton id={entry.id} />
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                            {entry.startedAt.toLocaleString([], {
+                              month: "short",
+                              day: "numeric",
+                              hour: "numeric",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+                        <span
+                          className="text-[0.8125rem] tabular font-medium"
+                          style={{ color: "var(--text)" }}
+                        >
+                          {formatDuration(duration)}
+                        </span>
+                        <EntryDeleteButton id={entry.id} />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );
