@@ -167,7 +167,7 @@ Decision: **Server Actions stay for the UI**; future agent endpoints will be rou
 
 ### Time / timezone
 
-`User.timezone` (default `"UTC"`). Store timestamps in UTC; format for display in the user's TZ. No date library is bundled — plain `Date` + `toLocaleX(...)` with explicit options. If formatting needs grow, install `date-fns`.
+Timestamps are stored in UTC. Display-side, the **server runtime is pinned to the owner's timezone** via `src/instrumentation.ts` (sets `process.env.TZ`, default `America/Los_Angeles`, override with `APP_TIMEZONE`). This makes server-rendered `toLocaleX(...)` calls and day/week-boundary math (`startOfToday`, timeline windows, gap detection) agree with what the browser renders — without it, Vercel's UTC servers shift every displayed time. `User.timezone` exists in the schema but is currently unused. No date library is bundled — plain `Date` + `toLocaleX(...)` with explicit options. If formatting needs grow (e.g. multi-timezone), install `date-fns` and thread `User.timezone` through instead.
 
 ### Per-request DB client
 
