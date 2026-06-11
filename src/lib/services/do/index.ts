@@ -8,6 +8,7 @@ export { getDoItemSummary, listDoItems, listSuggestedDoItems } from "./reads";
 export {
   createDoItem,
   deleteDoItem,
+  deleteDoItemsByProject,
   reflectOnDoItemSession,
   startTimerForDoItem,
   updateDoItem,

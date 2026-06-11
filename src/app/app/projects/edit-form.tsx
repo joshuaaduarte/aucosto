@@ -6,7 +6,8 @@ import {
   PROJECT_STATUS_LABELS,
   type ProjectStatus,
 } from "@/lib/projects";
-import { deleteProjectAction, updateProjectAction } from "./actions";
+import { updateProjectAction } from "./actions";
+import { DeleteProjectButton } from "./delete-project-button";
 
 export function ProjectEditForm({
   project,
@@ -20,6 +21,8 @@ export function ProjectEditForm({
     nextMilestone: string | null;
     targetDate: Date | null;
     notes: string | null;
+    openTaskCount: number;
+    doneTaskCount: number;
   };
 }) {
   const [state, formAction, pending] = useActionState(
@@ -129,25 +132,13 @@ export function ProjectEditForm({
         style={{ borderColor: "var(--border-faint)" }}
       >
         <p className="text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
-          Deleting keeps the linked tasks — they just lose the project.
+          You&apos;ll choose what happens to linked tasks.
         </p>
-        <form
-          action={deleteProjectAction}
-          onSubmit={(event) => {
-            if (!window.confirm(`Delete "${project.name}" permanently?`)) {
-              event.preventDefault();
-            }
-          }}
-        >
-          <input type="hidden" name="id" value={project.id} />
-          <button
-            type="submit"
-            className="btn-ghost"
-            style={{ color: "var(--accent-strong)" }}
-          >
-            Delete project
-          </button>
-        </form>
+        <DeleteProjectButton
+          projectId={project.id}
+          projectName={project.name}
+          taskCount={project.openTaskCount + project.doneTaskCount}
+        />
       </div>
     </details>
   );

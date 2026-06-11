@@ -41,6 +41,7 @@ const EVENT_LABELS: Record<string, string> = {
   "do.updated": "updated a do item",
   "do.completed": "completed a do item",
   "do.deleted": "deleted a do item",
+  "do.bulk_deleted": "deleted a project's linked tasks",
   "do.timer_started": "started a timer from a do item",
 
   // habits

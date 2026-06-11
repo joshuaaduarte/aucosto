@@ -226,6 +226,27 @@ export async function deleteDoItem(userId: string, id: string): Promise<void> {
   }
 }
 
+/** Bulk-delete every task linked to a project (used by project deletion). */
+export async function deleteDoItemsByProject(
+  userId: string,
+  projectId: string,
+): Promise<number> {
+  requireCan(userId, "do", "write");
+  const { count } = await prisma.doItem.deleteMany({
+    where: { userId, projectId },
+  });
+  if (count > 0) {
+    await recordEvent({
+      userId,
+      tool: "do",
+      type: "do.bulk_deleted",
+      refId: projectId,
+      meta: { count },
+    });
+  }
+  return count;
+}
+
 export async function startTimerForDoItem(
   userId: string,
   id: string,

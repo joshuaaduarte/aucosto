@@ -122,14 +122,16 @@ export async function updateProjectAction(
   revalidateProjects();
 }
 
-// Deleting a project leaves its tasks in place (they just lose the link).
+// Deleting a project: the form says whether linked tasks go with it
+// (deleteTasks="1") or stay in Do as standalone items.
 export async function deleteProjectAction(formData: FormData) {
   const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "").trim();
   if (!id) {
     throw new Error("Missing project id.");
   }
-  await deleteProject(userId, id);
+  const deleteTasks = String(formData.get("deleteTasks") ?? "") === "1";
+  await deleteProject(userId, id, { deleteTasks });
   revalidateProjects();
 }
 

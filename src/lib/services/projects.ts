@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { requireCan } from "@/lib/auth/can";
 import { normalizeDoStatus } from "@/lib/do";
+import { deleteDoItemsByProject } from "@/lib/services/do";
 import { recordEvent } from "@/lib/services/events";
 import { normalizeProjectStatus, type ProjectStatus } from "@/lib/projects";
 import type { Project } from "@/generated/prisma/client";
@@ -513,9 +514,21 @@ export async function updateProject(
   return summarize(project, { scheduledByTask, blocksByProject, now });
 }
 
-/** Delete a project. Linked tasks survive — DoItem.projectId is SetNull. */
-export async function deleteProject(userId: string, id: string): Promise<void> {
+/**
+ * Delete a project. By default linked tasks survive as standalone Do items
+ * (DoItem.projectId is SetNull); with deleteTasks they're removed too —
+ * their time entries always survive (TimeEntry.doItemId is SetNull).
+ */
+export async function deleteProject(
+  userId: string,
+  id: string,
+  options: { deleteTasks?: boolean } = {},
+): Promise<void> {
   requireCan(userId, "projects", "write");
+  let deletedTaskCount = 0;
+  if (options.deleteTasks) {
+    deletedTaskCount = await deleteDoItemsByProject(userId, id);
+  }
   const { count } = await prisma.project.deleteMany({ where: { id, userId } });
   if (count > 0) {
     await recordEvent({
@@ -523,6 +536,7 @@ export async function deleteProject(userId: string, id: string): Promise<void> {
       tool: "projects",
       type: "project.deleted",
       refId: id,
+      meta: { deletedTaskCount },
     });
   }
 }
