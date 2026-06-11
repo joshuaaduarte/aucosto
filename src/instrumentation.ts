@@ -8,11 +8,15 @@
 // all server-side Date math run in the owner's timezone, matching what
 // the browser shows client-side.
 //
-// Single-user app, single timezone. Override with APP_TIMEZONE (or TZ)
-// in the environment if it ever needs to change.
+// Set UNCONDITIONALLY: hosting platforms (Vercel included) often ship with
+// TZ already set to UTC, so deferring to a pre-existing TZ silently keeps
+// the bug. APP_TIMEZONE is the only supported override.
+//
+// Single-user app, single timezone.
 
 export async function register() {
-  if (process.env.NEXT_RUNTIME === "nodejs" && !process.env.TZ) {
+  if (process.env.NEXT_RUNTIME === "nodejs") {
     process.env.TZ = process.env.APP_TIMEZONE ?? "America/Los_Angeles";
+    console.log(`[instrumentation] server timezone pinned to ${process.env.TZ}`);
   }
 }
