@@ -98,27 +98,17 @@ export async function describeEntryAction(formData: FormData) {
 
 export type EntryFormState = { error?: string } | { ok: true } | undefined;
 
+// Times arrive as absolute ISO timestamps built in the BROWSER's timezone
+// by the entry editor (see entry-editor.tsx onSubmit). Never parse naive
+// "date + time" strings here — the server's timezone would decide what
+// wall-clock times mean, shifting entries whenever the two differ.
 const entryFormSchema = z.object({
   id: z.string().trim().optional(),
   label: z.string().trim().min(1, "Label is required").max(200),
   category: z.string().trim().max(80).optional(),
-  date: z.string().trim().min(1, "Date is required"),
-  start: z.string().trim().min(1, "Start time is required"),
-  end: z.string().trim().min(1, "End time is required"),
+  startedAtIso: z.string().min(1, "Start time is required"),
+  endedAtIso: z.string().min(1, "End time is required"),
 });
-
-function parseEntryWindow(date: string, start: string, end: string) {
-  const startedAt = new Date(`${date}T${start}`);
-  let endedAt = new Date(`${date}T${end}`);
-  if (Number.isNaN(startedAt.getTime()) || Number.isNaN(endedAt.getTime())) {
-    return null;
-  }
-  // End before start means the entry crossed midnight.
-  if (endedAt <= startedAt) {
-    endedAt = new Date(endedAt.getTime() + 24 * 60 * 60 * 1000);
-  }
-  return { startedAt, endedAt };
-}
 
 // Edit an existing completed entry, or manually add one (no id).
 // Used by the entry editor modal on the time page.
@@ -137,20 +127,16 @@ export async function saveEntryAction(
     id: (formData.get("id") as string) || undefined,
     label: formData.get("label") ?? "",
     category: (formData.get("category") as string) || undefined,
-    date: formData.get("date") ?? "",
-    start: formData.get("start") ?? "",
-    end: formData.get("end") ?? "",
+    startedAtIso: formData.get("startedAtIso") ?? "",
+    endedAtIso: formData.get("endedAtIso") ?? "",
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
 
-  const window = parseEntryWindow(
-    parsed.data.date,
-    parsed.data.start,
-    parsed.data.end,
-  );
-  if (!window) {
+  const startedAt = new Date(parsed.data.startedAtIso);
+  const endedAt = new Date(parsed.data.endedAtIso);
+  if (Number.isNaN(startedAt.getTime()) || Number.isNaN(endedAt.getTime())) {
     return { error: "Date and time are required." };
   }
 
@@ -159,8 +145,8 @@ export async function saveEntryAction(
       const updated = await timeService.updateEntry(userId, parsed.data.id, {
         label: parsed.data.label,
         category: parsed.data.category ?? null,
-        startedAt: window.startedAt,
-        endedAt: window.endedAt,
+        startedAt,
+        endedAt,
       });
       if (!updated) {
         return { error: "Entry not found." };
@@ -169,8 +155,8 @@ export async function saveEntryAction(
       await timeService.createPastEntry(userId, {
         label: parsed.data.label,
         category: parsed.data.category ?? null,
-        startedAt: window.startedAt,
-        endedAt: window.endedAt,
+        startedAt,
+        endedAt,
       });
     }
   } catch (error) {
