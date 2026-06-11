@@ -12,6 +12,7 @@ import {
   updateProject,
 } from "@/lib/services/projects";
 import { resolveActiveUserId } from "@/lib/viewer-context";
+import { windowFromFormData } from "@/lib/wall-clock";
 
 const projectSchema = z.object({
   name: z.string().trim().min(1, "Project name is required").max(120),
@@ -63,10 +64,6 @@ function nullableNumber(formData: FormData, key: string) {
   if (!raw) return null;
   const value = Number(raw);
   return Number.isFinite(value) ? value : null;
-}
-
-function parseDateTime(date: string, time: string) {
-  return new Date(`${date}T${time}`);
 }
 
 function revalidateProjects() {
@@ -181,19 +178,15 @@ export async function createProjectScheduleAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid block." };
   }
 
-  const startsAt = parseDateTime(parsed.data.date, parsed.data.start);
-  const endsAt = parseDateTime(parsed.data.date, parsed.data.end);
-  if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+  const window = windowFromFormData(formData);
+  if (!window) {
     return { error: "Date and time are required." };
-  }
-  if (endsAt <= startsAt) {
-    return { error: "End time has to be after start time." };
   }
 
   await createCalendarItem(userId, {
     title: parsed.data.title,
-    startsAt,
-    endsAt,
+    startsAt: window.startsAt,
+    endsAt: window.endsAt,
     location: parsed.data.location,
     notes: parsed.data.notes,
     kind: "block",

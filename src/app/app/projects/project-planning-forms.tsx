@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { DO_LANE_LABELS, DO_LANES } from "@/lib/do";
+import { fillIsoWindowFields } from "@/lib/wall-clock";
 import {
   createProjectScheduleAction,
   createProjectTaskAction,
@@ -248,11 +249,14 @@ export function ProjectScheduleForm({
       ref={formRef}
       action={formAction}
       className="space-y-3"
-      onSubmit={() => {
+      onSubmit={(event) => {
+        fillIsoWindowFields(event.currentTarget);
         submittedRef.current = true;
       }}
     >
       <input type="hidden" name="projectId" value={projectId} />
+      <input type="hidden" name="startsAtIso" defaultValue="" />
+      <input type="hidden" name="endsAtIso" defaultValue="" />
 
       <div className="space-y-1.5">
         <label

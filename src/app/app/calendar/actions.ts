@@ -9,16 +9,13 @@ import {
   updateCalendarItem,
 } from "@/lib/services/calendar";
 import { updateDoItem } from "@/lib/services/do";
+import { windowFromFormData } from "@/lib/wall-clock";
 import { listHabits, logHabitProgress, startTimerForHabit } from "@/lib/services/habits";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 
 function revalidateCalendar() {
   revalidatePath("/app");
   revalidatePath("/app/calendar");
-}
-
-function parseDateTime(date: string, time: string) {
-  return new Date(`${date}T${time}`);
 }
 
 function parseOptionalString(value: FormDataEntryValue | null) {
@@ -29,18 +26,20 @@ function parseOptionalString(value: FormDataEntryValue | null) {
 export async function createCalendarBlockAction(formData: FormData) {
   const userId = await resolveActiveUserId();
   const title = String(formData.get("title") ?? "");
-  const date = String(formData.get("date") ?? "");
-  const start = String(formData.get("start") ?? "");
-  const end = String(formData.get("end") ?? "");
   const doItemId = parseOptionalString(formData.get("doItemId"));
   const habitId = parseOptionalString(formData.get("habitId"));
   const notes = parseOptionalString(formData.get("notes"));
   const location = parseOptionalString(formData.get("location"));
 
+  const window = windowFromFormData(formData);
+  if (!window) {
+    throw new Error("Date and time are required.");
+  }
+
   await createCalendarItem(userId, {
     title,
-    startsAt: parseDateTime(date, start),
-    endsAt: parseDateTime(date, end),
+    startsAt: window.startsAt,
+    endsAt: window.endsAt,
     notes,
     location,
     kind: "block",
@@ -88,16 +87,18 @@ export async function updateCalendarBlockAction(formData: FormData) {
   const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "");
   const title = String(formData.get("title") ?? "");
-  const date = String(formData.get("date") ?? "");
-  const start = String(formData.get("start") ?? "");
-  const end = String(formData.get("end") ?? "");
   const notes = parseOptionalString(formData.get("notes"));
   const location = parseOptionalString(formData.get("location"));
 
+  const window = windowFromFormData(formData);
+  if (!window) {
+    throw new Error("Date and time are required.");
+  }
+
   await updateCalendarItem(userId, id, {
     title,
-    startsAt: parseDateTime(date, start),
-    endsAt: parseDateTime(date, end),
+    startsAt: window.startsAt,
+    endsAt: window.endsAt,
     notes,
     location,
     status: "confirmed",
@@ -108,13 +109,15 @@ export async function updateCalendarBlockAction(formData: FormData) {
 export async function moveCalendarItemAction(formData: FormData) {
   const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "");
-  const date = String(formData.get("date") ?? "");
-  const start = String(formData.get("start") ?? "");
-  const end = String(formData.get("end") ?? "");
+
+  const window = windowFromFormData(formData);
+  if (!window) {
+    throw new Error("Date and time are required.");
+  }
 
   await updateCalendarItem(userId, id, {
-    startsAt: parseDateTime(date, start),
-    endsAt: parseDateTime(date, end),
+    startsAt: window.startsAt,
+    endsAt: window.endsAt,
     status: "confirmed",
   });
   revalidateCalendar();

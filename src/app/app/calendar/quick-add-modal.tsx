@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatMinutes } from "@/lib/do";
+import { fillIsoWindowFields } from "@/lib/wall-clock";
 import { createCalendarBlockAction } from "./actions";
 
 const QUICK_TEMPLATES = [
@@ -266,7 +267,10 @@ export function CalendarQuickAddModal({
             <form
               action={createCalendarBlockAction}
               className="mt-5 space-y-4"
-              onSubmit={() => {
+              onSubmit={(event) => {
+                // Convert wall-clock fields to absolute timestamps in the
+                // browser's timezone before the server sees them.
+                fillIsoWindowFields(event.currentTarget);
                 setOpen(false);
                 resetForm();
               }}
@@ -274,6 +278,8 @@ export function CalendarQuickAddModal({
               <div className="space-y-1.5">
                 <input type="hidden" name="doItemId" value={doItemId} />
                 <input type="hidden" name="habitId" value={habitId} />
+                <input type="hidden" name="startsAtIso" defaultValue="" />
+                <input type="hidden" name="endsAtIso" defaultValue="" />
                 <label
                   className="block text-[0.75rem] font-medium"
                   style={{ color: "var(--text-muted)" }}

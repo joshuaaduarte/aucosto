@@ -15,6 +15,7 @@ import {
   updateHabit,
 } from "@/lib/services/habits";
 import { resolveActiveUserId } from "@/lib/viewer-context";
+import { windowFromFormData } from "@/lib/wall-clock";
 
 const cadenceEnum = z.enum(HABIT_CADENCES);
 const dayPartEnum = z.enum(HABIT_DAY_PARTS);
@@ -196,13 +197,14 @@ export async function scheduleHabitAction(
   const userId = await resolveActiveUserId();
   const habitId = String(formData.get("habitId") ?? "");
   const title = String(formData.get("title") ?? "").trim();
-  const date = String(formData.get("date") ?? "");
-  const start = String(formData.get("start") ?? "");
-  const end = String(formData.get("end") ?? "");
+  const window = windowFromFormData(formData);
+  if (!window) {
+    return { error: "Date and time are required." };
+  }
   await createCalendarItem(userId, {
     title,
-    startsAt: new Date(`${date}T${start}`),
-    endsAt: new Date(`${date}T${end}`),
+    startsAt: window.startsAt,
+    endsAt: window.endsAt,
     kind: "block",
     status: "confirmed",
     sourceTool: habitId ? "habit" : null,

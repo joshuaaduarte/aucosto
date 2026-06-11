@@ -28,9 +28,9 @@ function CompactMoveForm({
   return (
     <form action={moveCalendarItemAction}>
       <input type="hidden" name="id" value={item.id} />
-      <input type="hidden" name="date" value={formatDateValue(startsAt)} />
-      <input type="hidden" name="start" value={formatTimeValue(startsAt)} />
-      <input type="hidden" name="end" value={formatTimeValue(endsAt)} />
+      {/* Absolute timestamps — no wall-clock parsing on the server. */}
+      <input type="hidden" name="startsAtIso" value={startsAt.toISOString()} />
+      <input type="hidden" name="endsAtIso" value={endsAt.toISOString()} />
       <button className="btn-ghost h-8 px-2.5 text-[0.75rem]" type="submit">
         {label}
       </button>

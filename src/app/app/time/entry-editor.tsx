@@ -6,6 +6,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { PRESET_TIME_CATEGORIES } from "@/lib/time-categories";
+import { fillIsoWindowFields } from "@/lib/wall-clock";
 import { saveEntryAction, type EntryFormState } from "./actions";
 
 export type EditableEntry = {
@@ -146,30 +147,12 @@ function EntryModal({
             // the browser's timezone. Sending naive "date + time" strings to
             // the server would make the server's timezone decide what they
             // mean — which shifts every saved time when the two differ.
-            const form = event.currentTarget;
-            const get = (name: string) =>
-              (form.elements.namedItem(name) as HTMLInputElement | null)?.value ?? "";
-            const startedAt = new Date(`${get("date")}T${get("start")}`);
-            let endedAt = new Date(`${get("date")}T${get("end")}`);
-            if (
-              Number.isNaN(startedAt.getTime()) ||
-              Number.isNaN(endedAt.getTime())
-            ) {
-              return;
-            }
-            // End before start means the entry crossed midnight.
-            if (endedAt <= startedAt) {
-              endedAt = new Date(endedAt.getTime() + 24 * 60 * 60 * 1000);
-            }
-            (form.elements.namedItem("startedAtIso") as HTMLInputElement).value =
-              startedAt.toISOString();
-            (form.elements.namedItem("endedAtIso") as HTMLInputElement).value =
-              endedAt.toISOString();
+            fillIsoWindowFields(event.currentTarget);
           }}
         >
           {entry ? <input type="hidden" name="id" value={entry.id} /> : null}
-          <input type="hidden" name="startedAtIso" defaultValue="" />
-          <input type="hidden" name="endedAtIso" defaultValue="" />
+          <input type="hidden" name="startsAtIso" defaultValue="" />
+          <input type="hidden" name="endsAtIso" defaultValue="" />
 
           <div className="grid gap-3 sm:grid-cols-[1.6fr_1fr]">
             <div className="space-y-1.5">

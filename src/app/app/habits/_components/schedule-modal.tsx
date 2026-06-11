@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import type { HabitSummary } from "@/lib/services/habits";
+import { fillIsoWindowFields } from "@/lib/wall-clock";
 import { type HabitScheduleState, scheduleHabitAction } from "../actions";
 import { defaultScheduleStart } from "./habit-card-helpers";
 
@@ -53,12 +54,15 @@ export function ScheduleModal({ habit, onClose }: { habit: HabitSummary; onClose
           ref={formRef}
           action={formAction}
           className="mt-5 space-y-4"
-          onSubmit={() => {
+          onSubmit={(event) => {
+            fillIsoWindowFields(event.currentTarget);
             submittedRef.current = true;
           }}
         >
           <input type="hidden" name="habitId" value={habit.id} />
           <input type="hidden" name="title" value={habit.title} />
+          <input type="hidden" name="startsAtIso" defaultValue="" />
+          <input type="hidden" name="endsAtIso" defaultValue="" />
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
               <label htmlFor={`date-${habit.id}`} className="block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>

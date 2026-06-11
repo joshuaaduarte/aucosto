@@ -6,6 +6,7 @@ import * as timeService from "@/lib/services/time";
 import { reflectOnDoItemSession } from "@/lib/services/do";
 import { logHabitProgress } from "@/lib/services/habits";
 import { resolveActiveUserId } from "@/lib/viewer-context";
+import { windowFromFormData } from "@/lib/wall-clock";
 
 const startSchema = z.object({
   label: z.string().trim().min(1, "Label is required").max(200),
@@ -99,15 +100,13 @@ export async function describeEntryAction(formData: FormData) {
 export type EntryFormState = { error?: string } | { ok: true } | undefined;
 
 // Times arrive as absolute ISO timestamps built in the BROWSER's timezone
-// by the entry editor (see entry-editor.tsx onSubmit). Never parse naive
+// by the entry editor (see fillIsoWindowFields). Never parse naive
 // "date + time" strings here — the server's timezone would decide what
 // wall-clock times mean, shifting entries whenever the two differ.
 const entryFormSchema = z.object({
   id: z.string().trim().optional(),
   label: z.string().trim().min(1, "Label is required").max(200),
   category: z.string().trim().max(80).optional(),
-  startedAtIso: z.string().min(1, "Start time is required"),
-  endedAtIso: z.string().min(1, "End time is required"),
 });
 
 // Edit an existing completed entry, or manually add one (no id).
@@ -127,18 +126,17 @@ export async function saveEntryAction(
     id: (formData.get("id") as string) || undefined,
     label: formData.get("label") ?? "",
     category: (formData.get("category") as string) || undefined,
-    startedAtIso: formData.get("startedAtIso") ?? "",
-    endedAtIso: formData.get("endedAtIso") ?? "",
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
 
-  const startedAt = new Date(parsed.data.startedAtIso);
-  const endedAt = new Date(parsed.data.endedAtIso);
-  if (Number.isNaN(startedAt.getTime()) || Number.isNaN(endedAt.getTime())) {
+  const window = windowFromFormData(formData);
+  if (!window) {
     return { error: "Date and time are required." };
   }
+  const startedAt = window.startsAt;
+  const endedAt = window.endsAt;
 
   try {
     if (parsed.data.id) {
