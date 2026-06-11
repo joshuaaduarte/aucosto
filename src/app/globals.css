@@ -368,6 +368,13 @@ body > * {
   background: transparent;
   border: none;
   cursor: pointer;
+
+  /* Touch screens get a comfortably tappable target (min-* so explicit
+     h-/w- utilities can only make it bigger, never smaller). */
+  @media (pointer: coarse) {
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+  }
   transition: background 0.12s ease, color 0.12s ease;
 
   &:hover:not(:disabled) {

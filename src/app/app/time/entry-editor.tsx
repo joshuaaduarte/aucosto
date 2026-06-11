@@ -38,7 +38,7 @@ export function EntryEditButton({ entry }: { entry: EditableEntry }) {
         onClick={() => setOpen(true)}
         aria-label="Edit entry"
         title="Edit"
-        className="btn-icon opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+        className="btn-icon self-center opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 [@media(pointer:coarse)]:opacity-100"
       >
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M9.1 1.9l2 2L4.6 10.4l-2.5.5.5-2.5z" />

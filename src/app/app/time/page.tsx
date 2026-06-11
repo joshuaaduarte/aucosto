@@ -340,7 +340,7 @@ export default async function TimePage() {
                     return (
                       <li
                         key={entry.id}
-                        className="group grid grid-cols-[1fr_auto_24px_24px] items-baseline gap-3 rounded-md px-2 py-2 transition-colors hover:bg-bg-hover"
+                        className="group grid grid-cols-[1fr_auto_auto_auto] items-baseline gap-2 rounded-md px-2 py-2 transition-colors hover:bg-bg-hover sm:gap-3"
                         style={{
                           borderTop: "1px solid var(--border-faint)",
                         }}
