@@ -21,7 +21,7 @@ import {
   trackedCoverage,
 } from "@/lib/time-insights";
 import { PRESET_TIME_CATEGORIES, categoryColor } from "@/lib/time-categories";
-import { EntryDeleteButton } from "./entry-row";
+import { EntryDeleteButton, EntryNoteIndicator } from "./entry-row";
 import { AddEntryButton, EntryEditButton } from "./entry-editor";
 import { GapBackfillCard } from "./gap-backfill-card";
 import { InsightsSection } from "./insights-section";
@@ -408,6 +408,9 @@ export default async function TimePage() {
                                 ↗ {entry.habit.title}
                               </a>
                             )}
+                            {entry.notes ? (
+                              <EntryNoteIndicator note={entry.notes} />
+                            ) : null}
                           </div>
                           <p
                             className="mt-0.5 text-[0.75rem]"
@@ -433,6 +436,7 @@ export default async function TimePage() {
                             label: entry.label,
                             category: entry.category,
                             doItemId: entry.doItemId,
+                            notes: entry.notes,
                             startedAtIso: entry.startedAt.toISOString(),
                             endedAtIso: entry.endedAt!.toISOString(),
                           }}

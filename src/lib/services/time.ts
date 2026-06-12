@@ -98,6 +98,7 @@ export async function createPastEntry(
     label: string;
     category?: string | null;
     doItemId?: string | null;
+    notes?: string | null;
     startedAt: Date;
     endedAt: Date;
   },
@@ -121,6 +122,7 @@ export async function createPastEntry(
       label: input.label,
       category: input.category ?? null,
       doItemId: input.doItemId ?? null,
+      notes: input.notes ?? null,
       startedAt: input.startedAt,
       endedAt: input.endedAt,
     },
@@ -172,6 +174,7 @@ export async function updateEntry(
     label?: string;
     category?: string | null;
     doItemId?: string | null;
+    notes?: string | null;
     startedAt?: Date;
     endedAt?: Date;
   },
@@ -198,6 +201,7 @@ export async function updateEntry(
       label: input.label === undefined ? undefined : input.label,
       category: input.category === undefined ? undefined : input.category,
       doItemId: input.doItemId === undefined ? undefined : input.doItemId,
+      notes: input.notes === undefined ? undefined : input.notes,
       startedAt: input.startedAt === undefined ? undefined : input.startedAt,
       endedAt: input.endedAt === undefined ? undefined : input.endedAt,
     },

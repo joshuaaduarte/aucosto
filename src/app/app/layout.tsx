@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { dayKey } from "@/lib/reflect";
+import { getReflection } from "@/lib/services/reflect";
 import { getViewerContext } from "@/lib/viewer-context";
 import { AppSidebar, MobileNav } from "./sidebar";
 import { MobileTabBar } from "./_components/mobile-tab-bar";
@@ -21,6 +23,12 @@ export default async function AppLayout({
     showFinance: context?.financeVisible ?? false,
     isDemoMode: context?.isDemoMode ?? false,
   };
+
+  // Subtle badge on the More tab while today has no saved reflection.
+  const todayReflection =
+    context && context.isUnlocked
+      ? await getReflection(context.effectiveUserId, dayKey(new Date()))
+      : null;
 
   return (
     <div className="flex min-h-screen flex-1" style={{ background: "var(--bg-app)" }}>
@@ -46,7 +54,10 @@ export default async function AppLayout({
       {/* Mobile bottom tabs + global running-timer bar — not on the lock screen. */}
       {context && context.isUnlocked ? (
         <>
-          <MobileTabBar showFinance={navProps.showFinance} />
+          <MobileTabBar
+            showFinance={navProps.showFinance}
+            needsReflect={!todayReflection}
+          />
           <RunningTimerBar userId={context.effectiveUserId} />
         </>
       ) : null}

@@ -15,7 +15,8 @@ export type Tool =
   | "events"
   | "do"
   | "habit"
-  | "projects";
+  | "projects"
+  | "reflect";
 export type Action = "read" | "write";
 
 export function can(

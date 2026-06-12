@@ -111,6 +111,7 @@ export default async function CalendarPage({
             label: entry.label,
             category: entry.category,
             doItemId: entry.doItemId,
+            notes: entry.notes,
             startedAtIso: entry.startedAt.toISOString(),
             endedAtIso: entry.endedAt.toISOString(),
           },

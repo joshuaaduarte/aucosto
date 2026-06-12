@@ -12,6 +12,9 @@ const EVENT_LABELS: Record<string, string> = {
   "time.logged": "backfilled a time entry",
   "time.updated": "edited a time entry",
 
+  // reflect
+  "reflect.saved": "saved a daily reflection",
+
   // finance — manual edits
   "finance.account_created": "added a finance account",
   "finance.account_updated": "updated a finance account",

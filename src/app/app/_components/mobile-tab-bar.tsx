@@ -113,6 +113,16 @@ const MORE_TOOLS: MoreTool[] = [
     ),
   },
   {
+    href: "/app/reflect",
+    label: "Reflect",
+    icon: (
+      <svg {...ip}>
+        <path d="M7.5 13.5c3.3 0 6-2.46 6-5.5 0-3.04-2.7-5.5-6-5.5s-6 2.46-6 5.5c0 1.27.47 2.44 1.26 3.37L2.2 13.4l3.06-.6c.7.45 1.46.7 2.24.7Z" />
+        <path d="M5 6.75h5M5 9h3" />
+      </svg>
+    ),
+  },
+  {
     href: "/app/settings",
     label: "Settings",
     icon: (
@@ -124,7 +134,14 @@ const MORE_TOOLS: MoreTool[] = [
   },
 ];
 
-export function MobileTabBar({ showFinance }: { showFinance: boolean }) {
+export function MobileTabBar({
+  showFinance,
+  needsReflect = false,
+}: {
+  showFinance: boolean;
+  /** Today has no saved reflection yet — show a subtle dot on More. */
+  needsReflect?: boolean;
+}) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
   useBodyScrollLock(moreOpen);
@@ -161,7 +178,7 @@ export function MobileTabBar({ showFinance }: { showFinance: boolean }) {
           onClick={() => setMoreOpen(true)}
           aria-haspopup="dialog"
           aria-expanded={moreOpen}
-          className="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-1.5"
+          className="relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-1.5"
           style={{ color: moreActive ? "var(--text)" : "var(--text-faint)" }}
         >
           <svg {...ip}>
@@ -170,6 +187,14 @@ export function MobileTabBar({ showFinance }: { showFinance: boolean }) {
             <circle cx="12" cy="7.5" r="0.9" fill="currentColor" stroke="none" />
           </svg>
           <span className="text-[0.625rem] font-medium">More</span>
+          {needsReflect ? (
+            <span
+              className="absolute right-1/2 top-1 h-1.5 w-1.5 -translate-x-3 rounded-full"
+              style={{ background: "var(--accent)" }}
+              aria-hidden
+              title="No reflection saved today"
+            />
+          ) : null}
         </button>
       </nav>
 

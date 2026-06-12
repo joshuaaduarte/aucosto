@@ -39,6 +39,7 @@ model User {
   financeGoals        FinanceGoal[]
   financeTransactions FinanceTransaction[]
   calendarItems       CalendarItem[]
+  dailyReflections    DailyReflection[]
   events              Event[]
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt

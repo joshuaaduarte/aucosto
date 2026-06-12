@@ -1,0 +1,22 @@
+// Daily reflection tool. One row per user per local day: four 1–5 ratings,
+// three optional prose fields, and a JSON snapshot of the day's activity
+// captured at save time (tracked minutes, tasks done, habits, entry notes).
+
+model DailyReflection {
+  id                 String   @id @default(cuid())
+  userId             String
+  date               DateTime @db.Date
+  mood               Int
+  energyLevel        Int
+  productivityRating Int
+  dayRating          Int
+  wentWell           String?
+  carryForward       String?
+  freeNotes          String?
+  contextSnapshot    Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+}

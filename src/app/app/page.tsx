@@ -5,7 +5,9 @@ import { listSuggestedDoItems } from "@/lib/services/do";
 import { listAccounts, listTransactions } from "@/lib/services/finance";
 import { listHabits, listSuggestedHabits } from "@/lib/services/habits";
 import { listProjects } from "@/lib/services/projects";
+import { listRecentMoods } from "@/lib/services/reflect";
 import { getRunningEntry, listCompletedSince } from "@/lib/services/time";
+import { dayKey } from "@/lib/reflect";
 import { startOfToday, startOfWeek } from "@/lib/time";
 import { sumDurations } from "@/lib/time-summary";
 import { getViewerContext } from "@/lib/viewer-context";
@@ -25,6 +27,7 @@ import {
 } from "./_components/hub-derive";
 import { HubHeader } from "./_components/hub-header";
 import { QuickActionsSection } from "./_components/quick-actions-section";
+import { ReflectSection } from "./_components/reflect-section";
 import { WorkspaceSection } from "./_components/workspace-section";
 import { deriveDailyDigest } from "./_lib/daily-digest";
 import { deriveHubPrompts } from "./_lib/hub-prompts";
@@ -51,6 +54,7 @@ export default async function HubPage() {
     allHabits,
     projects,
     upcomingCalendar,
+    recentMoods,
   ] = userId
     ? await Promise.all([
         getRunningEntry(userId),
@@ -72,8 +76,9 @@ export default async function HubPage() {
         listHabits(userId),
         listProjects(userId),
         listUpcomingCalendarItems(userId, { limit: 3 }),
+        listRecentMoods(userId, { days: 7 }),
       ])
-    : [null, [], [], [], [], [], [], [], [], []];
+    : [null, [], [], [], [], [], [], [], [], [], []];
 
   const now = new Date();
   const todayStart = startOfToday();
@@ -145,6 +150,19 @@ export default async function HubPage() {
 
   const greeting = hourOfDayGreeting(timezone);
 
+  // Reflection strip: last 7 day keys (oldest → today), mood lookup, and
+  // the evening-nudge state.
+  const reflectDays = Array.from({ length: 7 }, (_, index) => {
+    const day = new Date(todayStart);
+    day.setDate(day.getDate() - (6 - index));
+    return dayKey(day);
+  });
+  const moodsByDay = Object.fromEntries(
+    recentMoods.map((row) => [row.dateKey, row.mood]),
+  );
+  const reflectedToday = dayKey(now) in moodsByDay;
+  const isEvening = now.getHours() >= 18;
+
   const subline = composeSubline({
     runningEntry,
     weekTotalMs,
@@ -167,6 +185,13 @@ export default async function HubPage() {
       <FocusModuleCard focus={focus} />
 
       <DailyDigestSection digest={digest} />
+
+      <ReflectSection
+        days={reflectDays}
+        moodsByDay={moodsByDay}
+        reflectedToday={reflectedToday}
+        isEvening={isEvening}
+      />
 
       <CrossToolCallout
         runningEntry={runningEntry}

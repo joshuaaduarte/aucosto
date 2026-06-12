@@ -3,6 +3,38 @@
 import { useEffect, useState, useTransition } from "react";
 import { deleteEntry } from "./actions";
 
+// Note indicator: small icon on rows that carry a session note; tap to
+// read it inline under the row.
+export function EntryNoteIndicator({ note }: { note: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-label={open ? "Hide note" : "Show note"}
+        title="Session note"
+        className="inline-flex items-center rounded px-1 py-0.5"
+        style={{ color: open ? "var(--text)" : "var(--text-faint)" }}
+      >
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M2 1.5h8v6.5l-2.5 2.5H2z" />
+          <path d="M7.5 10.5V8H10" />
+        </svg>
+      </button>
+      {open ? (
+        <span
+          className="w-full whitespace-pre-line rounded px-2 py-1.5 text-[0.78rem] leading-[1.5]"
+          style={{ background: "var(--bg-tint)", color: "var(--text-muted)" }}
+        >
+          {note}
+        </span>
+      ) : null}
+    </>
+  );
+}
+
 // Delete with a two-step confirm: first tap arms it ("Sure?"), second tap
 // within 3s deletes. Hover-revealed on pointer devices; always visible on
 // touch screens, where there is no hover to reveal it.

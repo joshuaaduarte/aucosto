@@ -108,6 +108,7 @@ const entryFormSchema = z.object({
   label: z.string().trim().min(1, "Label is required").max(200),
   category: z.string().trim().max(80).optional(),
   doItemId: z.string().trim().optional(),
+  notes: z.string().trim().max(600).optional(),
 });
 
 // Edit an existing completed entry, or manually add one (no id).
@@ -128,6 +129,7 @@ export async function saveEntryAction(
     label: formData.get("label") ?? "",
     category: (formData.get("category") as string) || undefined,
     doItemId: (formData.get("doItemId") as string) || undefined,
+    notes: (formData.get("notes") as string) || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
@@ -146,6 +148,7 @@ export async function saveEntryAction(
         label: parsed.data.label,
         category: parsed.data.category ?? null,
         doItemId: parsed.data.doItemId ?? null,
+        notes: parsed.data.notes ?? null,
         startedAt,
         endedAt,
       });
@@ -157,6 +160,7 @@ export async function saveEntryAction(
         label: parsed.data.label,
         category: parsed.data.category ?? null,
         doItemId: parsed.data.doItemId ?? null,
+        notes: parsed.data.notes ?? null,
         startedAt,
         endedAt,
       });

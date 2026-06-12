@@ -16,6 +16,7 @@ export type EditableEntry = {
   label: string;
   category: string | null;
   doItemId: string | null;
+  notes: string | null;
   startedAtIso: string;
   endedAtIso: string;
 };
@@ -383,6 +384,26 @@ export function EntryModal({
           <p className="text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
             An end time earlier than the start rolls into the next day.
           </p>
+
+          {/* Quick thought on the session — pulled into the day's
+              reflection snapshot. */}
+          <div className="space-y-1.5">
+            <label
+              className="block text-[0.75rem] font-medium"
+              style={{ color: "var(--text-muted)" }}
+              htmlFor="entry-editor-notes"
+            >
+              Note{" "}
+              <span style={{ color: "var(--text-faint)" }}>(optional)</span>
+            </label>
+            <textarea
+              id="entry-editor-notes"
+              name="notes"
+              defaultValue={entry?.notes ?? ""}
+              placeholder="A quick thought about this session..."
+              className="field min-h-[64px] resize-y"
+            />
+          </div>
 
           {state && "error" in state && state.error ? (
             <p
