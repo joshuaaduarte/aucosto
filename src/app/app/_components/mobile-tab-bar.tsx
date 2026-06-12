@@ -9,7 +9,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SignOutButton } from "../sign-out-button";
 import { useBodyScrollLock } from "./use-body-scroll-lock";
@@ -156,6 +156,17 @@ export function MobileTabBar({
   const [moreOpen, setMoreOpen] = useState(false);
   useBodyScrollLock(moreOpen);
 
+  // The reflection nudge only makes sense in the evening — before 6pm there's
+  // nothing to act on yet, so a dot all day reads as false urgency. The hour
+  // check must run client-side: the server is TZ-pinned to LA, but we want the
+  // viewer's actual local hour. Defaults to false until mounted so SSR (and
+  // the morning) never paints the dot.
+  const [isEvening, setIsEvening] = useState(false);
+  useEffect(() => {
+    setIsEvening(new Date().getHours() >= 18);
+  }, []);
+  const showReflectDot = needsReflect && isEvening;
+
   const moreTools = MORE_TOOLS.filter((tool) => showFinance || !tool.finance);
   const moreActive = moreTools.some(
     (tool) => pathname === tool.href || pathname.startsWith(`${tool.href}/`),
@@ -197,7 +208,7 @@ export function MobileTabBar({
             <circle cx="12" cy="7.5" r="0.9" fill="currentColor" stroke="none" />
           </svg>
           <span className="text-[0.625rem] font-medium">More</span>
-          {needsReflect ? (
+          {showReflectDot ? (
             <span
               className="absolute right-1/2 top-1 h-1.5 w-1.5 -translate-x-3 rounded-full"
               style={{ background: "var(--accent)" }}
