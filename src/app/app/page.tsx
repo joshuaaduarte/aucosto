@@ -6,7 +6,7 @@ import { listAccounts, listTransactions } from "@/lib/services/finance";
 import { listHabits, listSuggestedHabits } from "@/lib/services/habits";
 import { listProjects } from "@/lib/services/projects";
 import { listActiveRhythms, listRecentRhythms } from "@/lib/services/rhythms";
-import { suggestedRhythmForHour, type RhythmType } from "@/lib/rhythms";
+import type { RhythmType } from "@/lib/rhythms";
 import { listReflections, listRecentMoods } from "@/lib/services/reflect";
 import {
   buildDayFacts,
@@ -32,8 +32,7 @@ import {
   sumSpend,
 } from "./_components/hub-derive";
 import { HubHeader } from "./_components/hub-header";
-import { RhythmNudge } from "./_components/rhythm-nudge";
-import { SleepBackfillCard } from "./_components/sleep-backfill-card";
+import { RhythmHubCard } from "./_components/rhythm-hub-card";
 import { ProjectsProgressSection } from "./_components/projects-progress-section";
 import { QuickActionsSection } from "./_components/quick-actions-section";
 import { InsightOfTheDayCard } from "./_components/insight-of-the-day";
@@ -123,23 +122,19 @@ export default async function HubPage() {
 
   const now = new Date();
   const todayStart = startOfToday();
-  const localHour = Number(
-    new Intl.DateTimeFormat("en-US", {
-      hour: "numeric",
-      hour12: false,
-      timeZone: timezone,
-    }).format(now),
-  );
-  const suggestedRhythm = suggestedRhythmForHour(
-    Number.isFinite(localHour) ? localHour % 24 : now.getHours(),
-  );
-  const activeRhythmType =
-    activeRhythms.get(suggestedRhythm)?.type ??
-    [...activeRhythms.keys()][0] ??
-    null;
 
-  // Missed-sleep detection: on a morning, look for any sleep session (active
-  // or completed) started since ~6pm yesterday. None → prompt a backfill.
+  // The time-of-day rhythm suggestion is decided in the BROWSER (see
+  // RhythmHubCard) using the visitor's real local hour. The server runtime is
+  // pinned to America/Los_Angeles, so deriving the hour here would mislabel
+  // anyone in another zone (Eastern 5:51am → Pacific 2:51am → "sleep").
+  // We only pass the raw inputs: which rhythms are running, and whether last
+  // night's sleep was logged.
+  const activeRhythmTypes = [...activeRhythms.keys()] as RhythmType[];
+
+  // Missed-sleep detection: look for any sleep session (active or completed)
+  // started since ~6pm yesterday. None → the morning card prompts a backfill.
+  // Bedtimes (9pm–1am) sit well past 6pm in any US zone, so the server-local
+  // window boundary is robust enough; the morning gate itself is client-side.
   const sleepWindowStart = new Date(now);
   sleepWindowStart.setDate(sleepWindowStart.getDate() - 1);
   sleepWindowStart.setHours(18, 0, 0, 0);
@@ -147,8 +142,6 @@ export default async function HubPage() {
     (session) =>
       session.type === "sleep" && session.startedAt >= sleepWindowStart,
   );
-  const showSleepBackfill =
-    Boolean(userId) && suggestedRhythm === "wakeup" && !hasRecentSleep;
   const monthStart = startOfMonth();
   const previousMonthStart = startOfPreviousMonth();
   const weekTotalMs = sumDurations(weekEntries);
@@ -272,21 +265,12 @@ export default async function HubPage() {
       {/* Hero first: the one recommendation. Stat tiles support it below. */}
       <FocusModuleCard focus={focus} />
 
-      {showSleepBackfill ? (
-        <SleepBackfillCard
-          fallback={
-            <RhythmNudge
-              suggestedType={suggestedRhythm}
-              activeType={activeRhythmType}
-            />
-          }
+      {userId ? (
+        <RhythmHubCard
+          activeTypes={activeRhythmTypes}
+          hasRecentSleep={hasRecentSleep}
         />
-      ) : (
-        <RhythmNudge
-          suggestedType={suggestedRhythm}
-          activeType={activeRhythmType}
-        />
-      )}
+      ) : null}
 
       <InsightOfTheDayCard insight={insightOfTheDay} />
 
