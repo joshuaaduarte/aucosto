@@ -16,6 +16,7 @@ import {
   createDoFromHabitAction,
   deleteHabitAction,
   startHabitTimerAction,
+  undoTodayHabitLogAction,
 } from "../actions";
 import { detailTone } from "./habit-card-helpers";
 import { HabitEditForm } from "./habit-edit-form";
@@ -34,6 +35,8 @@ export function HabitDetailModal({
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
   const [deleteArmed, setDeleteArmed] = useState(false);
+  const [undoArmed, setUndoArmed] = useState(false);
+  const [undoPending, setUndoPending] = useState(false);
   const { emoji, rest } = splitLeadingEmoji(habit.title);
   const color = categoryColor(habit.bucket ?? "habit");
   const last7 = habit.recentDays.slice(-7);
@@ -43,6 +46,17 @@ export function HabitDetailModal({
     const timer = window.setTimeout(() => setDeleteArmed(false), 3000);
     return () => window.clearTimeout(timer);
   }, [deleteArmed]);
+
+  useEffect(() => {
+    if (!undoArmed) return;
+    const timer = window.setTimeout(() => setUndoArmed(false), 3000);
+    return () => window.clearTimeout(timer);
+  }, [undoArmed]);
+
+  const loggedToday =
+    habit.progressToday > 0 ||
+    habit.fallbackLoggedToday ||
+    habit.recoveryLoggedToday;
 
   return (
     <>
@@ -101,6 +115,58 @@ export function HabitDetailModal({
             <MetricTile label="Best run" value={`${habit.longestStreak}`} />
             <MetricTile label="30-day rate" value={`${Math.min(100, habit.completionRate30d)}%`} />
           </div>
+
+          {/* Today's log: edit (re-log) or undo. */}
+          {loggedToday && !habit.archivedAt ? (
+            <div
+              className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2.5"
+              style={{ borderColor: "var(--border-faint)", background: "var(--bg-tint)" }}
+            >
+              <p className="text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
+                Today:{" "}
+                <strong style={{ color: "var(--text)" }}>
+                  {habit.progressToday > 0
+                    ? formatHabitQuantity(habit.progressToday, habit.goalUnit as HabitGoalUnit)
+                    : "saved with a fallback"}
+                </strong>{" "}
+                logged
+              </p>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  className="btn-ghost h-8 px-2.5 text-[0.75rem]"
+                  onClick={() => setLogOpen(true)}
+                  title="Add to today's total"
+                >
+                  Add more
+                </button>
+                <button
+                  type="button"
+                  disabled={undoPending}
+                  onClick={async () => {
+                    if (!undoArmed) {
+                      setUndoArmed(true);
+                      return;
+                    }
+                    setUndoPending(true);
+                    const formData = new FormData();
+                    formData.set("id", habit.id);
+                    await undoTodayHabitLogAction(formData);
+                    setUndoPending(false);
+                    setUndoArmed(false);
+                  }}
+                  className="btn-ghost h-8 px-2.5 text-[0.75rem] font-semibold"
+                  style={{
+                    color: "var(--accent-strong)",
+                    background: undoArmed ? "var(--accent-tint)" : undefined,
+                  }}
+                  title="Removes all of today's entries — re-log with the right amount"
+                >
+                  {undoPending ? "Undoing…" : undoArmed ? "Sure?" : "Undo today"}
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           {/* Last 7 days mini calendar */}
           <div className="mt-4">

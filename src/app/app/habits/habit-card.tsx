@@ -18,9 +18,35 @@ import {
   startHabitTimerAction,
 } from "./actions";
 import { HabitDetailModal } from "./_components/habit-detail-modal";
+import { LogProgressModal } from "./_components/log-progress-modal";
+
+// Done-today chip: still tappable — opens the detail modal so a finished
+// habit can be edited (add more) or undone, not locked away for the day.
+export function DoneHabitChip({ habit }: { habit: HabitSummary }) {
+  const [detailOpen, setDetailOpen] = useState(false);
+  const { emoji, rest } = splitLeadingEmoji(habit.title);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setDetailOpen(true)}
+        className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.75rem] font-medium transition-colors hover:bg-bg-hover"
+        style={{ background: "var(--bg-tint)", color: "var(--text-muted)" }}
+        title="Tap to view, edit, or undo today's log"
+      >
+        {emoji ? `${emoji} ` : ""}
+        {rest} ✓
+      </button>
+      {detailOpen ? (
+        <HabitDetailModal habit={habit} onClose={() => setDetailOpen(false)} />
+      ) : null}
+    </>
+  );
+}
 
 export function HabitCard({ habit }: { habit: HabitSummary }) {
   const [detailOpen, setDetailOpen] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
   const [logPending, startLogTransition] = useTransition();
   const [timerPending, startTimerTransition] = useTransition();
   const { emoji, rest } = splitLeadingEmoji(habit.title);
@@ -149,20 +175,32 @@ export function HabitCard({ habit }: { habit: HabitSummary }) {
               </span>
             ) : goalUnit === "count" ? (
               <>
-                <button
-                  type="button"
-                  disabled={logPending}
-                  onClick={() => quickLog(1)}
-                  className="btn-ink h-9 rounded-full px-4 text-[0.8125rem]"
-                >
-                  {logPending ? "…" : `+1 ${emoji ?? ""}`.trim()}
-                </button>
+                {/* Big targets (steps) get a bulk-entry modal — tapping
+                    +1 ten thousand times is nobody's habit. */}
+                {habit.targetCount > 20 ? (
+                  <button
+                    type="button"
+                    onClick={() => setLogOpen(true)}
+                    className="btn-ink h-9 rounded-full px-4 text-[0.8125rem]"
+                  >
+                    Log {emoji ?? ""}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={logPending}
+                    onClick={() => quickLog(1)}
+                    className="btn-ink h-9 rounded-full px-4 text-[0.8125rem]"
+                  >
+                    {logPending ? "…" : `+1 ${emoji ?? ""}`.trim()}
+                  </button>
+                )}
                 <span
                   key={`count-${progress}`}
                   className="habit-pop tabular text-[0.85rem] font-semibold"
                   style={{ color: "var(--text)" }}
                 >
-                  {progress}/{habit.targetCount}
+                  {progress.toLocaleString()}/{habit.targetCount.toLocaleString()}
                 </span>
               </>
             ) : goalUnit === "minutes" ? (
@@ -242,6 +280,7 @@ export function HabitCard({ habit }: { habit: HabitSummary }) {
       </li>
 
       {detailOpen ? <HabitDetailModal habit={habit} onClose={() => setDetailOpen(false)} /> : null}
+      {logOpen ? <LogProgressModal habit={habit} onClose={() => setLogOpen(false)} /> : null}
     </>
   );
 }

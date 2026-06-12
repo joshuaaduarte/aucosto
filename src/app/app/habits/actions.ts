@@ -11,6 +11,7 @@ import {
   deleteHabit,
   listHabits,
   logHabitProgress,
+  removeTodayHabitEntries,
   startTimerForHabit,
   updateHabit,
 } from "@/lib/services/habits";
@@ -289,5 +290,15 @@ export async function quickLogHabitAction(formData: FormData) {
         : remaining;
 
   await logHabitProgress(userId, id, { quantity, notes: null, mode: "full" });
+  revalidateHabits();
+}
+
+// Undo today's log — clears today's entries so the habit can be re-logged
+// cleanly (fix a wrong count, remove an accidental tap, or just take it back).
+export async function undoTodayHabitLogAction(formData: FormData) {
+  const userId = await resolveActiveUserId();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  await removeTodayHabitEntries(userId, id);
   revalidateHabits();
 }

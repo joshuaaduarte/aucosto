@@ -1,10 +1,9 @@
 import type { ReactNode } from "react";
 import { HABIT_DAY_PARTS, HABIT_DAY_PART_LABELS, type HabitDayPart } from "@/lib/habits";
-import { splitLeadingEmoji } from "@/lib/habit-templates";
 import { listHabits, type HabitSummary } from "@/lib/services/habits";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import { HabitCreateForm } from "./create-form";
-import { HabitCard } from "./habit-card";
+import { DoneHabitChip, HabitCard } from "./habit-card";
 import { TemplatePicker } from "./_components/template-picker";
 
 export const dynamic = "force-dynamic";
@@ -137,19 +136,9 @@ export default async function HabitsPage() {
               <div>
                 <SectionHeading count={doneToday.length}>Done today</SectionHeading>
                 <div className="flex flex-wrap gap-1.5">
-                  {doneToday.map((habit) => {
-                    const { emoji, rest } = splitLeadingEmoji(habit.title);
-                    return (
-                      <span
-                        key={habit.id}
-                        className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.75rem] font-medium"
-                        style={{ background: "var(--bg-tint)", color: "var(--text-muted)" }}
-                      >
-                        {emoji ? `${emoji} ` : ""}
-                        {rest} ✓
-                      </span>
-                    );
-                  })}
+                  {doneToday.map((habit) => (
+                    <DoneHabitChip key={habit.id} habit={habit} />
+                  ))}
                 </div>
               </div>
             ) : null}

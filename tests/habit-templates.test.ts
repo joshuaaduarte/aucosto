@@ -33,6 +33,7 @@ describe("habit templates", () => {
       "workout",
       "run",
       "walk",
+      "steps-10k",
       "water",
       "sleep-8",
       "weekly-review",
@@ -47,6 +48,10 @@ describe("habit templates", () => {
     const water = findHabitTemplate("water")!;
     expect(water.goalUnit).toBe("count");
     expect(water.targetCount).toBe(8);
+    const steps = findHabitTemplate("steps-10k")!;
+    expect(steps.goalUnit).toBe("count");
+    expect(steps.targetCount).toBe(10000);
+    expect(steps.bucket).not.toBe("exercise"); // distinct color from Run/Walk
     const deepWork = findHabitTemplate("deep-work")!;
     expect(deepWork.goalUnit).toBe("minutes");
     expect(deepWork.defaultDurationMinutes).toBe(60);

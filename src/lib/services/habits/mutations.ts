@@ -241,3 +241,29 @@ export async function startTimerForHabit(userId: string, habitId: string) {
   });
   return entry;
 }
+
+/**
+ * Remove today's entries for a habit — the undo path for accidental or
+ * wrong logs. Clears the whole day so the user can re-log cleanly.
+ */
+export async function removeTodayHabitEntries(
+  userId: string,
+  habitId: string,
+): Promise<number> {
+  requireCan(userId, "habit", "write");
+  const dayStart = new Date();
+  dayStart.setHours(0, 0, 0, 0);
+  const { count } = await prisma.habitEntry.deleteMany({
+    where: { userId, habitId, loggedAt: { gte: dayStart } },
+  });
+  if (count > 0) {
+    await recordEvent({
+      userId,
+      tool: "habit",
+      type: "habit.unlogged",
+      refId: habitId,
+      meta: { entriesRemoved: count },
+    });
+  }
+  return count;
+}

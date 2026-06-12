@@ -51,6 +51,7 @@ const EVENT_LABELS: Record<string, string> = {
   "habit.created": "added a habit",
   "habit.updated": "updated a habit",
   "habit.logged": "logged habit progress",
+  "habit.unlogged": "undid today's habit log",
   "habit.archived": "archived a habit",
   "habit.reopened": "reopened a habit",
   "habit.timer_started": "started a timer from a habit",

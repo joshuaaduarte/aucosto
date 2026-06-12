@@ -9,6 +9,7 @@ export {
   createHabit,
   deleteHabit,
   logHabitProgress,
+  removeTodayHabitEntries,
   startTimerForHabit,
   updateHabit,
   type SaveHabitInput,

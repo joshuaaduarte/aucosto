@@ -138,6 +138,20 @@ export const HABIT_TEMPLATES: HabitTemplate[] = [
     bucket: "exercise",
     fallbackTitle: "Once around the block",
   },
+  {
+    key: "steps-10k",
+    emoji: "👟",
+    title: "10,000 steps",
+    description:
+      "Ten thousand steps is about 5 miles and 400 calories — a solid daily baseline.",
+    group: "Fitness",
+    dayPart: "day",
+    cadence: "daily",
+    goalUnit: "count",
+    targetCount: 10000,
+    defaultDurationMinutes: null,
+    bucket: "steps",
+  },
   // ── Wellness ─────────────────────────────────────────────────────
   {
     key: "water",
