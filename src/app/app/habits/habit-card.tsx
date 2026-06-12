@@ -61,13 +61,13 @@ export function HabitCard({ habit }: { habit: HabitSummary }) {
                   <div
                     className="h-[3px] rounded-full"
                     style={{
-                      width: `${Math.max(2, Math.round(habit.completionRate30d * 100))}%`,
+                      width: `${Math.min(100, Math.max(2, Math.round(habit.completionRate30d)))}%`,
                       background: "#14b8a6",
                     }}
                   />
                 </div>
                 <span className="tabular text-[0.65rem]" style={{ color: "var(--text-faint)" }}>
-                  {Math.round(habit.completionRate30d * 100)}% · 30d
+                  {Math.min(100, Math.round(habit.completionRate30d))}% · 30d
                 </span>
               </div>
 

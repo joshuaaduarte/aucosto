@@ -262,7 +262,7 @@ export default async function InsightsPage({
                         {habit.title}
                       </p>
                       <p className="tabular text-[0.72rem]" style={{ color: "var(--text-muted)" }}>
-                        {Math.round(habit.completionRate30d * 100)}% · 30d
+                        {Math.min(100, Math.round(habit.completionRate30d))}% · 30d
                       </p>
                     </div>
                     <div
@@ -272,7 +272,7 @@ export default async function InsightsPage({
                       <div
                         className="h-[4px] rounded-full"
                         style={{
-                          width: `${Math.max(2, Math.round(habit.completionRate30d * 100))}%`,
+                          width: `${Math.min(100, Math.max(2, Math.round(habit.completionRate30d)))}%`,
                           background: "#14b8a6",
                         }}
                       />
