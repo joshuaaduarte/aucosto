@@ -14,12 +14,14 @@ import {
   type HabitGoalUnit,
 } from "@/lib/habits";
 import { createHabitAction, type HabitState } from "./actions";
+import { useBodyScrollLock } from "../_components/use-body-scroll-lock";
 
 const initialState: HabitState = undefined;
 
 export function HabitCreateForm() {
   const [state, formAction, pending] = useActionState(createHabitAction, initialState);
   const [open, setOpen] = useState(false);
+  useBodyScrollLock(open);
   const [cadence, setCadence] = useState<HabitCadence>("daily");
   const [dayPart, setDayPart] = useState<HabitDayPart>("anytime");
   const [goalUnit, setGoalUnit] = useState<HabitGoalUnit>("check");

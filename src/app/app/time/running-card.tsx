@@ -11,6 +11,7 @@ import {
 } from "./actions";
 import { formatDuration } from "@/lib/time";
 import { DescribeRow } from "./describe-row";
+import { useBodyScrollLock } from "../_components/use-body-scroll-lock";
 
 export function RunningCard({
   entryId,
@@ -47,6 +48,7 @@ export function RunningCard({
   const [now, setNow] = useState(() => Date.now());
   const [pending, startTransition] = useTransition();
   const [reflectOpen, setReflectOpen] = useState(false);
+  useBodyScrollLock(reflectOpen);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);

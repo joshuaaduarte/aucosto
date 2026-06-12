@@ -5,8 +5,10 @@ import { formatHabitQuantity, type HabitGoalUnit } from "@/lib/habits";
 import type { HabitSummary } from "@/lib/services/habits";
 import { type HabitLogState, logHabitAction } from "../actions";
 import { MetricTile } from "./stat-tiles";
+import { useBodyScrollLock } from "../../_components/use-body-scroll-lock";
 
 export function LogProgressModal({ habit, onClose }: { habit: HabitSummary; onClose: () => void }) {
+  useBodyScrollLock();
   const [state, formAction, pending] = useActionState<HabitLogState, FormData>(logHabitAction, undefined);
   const formRef = useRef<HTMLFormElement>(null);
   const submittedRef = useRef(false);

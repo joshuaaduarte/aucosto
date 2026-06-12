@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { DO_BUCKET_SUGGESTIONS, DO_LANE_LABELS, DO_LANES } from "@/lib/do";
 import { createDoItemAction, type DoState } from "./actions";
+import { useBodyScrollLock } from "../_components/use-body-scroll-lock";
 
 const initialState: DoState = undefined;
 
@@ -25,6 +26,7 @@ export function DoCreateForm({
   const formRef = useRef<HTMLFormElement>(null);
   const submittedRef = useRef(false);
   const [open, setOpen] = useState(false);
+  useBodyScrollLock(open);
   const [title, setTitle] = useState("");
   const [lane, setLane] = useState<(typeof DO_LANES)[number]>("next");
   const [estimatedMinutes, setEstimatedMinutes] = useState("");

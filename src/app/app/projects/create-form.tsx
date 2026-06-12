@@ -7,6 +7,7 @@ import {
   type ProjectStatus,
 } from "@/lib/projects";
 import { createProjectAction, type ProjectState } from "./actions";
+import { useBodyScrollLock } from "../_components/use-body-scroll-lock";
 
 const initialState: ProjectState = undefined;
 
@@ -31,6 +32,7 @@ export function ProjectCreateForm() {
   const formRef = useRef<HTMLFormElement>(null);
   const submittedRef = useRef(false);
   const [open, setOpen] = useState(false);
+  useBodyScrollLock(open);
   const [name, setName] = useState("");
   const [bucket, setBucket] = useState("");
   const [status, setStatus] = useState<ProjectStatus>("active");

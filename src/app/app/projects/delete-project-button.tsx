@@ -6,6 +6,7 @@
 
 import { useState, useTransition } from "react";
 import { deleteProjectAction } from "./actions";
+import { useBodyScrollLock } from "../_components/use-body-scroll-lock";
 
 export function DeleteProjectButton({
   projectId,
@@ -17,6 +18,7 @@ export function DeleteProjectButton({
   taskCount: number;
 }) {
   const [open, setOpen] = useState(false);
+  useBodyScrollLock(open);
   const [pending, startTransition] = useTransition();
   const [choice, setChoice] = useState<"with-tasks" | "keep-tasks" | null>(
     null,

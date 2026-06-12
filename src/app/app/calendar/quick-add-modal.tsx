@@ -4,6 +4,7 @@ import { useState } from "react";
 import { formatMinutes } from "@/lib/do";
 import { fillIsoWindowFields } from "@/lib/wall-clock";
 import { createCalendarBlockAction } from "./actions";
+import { useBodyScrollLock } from "../_components/use-body-scroll-lock";
 
 const QUICK_TEMPLATES = [
   { title: "Deep work", start: "09:00", end: "10:30" },
@@ -39,6 +40,7 @@ export function CalendarQuickAddModal({
   }>;
 }) {
   const [open, setOpen] = useState(false);
+  useBodyScrollLock(open);
   const [title, setTitle] = useState("");
   const [doItemId, setDoItemId] = useState("");
   const [habitId, setHabitId] = useState("");

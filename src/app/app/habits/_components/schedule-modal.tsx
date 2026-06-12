@@ -5,8 +5,10 @@ import type { HabitSummary } from "@/lib/services/habits";
 import { fillIsoWindowFields } from "@/lib/wall-clock";
 import { type HabitScheduleState, scheduleHabitAction } from "../actions";
 import { defaultScheduleStart } from "./habit-card-helpers";
+import { useBodyScrollLock } from "../../_components/use-body-scroll-lock";
 
 export function ScheduleModal({ habit, onClose }: { habit: HabitSummary; onClose: () => void }) {
+  useBodyScrollLock();
   const [state, formAction, pending] = useActionState<HabitScheduleState, FormData>(scheduleHabitAction, undefined);
   const formRef = useRef<HTMLFormElement>(null);
   const submittedRef = useRef(false);

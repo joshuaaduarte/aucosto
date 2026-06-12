@@ -18,6 +18,7 @@ import {
   updateDoItemAction,
 } from "./actions";
 import { StartTimerButton } from "../_components/start-timer-button";
+import { useBodyScrollLock } from "../_components/use-body-scroll-lock";
 
 function DetailRow({
   label,
@@ -52,6 +53,7 @@ function CompletionModal({
   onClose: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
+  useBodyScrollLock();
 
   return (
     <div

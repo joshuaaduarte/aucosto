@@ -9,6 +9,7 @@ import { createPortal } from "react-dom";
 import { PRESET_TIME_CATEGORIES } from "@/lib/time-categories";
 import { fillIsoWindowFields } from "@/lib/wall-clock";
 import { saveEntryAction, type EntryFormState } from "./actions";
+import { useBodyScrollLock } from "../_components/use-body-scroll-lock";
 
 export type EditableEntry = {
   id: string;
@@ -91,6 +92,7 @@ function EntryModal({
   );
   const [category, setCategory] = useState(entry?.category ?? "");
   const closedRef = useRef(false);
+  useBodyScrollLock();
 
   useEffect(() => {
     if (state && "ok" in state && state.ok && !closedRef.current) {
