@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   DO_BUCKET_SUGGESTIONS,
   DO_LANE_LABELS,
@@ -44,6 +44,49 @@ function DetailRow({
         {value}
       </p>
     </div>
+  );
+}
+
+// Two-step delete (consistent with time entries / habits / projects):
+// first tap arms "Sure?" for 3s, second tap deletes.
+function DeleteTaskButton({ id }: { id: string }) {
+  const [pending, startTransition] = useTransition();
+  const [armed, setArmed] = useState(false);
+
+  useEffect(() => {
+    if (!armed) return;
+    const timer = window.setTimeout(() => setArmed(false), 3000);
+    return () => window.clearTimeout(timer);
+  }, [armed]);
+
+  if (armed) {
+    return (
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() =>
+          startTransition(async () => {
+            const formData = new FormData();
+            formData.set("id", id);
+            await deleteDoItemAction(formData);
+          })
+        }
+        className="btn-ghost col-span-2 h-8 w-full px-2.5 text-[0.75rem] font-semibold sm:col-span-1"
+        style={{ color: "var(--accent-strong)", background: "var(--accent-tint)" }}
+      >
+        {pending ? "Deleting..." : "Sure?"}
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setArmed(true)}
+      className="btn-ghost col-span-2 h-8 w-full px-2.5 text-[0.75rem] sm:col-span-1"
+    >
+      Delete
+    </button>
   );
 }
 
@@ -267,12 +310,7 @@ export function DoItemCard({
                 </form>
               )}
 
-              <form action={deleteDoItemAction} className="contents sm:block">
-                <input type="hidden" name="id" value={item.id} />
-                <button className="btn-ghost col-span-2 h-8 w-full px-2.5 text-[0.75rem] sm:col-span-1" type="submit">
-                  Delete
-                </button>
-              </form>
+              <DeleteTaskButton id={item.id} />
               {item.habitId ? (
                 <a href="/app/habits" className="btn-ghost col-span-2 h-8 w-full px-2.5 text-[0.75rem] sm:col-span-1">
                   Open habit

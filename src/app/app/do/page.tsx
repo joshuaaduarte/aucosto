@@ -22,11 +22,59 @@ function SectionCard({
   eyebrow,
   title,
   children,
+  collapsed = false,
+  count,
 }: {
   eyebrow: string;
   title: string;
   children: ReactNode;
+  /** Render as a closed <details> — used for low-priority lanes so the
+      page stays scannable, especially on phones. */
+  collapsed?: boolean;
+  count?: number;
 }) {
+  const header = (
+    <>
+      <p
+        className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+        style={{ color: "var(--text-faint)" }}
+      >
+        {eyebrow}
+        {count !== undefined ? ` · ${count}` : ""}
+      </p>
+      <h2
+        className="mt-1 text-[1rem] font-semibold tracking-tight"
+        style={{ color: "var(--text)" }}
+      >
+        {title}
+      </h2>
+    </>
+  );
+
+  if (collapsed) {
+    return (
+      <details
+        className="group rounded-md border p-5"
+        style={{
+          borderColor: "var(--border-soft)",
+          background: "var(--bg-page)",
+        }}
+      >
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+          <div>{header}</div>
+          <span
+            className="text-[0.75rem] transition-transform group-open:rotate-180"
+            style={{ color: "var(--text-faint)" }}
+            aria-hidden
+          >
+            v
+          </span>
+        </summary>
+        <div className="mt-4">{children}</div>
+      </details>
+    );
+  }
+
   return (
     <section
       className="rounded-md border p-5"
@@ -35,18 +83,7 @@ function SectionCard({
         background: "var(--bg-page)",
       }}
     >
-      <p
-        className="text-[0.6875rem] font-semibold uppercase tracking-wider"
-        style={{ color: "var(--text-faint)" }}
-      >
-        {eyebrow}
-      </p>
-      <h2
-        className="mt-1 text-[1rem] font-semibold tracking-tight"
-        style={{ color: "var(--text)" }}
-      >
-        {title}
-      </h2>
+      {header}
       <div className="mt-4">{children}</div>
     </section>
   );
@@ -294,6 +331,8 @@ export default async function DoPage() {
             key={lane}
             eyebrow={DO_LANE_LABELS[lane]}
             title={DO_LANE_DESCRIPTIONS[lane]}
+            collapsed={lane === "later" || lane === "someday"}
+            count={byLane[lane].tasks.length + byLane[lane].habits.length}
           >
             {byLane[lane].tasks.length === 0 && byLane[lane].habits.length === 0 ? (
               <p
@@ -343,7 +382,12 @@ export default async function DoPage() {
         ))}
       </section>
 
-      <SectionCard eyebrow="Done" title="Recently closed loops.">
+      <SectionCard
+        eyebrow="Done"
+        title="Recently closed loops."
+        collapsed
+        count={doneItems.length}
+      >
         {doneItems.length === 0 ? (
           <p className="text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
             Nothing completed yet.

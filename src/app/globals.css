@@ -319,6 +319,11 @@ body > * {
   justify-content: center;
   height: 2.25rem;
   padding-inline: 0.875rem;
+
+  /* Touch screens: ≥40px target even when an explicit h-8 shrinks it. */
+  @media (pointer: coarse) {
+    min-height: 2.5rem;
+  }
   background: var(--text);
   color: var(--bg-page);
   font-family: var(--font-inter-tight), sans-serif;
@@ -341,6 +346,11 @@ body > * {
   justify-content: center;
   height: 2.25rem;
   padding-inline: 0.75rem;
+
+  /* Touch screens: ≥40px target even when an explicit h-8 shrinks it. */
+  @media (pointer: coarse) {
+    min-height: 2.5rem;
+  }
   background: transparent;
   color: var(--text);
   font-family: var(--font-inter-tight), sans-serif;
