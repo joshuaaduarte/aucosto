@@ -36,7 +36,7 @@ export default async function AppLayout({
           className="flex-1 w-full max-w-[940px] mx-auto px-6 py-10 sm:px-12 sm:py-14 lg:px-20 lg:py-14"
           style={{
             paddingBottom:
-              "calc(3.5rem + var(--mobile-tabbar-height) + var(--safe-area-bottom))",
+              "calc(3.5rem + var(--mobile-tabbar-height) + var(--timer-bar-height) + var(--safe-area-bottom))",
           }}
         >
           {children}

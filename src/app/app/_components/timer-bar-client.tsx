@@ -34,13 +34,18 @@ export function TimerBarClient({
   if (pathname === "/app/time") return null;
 
   return (
-    <div
-      className="pointer-events-none fixed inset-x-0 z-40 flex justify-center px-4"
-      style={{
-        bottom:
-          "calc(var(--mobile-tabbar-height, 0px) + env(safe-area-inset-bottom, 0px) + 0.625rem)",
-      }}
-    >
+    <>
+      {/* Publish reserved height while visible: FABs and page content read
+          --timer-bar-height to shift above the bar (0 when no timer). */}
+      <style>{`:root{--timer-bar-height:3.25rem}`}</style>
+      <div
+        className="pointer-events-none fixed inset-x-0 flex justify-center px-4"
+        style={{
+          zIndex: 41,
+          bottom:
+            "calc(var(--mobile-tabbar-height, 0px) + env(safe-area-inset-bottom, 0px) + 0.5rem)",
+        }}
+      >
       <div
         className="pointer-events-auto flex w-full max-w-[26rem] items-center gap-2.5 rounded-full border py-1.5 pl-3.5 pr-1.5 shadow-lg"
         style={{
@@ -87,6 +92,7 @@ export function TimerBarClient({
           {pending ? "..." : "Stop"}
         </button>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

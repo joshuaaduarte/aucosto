@@ -69,6 +69,10 @@
   /* Content height of the mobile bottom tab bar (excludes the safe-area
      inset). 0 on desktop so dependent offsets collapse. */
   --mobile-tabbar-height: 0px;
+  /* Reserved height for the running-timer bar. Published (via a <style>
+     tag) only while the bar is visible, so FABs and content shift up to
+     make room and collapse back when the timer stops. */
+  --timer-bar-height: 0px;
 }
 
 /* ━━━ Dark mode (via OS preference) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
@@ -420,8 +424,12 @@ body > * {
 .calendar-fab {
   position: fixed;
   right: calc(1rem + var(--safe-area-right));
-  bottom: calc(1rem + var(--safe-area-bottom) + var(--mobile-tabbar-height));
-  z-index: 40;
+  /* Stack: tab bar (z40) → timer bar (z41) → FAB (z42) → modals (z50). */
+  bottom: calc(
+    1rem + var(--safe-area-bottom) + var(--mobile-tabbar-height) +
+      var(--timer-bar-height)
+  );
+  z-index: 42;
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
