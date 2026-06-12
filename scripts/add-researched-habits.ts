@@ -1,3 +1,7 @@
+// One-off seeder: inserts a researched starter set of habits for the seeded
+// user. Superseded for day-to-day use by the in-app template picker
+// (src/lib/habit-templates.ts) — keep for bulk re-seeding a fresh DB.
+//   npx tsx --env-file=.env scripts/add-researched-habits.ts
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 

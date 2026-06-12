@@ -1,3 +1,6 @@
+// One-off backfill: assigns a category (via inferCategory) to every finance
+// transaction that has none. Idempotent — only touches NULL categories.
+//   npx tsx --env-file=.env scripts/backfill-finance-categories.ts
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { inferCategory } from "../src/lib/finance-categories";

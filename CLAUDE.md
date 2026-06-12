@@ -10,9 +10,11 @@ aucosto is a personal day-to-day dashboard / hub of tools. Single-user (Josh); p
 
 **Current branch state: `main` IS the live Next.js app.** (The old CRA scaffold is history; `origin/nextjs-rewrite` is a stale remnant of the rewrite.)
 
+**Deeper docs:** `docs/architecture.md` (per-tool file map and gotchas) and `docs/lessons.md` (hard-won debugging lessons — read before touching raw SQL, migrations, mobile layout, or modals). Deployed on **Vercel** (auto-deploy from `main`); `/api/health` reports the live commit sha + DB reachability.
+
 ## Tool map — go here first
 
-Seven tools, one row each. Every tool follows the same shape: schema → service → page/actions → widget.
+Nine tools, one row each. Every tool follows the same shape: schema → service → page/actions → widget.
 
 | Tool | Schema (`prisma/schema/`) | Service (`src/lib/services/`) | UI (`src/app/app/`) | Widget (`src/lib/widgets/`) | Pure helpers (`src/lib/`) |
 |---|---|---|---|---|---|
@@ -20,9 +22,13 @@ Seven tools, one row each. Every tool follows the same shape: schema → service
 | finance | `finance.prisma` (FinanceConnection, FinanceAccount, FinanceGoal, FinanceTransaction) | `finance/` (split: `accounts`, `connections`, `goals`, `transactions`, `teller-sync`, `webhooks`, `shared`, re-exported via `index.ts`) | `finance/` (sections under `_components/`, derive logic in `_lib/derive.ts`) | `finance.tsx` | `money.ts`, `csv.ts`, `finance-*.ts`, `statement-import/` |
 | calendar | `calendar.prisma` (CalendarItem) | `calendar.ts` | `calendar/` (derive logic in `_lib/derive.ts`) | `calendar.tsx` | — |
 | do (tasks) | `do.prisma` (DoItem) | `do/` (split: `reads`, `mutations`, `shared`, barrel `index.ts`) | `do/` | `do.tsx` | `do.ts` |
-| habits | `habits.prisma` (Habit, HabitEntry) | `habits/` (split: `derive`, `reads`, `mutations`, `shared`, barrel `index.ts`) | `habits/` | `habits.tsx` | `habits.ts` |
+| habits | `habits.prisma` (Habit, HabitEntry) | `habits/` (split: `derive`, `reads`, `mutations`, `shared`, barrel `index.ts`) | `habits/` | `habits.tsx` | `habits.ts`, `habit-templates.ts` (one-tap presets, emoji-in-title icon convention) |
 | projects | `projects.prisma` (Project) | `projects.ts` | `projects/` | — (no widget) | `projects.ts` |
+| reflect | `reflect.prisma` (DailyReflection) | `reflect.ts` (⚠️ raw SQL — see "Known technical debt") | `reflect/` (+ `reflect/history/`) | — (hub `ReflectSection`) | `reflect.ts` (mood scale, dayKey, snapshot types) |
+| insights | — (reads everything) | — (queries via other services) | `insights/` | — (hub `InsightOfTheDayCard`) | `insights/` (shared buckets, trends, patterns, daily — all pure + tested) |
 | events (activity log) | `events.prisma` (Event) | `events.ts` (`recordEvent`) | — | `activity.tsx` | `event-types.ts` (label map) |
+
+Cross-cutting pure helpers: `wall-clock.ts` (browser-side date/time → ISO conversion for forms — **mandatory** for any date+start+end form, see lessons #10).
 
 Note the naming convention: `src/lib/<tool>.ts` = **pure helpers** (no DB, importable anywhere); `src/lib/services/<tool>.ts` = **server-only DB access**. Same basename, different layer.
 
@@ -33,7 +39,9 @@ Cross-tool links (all via nullable FKs with `onDelete: SetNull`, except HabitEnt
 
 Other key entry points:
 - Hub page: `src/app/app/page.tsx` (fetches + composes; sections/icons/derive live in `_components/`, suggestion engine in `_lib/hub-prompts.ts`, today digest in `_lib/daily-digest.ts`).
-- Shared app-level UI lives in `src/app/app/_components/` (icons, start-timer button, hub sections).
+- Shared app-level UI lives in `src/app/app/_components/` (icons, start-timer button, hub sections, **global running-timer bar**, **mobile bottom tab bar + More sheet**, `use-body-scroll-lock.ts`).
+- App layout (`src/app/app/layout.tsx`): renders sidebar/tab bar/timer bar and a reflection badge read — **anything awaited here runs on every page; reads here must never throw** (wrapped in try/catch, keep it that way).
+- Health probe: `src/app/api/health/route.ts` — live commit sha, DB reachability, reflect-table presence. First stop when production misbehaves.
 - Viewer context: `src/lib/viewer-context.ts` — **read this before touching auth-adjacent code** (see below).
 - Teller bank linking: `src/lib/teller.ts` (API client), `src/lib/services/finance/teller-sync.ts`, webhook at `src/app/api/teller/webhook/route.ts` (verified via `src/lib/teller-webhooks.ts`).
 - Statement import: `src/lib/statement-import/` (CSV + PDF parsers; `pdf-text.ts` extracts text).
@@ -70,9 +78,17 @@ npm run smoke        # non-destructive smoke verification
 npm run smoke:demo   # destructive demo-fixture load for seeded user
 ```
 
-`tsx` scripts (seed, `scripts/*.ts`) do **not** auto-load `.env` — run via `tsx --env-file=.env ...`. One-off maintenance scripts live in `scripts/` (`backfill-finance-categories.ts`, `add-researched-habits.ts`, etc.).
+`tsx` scripts (seed, `scripts/*.ts`) do **not** auto-load `.env` — run via `tsx --env-file=.env ...`. Maintenance/diagnostic scripts live in `scripts/` — each has a header comment explaining what it does and when to run it. Notable: `check-reflect.ts` (post-migration health check), `create-reflect-table.sql` (idempotent fallback if the reflect migration is stuck), `shift-times.ts` (repair timezone-shifted timestamps, dry-run by default).
 
 To reset the dev DB: `prisma migrate reset` (truncates the Supabase DB and replays migrations). Follow with `db:seed` to recreate the single user.
+
+### Migration workflow (and recovery)
+
+1. Add/edit `prisma/schema/<tool>.prisma` → `npm run db:migrate` (uses `DIRECT_URL`; also regenerates the client). **Verify it ran:** `src/generated/prisma` timestamps must change — if they didn't, the run failed before applying (see `docs/lessons.md` #1).
+2. If a checked-in migration is stuck (table missing but migration recorded as pending), apply its SQL manually (psql with `DIRECT_URL`, or the Supabase SQL editor), then `npx prisma migrate resolve --applied <migration_name>` so Prisma records it, then `npm run db:generate`.
+3. Verify with the matching health-check script (`scripts/check-reflect.ts` is the template).
+
+`DATABASE_URL` = transaction pooler (runtime; can't run prepared DDL); `DIRECT_URL` = session pooler (migrations only).
 
 ## Architecture
 
@@ -169,6 +185,34 @@ Decision: **Server Actions stay for the UI**; future agent endpoints will be rou
 
 Timestamps are stored in UTC. Display-side, the **server runtime is pinned to the owner's timezone** via `src/instrumentation.ts` (sets `process.env.TZ`, default `America/Los_Angeles`, override with `APP_TIMEZONE`). This makes server-rendered `toLocaleX(...)` calls and day/week-boundary math (`startOfToday`, timeline windows, gap detection) agree with what the browser renders — without it, Vercel's UTC servers shift every displayed time. `User.timezone` exists in the schema but is currently unused. No date library is bundled — plain `Date` + `toLocaleX(...)` with explicit options. If formatting needs grow (e.g. multi-timezone), install `date-fns` and thread `User.timezone` through instead.
 
+### Shared color palette
+
+`src/lib/time-categories.ts` is the single color system. `categoryColor(name)` resolves preset time categories (work, reading, exercise, …), linked-tool colors (`"do"` green, `"habit"` teal, `"calendar"` rose), and stable hash-based colors for any custom string. **Everything colored uses it**: time chips/insights, calendar item dots and timeline blocks (`calendarItemColor` in calendar derive), habit cards (via `Habit.bucket`, which doubles as the color key), Do bucket pills, hub progress indicators. Don't introduce ad-hoc colors — pass a category/bucket string through `categoryColor`.
+
+### Mobile layout system (bottom stack + touch)
+
+Three fixed elements share the bottom of the viewport, coordinated by CSS variables in `globals.css`:
+
+- `--mobile-tabbar-height` — 3.25rem under `lg`, 0 on desktop.
+- `--timer-bar-height` — published via a `<style>` tag by the timer bar **only while it renders**, so offsets collapse when no timer runs.
+- z-index ladder: tab bar **40** → timer bar **41** → FABs (`.calendar-fab`) **42** → modal backdrops **50**. New bottom-pinned elements must join this ladder and offset with `calc(var(--mobile-tabbar-height) + var(--timer-bar-height) + var(--safe-area-bottom))`.
+
+Touch affordances: hover-revealed controls add `[@media(pointer:coarse)]:opacity-100`; `btn-icon`/`btn-ink`/`btn-ghost` grow to ≥2.5rem targets under `pointer: coarse` via `min-*` (desktop untouched); `.field` inputs are ≥1rem under 640px (iOS zoom prevention). Safe-area insets need the `viewport-fit=cover` export in `src/app/layout.tsx`. Modals: bottom sheets on mobile, centered on desktop (`.calendar-modal*`); every modal calls `useBodyScrollLock` (reference-counted) and any modal nested in an animated section should portal to `document.body` (see lessons #6).
+
+### Error handling — degrade, don't die
+
+The pattern, learned the hard way (two production outages — `docs/lessons.md` #2–#4):
+
+- **Service reads that power cosmetic UI return empty on failure** (log unexpected errors via `console.error`), never throw. See `src/lib/services/reflect.ts`.
+- **Missing-table guards match Prisma error codes** (`P2021`; `P2010` + 42P01 in meta), not message strings — the pg adapter rewrites messages.
+- **Layout-level awaits get their own try/catch** regardless of service guarantees — `src/app/app/layout.tsx` runs on every page.
+- Server actions return `{ error }` state for form errors; writes stay strict and throw.
+
+### Known technical debt
+
+- **Reflect service uses `$queryRaw`** (`src/lib/services/reflect.ts`): the DailyReflection model was authored in an environment that couldn't run `prisma generate`, so the generated client predates it. Once `npm run db:generate` has run with the current schema, the raw queries can be swapped for `prisma.dailyReflection.*` without changing callers. Until then: every date parameter needs an explicit `::date` cast, and **never** do parameterized date arithmetic (lessons #2).
+- `origin/nextjs-rewrite` is a stale branch; `User.timezone` column exists but is unused (the runtime TZ pin supersedes it for now).
+
 ### Per-request DB client
 
 `src/lib/prisma.ts` is a global singleton (dev-mode protected against HMR re-instantiation). **Services** `import { prisma } from "@/lib/prisma"`; app code does not. Do not `new PrismaClient()` anywhere except in scripts where a one-shot is desired.
@@ -183,7 +227,7 @@ ESLint enforces `react-hooks/purity` even in async Server Components — `Date.n
 
 `.env` (gitignored) holds `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, the `SEED_USER_*` triplet, and (optional) Teller credentials: `TELLER_ENV`, `TELLER_APPLICATION_ID`, `TELLER_WEBHOOK_SIGNING_SECRETS`, `TELLER_CERT_PEM`, `TELLER_PRIVATE_KEY_PEM`. Linked-account access tokens are encrypted at rest using `AUTH_SECRET` (`src/lib/secrets.ts`). Changing the seed password requires re-running `npm run db:seed`.
 
-Optional: `LOG_LEVEL` overrides the Pino level (defaults to `debug` in dev, `info` in prod).
+Optional: `LOG_LEVEL` overrides the Pino level (defaults to `debug` in dev, `info` in prod). `APP_TIMEZONE` overrides the server timezone pin (defaults to `America/Los_Angeles`; set **unconditionally** in `src/instrumentation.ts` because Vercel presets `TZ=UTC`).
 
 ## Tests
 
