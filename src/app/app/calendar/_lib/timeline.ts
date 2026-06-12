@@ -13,6 +13,11 @@ export type TimelineBlock = {
   color: string;
   topPct: number;
   heightPct: number;
+  /** Horizontal slot within the lane — overlapping blocks split into
+      side-by-side sub-columns (Google Calendar style). Full-width blocks
+      get leftPct 0 / widthPct 100. */
+  leftPct: number;
+  widthPct: number;
   running: boolean;
   muted: boolean;
 };
@@ -34,6 +39,105 @@ export type DayTimelineModel = {
 
 const MIN_START_HOUR = 7;
 const MIN_END_HOUR = 22;
+
+/**
+ * Blocks occupy at least this many minutes of vertical space so short
+ * entries stay readable and tappable (~16px at the component's 44px/hour
+ * scale). The inflation happens in the TIME domain, before overlap
+ * detection — so back-to-back short entries that would visually collide
+ * are treated as overlapping and split into sub-columns instead of
+ * painting over each other.
+ */
+const MIN_BLOCK_MINUTES = 22;
+
+type LaneInterval<T> = {
+  data: T;
+  startMs: number;
+  endMs: number;
+};
+
+type LanePlacement<T> = {
+  data: T;
+  topPct: number;
+  heightPct: number;
+  leftPct: number;
+  widthPct: number;
+};
+
+/**
+ * Assign vertical positions plus side-by-side sub-columns for a lane.
+ * Greedy interval-graph coloring: blocks are clustered while their
+ * (min-height-inflated) spans chain-overlap; within a cluster each block
+ * takes the first free column, and every block in the cluster shares the
+ * cluster's column count for its width.
+ */
+function layoutLane<T>(
+  intervals: LaneInterval<T>[],
+  windowStartMs: number,
+  windowMs: number,
+): LanePlacement<T>[] {
+  const minMs = MIN_BLOCK_MINUTES * 60_000;
+  const sorted = [...intervals].sort(
+    (a, b) => a.startMs - b.startMs || a.endMs - b.endMs,
+  );
+
+  type Working = {
+    interval: LaneInterval<T>;
+    effEndMs: number;
+    col: number;
+    cols: number;
+  };
+  const placed: Working[] = [];
+  let cluster: Working[] = [];
+  let columnEnds: number[] = [];
+
+  const closeCluster = () => {
+    const cols = Math.max(1, columnEnds.length);
+    for (const block of cluster) block.cols = cols;
+    cluster = [];
+    columnEnds = [];
+  };
+
+  for (const interval of sorted) {
+    const effEndMs = Math.max(interval.endMs, interval.startMs + minMs);
+    if (
+      columnEnds.length > 0 &&
+      columnEnds.every((end) => end <= interval.startMs)
+    ) {
+      closeCluster();
+    }
+    let col = columnEnds.findIndex((end) => end <= interval.startMs);
+    if (col === -1) {
+      col = columnEnds.length;
+      columnEnds.push(effEndMs);
+    } else {
+      columnEnds[col] = effEndMs;
+    }
+    const block: Working = { interval, effEndMs, col, cols: 1 };
+    placed.push(block);
+    cluster.push(block);
+  }
+  closeCluster();
+
+  return placed.map((block) => {
+    const topPct = clampPct(
+      ((block.interval.startMs - windowStartMs) / windowMs) * 100,
+    );
+    const bottomPct = clampPct(
+      ((Math.min(block.effEndMs, windowStartMs + windowMs) - windowStartMs) /
+        windowMs) *
+        100,
+    );
+    const widthPct = 100 / block.cols;
+    return {
+      data: block.interval.data,
+      topPct,
+      heightPct: Math.max(bottomPct - topPct, 1.5),
+      leftPct: block.col * widthPct,
+      widthPct,
+    };
+  });
+}
 
 type PlannedInput = Pick<
   CalendarItem,
@@ -96,60 +200,60 @@ export function buildDayTimeline(input: {
   windowEnd.setTime(dayStart.getTime() + endHour * 3_600_000);
   const windowMs = windowEnd.getTime() - windowStart.getTime();
 
-  const position = (start: Date, end: Date) => {
-    const from = Math.max(start.getTime(), windowStart.getTime());
-    const to = Math.min(end.getTime(), windowEnd.getTime());
-    const topPct = clampPct(((from - windowStart.getTime()) / windowMs) * 100);
-    const bottomPct = clampPct(((to - windowStart.getTime()) / windowMs) * 100);
-    return { topPct, heightPct: Math.max(bottomPct - topPct, 1.5) };
-  };
+  const windowStartMs = windowStart.getTime();
+  const clip = (start: Date, end: Date) => ({
+    startMs: Math.max(start.getTime(), windowStartMs),
+    endMs: Math.min(end.getTime(), windowEnd.getTime()),
+  });
 
-  const planned: TimelineBlock[] = timed
-    .filter((item) => item.endsAt > windowStart && item.startsAt < windowEnd)
-    .map((item) => {
-      const { topPct, heightPct } = position(item.startsAt, item.endsAt);
-      return {
-        id: item.id,
-        title: item.title,
-        detail: `${formatShort(item.startsAt)}–${formatShort(item.endsAt)}`,
-        // One color language with the rest of the app: task-sourced blocks
-        // use the "do" color, habit blocks "habit", native blocks "calendar".
-        color:
-          item.kind === "external"
-            ? categoryColor(null)
-            : item.sourceTool === "do"
-              ? categoryColor("do")
-              : item.sourceTool === "habit"
-                ? categoryColor("habit")
-                : categoryColor("calendar"),
-        topPct,
-        heightPct,
-        running: false,
-        muted: item.status === "done",
-      };
-    });
+  const planned: TimelineBlock[] = layoutLane(
+    timed
+      .filter((item) => item.endsAt > windowStart && item.startsAt < windowEnd)
+      .map((item) => ({ data: item, ...clip(item.startsAt, item.endsAt) })),
+    windowStartMs,
+    windowMs,
+  ).map(({ data: item, ...placement }) => ({
+    id: item.id,
+    title: item.title,
+    detail: `${formatShort(item.startsAt)}–${formatShort(item.endsAt)}`,
+    // One color language with the rest of the app: task-sourced blocks
+    // use the "do" color, habit blocks "habit", native blocks "calendar".
+    color:
+      item.kind === "external"
+        ? categoryColor(null)
+        : item.sourceTool === "do"
+          ? categoryColor("do")
+          : item.sourceTool === "habit"
+            ? categoryColor("habit")
+            : categoryColor("calendar"),
+    ...placement,
+    running: false,
+    muted: item.status === "done",
+  }));
 
-  const actual: TimelineBlock[] = input.entries
-    .filter((entry) => {
-      const end = entry.endedAt ?? input.now;
-      return end > windowStart && entry.startedAt < windowEnd;
-    })
-    .map((entry) => {
-      const end = entry.endedAt ?? input.now;
-      const { topPct, heightPct } = position(entry.startedAt, end);
-      return {
-        id: entry.id,
-        title: entry.label,
-        detail: entry.endedAt
-          ? `${formatShort(entry.startedAt)}–${formatShort(entry.endedAt)}`
-          : `${formatShort(entry.startedAt)} – now`,
-        color: categoryColor(entry.category),
-        topPct,
-        heightPct,
-        running: !entry.endedAt,
-        muted: false,
-      };
-    });
+  const actual: TimelineBlock[] = layoutLane(
+    input.entries
+      .filter((entry) => {
+        const end = entry.endedAt ?? input.now;
+        return end > windowStart && entry.startedAt < windowEnd;
+      })
+      .map((entry) => ({
+        data: entry,
+        ...clip(entry.startedAt, entry.endedAt ?? input.now),
+      })),
+    windowStartMs,
+    windowMs,
+  ).map(({ data: entry, ...placement }) => ({
+    id: entry.id,
+    title: entry.label,
+    detail: entry.endedAt
+      ? `${formatShort(entry.startedAt)}–${formatShort(entry.endedAt)}`
+      : `${formatShort(entry.startedAt)} – now`,
+    color: categoryColor(entry.category),
+    ...placement,
+    running: !entry.endedAt,
+    muted: false,
+  }));
 
   const hourCount = endHour - startHour;
   const step = hourCount > 12 ? 2 : 1;

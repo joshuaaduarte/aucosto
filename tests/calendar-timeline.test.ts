@@ -133,6 +133,97 @@ describe("buildDayTimeline", () => {
     expect(model.actual[0]!.color).not.toBe(model.actual[1]!.color);
   });
 
+  it("splits genuinely concurrent entries into side-by-side columns", () => {
+    const model = buildDayTimeline({
+      items: [],
+      entries: [
+        {
+          id: "a",
+          label: "A",
+          category: "work",
+          startedAt: local(9, 0),
+          endedAt: local(10, 0),
+        },
+        {
+          id: "b",
+          label: "B",
+          category: "reading",
+          startedAt: local(9, 30),
+          endedAt: local(10, 30),
+        },
+      ],
+      day,
+      now: local(12),
+    });
+    const [a, b] = [
+      model.actual.find((x) => x.id === "a")!,
+      model.actual.find((x) => x.id === "b")!,
+    ];
+    expect(a.widthPct).toBe(50);
+    expect(b.widthPct).toBe(50);
+    expect(a.leftPct).toBe(0);
+    expect(b.leftPct).toBe(50);
+  });
+
+  it("gives short back-to-back entries min height via sub-columns, not overlap", () => {
+    // Three 5-minute entries in a row: each inflates to the 22-minute
+    // visual minimum, so they chain-overlap and must split into columns.
+    const model = buildDayTimeline({
+      items: [],
+      entries: [0, 1, 2].map((i) => ({
+        id: `e${i}`,
+        label: `E${i}`,
+        category: "chores",
+        startedAt: local(9, i * 5),
+        endedAt: local(9, i * 5 + 5),
+      })),
+      day,
+      now: local(12),
+    });
+    expect(model.actual).toHaveLength(3);
+    // All share one cluster → equal widths summing to 100%.
+    const widths = model.actual.map((b) => b.widthPct);
+    expect(new Set(widths).size).toBe(1);
+    expect(widths[0]! * 3).toBeCloseTo(100, 5);
+    // Distinct columns — no two blocks share a left offset.
+    const lefts = new Set(model.actual.map((b) => b.leftPct));
+    expect(lefts.size).toBe(3);
+    // Heights reflect the 22-minute minimum, not the raw 5 minutes.
+    const windowHours = 15; // default 07:00–22:00
+    const minPct = (22 / 60 / windowHours) * 100;
+    for (const block of model.actual) {
+      expect(block.heightPct).toBeCloseTo(minPct, 1);
+    }
+  });
+
+  it("keeps non-overlapping long entries full width", () => {
+    const model = buildDayTimeline({
+      items: [],
+      entries: [
+        {
+          id: "a",
+          label: "A",
+          category: "work",
+          startedAt: local(9),
+          endedAt: local(10),
+        },
+        {
+          id: "b",
+          label: "B",
+          category: "work",
+          startedAt: local(11),
+          endedAt: local(12),
+        },
+      ],
+      day,
+      now: local(13),
+    });
+    for (const block of model.actual) {
+      expect(block.widthPct).toBe(100);
+      expect(block.leftPct).toBe(0);
+    }
+  });
+
   it("hides the now line outside the window", () => {
     const model = buildDayTimeline({
       items: [calItem("a", local(9), local(10))],

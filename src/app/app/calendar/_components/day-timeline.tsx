@@ -171,51 +171,63 @@ function TimelineLane({
         windowEndIso={model.windowEnd.toISOString()}
       />
 
-      {blocks.map((block) => (
-        <article
-          key={block.id}
-          className="absolute inset-x-1 overflow-hidden rounded px-1.5 py-0.5"
-          style={{
-            top: `${block.topPct}%`,
-            height: `${block.heightPct}%`,
-            minHeight: "14px",
-            background:
-              variant === "actual"
-                ? `color-mix(in srgb, ${block.color} 22%, var(--bg-page))`
-                : "var(--bg-page)",
-            borderLeft: `3px solid ${block.color}`,
-            border:
-              variant === "planned"
-                ? "1px solid var(--border-soft)"
-                : undefined,
-            borderLeftWidth: "3px",
-            borderLeftStyle: "solid",
-            borderLeftColor: block.color,
-            opacity: block.muted ? 0.55 : 1,
-          }}
-          title={`${block.title} · ${block.detail}`}
-        >
-          <p
-            className="truncate text-[0.6875rem] font-medium leading-tight"
-            style={{ color: "var(--text)" }}
+      {blocks.map((block) => {
+        const blockPx = (block.heightPct / 100) * height;
+        const compact = blockPx < 30;
+        return (
+          <article
+            key={block.id}
+            className="absolute overflow-hidden rounded px-1.5 py-0.5"
+            style={{
+              top: `${block.topPct}%`,
+              height: `${block.heightPct}%`,
+              // Sub-columns: overlapping blocks sit side by side with a
+              // 2px gutter instead of painting over each other.
+              left: `calc(${block.leftPct}% + 4px)`,
+              width: `calc(${block.widthPct}% - 8px)`,
+              minHeight: "15px",
+              background:
+                variant === "actual"
+                  ? `color-mix(in srgb, ${block.color} 22%, var(--bg-page))`
+                  : "var(--bg-page)",
+              borderLeft: `3px solid ${block.color}`,
+              border:
+                variant === "planned"
+                  ? "1px solid var(--border-soft)"
+                  : undefined,
+              borderLeftWidth: "3px",
+              borderLeftStyle: "solid",
+              borderLeftColor: block.color,
+              opacity: block.muted ? 0.55 : 1,
+            }}
+            title={`${block.title} · ${block.detail}`}
           >
-            {block.running ? (
-              <span
-                className="ink-pulse mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
-                style={{ background: "var(--accent)" }}
-                aria-hidden
-              />
+            <p
+              className="truncate text-[0.6875rem] font-medium leading-tight"
+              style={{ color: "var(--text)" }}
+            >
+              {block.running ? (
+                <span
+                  className="ink-pulse mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
+                  style={{ background: "var(--accent)" }}
+                  aria-hidden
+                />
+              ) : null}
+              {block.title}
+            </p>
+            {/* Short blocks: title only — the time range lives in the
+                hover/long-press tooltip via the title attribute. */}
+            {!compact ? (
+              <p
+                className="truncate text-[0.625rem] leading-tight"
+                style={{ color: "var(--text-faint)" }}
+              >
+                {block.detail}
+              </p>
             ) : null}
-            {block.title}
-          </p>
-          <p
-            className="truncate text-[0.625rem] leading-tight"
-            style={{ color: "var(--text-faint)" }}
-          >
-            {block.detail}
-          </p>
-        </article>
-      ))}
+          </article>
+        );
+      })}
 
       {blocks.length === 0 ? (
         <p
