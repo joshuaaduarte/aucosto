@@ -708,6 +708,15 @@ input.field[type="time"]::-webkit-datetime-edit {
 @utility fade-in-delay-3 { animation: blockFade 0.28s cubic-bezier(0.25, 0.1, 0.25, 1) 0.15s both; }
 @utility fade-in-delay-4 { animation: blockFade 0.28s cubic-bezier(0.25, 0.1, 0.25, 1) 0.20s both; }
 
+/* Satisfying pop when a habit gets logged — keyed elements re-animate on
+   every progress change. */
+@keyframes habitPop {
+  0%   { transform: scale(0.6); opacity: 0; }
+  60%  { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@utility habit-pop { animation: habitPop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
 @keyframes accentPulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50%      { opacity: 0.55; transform: scale(0.92); }

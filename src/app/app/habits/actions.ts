@@ -14,6 +14,7 @@ import {
   startTimerForHabit,
   updateHabit,
 } from "@/lib/services/habits";
+import { findHabitTemplate, templateTitle } from "@/lib/habit-templates";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import { windowFromFormData } from "@/lib/wall-clock";
 
@@ -234,4 +235,59 @@ export async function quickLogHabitFromDoAction(formData: FormData) {
 
   revalidateHabits();
   revalidatePath("/app/do");
+}
+
+// ── One-tap flows (templates + quick logging) ─────────────────────
+
+export async function addHabitFromTemplateAction(formData: FormData) {
+  const userId = await resolveActiveUserId();
+  const key = String(formData.get("templateKey") ?? "").trim();
+  const template = findHabitTemplate(key);
+  if (!template) return;
+
+  // Skip if an identical habit already exists (idempotent one-tap add).
+  const existing = await listHabits(userId, { includeArchived: true });
+  const title = templateTitle(template);
+  if (existing.some((habit) => habit.title === title)) return;
+
+  await createHabit(userId, {
+    title,
+    bucket: template.bucket,
+    notes: template.description,
+    fallbackTitle: template.fallbackTitle ?? null,
+    rescuePrompt: null,
+    dayPart: template.dayPart,
+    cadence: template.cadence,
+    targetCount: template.targetCount,
+    goalUnit: template.goalUnit,
+    defaultDurationMinutes: template.defaultDurationMinutes,
+    reminderTime: null,
+    daysOfWeek: "",
+  });
+  revalidateHabits();
+}
+
+// One tap from the card: check habits complete, count habits add +1,
+// minutes habits log the remaining target. No modal in the way.
+export async function quickLogHabitAction(formData: FormData) {
+  const userId = await resolveActiveUserId();
+  const id = String(formData.get("id") ?? "");
+  const quantityRaw = Number(formData.get("quantity") ?? "");
+  const habits = await listHabits(userId, { includeArchived: false });
+  const habit = habits.find((item) => item.id === id);
+  if (!habit) return;
+
+  const remaining =
+    habit.cadence === "weekly"
+      ? Math.max(1, habit.targetCount - habit.progressThisWeek)
+      : Math.max(1, habit.targetCount - habit.progressToday);
+  const quantity =
+    Number.isFinite(quantityRaw) && quantityRaw > 0
+      ? quantityRaw
+      : habit.goalUnit === "count"
+        ? 1
+        : remaining;
+
+  await logHabitProgress(userId, id, { quantity, notes: null, mode: "full" });
+  revalidateHabits();
 }
