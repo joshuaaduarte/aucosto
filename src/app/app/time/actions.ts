@@ -97,6 +97,30 @@ export async function describeEntryAction(formData: FormData) {
   revalidatePath("/app/calendar");
 }
 
+// Save notes on an entry (typically the one still running) without touching
+// the clock. Called from debounced, optimistic note inputs on the running card
+// and the global timer bar, so it must never throw — a dropped keystroke-save
+// should fail silently, not surface an error. No revalidate: the time page is
+// force-dynamic and nothing else renders a running entry's notes live, so
+// re-rendering mid-typing would only risk disrupting the input.
+export async function updateEntryNotes(
+  entryId: string,
+  notes: string,
+): Promise<{ ok: boolean }> {
+  try {
+    const userId = await resolveActiveUserId();
+    const id = entryId.trim();
+    if (!id) return { ok: false };
+    const trimmed = notes.trim();
+    const updated = await timeService.updateEntry(userId, id, {
+      notes: trimmed ? notes.slice(0, 2000) : null,
+    });
+    return { ok: Boolean(updated) };
+  } catch {
+    return { ok: false };
+  }
+}
+
 export type EntryFormState = { error?: string } | { ok: true } | undefined;
 
 // Times arrive as absolute ISO timestamps built in the BROWSER's timezone

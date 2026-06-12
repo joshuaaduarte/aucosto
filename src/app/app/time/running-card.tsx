@@ -11,6 +11,7 @@ import {
 } from "./actions";
 import { formatDuration } from "@/lib/time";
 import { DescribeRow } from "./describe-row";
+import { RunningNotes } from "./running-notes";
 import { useBodyScrollLock } from "../_components/use-body-scroll-lock";
 
 export function RunningCard({
@@ -18,6 +19,7 @@ export function RunningCard({
   label,
   category,
   startedAtIso,
+  notes = null,
   doItem,
   habit,
   switchPanel,
@@ -27,6 +29,7 @@ export function RunningCard({
   label: string;
   category: string | null;
   startedAtIso: string;
+  notes?: string | null;
   switchPanel?: React.ReactNode;
   recentLabels?: string[];
   doItem?: {
@@ -212,6 +215,9 @@ export function RunningCard({
             )}
           </div>
         </div>
+
+        {/* Jot notes mid-session — keyed by entry so a switch starts fresh. */}
+        <RunningNotes key={entryId} entryId={entryId} initialNotes={notes} />
 
         {switchPanel ? (
           <div

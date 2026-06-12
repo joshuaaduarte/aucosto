@@ -451,6 +451,7 @@ export default async function TimePage() {
             label={running.label}
             category={running.category}
             startedAtIso={running.startedAt.toISOString()}
+            notes={running.notes}
             switchPanel={quickStart}
             recentLabels={runningRecentLabels}
             doItem={
