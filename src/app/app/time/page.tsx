@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import {
   getRunningEntry,
@@ -86,7 +87,11 @@ type SleepMarker = {
   wakeTime: string | null;
 };
 
-/** Read-only sleep marker row: dimmed, moon icon, indigo left rail, no actions. */
+/**
+ * Read-only sleep bookend — a soft indigo day-boundary callout, not a list
+ * row. Moon icon, sleep duration prominent, wake/bedtime secondary. No actions,
+ * no hover: it's purely informational context between time entries.
+ */
 function SleepMarkerRow({
   variant,
   sleep,
@@ -94,9 +99,23 @@ function SleepMarkerRow({
   variant: "bed" | "wake";
   sleep: SleepMarker;
 }) {
-  let text: string;
+  const dot = (
+    <span aria-hidden className="px-2" style={{ color: "var(--text-faint)" }}>
+      ·
+    </span>
+  );
+
+  let content: ReactNode;
   if (variant === "bed") {
-    text = `Went to sleep · ${formatShortTime(sleep.startedAt)}`;
+    content = (
+      <>
+        <span style={{ color: "var(--text-muted)" }}>Went to sleep</span>
+        {dot}
+        <span className="font-medium" style={{ color: "var(--text)" }}>
+          {formatShortTime(sleep.startedAt)}
+        </span>
+      </>
+    );
   } else {
     const wakeLabel = sleep.endedAt
       ? formatShortTime(sleep.endedAt)
@@ -108,27 +127,41 @@ function SleepMarkerRow({
           ? rhythmDurationMinutes(sleep.startedAt, sleep.endedAt)
           : null;
     const durLabel = minutes ? formatRhythmDuration(minutes) : null;
-    if (durLabel && wakeLabel) text = `Slept ${durLabel} · woke up ${wakeLabel}`;
-    else if (wakeLabel) text = `Woke up ${wakeLabel}`;
-    else text = "Woke up";
+    content = durLabel ? (
+      <>
+        <span className="font-semibold" style={{ color: "var(--text)" }}>
+          Slept {durLabel}
+        </span>
+        {wakeLabel ? (
+          <>
+            {dot}
+            <span style={{ color: "var(--text-muted)" }}>
+              woke up {wakeLabel}
+            </span>
+          </>
+        ) : null}
+      </>
+    ) : (
+      <span className="font-semibold" style={{ color: "var(--text)" }}>
+        {wakeLabel ? `Woke up ${wakeLabel}` : "Woke up"}
+      </span>
+    );
   }
+
   return (
-    <li
-      className="flex items-center gap-2 rounded-md py-1.5 pl-3 pr-2"
-      style={{
-        borderTop: "1px solid var(--border-faint)",
-        borderLeft: "2px solid #818cf8",
-      }}
-    >
-      <span aria-hidden className="text-[0.8125rem] opacity-60">
-        🌙
-      </span>
-      <span
-        className="text-[0.8125rem] italic"
-        style={{ color: "var(--text-faint)" }}
+    <li className="list-none">
+      <div
+        className="my-1.5 flex items-center gap-2.5 rounded-xl px-4 py-2.5"
+        style={{
+          background: "rgba(79, 70, 229, 0.12)",
+          border: "1px solid rgba(99, 102, 241, 0.22)",
+        }}
       >
-        {text}
-      </span>
+        <span aria-hidden className="shrink-0 text-[1rem] opacity-80">
+          🌙
+        </span>
+        <span className="text-[0.8125rem] leading-snug">{content}</span>
+      </div>
     </li>
   );
 }
@@ -537,10 +570,12 @@ export default async function TimePage() {
                   {group.label}
                 </h3>
                 <ul>
-                  {group.wake.map((sleep) => (
+                  {/* Bedtime sits at the top: it's the latest event of this
+                      day, and the list is newest-first. */}
+                  {group.bed.map((sleep) => (
                     <SleepMarkerRow
-                      key={`wake-${sleep.id}`}
-                      variant="wake"
+                      key={`bed-${sleep.id}`}
+                      variant="bed"
                       sleep={sleep}
                     />
                   ))}
@@ -655,10 +690,12 @@ export default async function TimePage() {
                       </li>
                     );
                   })}
-                  {group.bed.map((sleep) => (
+                  {/* Wake-up sits at the bottom: it's the earliest event of
+                      this day. */}
+                  {group.wake.map((sleep) => (
                     <SleepMarkerRow
-                      key={`bed-${sleep.id}`}
-                      variant="bed"
+                      key={`wake-${sleep.id}`}
+                      variant="wake"
                       sleep={sleep}
                     />
                   ))}
