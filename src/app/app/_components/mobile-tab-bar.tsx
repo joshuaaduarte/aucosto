@@ -1,13 +1,18 @@
 "use client";
 
-// Bottom tab bar for phones: the four areas you bounce between all day.
-// The hamburger drawer stays for secondary destinations (habits, finance,
-// projects, settings). Hidden on lg+ where the sidebar takes over. Its
-// height is published as --mobile-tabbar-height (globals.css) so the
-// running-timer bar and FAB can sit above it.
+// Bottom tab bar for phones: the four areas you bounce between all day,
+// plus a More tab that opens a half-sheet with the remaining tools
+// (Habits, Projects, Finance when visible, Settings) and theme/sign-out.
+// Hidden on lg+ where the sidebar takes over. Its height is published as
+// --mobile-tabbar-height (globals.css) so the running-timer bar and FABs
+// stack above it.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { SignOutButton } from "../sign-out-button";
+import { useBodyScrollLock } from "./use-body-scroll-lock";
 
 const ip = {
   width: 18,
@@ -66,31 +71,167 @@ const TABS = [
   },
 ];
 
-export function MobileTabBar() {
+type MoreTool = {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  finance?: boolean;
+};
+
+const MORE_TOOLS: MoreTool[] = [
+  {
+    href: "/app/habits",
+    label: "Habits",
+    icon: (
+      <svg {...ip}>
+        <path d="M3 4.5h6.5a2.5 2.5 0 0 1 0 5H8.5" />
+        <path d="M9.5 2.75 11.25 4.5 9.5 6.25" />
+        <path d="M6.5 10.5H4a2.5 2.5 0 0 1 0-5h1" />
+        <path d="M3.5 8.75 1.75 10.5 3.5 12.25" />
+      </svg>
+    ),
+  },
+  {
+    href: "/app/projects",
+    label: "Projects",
+    icon: (
+      <svg {...ip}>
+        <rect x="2" y="3" width="11" height="3" rx="0.75" />
+        <rect x="2" y="8.5" width="7.5" height="3" rx="0.75" />
+      </svg>
+    ),
+  },
+  {
+    href: "/app/finance",
+    label: "Finance",
+    finance: true,
+    icon: (
+      <svg {...ip}>
+        <path d="M2 5.5C2 4.67 2.67 4 3.5 4H12a1 1 0 0 1 1 1v6.5c0 .83-.67 1.5-1.5 1.5h-8A1.5 1.5 0 0 1 2 11.5V5.5Z" />
+        <path d="M10 8.25h2.5" />
+      </svg>
+    ),
+  },
+  {
+    href: "/app/settings",
+    label: "Settings",
+    icon: (
+      <svg {...ip}>
+        <circle cx="7.5" cy="7.5" r="2" />
+        <path d="M7.5 1.5v1.5M7.5 12v1.5M1.5 7.5H3M12 7.5h1.5M3 3l1 1M11 11l1 1M12 3l-1 1M4 11l-1 1" />
+      </svg>
+    ),
+  },
+];
+
+export function MobileTabBar({ showFinance }: { showFinance: boolean }) {
   const pathname = usePathname();
+  const [moreOpen, setMoreOpen] = useState(false);
+  useBodyScrollLock(moreOpen);
+
+  const moreTools = MORE_TOOLS.filter((tool) => showFinance || !tool.finance);
+  const moreActive = moreTools.some(
+    (tool) => pathname === tool.href || pathname.startsWith(`${tool.href}/`),
+  );
 
   return (
-    <nav className="mobile-tabbar lg:hidden" aria-label="Primary">
-      {TABS.map((tab) => {
-        const active =
-          tab.href === "/app"
-            ? pathname === "/app"
-            : pathname === tab.href || pathname.startsWith(`${tab.href}/`);
-        return (
-          <Link
-            key={tab.href}
-            href={tab.href}
-            aria-current={active ? "page" : undefined}
-            className="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-1.5"
-            style={{
-              color: active ? "var(--text)" : "var(--text-faint)",
-            }}
+    <>
+      <nav className="mobile-tabbar lg:hidden" aria-label="Primary">
+        {TABS.map((tab) => {
+          const active =
+            tab.href === "/app"
+              ? pathname === "/app"
+              : pathname === tab.href || pathname.startsWith(`${tab.href}/`);
+          return (
+            <Link
+              key={tab.href}
+              href={tab.href}
+              aria-current={active ? "page" : undefined}
+              className="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-1.5"
+              style={{ color: active ? "var(--text)" : "var(--text-faint)" }}
+            >
+              {tab.icon}
+              <span className="text-[0.625rem] font-medium">{tab.label}</span>
+            </Link>
+          );
+        })}
+
+        <button
+          type="button"
+          onClick={() => setMoreOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={moreOpen}
+          className="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-1.5"
+          style={{ color: moreActive ? "var(--text)" : "var(--text-faint)" }}
+        >
+          <svg {...ip}>
+            <circle cx="3" cy="7.5" r="0.9" fill="currentColor" stroke="none" />
+            <circle cx="7.5" cy="7.5" r="0.9" fill="currentColor" stroke="none" />
+            <circle cx="12" cy="7.5" r="0.9" fill="currentColor" stroke="none" />
+          </svg>
+          <span className="text-[0.625rem] font-medium">More</span>
+        </button>
+      </nav>
+
+      {moreOpen ? (
+        <div
+          className="calendar-modal-backdrop"
+          role="presentation"
+          onClick={() => setMoreOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="More tools"
+            className="calendar-modal"
+            onClick={(event) => event.stopPropagation()}
           >
-            {tab.icon}
-            <span className="text-[0.625rem] font-medium">{tab.label}</span>
-          </Link>
-        );
-      })}
-    </nav>
+            <p
+              className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+              style={{ color: "var(--text-faint)" }}
+            >
+              More tools
+            </p>
+
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {moreTools.map((tool) => {
+                const active =
+                  pathname === tool.href ||
+                  pathname.startsWith(`${tool.href}/`);
+                return (
+                  <Link
+                    key={tool.href}
+                    href={tool.href}
+                    onClick={() => setMoreOpen(false)}
+                    aria-current={active ? "page" : undefined}
+                    className="flex items-center gap-2.5 rounded-md border px-3 py-3 text-[0.875rem] font-medium"
+                    style={{
+                      borderColor: active
+                        ? "var(--border)"
+                        : "var(--border-faint)",
+                      background: active ? "var(--bg-tint)" : "var(--bg-page)",
+                      color: "var(--text)",
+                    }}
+                  >
+                    <span style={{ color: "var(--text-muted)" }}>
+                      {tool.icon}
+                    </span>
+                    {tool.label}
+                  </Link>
+                );
+              })}
+            </div>
+
+            <div
+              className="mt-4 flex items-center justify-between border-t pt-3"
+              style={{ borderColor: "var(--border-faint)" }}
+            >
+              <ThemeToggle />
+              <SignOutButton />
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }

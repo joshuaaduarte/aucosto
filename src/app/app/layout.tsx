@@ -46,7 +46,7 @@ export default async function AppLayout({
       {/* Mobile bottom tabs + global running-timer bar — not on the lock screen. */}
       {context && context.isUnlocked ? (
         <>
-          <MobileTabBar />
+          <MobileTabBar showFinance={navProps.showFinance} />
           <RunningTimerBar userId={context.effectiveUserId} />
         </>
       ) : null}
