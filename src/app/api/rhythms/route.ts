@@ -10,11 +10,13 @@ import { NextResponse } from "next/server";
 import { getViewerContext } from "@/lib/viewer-context";
 import { isRhythmType } from "@/lib/rhythms";
 import {
+  completeMorning,
   endRhythm,
   getActiveRhythm,
   listActiveRhythms,
   listRecentRhythms,
   logRhythmSession,
+  startMorning,
   startRhythm,
 } from "@/lib/services/rhythms";
 
@@ -69,10 +71,25 @@ export async function POST(request: Request) {
     sessionId?: string;
     startedAt?: string;
     endedAt?: string;
+    wakeTime?: string | null;
     notes?: string | null;
   };
 
   try {
+    // Morning check-in: log/refresh today's wake time, carry over last
+    // night's sleep duration. Returns { sleepMinutes }.
+    if (payload.action === "morning") {
+      const result = await startMorning(
+        userId,
+        typeof payload.wakeTime === "string" ? payload.wakeTime : null,
+      );
+      return NextResponse.json(result, { status: 201 });
+    }
+    // Wrap up the morning so the hub card dismisses for the rest of the day.
+    if (payload.action === "complete-morning") {
+      await completeMorning(userId);
+      return NextResponse.json({ ok: true });
+    }
     if (payload.action === "start") {
       if (!isRhythmType(payload.type)) {
         return NextResponse.json({ error: "Unknown rhythm type." }, { status: 400 });

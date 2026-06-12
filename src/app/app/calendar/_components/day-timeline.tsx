@@ -145,6 +145,7 @@ export function DayTimeline({
           variant="actual"
           payloads={payloads}
           tasks={tasks}
+          context={model.context}
         />
       </div>
       )}
@@ -159,6 +160,7 @@ function TimelineLane({
   variant,
   payloads,
   tasks,
+  context = [],
 }: {
   blocks: TimelineBlock[];
   model: DayTimelineModel;
@@ -166,6 +168,8 @@ function TimelineLane({
   variant: "planned" | "actual";
   payloads: Record<string, TimelineBlockPayload>;
   tasks: LinkableTask[];
+  /** Read-only rhythm context drawn behind the tracked blocks. */
+  context?: TimelineBlock[];
 }) {
   return (
     <div
@@ -182,6 +186,29 @@ function TimelineLane({
           }}
           aria-hidden
         />
+      ))}
+
+      {/* Rhythm context: soft, striped, non-interactive backdrop. */}
+      {context.map((block) => (
+        <div
+          key={block.id}
+          className="absolute left-0 right-0 flex items-start justify-end overflow-hidden rounded-sm px-1.5 py-0.5"
+          style={{
+            top: `${block.topPct}%`,
+            height: `${block.heightPct}%`,
+            background: `repeating-linear-gradient(45deg, ${block.color}1f, ${block.color}1f 6px, ${block.color}0f 6px, ${block.color}0f 12px)`,
+            borderLeft: `2px solid ${block.color}66`,
+            pointerEvents: "none",
+          }}
+          aria-hidden
+        >
+          <span
+            className="text-[0.5625rem] font-semibold uppercase tracking-wider"
+            style={{ color: block.color }}
+          >
+            {block.title}
+          </span>
+        </div>
       ))}
 
       <TimelineNowLine

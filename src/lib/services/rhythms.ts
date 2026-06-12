@@ -15,6 +15,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireCan } from "@/lib/auth/can";
 import { recordEvent } from "@/lib/services/events";
+import { startOfToday } from "@/lib/time";
 import {
   normalizeRhythmType,
   rhythmDurationMinutes,
@@ -298,4 +299,216 @@ export async function endRhythm(
     meta: { rhythm: record.type, durationMinutes: record.durationMinutes },
   });
   return record;
+}
+
+// ── Morning check-in ──────────────────────────────────────────────
+//
+// The hub's morning card is the whole "wake-up" flow now (there's no
+// dedicated page). One `wakeup` RhythmSession per day carries the morning:
+// `metadata.wakeTime` ("HH:mm" as the visitor typed it) and a derived
+// `metadata.sleepMinutes`. It's started when you log your wake time and
+// ended ("completed") when you tap "Done with morning". "Today" uses the
+// server's pinned LA day boundary (startOfToday) — single-user app.
+
+export type MorningStatus = {
+  /** The wakeup session's id (for direct updates). */
+  id: string;
+  /** "HH:mm" the user reported waking, or null if not captured. */
+  wakeTime: string | null;
+  startedAt: Date;
+  /** endedAt is set → the morning was explicitly wrapped up. */
+  completed: boolean;
+  /** Sleep duration carried over from last night, when known. */
+  sleepMinutes: number | null;
+};
+
+type MetaRow = Row & { metadata: unknown };
+
+function readMorningMeta(metadata: unknown): {
+  wakeTime: string | null;
+  sleepMinutes: number | null;
+} {
+  const meta = (metadata ?? {}) as {
+    wakeTime?: unknown;
+    sleepMinutes?: unknown;
+  };
+  return {
+    wakeTime: typeof meta.wakeTime === "string" ? meta.wakeTime : null,
+    sleepMinutes:
+      typeof meta.sleepMinutes === "number" ? meta.sleepMinutes : null,
+  };
+}
+
+/** Today's morning (wakeup) session, or null before the day's first check-in. */
+export async function getTodayMorning(
+  userId: string,
+): Promise<MorningStatus | null> {
+  requireCan(userId, "rhythm", "read");
+  try {
+    const rows = await prisma.$queryRaw<MetaRow[]>(Prisma.sql`
+      SELECT ${SELECT_FIELDS}, "metadata"
+      FROM "RhythmSession"
+      WHERE "userId" = ${userId}
+        AND "type" = 'wakeup'
+        AND "startedAt" >= ${startOfToday()}
+      ORDER BY "startedAt" DESC
+      LIMIT 1
+    `);
+    const row = rows[0];
+    if (!row) return null;
+    const meta = readMorningMeta(row.metadata);
+    return {
+      id: row.id,
+      wakeTime: meta.wakeTime,
+      startedAt: row.startedAt,
+      completed: row.endedAt !== null,
+      sleepMinutes: meta.sleepMinutes,
+    };
+  } catch (error) {
+    if (!isMissingTableError(error)) {
+      console.error("[rhythms] getTodayMorning failed", error);
+    }
+    return null;
+  }
+}
+
+/**
+ * Resolve last night's sleep into a duration. A sleep session started since
+ * ~6pm yesterday is either still running (tapped "going to bed" and never
+ * closed → close it at wake time = now) or already backfilled (read its
+ * stored duration). Degrades to null if the table's missing.
+ */
+async function resolveLastNightSleepMinutes(
+  userId: string,
+): Promise<number | null> {
+  const windowStart = new Date();
+  windowStart.setDate(windowStart.getDate() - 1);
+  windowStart.setHours(18, 0, 0, 0);
+  try {
+    const rows = await prisma.$queryRaw<Row[]>(Prisma.sql`
+      SELECT ${SELECT_FIELDS}
+      FROM "RhythmSession"
+      WHERE "userId" = ${userId}
+        AND "type" = 'sleep'
+        AND "startedAt" >= ${windowStart}
+      ORDER BY "startedAt" DESC
+      LIMIT 1
+    `);
+    const row = rows[0];
+    if (!row) return null;
+    if (row.endedAt) return row.durationMinutes;
+    const ended = await endRhythm(userId, row.id);
+    return ended?.durationMinutes ?? null;
+  } catch (error) {
+    if (!isMissingTableError(error)) {
+      console.error("[rhythms] resolveLastNightSleepMinutes failed", error);
+    }
+    return null;
+  }
+}
+
+/**
+ * Log (or update) today's wake time and start the morning. Closes any open
+ * sleep session and carries its duration into metadata. Idempotent: a second
+ * call just refreshes the wake time. Returns the resolved sleep duration so
+ * the card can show "You slept ~7h 20m".
+ */
+export async function startMorning(
+  userId: string,
+  wakeTime: string | null,
+): Promise<{ sleepMinutes: number | null }> {
+  requireCan(userId, "rhythm", "write");
+  const cleanWake =
+    typeof wakeTime === "string" && /^\d{1,2}:\d{2}$/.test(wakeTime.trim())
+      ? wakeTime.trim()
+      : null;
+
+  const existing = await getTodayMorning(userId);
+  const sleepMinutes =
+    existing?.sleepMinutes ?? (await resolveLastNightSleepMinutes(userId));
+  const metaJson = JSON.stringify({ wakeTime: cleanWake, sleepMinutes });
+
+  try {
+    if (existing) {
+      await prisma.$executeRaw(Prisma.sql`
+        UPDATE "RhythmSession"
+        SET "metadata" = ${metaJson}::jsonb
+        WHERE "userId" = ${userId} AND "id" = ${existing.id}
+      `);
+    } else {
+      const id = randomUUID();
+      await prisma.$executeRaw(Prisma.sql`
+        INSERT INTO "RhythmSession" (
+          "id", "userId", "type", "startedAt", "metadata", "createdAt"
+        ) VALUES (
+          ${id}, ${userId}, 'wakeup', now(), ${metaJson}::jsonb, now()
+        )
+      `);
+      await recordEvent({
+        userId,
+        tool: "rhythm",
+        type: "rhythm.started",
+        refId: id,
+        meta: { rhythm: "wakeup", wakeTime: cleanWake },
+      });
+    }
+  } catch (error) {
+    if (isMissingTableError(error)) {
+      throw new Error(
+        "The rhythms table isn't migrated yet — apply scripts/create-rhythm-table.sql first.",
+      );
+    }
+    throw error;
+  }
+  return { sleepMinutes };
+}
+
+/** Wrap up today's morning (sets endedAt → the hub card dismisses itself). */
+export async function completeMorning(userId: string): Promise<void> {
+  requireCan(userId, "rhythm", "write");
+  try {
+    const rows = await prisma.$queryRaw<Row[]>(Prisma.sql`
+      SELECT ${SELECT_FIELDS}
+      FROM "RhythmSession"
+      WHERE "userId" = ${userId}
+        AND "type" = 'wakeup'
+        AND "startedAt" >= ${startOfToday()}
+        AND "endedAt" IS NULL
+      ORDER BY "startedAt" DESC
+      LIMIT 1
+    `);
+    if (rows[0]) await endRhythm(userId, rows[0].id);
+  } catch (error) {
+    if (isMissingTableError(error)) return;
+    throw error;
+  }
+}
+
+/**
+ * Sleep + wakeup sessions overlapping [from, to) — the calendar renders these
+ * as soft, read-only context blocks beside tracked time. An open session is
+ * treated as running up to now() for the overlap test.
+ */
+export async function listRhythmSessionsBetween(
+  userId: string,
+  range: { from: Date; to: Date },
+): Promise<RhythmSessionRecord[]> {
+  requireCan(userId, "rhythm", "read");
+  try {
+    const rows = await prisma.$queryRaw<Row[]>(Prisma.sql`
+      SELECT ${SELECT_FIELDS}
+      FROM "RhythmSession"
+      WHERE "userId" = ${userId}
+        AND "type" IN ('sleep', 'wakeup')
+        AND "startedAt" < ${range.to}
+        AND COALESCE("endedAt", now()) > ${range.from}
+      ORDER BY "startedAt" ASC
+    `);
+    return rows.map(toRecord);
+  } catch (error) {
+    if (!isMissingTableError(error)) {
+      console.error("[rhythms] listRhythmSessionsBetween failed", error);
+    }
+    return [];
+  }
 }

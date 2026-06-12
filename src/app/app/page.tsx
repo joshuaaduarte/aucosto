@@ -5,8 +5,11 @@ import { listDoItems, listSuggestedDoItems } from "@/lib/services/do";
 import { listAccounts, listTransactions } from "@/lib/services/finance";
 import { listHabits, listSuggestedHabits } from "@/lib/services/habits";
 import { listProjects } from "@/lib/services/projects";
-import { listActiveRhythms, listRecentRhythms } from "@/lib/services/rhythms";
-import type { RhythmType } from "@/lib/rhythms";
+import {
+  getActiveRhythm,
+  getTodayMorning,
+  listRecentRhythms,
+} from "@/lib/services/rhythms";
 import { listReflections, listRecentMoods } from "@/lib/services/reflect";
 import {
   buildDayFacts,
@@ -110,26 +113,22 @@ export default async function HubPage() {
       ])
     : [null, [], [], [], [], [], [], [], [], [], [], [], [], []];
 
-  // Contextual rhythm nudge: which rhythm fits this hour, whether one is
-  // already running, and (on a morning) whether last night's sleep went
-  // unlogged. Fetched separately to keep the big tuple above intact.
-  const activeRhythms = userId
-    ? await listActiveRhythms(userId)
-    : new Map<RhythmType, never>();
-  const recentRhythms = userId
-    ? await listRecentRhythms(userId, { limit: 40 })
-    : [];
+  // Rhythm hub card inputs: today's morning check-in, a running sleep
+  // session, and (on a morning) whether last night's sleep went unlogged.
+  // Fetched separately to keep the big tuple above intact. The time-of-day
+  // gating itself happens in the BROWSER (see RhythmHubCard) — the server is
+  // pinned to America/Los_Angeles, so deriving the hour here would mislabel
+  // anyone in another zone.
+  const [todayMorning, activeSleep, recentRhythms] = userId
+    ? await Promise.all([
+        getTodayMorning(userId),
+        getActiveRhythm(userId, "sleep"),
+        listRecentRhythms(userId, { limit: 40 }),
+      ])
+    : [null, null, []];
 
   const now = new Date();
   const todayStart = startOfToday();
-
-  // The time-of-day rhythm suggestion is decided in the BROWSER (see
-  // RhythmHubCard) using the visitor's real local hour. The server runtime is
-  // pinned to America/Los_Angeles, so deriving the hour here would mislabel
-  // anyone in another zone (Eastern 5:51am → Pacific 2:51am → "sleep").
-  // We only pass the raw inputs: which rhythms are running, and whether last
-  // night's sleep was logged.
-  const activeRhythmTypes = [...activeRhythms.keys()] as RhythmType[];
 
   // Missed-sleep detection: look for any sleep session (active or completed)
   // started since ~6pm yesterday. None → the morning card prompts a backfill.
@@ -267,8 +266,26 @@ export default async function HubPage() {
 
       {userId ? (
         <RhythmHubCard
-          activeTypes={activeRhythmTypes}
+          morning={
+            todayMorning
+              ? {
+                  started: true,
+                  completed: todayMorning.completed,
+                  wakeTime: todayMorning.wakeTime,
+                  sleepMinutes: todayMorning.sleepMinutes,
+                }
+              : null
+          }
+          morningHabits={allHabits
+            .filter((habit) => habit.dayPart === "morning")
+            .map((habit) => ({
+              id: habit.id,
+              title: habit.title,
+              completedToday: habit.completedToday,
+            }))}
+          hasReflectionToday={reflectedToday}
           hasRecentSleep={hasRecentSleep}
+          activeSleepStartedAtMs={activeSleep?.startedAt.getTime() ?? null}
         />
       ) : null}
 

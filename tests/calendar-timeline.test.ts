@@ -233,4 +233,40 @@ describe("buildDayTimeline", () => {
     });
     expect(model.nowPct).toBeNull();
   });
+
+  it("renders rhythm sessions as read-only, full-width context blocks", () => {
+    const model = buildDayTimeline({
+      items: [],
+      entries: [],
+      rhythms: [
+        // Overnight sleep clipped to the day → 00:00–06:30.
+        { id: "s1", type: "sleep", startedAt: local(0), endedAt: local(6, 30) },
+        // Morning routine.
+        { id: "m1", type: "wakeup", startedAt: local(6, 30), endedAt: local(7) },
+      ],
+      day,
+      now: local(12),
+    });
+    expect(model.context).toHaveLength(2);
+    const sleep = model.context.find((b) => b.id === "rhythm-s1")!;
+    expect(sleep.title).toBe("Sleep");
+    expect(sleep.muted).toBe(true);
+    expect(sleep.leftPct).toBe(0);
+    expect(sleep.widthPct).toBe(100);
+    // Early sleep expands the window down to midnight.
+    expect(model.windowStart.getHours()).toBe(0);
+    expect(model.context.find((b) => b.id === "rhythm-m1")!.title).toBe("Morning");
+  });
+
+  it("treats a running rhythm session as open to now", () => {
+    const model = buildDayTimeline({
+      items: [],
+      entries: [],
+      rhythms: [{ id: "s1", type: "sleep", startedAt: local(0), endedAt: null }],
+      day,
+      now: local(6),
+    });
+    const sleep = model.context[0]!;
+    expect(sleep.running).toBe(true);
+  });
 });

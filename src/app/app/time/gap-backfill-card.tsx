@@ -13,10 +13,13 @@ export function GapBackfillCard({
   gapStartIso,
   gapMinutes,
   categories,
+  sinceWakeup = false,
 }: {
   gapStartIso: string;
   gapMinutes: number;
   categories: QuickStartCategory[];
+  /** Gap is anchored at this morning's wake time, not the last entry. */
+  sinceWakeup?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -60,18 +63,30 @@ export function GapBackfillCard({
             className="text-[0.6875rem] font-semibold uppercase tracking-wider"
             style={{ color: "var(--text-faint)" }}
           >
-            Untracked gap
+            {sinceWakeup ? "Since you woke up" : "Untracked gap"}
           </p>
           <p
             className="mt-1 text-[0.9375rem] font-semibold tracking-tight"
             style={{ color: "var(--text)" }}
           >
-            {gapLabel} since{" "}
-            {gapStart.toLocaleTimeString([], {
-              hour: "numeric",
-              minute: "2-digit",
-            })}{" "}
-            — what were you doing?
+            {sinceWakeup ? (
+              <>
+                No time tracked since you woke up at{" "}
+                {gapStart.toLocaleTimeString([], {
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </>
+            ) : (
+              <>
+                {gapLabel} since{" "}
+                {gapStart.toLocaleTimeString([], {
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}{" "}
+                — what were you doing?
+              </>
+            )}
           </p>
         </div>
         <button

@@ -34,7 +34,15 @@ export type DayTimelineModel = {
   hourMarks: TimelineHourMark[];
   planned: TimelineBlock[];
   actual: TimelineBlock[];
+  /** Read-only rhythm context (sleep / morning) behind the tracked lane. */
+  context: TimelineBlock[];
   nowPct: number | null;
+};
+
+/** Soft, read-only context colors for rhythm sessions on the timeline. */
+const RHYTHM_CONTEXT_COLOR: Record<string, string> = {
+  sleep: "#94a3b8", // slate — a light gray block
+  wakeup: "#f59e0b", // amber — the morning routine
 };
 
 const MIN_START_HOUR = 7;
@@ -149,6 +157,13 @@ type ActualInput = Pick<
   "id" | "label" | "category" | "startedAt" | "endedAt"
 >;
 
+type RhythmInput = {
+  id: string;
+  type: string;
+  startedAt: Date;
+  endedAt: Date | null;
+};
+
 function formatShort(date: Date): string {
   return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
@@ -160,6 +175,7 @@ function clampPct(value: number): number {
 export function buildDayTimeline(input: {
   items: PlannedInput[];
   entries: ActualInput[];
+  rhythms?: RhythmInput[];
   day: Date;
   now: Date;
 }): DayTimelineModel {
@@ -169,6 +185,7 @@ export function buildDayTimeline(input: {
   dayEnd.setDate(dayEnd.getDate() + 1);
 
   const timed = input.items.filter((item) => !item.allDay);
+  const rhythms = input.rhythms ?? [];
 
   // Expand the visible window to fit everything, default 07:00–22:00.
   let startHour = MIN_START_HOUR;
@@ -189,6 +206,9 @@ export function buildDayTimeline(input: {
   for (const item of timed) consider(item.startsAt, item.endsAt);
   for (const entry of input.entries) {
     consider(entry.startedAt, entry.endedAt ?? input.now);
+  }
+  for (const rhythm of rhythms) {
+    consider(rhythm.startedAt, rhythm.endedAt ?? input.now);
   }
   startHour = Math.max(0, startHour);
   endHour = Math.min(24, Math.max(endHour, startHour + 1));
@@ -255,6 +275,34 @@ export function buildDayTimeline(input: {
     muted: false,
   }));
 
+  // Rhythm context: sleep / morning sessions as soft, read-only blocks that
+  // sit behind the tracked lane. Clipped to the window, never interactive.
+  const context: TimelineBlock[] = layoutLane(
+    rhythms
+      .filter((rhythm) => {
+        const end = rhythm.endedAt ?? input.now;
+        return end > windowStart && rhythm.startedAt < windowEnd;
+      })
+      .map((rhythm) => ({
+        data: rhythm,
+        ...clip(rhythm.startedAt, rhythm.endedAt ?? input.now),
+      })),
+    windowStartMs,
+    windowMs,
+  ).map(({ data: rhythm, ...placement }) => ({
+    id: `rhythm-${rhythm.id}`,
+    title: rhythm.type === "sleep" ? "Sleep" : "Morning",
+    detail: `${formatShort(rhythm.startedAt)}–${formatShort(rhythm.endedAt ?? input.now)}`,
+    color: RHYTHM_CONTEXT_COLOR[rhythm.type] ?? categoryColor(null),
+    // Context spans the full lane width — it's a backdrop, not a column.
+    topPct: placement.topPct,
+    heightPct: placement.heightPct,
+    leftPct: 0,
+    widthPct: 100,
+    running: rhythm.endedAt === null,
+    muted: true,
+  }));
+
   const hourCount = endHour - startHour;
   const step = hourCount > 12 ? 2 : 1;
   const hourMarks: TimelineHourMark[] = [];
@@ -274,5 +322,5 @@ export function buildDayTimeline(input: {
         )
       : null;
 
-  return { windowStart, windowEnd, hourMarks, planned, actual, nowPct };
+  return { windowStart, windowEnd, hourMarks, planned, actual, context, nowPct };
 }

@@ -7,6 +7,7 @@ import { listAccounts } from "@/lib/services/finance";
 import { listDoItems, listSuggestedDoItems } from "@/lib/services/do";
 import { listSuggestedHabits } from "@/lib/services/habits";
 import { listCalendarItems } from "@/lib/services/calendar";
+import { listRhythmSessionsBetween } from "@/lib/services/rhythms";
 import {
   resolveActiveUserId,
   requireViewerContext,
@@ -65,12 +66,13 @@ export default async function CalendarPage({
   const sevenDaysAgo = new Date(todayStart);
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
 
-  const [weekItems, runningEntry, completedWeek, timelineItems, timelineEntries, trailingItems, trailingEntries, accounts, suggestedTasks, suggestedHabits, openTasks] = await Promise.all([
+  const [weekItems, runningEntry, completedWeek, timelineItems, timelineEntries, timelineRhythms, trailingItems, trailingEntries, accounts, suggestedTasks, suggestedHabits, openTasks] = await Promise.all([
     listCalendarItems(userId, { from: weekStart, to: weekEnd }),
     getRunningEntry(userId),
     listCompletedSince(userId, startOfWeek()),
     listCalendarItems(userId, { from: selectedDayStart, to: selectedDayEnd }),
     listEntriesBetween(userId, { from: selectedDayStart, to: selectedDayEnd }),
+    listRhythmSessionsBetween(userId, { from: selectedDayStart, to: selectedDayEnd }),
     listCalendarItems(userId, { from: sevenDaysAgo, to: todayEnd }),
     listEntriesBetween(userId, { from: sevenDaysAgo, to: todayEnd }),
     context.financeVisible ? listAccounts(userId) : Promise.resolve([]),
@@ -101,6 +103,12 @@ export default async function CalendarPage({
   const timeline = buildDayTimeline({
     items: timelineItems,
     entries: timelineEntries,
+    rhythms: timelineRhythms.map((session) => ({
+      id: session.id,
+      type: session.type,
+      startedAt: session.startedAt,
+      endedAt: session.endedAt,
+    })),
     day: selectedDay,
     now,
   });

@@ -11,6 +11,7 @@ import {
 } from "@/lib/services/do";
 import { listSuggestedHabits } from "@/lib/services/habits";
 import { listCalendarItems } from "@/lib/services/calendar";
+import { getTodayMorning } from "@/lib/services/rhythms";
 import { formatDuration, formatHM, startOfToday, startOfWeek } from "@/lib/time";
 import {
   buildDailyStacks,
@@ -68,7 +69,7 @@ export default async function TimePage() {
   eightWeeksAgo.setDate(eightWeeksAgo.getDate() - 8 * 7);
 
   const running = await getRunningEntry(userId);
-  const [recent, windowEntries, todayCalendarItems, suggestedTasks, suggestedHabits, openTasks, runningDoSummary] =
+  const [recent, windowEntries, todayCalendarItems, suggestedTasks, suggestedHabits, openTasks, runningDoSummary, todayMorning] =
     await Promise.all([
       listRecentEntries(userId, { limit: 30 }),
       listEntriesBetween(userId, { from: sevenDaysAgo, to: tomorrow }),
@@ -79,6 +80,7 @@ export default async function TimePage() {
       running?.doItem
         ? getDoItemSummary(userId, running.doItem.id)
         : Promise.resolve(null),
+      getTodayMorning(userId),
     ]);
   const eightWeekEntries = await listEntriesBetween(userId, {
     from: eightWeeksAgo,
@@ -167,9 +169,28 @@ export default async function TimePage() {
         : latest,
     null,
   );
+  // "Since you woke up" baseline: when the morning check-in logged a wake
+  // time and nothing's been tracked since, anchor the untracked gap at wake
+  // time instead of the last entry's end. Wake time is "HH:mm" from the
+  // browser; resolve it against today in the (LA-pinned) server clock.
+  const wakeAnchor = (() => {
+    if (!todayMorning?.wakeTime) return null;
+    const [h, m] = todayMorning.wakeTime.split(":").map(Number);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+    const at = new Date(now);
+    at.setHours(h, m, 0, 0);
+    return at.getTime() <= now.getTime() ? at : null;
+  })();
+  const sinceWakeup =
+    wakeAnchor !== null && (!lastEndedAt || lastEndedAt < wakeAnchor);
   const gap = running
     ? null
-    : findUntrackedGap({ lastEndedAt, now, minMinutes: 10 });
+    : findUntrackedGap({
+        lastEndedAt: sinceWakeup ? wakeAnchor : lastEndedAt,
+        now,
+        minMinutes: 10,
+        maxHours: sinceWakeup ? 18 : 12,
+      });
 
   // "What specifically?" suggestions: labels recently used in the running
   // entry's category (looks across the last 7 days and the recent archive).
@@ -246,6 +267,7 @@ export default async function TimePage() {
             gapStartIso={gap.start.toISOString()}
             gapMinutes={gap.minutes}
             categories={quickStartCategories}
+            sinceWakeup={sinceWakeup}
           />
         </section>
       ) : null}

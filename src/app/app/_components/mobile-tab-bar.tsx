@@ -123,17 +123,6 @@ const MORE_TOOLS: MoreTool[] = [
     ),
   },
   {
-    href: "/app/rhythms",
-    label: "Rhythms",
-    icon: (
-      <svg {...ip}>
-        <path d="M1.5 7.5a6 6 0 0 1 10.5-4" />
-        <path d="M13.5 7.5a6 6 0 0 1-10.5 4" />
-        <path d="M12 1.25v2.5h-2.5M3 13.75v-2.5h2.5" />
-      </svg>
-    ),
-  },
-  {
     href: "/app/reflect",
     label: "Reflect",
     icon: (
