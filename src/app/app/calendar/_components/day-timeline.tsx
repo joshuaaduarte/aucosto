@@ -219,7 +219,7 @@ export function CalendarTimeline({
       el.removeEventListener("transitionend", onEnd);
       el.style.transition = "none";
       el.style.transform = `translateX(${-outPct}%)`; // park opposite, off-screen
-      router.push(dir === -1 ? nextDayHref : prevDayHref);
+      router.push(dir === -1 ? nextDayHref : prevDayHref, { scroll: false });
     };
     el.addEventListener("transitionend", onEnd);
   };
@@ -288,6 +288,7 @@ export function CalendarTimeline({
           <div className="hidden items-center gap-1.5 md:flex">
             <Link
               href={nav.prevHref}
+              scroll={false}
               aria-label="Previous"
               className="btn-icon rounded-md border"
               style={{ borderColor: "var(--border-faint)" }}
@@ -298,6 +299,7 @@ export function CalendarTimeline({
             </Link>
             <Link
               href={nav.nextHref}
+              scroll={false}
               aria-label="Next"
               className="btn-icon rounded-md border"
               style={{ borderColor: "var(--border-faint)" }}
@@ -307,7 +309,7 @@ export function CalendarTimeline({
               </svg>
             </Link>
             {!nav.isToday ? (
-              <Link href={nav.todayHref} className="btn-ghost h-8 px-2.5 text-[0.75rem]">
+              <Link href={nav.todayHref} scroll={false} className="btn-ghost h-8 px-2.5 text-[0.75rem]">
                 Today
               </Link>
             ) : null}
@@ -317,6 +319,7 @@ export function CalendarTimeline({
           <div className="flex items-center gap-1.5 md:hidden">
             <Link
               href={prevDayHref}
+              scroll={false}
               aria-label="Previous day"
               className="btn-icon rounded-md border"
               style={{ borderColor: "var(--border-faint)" }}
@@ -327,6 +330,7 @@ export function CalendarTimeline({
             </Link>
             <Link
               href={nextDayHref}
+              scroll={false}
               aria-label="Next day"
               className="btn-icon rounded-md border"
               style={{ borderColor: "var(--border-faint)" }}
@@ -336,7 +340,7 @@ export function CalendarTimeline({
               </svg>
             </Link>
             {anchorDay !== today ? (
-              <Link href={todayDayHref} className="btn-ghost h-8 px-2.5 text-[0.75rem]">
+              <Link href={todayDayHref} scroll={false} className="btn-ghost h-8 px-2.5 text-[0.75rem]">
                 Today
               </Link>
             ) : null}

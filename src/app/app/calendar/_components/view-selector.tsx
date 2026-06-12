@@ -58,7 +58,9 @@ export function ViewSelector({
       saved = null;
     }
     if (isCalendarView(saved ?? undefined) && saved !== view) {
-      router.replace(hrefFor(saved as CalendarView, anchorDay));
+      router.replace(hrefFor(saved as CalendarView, anchorDay), {
+        scroll: false,
+      });
     }
   }, [hasExplicitView, view, anchorDay, router]);
 
@@ -68,7 +70,7 @@ export function ViewSelector({
     } catch {
       // Private mode / disabled storage — URL still carries the view.
     }
-    if (next !== view) router.push(hrefFor(next, anchorDay));
+    if (next !== view) router.push(hrefFor(next, anchorDay), { scroll: false });
   };
 
   return (

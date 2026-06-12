@@ -53,6 +53,7 @@ export function MobileDateStrip({
             key={iso}
             ref={isSelected ? selectedRef : undefined}
             href={`/app/calendar?view=1d&day=${iso}`}
+            scroll={false}
             aria-current={isSelected ? "date" : undefined}
             className="flex min-w-[2.75rem] flex-1 flex-col items-center gap-1 rounded-lg py-1.5"
           >
