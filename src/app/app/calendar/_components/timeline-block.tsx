@@ -55,7 +55,10 @@ export function TimelineBlockButton({
     <>
       <button
         type="button"
-        onClick={() => {
+        // Keep block taps from starting a drag-create on the lane underneath.
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
           if (payload.type === "running") {
             router.push("/app/time");
             return;

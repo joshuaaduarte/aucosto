@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildDayTimeline } from "@/app/app/calendar/_lib/timeline";
+import {
+  buildDayTimeline,
+  dayWindowHours,
+} from "@/app/app/calendar/_lib/timeline";
 
 const day = new Date(2026, 5, 10); // local midnight
 const local = (hour: number, minute = 0) =>
@@ -268,5 +271,56 @@ describe("buildDayTimeline", () => {
     });
     const sleep = model.context[0]!;
     expect(sleep.running).toBe(true);
+  });
+
+  it("honors an explicit bounds override (shared multi-day y-axis)", () => {
+    const model = buildDayTimeline({
+      items: [calItem("a", local(9), local(10))],
+      entries: [],
+      day,
+      now: local(12),
+      bounds: { startHour: 5, endHour: 20 },
+    });
+    // The window is forced to the shared bounds, not the 07:00–22:00 default.
+    expect(model.windowStart.getHours()).toBe(5);
+    expect(model.windowEnd.getHours()).toBe(20);
+    // The 9–10 block positions against the forced 5→20 (15h) window.
+    const block = model.planned[0]!;
+    expect(block.topPct).toBeCloseTo(((9 - 5) / 15) * 100, 5);
+  });
+});
+
+describe("dayWindowHours", () => {
+  it("returns the default 07:00–22:00 window when everything fits", () => {
+    expect(dayWindowHours({ items: [], entries: [], day, now: local(12) })).toEqual(
+      { startHour: 7, endHour: 22 },
+    );
+  });
+
+  it("expands to fit early and late items, ignoring all-day items", () => {
+    expect(
+      dayWindowHours({
+        items: [
+          calItem("early", local(5, 30), local(6)),
+          calItem("late", local(22), local(23, 30)),
+          calItem("allday", local(0), local(0), { allDay: true }),
+        ],
+        entries: [],
+        day,
+        now: local(12),
+      }),
+    ).toEqual({ startHour: 5, endHour: 24 });
+  });
+
+  it("agrees with the window buildDayTimeline computes on its own", () => {
+    const input = {
+      items: [calItem("a", local(8), local(9))],
+      entries: [],
+      day,
+      now: local(12),
+    };
+    const bounds = dayWindowHours(input);
+    const model = buildDayTimeline(input);
+    expect(model.windowStart.getHours()).toBe(bounds.startHour);
   });
 });

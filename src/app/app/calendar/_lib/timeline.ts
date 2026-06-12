@@ -172,20 +172,28 @@ function clampPct(value: number): number {
   return Math.min(100, Math.max(0, value));
 }
 
-export function buildDayTimeline(input: {
+export type DayTimelineInput = {
   items: PlannedInput[];
   entries: ActualInput[];
   rhythms?: RhythmInput[];
   day: Date;
   now: Date;
-}): DayTimelineModel {
+};
+
+/**
+ * Compute the visible hour window [startHour, endHour] for a single day,
+ * expanding the default 07:00–22:00 to fit any item/entry/rhythm that spills
+ * outside it. Exported so multi-day views can union the windows across their
+ * columns and render every day against one shared y-axis.
+ */
+export function dayWindowHours(input: DayTimelineInput): {
+  startHour: number;
+  endHour: number;
+} {
   const dayStart = new Date(input.day);
   dayStart.setHours(0, 0, 0, 0);
   const dayEnd = new Date(dayStart);
   dayEnd.setDate(dayEnd.getDate() + 1);
-
-  const timed = input.items.filter((item) => !item.allDay);
-  const rhythms = input.rhythms ?? [];
 
   // Expand the visible window to fit everything, default 07:00–22:00.
   let startHour = MIN_START_HOUR;
@@ -203,15 +211,34 @@ export function buildDayTimeline(input: {
       Math.ceil((to - dayStart.getTime()) / 3_600_000),
     );
   };
-  for (const item of timed) consider(item.startsAt, item.endsAt);
+  for (const item of input.items) {
+    if (item.allDay) continue;
+    consider(item.startsAt, item.endsAt);
+  }
   for (const entry of input.entries) {
     consider(entry.startedAt, entry.endedAt ?? input.now);
   }
-  for (const rhythm of rhythms) {
+  for (const rhythm of input.rhythms ?? []) {
     consider(rhythm.startedAt, rhythm.endedAt ?? input.now);
   }
   startHour = Math.max(0, startHour);
   endHour = Math.min(24, Math.max(endHour, startHour + 1));
+  return { startHour, endHour };
+}
+
+export function buildDayTimeline(
+  input: DayTimelineInput & {
+    /** Force the hour window (e.g. a shared y-axis across multi-day columns). */
+    bounds?: { startHour: number; endHour: number };
+  },
+): DayTimelineModel {
+  const dayStart = new Date(input.day);
+  dayStart.setHours(0, 0, 0, 0);
+
+  const timed = input.items.filter((item) => !item.allDay);
+  const rhythms = input.rhythms ?? [];
+
+  const { startHour, endHour } = input.bounds ?? dayWindowHours(input);
 
   const windowStart = new Date(dayStart);
   windowStart.setHours(startHour, 0, 0, 0);

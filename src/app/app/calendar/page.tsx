@@ -27,9 +27,13 @@ import {
   startOfCalendarWeek,
   startOfDay,
 } from "./_lib/derive";
-import { buildDayTimeline } from "./_lib/timeline";
+import { buildDayTimeline, dayWindowHours } from "./_lib/timeline";
 import { CalendarHeader } from "./_components/calendar-header";
-import { DayTimeline } from "./_components/day-timeline";
+import {
+  CalendarTimeline,
+  type CalendarColumn,
+} from "./_components/day-timeline";
+import { isCalendarView, type CalendarView } from "./_components/view-selector";
 import type { TimelineBlockPayload } from "./_components/timeline-block";
 import { derivePlanVsActual } from "@/lib/insights";
 import { OpenTimeSection } from "./_components/open-time-section";
@@ -43,7 +47,7 @@ export const dynamic = "force-dynamic";
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ day?: string }>;
+  searchParams: Promise<{ day?: string; view?: string }>;
 }) {
   const userId = await resolveActiveUserId();
   const context = await requireViewerContext();
@@ -60,8 +64,19 @@ export default async function CalendarPage({
   const selectedDay =
     parsedDay && !Number.isNaN(parsedDay.getTime()) ? parsedDay : now;
   const selectedDayStart = startOfDay(selectedDay);
-  const selectedDayEnd = endOfDay(selectedDay);
   const isTodaySelected = selectedDayStart.getTime() === todayStart.getTime();
+
+  // View span: ?view=1d|2d|3d|w → 1/2/3/7 columns starting at the anchor day.
+  const hasExplicitView = isCalendarView(params.view);
+  const view: CalendarView = hasExplicitView
+    ? (params.view as CalendarView)
+    : "1d";
+  const viewDays = { "1d": 1, "2d": 2, "3d": 3, w: 7 }[view];
+  const columnDays = Array.from({ length: viewDays }, (_, index) =>
+    startOfDay(addDays(selectedDayStart, index)),
+  );
+  const rangeStart = columnDays[0];
+  const rangeEnd = endOfDay(columnDays[columnDays.length - 1]);
 
   const sevenDaysAgo = new Date(todayStart);
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
@@ -70,9 +85,9 @@ export default async function CalendarPage({
     listCalendarItems(userId, { from: weekStart, to: weekEnd }),
     getRunningEntry(userId),
     listCompletedSince(userId, startOfWeek()),
-    listCalendarItems(userId, { from: selectedDayStart, to: selectedDayEnd }),
-    listEntriesBetween(userId, { from: selectedDayStart, to: selectedDayEnd }),
-    listRhythmSessionsBetween(userId, { from: selectedDayStart, to: selectedDayEnd }),
+    listCalendarItems(userId, { from: rangeStart, to: rangeEnd }),
+    listEntriesBetween(userId, { from: rangeStart, to: rangeEnd }),
+    listRhythmSessionsBetween(userId, { from: rangeStart, to: rangeEnd }),
     listCalendarItems(userId, { from: sevenDaysAgo, to: todayEnd }),
     listEntriesBetween(userId, { from: sevenDaysAgo, to: todayEnd }),
     context.financeVisible ? listAccounts(userId) : Promise.resolve([]),
@@ -100,18 +115,45 @@ export default async function CalendarPage({
     suggestedTasks,
     limit: 3,
   });
-  const timeline = buildDayTimeline({
-    items: timelineItems,
-    entries: timelineEntries,
-    rhythms: timelineRhythms.map((session) => ({
-      id: session.id,
-      type: session.type,
-      startedAt: session.startedAt,
-      endedAt: session.endedAt,
-    })),
-    day: selectedDay,
-    now,
-  });
+  const rhythmInputs = timelineRhythms.map((session) => ({
+    id: session.id,
+    type: session.type,
+    startedAt: session.startedAt,
+    endedAt: session.endedAt,
+  }));
+
+  // Shared y-axis across columns: union each day's auto-expanded hour window so
+  // every column lines up on the same axis.
+  let unionStartHour = 24;
+  let unionEndHour = 0;
+  for (const day of columnDays) {
+    const { startHour, endHour } = dayWindowHours({
+      items: timelineItems,
+      entries: timelineEntries,
+      rhythms: rhythmInputs,
+      day,
+      now,
+    });
+    unionStartHour = Math.min(unionStartHour, startHour);
+    unionEndHour = Math.max(unionEndHour, endHour);
+  }
+  const sharedBounds = { startHour: unionStartHour, endHour: unionEndHour };
+
+  const columns: CalendarColumn[] = columnDays.map((day) => ({
+    dayIso: formatDateValue(day),
+    weekday: day.toLocaleDateString([], { weekday: "short" }),
+    dayNum: day.getDate(),
+    isToday: day.getTime() === todayStart.getTime(),
+    model: buildDayTimeline({
+      items: timelineItems,
+      entries: timelineEntries,
+      rhythms: rhythmInputs,
+      day,
+      now,
+      bounds: sharedBounds,
+    }),
+  }));
+
   // Tap payloads for timeline blocks: tracked entries open the entry edit
   // modal, the running entry hops to /app/time, planned blocks open a
   // compact block editor.
@@ -157,17 +199,24 @@ export default async function CalendarPage({
     now,
   });
 
+  const firstColumn = columnDays[0];
+  const lastColumn = columnDays[columnDays.length - 1];
+  const rangeLabel =
+    viewDays === 1
+      ? isTodaySelected
+        ? "Today"
+        : firstColumn.toLocaleDateString([], {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+          })
+      : `${firstColumn.toLocaleDateString([], { month: "short", day: "numeric" })} – ${lastColumn.toLocaleDateString([], { month: "short", day: "numeric" })}`;
+
   const timelineNav = {
-    dayLabel: isTodaySelected
-      ? "Today"
-      : selectedDayStart.toLocaleDateString([], {
-          weekday: "short",
-          month: "short",
-          day: "numeric",
-        }),
-    prevHref: `/app/calendar?day=${formatDateValue(addDays(selectedDayStart, -1))}`,
-    nextHref: `/app/calendar?day=${formatDateValue(addDays(selectedDayStart, 1))}`,
-    todayHref: "/app/calendar",
+    prevHref: `/app/calendar?view=${view}&day=${formatDateValue(addDays(selectedDayStart, -viewDays))}`,
+    nextHref: `/app/calendar?view=${view}&day=${formatDateValue(addDays(selectedDayStart, viewDays))}`,
+    todayHref: `/app/calendar?view=${view}`,
+    rangeLabel,
     isToday: isTodaySelected,
   };
 
@@ -182,11 +231,14 @@ export default async function CalendarPage({
 
       <SignalsSection signals={signals} />
 
-      <DayTimeline
-        model={timeline}
-        nav={timelineNav}
+      <CalendarTimeline
+        view={view}
+        hasExplicitView={hasExplicitView}
+        anchorDay={formatDateValue(selectedDayStart)}
+        columns={columns}
         payloads={timelinePayloads}
         tasks={linkableTasks}
+        nav={timelineNav}
       />
 
       {planVsActual7d.overallPct !== null ? (

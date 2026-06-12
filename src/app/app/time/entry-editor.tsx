@@ -92,16 +92,29 @@ export function AddEntryButton({ tasks = [] }: { tasks?: LinkableTask[] }) {
 
 const initialState: EntryFormState = undefined;
 
+/** Wall-clock prefill for a brand-new entry (e.g. dragged out on the calendar). */
+export type EntryDefaults = {
+  date: string;
+  start: string;
+  end: string;
+  label?: string;
+  category?: string;
+};
+
 // Exported for reuse: the calendar timeline opens this same modal when a
-// tracked block is tapped.
+// tracked block is tapped, or when a time range is dragged out on the grid
+// (passing `defaults` to prefill the date/start/end of a new entry).
 export function EntryModal({
   title,
   entry,
+  defaults,
   tasks,
   onClose,
 }: {
   title: string;
   entry: EditableEntry | null;
+  /** Prefill for a new entry; ignored when editing an existing `entry`. */
+  defaults?: EntryDefaults;
   tasks: LinkableTask[];
   onClose: () => void;
 }) {
@@ -109,7 +122,10 @@ export function EntryModal({
     saveEntryAction,
     initialState,
   );
-  const [category, setCategory] = useState(entry?.category ?? "");
+  const [category, setCategory] = useState(
+    entry?.category ?? defaults?.category ?? "",
+  );
+  const labelRef = useRef<HTMLInputElement>(null);
   const [doItemId, setDoItemId] = useState(entry?.doItemId ?? "");
   const [taskQuery, setTaskQuery] = useState("");
   const closedRef = useRef(false);
@@ -128,6 +144,12 @@ export function EntryModal({
       onClose();
     }
   }, [state, onClose]);
+
+  // Dragging out a range prefills the times — drop the cursor on the label so
+  // the user can name the session and submit without reaching for the mouse.
+  useEffect(() => {
+    if (!entry && defaults) labelRef.current?.focus();
+  }, [entry, defaults]);
 
   const todayValue = new Date().toLocaleDateString("en-CA");
 
@@ -199,10 +221,11 @@ export function EntryModal({
                 Session
               </label>
               <input
+                ref={labelRef}
                 id="entry-editor-label"
                 name="label"
                 required
-                defaultValue={entry?.label ?? ""}
+                defaultValue={entry?.label ?? defaults?.label ?? ""}
                 placeholder="What was it?"
                 className="field"
               />
@@ -341,7 +364,11 @@ export function EntryModal({
                 name="date"
                 type="date"
                 required
-                defaultValue={entry ? dateValue(entry.startedAtIso) : todayValue}
+                defaultValue={
+                  entry
+                    ? dateValue(entry.startedAtIso)
+                    : (defaults?.date ?? todayValue)
+                }
                 className="field"
               />
             </div>
@@ -358,7 +385,11 @@ export function EntryModal({
                 name="start"
                 type="time"
                 required
-                defaultValue={entry ? timeValue(entry.startedAtIso) : ""}
+                defaultValue={
+                  entry
+                    ? timeValue(entry.startedAtIso)
+                    : (defaults?.start ?? "")
+                }
                 className="field"
               />
             </div>
@@ -375,7 +406,9 @@ export function EntryModal({
                 name="end"
                 type="time"
                 required
-                defaultValue={entry ? timeValue(entry.endedAtIso) : ""}
+                defaultValue={
+                  entry ? timeValue(entry.endedAtIso) : (defaults?.end ?? "")
+                }
                 className="field"
               />
             </div>
