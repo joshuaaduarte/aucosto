@@ -71,7 +71,7 @@ function toTimeValue(date: Date): string {
  */
 function prettyTime(value: string): string {
   const [h, m] = value.split(":").map(Number);
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return value;
+  if (h === undefined || m === undefined || !Number.isFinite(h) || !Number.isFinite(m)) return value;
   const period = h < 12 ? "am" : "pm";
   const h12 = h % 12 === 0 ? 12 : h % 12;
   return `${h12}:${String(m).padStart(2, "0")}${period}`;

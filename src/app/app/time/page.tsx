@@ -176,7 +176,7 @@ export default async function TimePage() {
   const wakeAnchor = (() => {
     if (!todayMorning?.wakeTime) return null;
     const [h, m] = todayMorning.wakeTime.split(":").map(Number);
-    if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+    if (h === undefined || m === undefined || !Number.isFinite(h) || !Number.isFinite(m)) return null;
     const at = new Date(now);
     at.setHours(h, m, 0, 0);
     return at.getTime() <= now.getTime() ? at : null;
