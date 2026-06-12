@@ -16,6 +16,15 @@ function toTimeValue(date: Date): string {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+/** Parse an "HH:mm" input into numeric parts, or null when malformed. */
+function parseTime(value: string): { h: number; m: number } | null {
+  const [hStr, mStr] = value.split(":");
+  const h = Number(hStr);
+  const m = Number(mStr);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  return { h, m };
+}
+
 /**
  * Resolve bed/wake "HH:mm" into absolute ISO timestamps. Wake is assumed to
  * be this morning (today, unless that lands in the future → yesterday). Bed
@@ -23,19 +32,19 @@ function toTimeValue(date: Date): string {
  * day is at/after the wake time of day (the normal overnight case).
  */
 function resolveWindow(bed: string, wake: string): { startedAt: string; endedAt: string } | null {
-  const [bh, bm] = bed.split(":").map(Number);
-  const [wh, wm] = wake.split(":").map(Number);
-  if ([bh, bm, wh, wm].some((n) => Number.isNaN(n))) return null;
+  const b = parseTime(bed);
+  const w = parseTime(wake);
+  if (!b || !w) return null;
 
   const now = new Date();
   const wakeDate = new Date(now);
-  wakeDate.setHours(wh, wm, 0, 0);
+  wakeDate.setHours(w.h, w.m, 0, 0);
   if (wakeDate.getTime() > now.getTime()) {
     wakeDate.setDate(wakeDate.getDate() - 1);
   }
 
   const bedDate = new Date(wakeDate);
-  bedDate.setHours(bh, bm, 0, 0);
+  bedDate.setHours(b.h, b.m, 0, 0);
   if (bedDate.getTime() >= wakeDate.getTime()) {
     bedDate.setDate(bedDate.getDate() - 1);
   }

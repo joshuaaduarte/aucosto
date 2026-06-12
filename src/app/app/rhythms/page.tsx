@@ -112,6 +112,31 @@ function RhythmCard({
           className="text-[0.6875rem] font-semibold uppercase tracking-wider"
           style={{ color: "var(--text-faint)" }}
         >
+          Suggested flow
+        </p>
+        <ul className="mt-1.5 space-y-1">
+          {def.checklist.map((item) => (
+            <li
+              key={item}
+              className="flex items-start gap-2 text-[0.8125rem]"
+              style={{ color: "var(--text-muted)" }}
+            >
+              <span
+                aria-hidden
+                className="mt-[0.45rem] inline-block h-1 w-1 shrink-0 rounded-full"
+                style={{ background: accent }}
+              />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="mt-3">
+        <p
+          className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+          style={{ color: "var(--text-faint)" }}
+        >
           Last 5
         </p>
         {recent.length === 0 ? (

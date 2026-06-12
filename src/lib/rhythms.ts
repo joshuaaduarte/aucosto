@@ -29,6 +29,11 @@ export type RhythmDefinition = {
   timed: boolean;
   /** Color key resolved through categoryColor() for chips and accents. */
   colorKey: string;
+  /**
+   * Static, non-persisted prompts shown on the card — a gentle "here's what
+   * this flow usually involves". Not checked off or stored anywhere.
+   */
+  checklist: string[];
 };
 
 export const RHYTHM_DEFINITIONS: Record<RhythmType, RhythmDefinition> = {
@@ -39,6 +44,12 @@ export const RHYTHM_DEFINITIONS: Record<RhythmType, RhythmDefinition> = {
     icon: "🌅",
     timed: false,
     colorKey: "morning",
+    checklist: [
+      "Drink a glass of water",
+      "Step outside for daylight",
+      "Set the one thing that matters today",
+      "Skip the phone for 20 minutes",
+    ],
   },
   work: {
     type: "work",
@@ -47,6 +58,12 @@ export const RHYTHM_DEFINITIONS: Record<RhythmType, RhythmDefinition> = {
     icon: "💻",
     timed: true,
     colorKey: "work",
+    checklist: [
+      "Pick a single focus task",
+      "Silence notifications",
+      "Start a timer to protect the block",
+      "Close stray tabs and chats",
+    ],
   },
   winddown: {
     type: "winddown",
@@ -55,6 +72,12 @@ export const RHYTHM_DEFINITIONS: Record<RhythmType, RhythmDefinition> = {
     icon: "🌇",
     timed: false,
     colorKey: "evening",
+    checklist: [
+      "Review what got done",
+      "Set up tomorrow's first task",
+      "Tidy the workspace",
+      "Reflect on the day",
+    ],
   },
   sleep: {
     type: "sleep",
@@ -63,6 +86,12 @@ export const RHYTHM_DEFINITIONS: Record<RhythmType, RhythmDefinition> = {
     icon: "🌙",
     timed: true,
     colorKey: "sleep",
+    checklist: [
+      "Screens off",
+      "Dim the lights",
+      "Set tomorrow's alarm",
+      "Wind down with a book or stretch",
+    ],
   },
   workout: {
     type: "workout",
@@ -71,6 +100,12 @@ export const RHYTHM_DEFINITIONS: Record<RhythmType, RhythmDefinition> = {
     icon: "🏋️",
     timed: true,
     colorKey: "exercise",
+    checklist: [
+      "Warm up first",
+      "Hydrate before and after",
+      "Note today's focus (push / pull / cardio)",
+      "Cool down and stretch",
+    ],
   },
 };
 
