@@ -91,7 +91,9 @@ export function AddEntryButton({ tasks = [] }: { tasks?: LinkableTask[] }) {
 
 const initialState: EntryFormState = undefined;
 
-function EntryModal({
+// Exported for reuse: the calendar timeline opens this same modal when a
+// tracked block is tapped.
+export function EntryModal({
   title,
   entry,
   tasks,

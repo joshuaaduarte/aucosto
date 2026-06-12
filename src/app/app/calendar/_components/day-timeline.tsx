@@ -3,7 +3,12 @@
 // All positioning math lives in ../_lib/timeline.ts (pure, tested).
 
 import Link from "next/link";
+import type { LinkableTask } from "../../time/entry-editor";
 import type { DayTimelineModel, TimelineBlock } from "../_lib/timeline";
+import {
+  TimelineBlockButton,
+  type TimelineBlockPayload,
+} from "./timeline-block";
 import { TimelineNowLine } from "./timeline-now-line";
 
 const PX_PER_HOUR = 44;
@@ -19,9 +24,14 @@ export type DayTimelineNav = {
 export function DayTimeline({
   model,
   nav,
+  payloads,
+  tasks,
 }: {
   model: DayTimelineModel;
   nav: DayTimelineNav;
+  /** Per-block tap payloads keyed by block id (entry edit / planned edit / running). */
+  payloads: Record<string, TimelineBlockPayload>;
+  tasks: LinkableTask[];
 }) {
   const hours =
     (model.windowEnd.getTime() - model.windowStart.getTime()) / 3_600_000;
@@ -125,12 +135,16 @@ export function DayTimeline({
           model={model}
           height={height}
           variant="planned"
+          payloads={payloads}
+          tasks={tasks}
         />
         <TimelineLane
           blocks={model.actual}
           model={model}
           height={height}
           variant="actual"
+          payloads={payloads}
+          tasks={tasks}
         />
       </div>
       )}
@@ -143,11 +157,15 @@ function TimelineLane({
   model,
   height,
   variant,
+  payloads,
+  tasks,
 }: {
   blocks: TimelineBlock[];
   model: DayTimelineModel;
   height: number;
   variant: "planned" | "actual";
+  payloads: Record<string, TimelineBlockPayload>;
+  tasks: LinkableTask[];
 }) {
   return (
     <div
@@ -173,59 +191,17 @@ function TimelineLane({
 
       {blocks.map((block) => {
         const blockPx = (block.heightPct / 100) * height;
-        const compact = blockPx < 30;
+        const payload = payloads[block.id];
+        if (!payload) return null;
         return (
-          <article
+          <TimelineBlockButton
             key={block.id}
-            className="absolute overflow-hidden rounded px-1.5 py-0.5"
-            style={{
-              top: `${block.topPct}%`,
-              height: `${block.heightPct}%`,
-              // Sub-columns: overlapping blocks sit side by side with a
-              // 2px gutter instead of painting over each other.
-              left: `calc(${block.leftPct}% + 4px)`,
-              width: `calc(${block.widthPct}% - 8px)`,
-              minHeight: "15px",
-              background:
-                variant === "actual"
-                  ? `color-mix(in srgb, ${block.color} 22%, var(--bg-page))`
-                  : "var(--bg-page)",
-              borderLeft: `3px solid ${block.color}`,
-              border:
-                variant === "planned"
-                  ? "1px solid var(--border-soft)"
-                  : undefined,
-              borderLeftWidth: "3px",
-              borderLeftStyle: "solid",
-              borderLeftColor: block.color,
-              opacity: block.muted ? 0.55 : 1,
-            }}
-            title={`${block.title} · ${block.detail}`}
-          >
-            <p
-              className="truncate text-[0.6875rem] font-medium leading-tight"
-              style={{ color: "var(--text)" }}
-            >
-              {block.running ? (
-                <span
-                  className="ink-pulse mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
-                  style={{ background: "var(--accent)" }}
-                  aria-hidden
-                />
-              ) : null}
-              {block.title}
-            </p>
-            {/* Short blocks: title only — the time range lives in the
-                hover/long-press tooltip via the title attribute. */}
-            {!compact ? (
-              <p
-                className="truncate text-[0.625rem] leading-tight"
-                style={{ color: "var(--text-faint)" }}
-              >
-                {block.detail}
-              </p>
-            ) : null}
-          </article>
+            block={block}
+            variant={variant}
+            compact={blockPx < 30}
+            payload={payload}
+            tasks={tasks}
+          />
         );
       })}
 

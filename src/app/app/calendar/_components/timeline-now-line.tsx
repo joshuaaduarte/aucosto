@@ -42,7 +42,7 @@ export function TimelineNowLine({
 
   return (
     <div
-      className="absolute inset-x-0 z-10"
+      className="pointer-events-none absolute inset-x-0 z-10"
       style={{ top: `${topPct}%`, borderTop: "1px dashed var(--accent)" }}
       aria-hidden
     />

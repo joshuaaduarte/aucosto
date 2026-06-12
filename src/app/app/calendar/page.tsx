@@ -4,7 +4,7 @@ import {
   listEntriesBetween,
 } from "@/lib/services/time";
 import { listAccounts } from "@/lib/services/finance";
-import { listSuggestedDoItems } from "@/lib/services/do";
+import { listDoItems, listSuggestedDoItems } from "@/lib/services/do";
 import { listSuggestedHabits } from "@/lib/services/habits";
 import { listCalendarItems } from "@/lib/services/calendar";
 import {
@@ -29,6 +29,7 @@ import {
 import { buildDayTimeline } from "./_lib/timeline";
 import { CalendarHeader } from "./_components/calendar-header";
 import { DayTimeline } from "./_components/day-timeline";
+import type { TimelineBlockPayload } from "./_components/timeline-block";
 import { OpenTimeSection } from "./_components/open-time-section";
 import { SignalsSection } from "./_components/signals-section";
 import { TodayBucketSections } from "./_components/today-sections";
@@ -60,7 +61,7 @@ export default async function CalendarPage({
   const selectedDayEnd = endOfDay(selectedDay);
   const isTodaySelected = selectedDayStart.getTime() === todayStart.getTime();
 
-  const [weekItems, runningEntry, completedWeek, timelineItems, timelineEntries, accounts, suggestedTasks, suggestedHabits] = await Promise.all([
+  const [weekItems, runningEntry, completedWeek, timelineItems, timelineEntries, accounts, suggestedTasks, suggestedHabits, openTasks] = await Promise.all([
     listCalendarItems(userId, { from: weekStart, to: weekEnd }),
     getRunningEntry(userId),
     listCompletedSince(userId, startOfWeek()),
@@ -69,6 +70,7 @@ export default async function CalendarPage({
     context.financeVisible ? listAccounts(userId) : Promise.resolve([]),
     listSuggestedDoItems(userId, { limit: 5 }),
     listSuggestedHabits(userId, { limit: 4 }),
+    listDoItems(userId, { includeDone: false }),
   ]);
 
   const todayItems = weekItems.filter(
@@ -96,6 +98,43 @@ export default async function CalendarPage({
     day: selectedDay,
     now,
   });
+  // Tap payloads for timeline blocks: tracked entries open the entry edit
+  // modal, the running entry hops to /app/time, planned blocks open a
+  // compact block editor.
+  const timelinePayloads: Record<string, TimelineBlockPayload> = {};
+  for (const entry of timelineEntries) {
+    timelinePayloads[entry.id] = entry.endedAt
+      ? {
+          type: "entry",
+          entry: {
+            id: entry.id,
+            label: entry.label,
+            category: entry.category,
+            doItemId: entry.doItemId,
+            startedAtIso: entry.startedAt.toISOString(),
+            endedAtIso: entry.endedAt.toISOString(),
+          },
+        }
+      : { type: "running" };
+  }
+  for (const item of timelineItems) {
+    timelinePayloads[item.id] = {
+      type: "item",
+      item: {
+        id: item.id,
+        title: item.title,
+        dateValue: formatDateValue(item.startsAt),
+        startValue: formatTimeValue(item.startsAt),
+        endValue: formatTimeValue(item.endsAt),
+        status: item.status,
+      },
+    };
+  }
+  const linkableTasks = openTasks.map((task) => ({
+    id: task.id,
+    title: task.title,
+  }));
+
   const timelineNav = {
     dayLabel: isTodaySelected
       ? "Today"
@@ -121,7 +160,12 @@ export default async function CalendarPage({
 
       <SignalsSection signals={signals} />
 
-      <DayTimeline model={timeline} nav={timelineNav} />
+      <DayTimeline
+        model={timeline}
+        nav={timelineNav}
+        payloads={timelinePayloads}
+        tasks={linkableTasks}
+      />
 
       <OpenTimeSection gapSuggestions={gapSuggestions} />
 
