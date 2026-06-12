@@ -140,7 +140,11 @@ export function TimelineLane({
     <>
       <div
         ref={laneRef}
-        className="relative overflow-hidden rounded"
+        // overflow-clip (not -hidden) so this box clips blocks to its rounded
+        // bounds WITHOUT becoming a scroll container — that lets the sticky
+        // empty-state below resolve against the page scroll (the viewport)
+        // rather than getting trapped and pinned to this lane's own height.
+        className="relative overflow-clip rounded"
         style={{
           height,
           background: "var(--bg-tint)",
@@ -236,8 +240,15 @@ export function TimelineLane({
         })}
 
         {blocks.length === 0 && !drag ? (
+          // Sticky (not absolute) + top-[50vh] so the hint floats to the
+          // centre of the *viewport*, not the centre of this lane. Each day's
+          // window covers a different span of hours, so the lane height varies
+          // — absolute top-1/2 put the text at a different on-screen position
+          // every day. Sticky to the viewport keeps it visually consistent
+          // regardless of timeline height or scroll position. pointer-events
+          // stay off so taps fall through to the lane (drag-to-create) beneath.
           <p
-            className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 px-2 text-center text-[0.6875rem]"
+            className="pointer-events-none sticky top-[50vh] -translate-y-1/2 px-2 text-center text-[0.6875rem]"
             style={{ color: "var(--text-faint)" }}
           >
             {variant === "planned"

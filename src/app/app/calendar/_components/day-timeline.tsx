@@ -499,7 +499,10 @@ export function CalendarTimeline({
             </div>
           </div>
 
-          <div className="min-w-0 flex-1 overflow-hidden">
+          {/* overflow-clip (not -hidden): clips the 300%-wide track to one
+              panel without becoming a scroll container, so the per-lane sticky
+              empty-state can resolve against the page/viewport scroll. */}
+          <div className="min-w-0 flex-1 overflow-clip">
             <div
               ref={pagerRef}
               className="flex"
@@ -542,7 +545,9 @@ export function CalendarTimeline({
         </div>
       ) : (
         // Clip so a committed swipe can slide the day fully off-screen.
-        <div className="overflow-hidden">
+        // overflow-clip (not -hidden) keeps this from becoming a scroll
+        // container, so the sticky empty-state resolves against the viewport.
+        <div className="overflow-clip">
           <div
             ref={swipeRef}
             className="flex gap-2 sm:gap-3"
