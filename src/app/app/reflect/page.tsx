@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { dayKey, summarizeSnapshot } from "@/lib/reflect";
+import { dayKey, moodColor, summarizeSnapshot } from "@/lib/reflect";
 import {
   buildReflectionSnapshot,
   getReflection,
+  listRecentMoods,
 } from "@/lib/services/reflect";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import { ReflectionForm } from "./reflection-form";
@@ -14,10 +15,22 @@ export default async function ReflectPage() {
   const now = new Date();
   const todayKey = dayKey(now);
 
-  const [existing, context] = await Promise.all([
+  const [existing, context, recentMoods] = await Promise.all([
     getReflection(userId, todayKey),
     buildReflectionSnapshot(userId, now),
+    listRecentMoods(userId, { days: 7 }),
   ]);
+
+  // Last 7 day keys (oldest → today) for the mood-dot strip.
+  const moodsByDay = Object.fromEntries(
+    recentMoods.map((row) => [row.dateKey, row.mood]),
+  );
+  const last7Days = Array.from({ length: 7 }, (_, index) => {
+    const day = new Date(now);
+    day.setHours(0, 0, 0, 0);
+    day.setDate(day.getDate() - (6 - index));
+    return dayKey(day);
+  });
 
   const todayLabel = now.toLocaleDateString([], {
     weekday: "long",
@@ -42,9 +55,31 @@ export default async function ReflectPage() {
             {todayLabel}
           </h1>
         </div>
-        <Link href="/app/reflect/history" className="btn-ghost shrink-0">
-          History
-        </Link>
+        <div className="flex shrink-0 items-center gap-3">
+          <Link
+            href="/app/reflect/history"
+            className="flex items-center gap-1.5"
+            title="Last 7 days of mood — tap for history"
+            aria-label="Reflection history"
+          >
+            {last7Days.map((day) => {
+              const mood = moodsByDay[day];
+              return (
+                <span
+                  key={day}
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{
+                    background: mood ? moodColor(mood) : "transparent",
+                    border: mood ? "none" : "1px solid var(--border)",
+                  }}
+                />
+              );
+            })}
+          </Link>
+          <Link href="/app/reflect/history" className="btn-ghost shrink-0">
+            History
+          </Link>
+        </div>
       </header>
 
       {/* Auto-captured context: the day so far, plus session notes. */}

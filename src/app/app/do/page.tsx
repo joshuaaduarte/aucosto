@@ -12,6 +12,8 @@ import {
   type HabitTaskSummary,
 } from "@/lib/services/habits";
 import { listProjects } from "@/lib/services/projects";
+import { estimationSparkline } from "@/lib/insights";
+import { Sparkline } from "../insights/_components/charts";
 import { DoCreateForm } from "./create-form";
 import { DoItemCard } from "./do-item-card";
 import { HabitTaskCard } from "./habit-task-card";
@@ -197,6 +199,16 @@ export default async function DoPage() {
   const activeProjectCount = new Set(
     activeItems.map((item) => item.projectId).filter(Boolean),
   ).size;
+  // Estimation sparkline: actual/estimate ratio for the last 10 completions.
+  const estimateSpark = estimationSparkline(
+    doneItems.map((item) => ({
+      completedAt: item.completedAt,
+      estimatedMinutes: item.estimatedMinutes,
+      actualMinutes: item.effectiveActualMinutes,
+      bucket: item.bucket,
+    })),
+    { limit: 10 },
+  );
 
   return (
     <div className="space-y-10">
@@ -278,6 +290,36 @@ export default async function DoPage() {
           }
         />
       </section>
+
+      {estimateSpark.ratios.length >= 3 ? (
+        <section
+          className="fade-in-delay-1 flex items-center gap-4 rounded-md border px-4 py-3"
+          style={{ borderColor: "var(--border-faint)", background: "var(--bg-page)" }}
+        >
+          <div className="min-w-0 flex-1">
+            <p
+              className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+              style={{ color: "var(--text-faint)" }}
+            >
+              Estimation trend · last {estimateSpark.ratios.length} completed
+            </p>
+            {/* 1.0 = perfect estimate; above = ran long, below = ran short. */}
+            <Sparkline values={estimateSpark.ratios} color="#8b5cf6" />
+          </div>
+          {estimateSpark.latestAccuracy !== null ? (
+            <p
+              className="shrink-0 text-right text-[0.78rem] leading-snug"
+              style={{ color: "var(--text-muted)" }}
+            >
+              <span className="font-semibold" style={{ color: "var(--text)" }}>
+                {estimateSpark.latestAccuracy}%
+              </span>
+              <br />
+              accuracy
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       <section className="grid gap-3 lg:grid-cols-2">
         <SectionCard eyebrow="Attention" title="Where the loop still needs help.">

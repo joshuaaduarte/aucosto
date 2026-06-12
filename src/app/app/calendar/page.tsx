@@ -30,6 +30,7 @@ import { buildDayTimeline } from "./_lib/timeline";
 import { CalendarHeader } from "./_components/calendar-header";
 import { DayTimeline } from "./_components/day-timeline";
 import type { TimelineBlockPayload } from "./_components/timeline-block";
+import { derivePlanVsActual } from "@/lib/insights";
 import { OpenTimeSection } from "./_components/open-time-section";
 import { SignalsSection } from "./_components/signals-section";
 import { TodayBucketSections } from "./_components/today-sections";
@@ -61,12 +62,17 @@ export default async function CalendarPage({
   const selectedDayEnd = endOfDay(selectedDay);
   const isTodaySelected = selectedDayStart.getTime() === todayStart.getTime();
 
-  const [weekItems, runningEntry, completedWeek, timelineItems, timelineEntries, accounts, suggestedTasks, suggestedHabits, openTasks] = await Promise.all([
+  const sevenDaysAgo = new Date(todayStart);
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+
+  const [weekItems, runningEntry, completedWeek, timelineItems, timelineEntries, trailingItems, trailingEntries, accounts, suggestedTasks, suggestedHabits, openTasks] = await Promise.all([
     listCalendarItems(userId, { from: weekStart, to: weekEnd }),
     getRunningEntry(userId),
     listCompletedSince(userId, startOfWeek()),
     listCalendarItems(userId, { from: selectedDayStart, to: selectedDayEnd }),
     listEntriesBetween(userId, { from: selectedDayStart, to: selectedDayEnd }),
+    listCalendarItems(userId, { from: sevenDaysAgo, to: todayEnd }),
+    listEntriesBetween(userId, { from: sevenDaysAgo, to: todayEnd }),
     context.financeVisible ? listAccounts(userId) : Promise.resolve([]),
     listSuggestedDoItems(userId, { limit: 5 }),
     listSuggestedHabits(userId, { limit: 4 }),
@@ -136,6 +142,13 @@ export default async function CalendarPage({
     title: task.title,
   }));
 
+  // Last-7-days plan-vs-actual strip under the timeline.
+  const planVsActual7d = derivePlanVsActual(trailingItems, trailingEntries, {
+    from: sevenDaysAgo,
+    to: todayEnd,
+    now,
+  });
+
   const timelineNav = {
     dayLabel: isTodaySelected
       ? "Today"
@@ -167,6 +180,41 @@ export default async function CalendarPage({
         payloads={timelinePayloads}
         tasks={linkableTasks}
       />
+
+      {planVsActual7d.overallPct !== null ? (
+        <section
+          className="flex items-center gap-3 rounded-md border px-4 py-2.5"
+          style={{
+            borderColor: "var(--border-faint)",
+            background: "var(--bg-page)",
+          }}
+        >
+          <p
+            className="shrink-0 text-[0.6875rem] font-semibold uppercase tracking-wider"
+            style={{ color: "var(--text-faint)" }}
+          >
+            Plan → tracked · 7d
+          </p>
+          <div
+            className="h-[5px] min-w-0 flex-1 rounded-full"
+            style={{ background: "var(--bg-tint-strong)" }}
+          >
+            <div
+              className="h-[5px] rounded-full"
+              style={{
+                width: `${Math.min(100, planVsActual7d.overallPct)}%`,
+                background: "#f43f5e",
+              }}
+            />
+          </div>
+          <p
+            className="tabular shrink-0 text-[0.78rem] font-semibold"
+            style={{ color: "var(--text)" }}
+          >
+            {planVsActual7d.overallPct}%
+          </p>
+        </section>
+      ) : null}
 
       <OpenTimeSection gapSuggestions={gapSuggestions} />
 

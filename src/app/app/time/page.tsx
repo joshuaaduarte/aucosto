@@ -20,6 +20,8 @@ import {
   summarizeCategoriesWindow,
   trackedCoverage,
 } from "@/lib/time-insights";
+import { weeklyTrackedSparkline } from "@/lib/insights";
+import { Sparkline } from "../insights/_components/charts";
 import { PRESET_TIME_CATEGORIES, categoryColor } from "@/lib/time-categories";
 import { EntryDeleteButton, EntryNoteIndicator } from "./entry-row";
 import { AddEntryButton, EntryEditButton } from "./entry-editor";
@@ -62,6 +64,8 @@ export default async function TimePage() {
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
   const tomorrow = new Date(todayStart);
   tomorrow.setDate(tomorrow.getDate() + 1);
+  const eightWeeksAgo = new Date(todayStart);
+  eightWeeksAgo.setDate(eightWeeksAgo.getDate() - 8 * 7);
 
   const running = await getRunningEntry(userId);
   const [recent, windowEntries, todayCalendarItems, suggestedTasks, suggestedHabits, openTasks, runningDoSummary] =
@@ -76,6 +80,14 @@ export default async function TimePage() {
         ? getDoItemSummary(userId, running.doItem.id)
         : Promise.resolve(null),
     ]);
+  const eightWeekEntries = await listEntriesBetween(userId, {
+    from: eightWeeksAgo,
+    to: tomorrow,
+  });
+  const weeklySpark = weeklyTrackedSparkline(eightWeekEntries, {
+    weeks: 8,
+    now,
+  });
 
   // Open tasks the entry editor can link entries to.
   const linkableTasks = openTasks.map((task) => ({
@@ -300,6 +312,48 @@ export default async function TimePage() {
           hint="of waking hours today"
         />
       </section>
+
+      {/* 8-week trend strip */}
+      {weeklySpark.values.some((value) => value > 0) ? (
+        <section
+          className="fade-in-delay-2 flex items-center gap-4 rounded-md border px-4 py-3"
+          style={{ borderColor: "var(--border-faint)", background: "var(--bg-page)" }}
+        >
+          <div className="min-w-0 flex-1">
+            <p
+              className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+              style={{ color: "var(--text-faint)" }}
+            >
+              8-week trend
+            </p>
+            <Sparkline values={weeklySpark.values} color="#10b981" />
+          </div>
+          <p
+            className="shrink-0 text-right text-[0.78rem] leading-snug"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {formatHM(weeklySpark.currentMs)} this week
+            {weeklySpark.paceVsAveragePct !== null ? (
+              <>
+                <br />
+                <span
+                  className="font-semibold"
+                  style={{
+                    color:
+                      weeklySpark.paceVsAveragePct >= 0
+                        ? "#10b981"
+                        : "var(--accent-strong)",
+                  }}
+                >
+                  {weeklySpark.paceVsAveragePct >= 0 ? "+" : ""}
+                  {weeklySpark.paceVsAveragePct}% pace
+                </span>{" "}
+                vs avg
+              </>
+            ) : null}
+          </p>
+        </section>
+      ) : null}
 
       {/* Insights */}
       <section className="fade-in-delay-3">

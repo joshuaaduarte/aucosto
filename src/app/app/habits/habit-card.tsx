@@ -52,6 +52,25 @@ export function HabitCard({ habit }: { habit: HabitSummary }) {
                 {habit.bucket ? <span className="pill">{habit.bucket}</span> : null}
               </div>
 
+              {/* 4-week consistency at a glance (completionRate30d). */}
+              <div className="mt-1.5 flex items-center gap-2" title="Completion rate, last 30 days">
+                <div
+                  className="h-[3px] w-24 rounded-full"
+                  style={{ background: "var(--bg-tint-strong)" }}
+                >
+                  <div
+                    className="h-[3px] rounded-full"
+                    style={{
+                      width: `${Math.max(2, Math.round(habit.completionRate30d * 100))}%`,
+                      background: "#14b8a6",
+                    }}
+                  />
+                </div>
+                <span className="tabular text-[0.65rem]" style={{ color: "var(--text-faint)" }}>
+                  {Math.round(habit.completionRate30d * 100)}% · 30d
+                </span>
+              </div>
+
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <span className="pill">{habit.dayPartLabel}</span>
                 <span className="pill">{habit.cadenceLabel}</span>
