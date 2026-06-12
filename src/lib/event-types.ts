@@ -61,6 +61,10 @@ const EVENT_LABELS: Record<string, string> = {
   "project.updated": "updated a project",
   "project.deleted": "deleted a project",
 
+  // rhythms
+  "rhythm.started": "started a rhythm",
+  "rhythm.ended": "completed a rhythm",
+
   // user
   "user.privacy_updated": "updated privacy settings",
 };

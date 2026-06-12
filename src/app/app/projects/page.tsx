@@ -1,10 +1,13 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { resolveActiveUserId } from "@/lib/viewer-context";
-import { PROJECT_STATUS_LABELS } from "@/lib/projects";
+import { projectProgress, projectStatusStyle } from "@/lib/projects";
 import { formatMinutes } from "@/lib/do";
 import { listProjects, type ProjectLinkedTaskSummary, type ProjectSummary } from "@/lib/services/projects";
 import { ProjectCreateForm } from "./create-form";
 import { ProjectEditForm } from "./edit-form";
+import { QuickAddTask } from "./quick-add-task";
+import { ArchiveProjectButton } from "./archive-button";
 import {
   ProjectScheduleForm,
   ProjectTaskCreateForm,
@@ -58,6 +61,60 @@ function formatDateTime(value: Date) {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function StatusBadge({ status }: { status: ProjectSummary["status"] }) {
+  const style = projectStatusStyle(status);
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wider"
+      style={{ background: style.bg, color: style.color }}
+    >
+      <span
+        className="inline-block h-1.5 w-1.5 rounded-full"
+        style={{ background: style.color }}
+      />
+      {style.label}
+    </span>
+  );
+}
+
+function ProgressBar({
+  doneCount,
+  openCount,
+}: {
+  doneCount: number;
+  openCount: number;
+}) {
+  const total = doneCount + openCount;
+  const pct = projectProgress(doneCount, openCount);
+  return (
+    <div className="space-y-1">
+      <div className="flex items-baseline justify-between gap-2">
+        <p
+          className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+          style={{ color: "var(--text-faint)" }}
+        >
+          Progress
+        </p>
+        <p className="tabular text-[0.75rem]" style={{ color: "var(--text-muted)" }}>
+          {total === 0 ? "No tasks yet" : `${doneCount}/${total} · ${pct}%`}
+        </p>
+      </div>
+      <div
+        className="h-[6px] overflow-hidden rounded-full"
+        style={{ background: "var(--bg-tint-strong)" }}
+      >
+        <div
+          className="h-full rounded-full transition-all"
+          style={{
+            width: `${Math.max(total === 0 ? 0 : 3, pct)}%`,
+            background: pct === 100 ? "#3b82f6" : "var(--accent)",
+          }}
+        />
+      </div>
+    </div>
+  );
 }
 
 function TaskChip({ task }: { task: ProjectLinkedTaskSummary }) {
@@ -146,10 +203,14 @@ function ProjectCard({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-[0.9375rem] font-medium" style={{ color: "var(--text)" }}>
+              <Link
+                href={`/app/projects/${project.id}`}
+                className="text-[0.9375rem] font-medium hover:underline"
+                style={{ color: "var(--text)" }}
+              >
                 {project.name}
-              </p>
-              <span className="pill">{PROJECT_STATUS_LABELS[project.status]}</span>
+              </Link>
+              <StatusBadge status={project.status} />
               {project.bucket ? <span className="pill">{project.bucket}</span> : null}
             </div>
             {project.summary ? (
@@ -167,6 +228,11 @@ function ProjectCard({
             </div>
           ) : null}
         </div>
+
+        <ProgressBar
+          doneCount={project.doneTaskCount}
+          openCount={project.openTaskCount}
+        />
 
         <section
           className="grid gap-px overflow-hidden rounded-md border sm:grid-cols-2 xl:grid-cols-4"
@@ -233,9 +299,12 @@ function ProjectCard({
 
         <section className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
           <div className="rounded-md border p-3" style={{ borderColor: "var(--border-faint)" }}>
-            <p className="text-[0.75rem] font-semibold uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>
-              Linked work
-            </p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[0.75rem] font-semibold uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>
+                Linked work
+              </p>
+              <QuickAddTask projectId={project.id} />
+            </div>
             <div className="mt-3 grid gap-4 lg:grid-cols-2">
               <TaskLane label="Today" tasks={todayTasks} empty="Nothing queued for today." />
               <TaskLane label="Next" tasks={nextTasks} empty="No next task is defined yet." />
@@ -294,6 +363,20 @@ function ProjectCard({
             </details>
 
             <ProjectEditForm project={project} />
+
+            <div className="flex items-center justify-between gap-2 px-1">
+              <Link
+                href={`/app/projects/${project.id}`}
+                className="text-[0.75rem] font-medium hover:underline"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Open detail →
+              </Link>
+              <ArchiveProjectButton
+                projectId={project.id}
+                archived={project.status !== "archived"}
+              />
+            </div>
           </div>
         </section>
       </div>
@@ -301,12 +384,21 @@ function ProjectCard({
   );
 }
 
-export default async function ProjectsPage() {
+export default async function ProjectsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ archived?: string }>;
+}) {
   const userId = await resolveActiveUserId();
+  const params = await searchParams;
+  const showArchived = params.archived === "1";
   const projects = await listProjects(userId);
   const todayDateValue = new Date().toISOString().slice(0, 10);
 
-  const active = projects.filter((project) => project.status !== "done");
+  const archived = projects.filter((project) => project.status === "archived");
+  const active = projects.filter(
+    (project) => project.status !== "done" && project.status !== "archived",
+  );
   const done = projects.filter((project) => project.status === "done");
   const waitingCount = active.filter((project) => project.status === "waiting").length;
   const targetingCount = active.filter((project) => project.targetDate).length;
@@ -388,6 +480,37 @@ export default async function ProjectsPage() {
           </ol>
         )}
       </SectionCard>
+
+      {archived.length > 0 ? (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <p
+              className="text-[0.75rem] font-semibold uppercase tracking-wider"
+              style={{ color: "var(--text-faint)" }}
+            >
+              Archived · {archived.length}
+            </p>
+            <Link
+              href={showArchived ? "/app/projects" : "/app/projects?archived=1"}
+              className="text-[0.8125rem] font-medium hover:underline"
+              style={{ color: "var(--text-muted)" }}
+            >
+              {showArchived ? "Hide archived" : "Show archived"}
+            </Link>
+          </div>
+          {showArchived ? (
+            <ol className="space-y-4">
+              {archived.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  todayDateValue={todayDateValue}
+                />
+              ))}
+            </ol>
+          ) : null}
+        </section>
+      ) : null}
     </div>
   );
 }

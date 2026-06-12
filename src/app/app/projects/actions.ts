@@ -9,6 +9,7 @@ import { createDoItem, updateDoItem } from "@/lib/services/do";
 import {
   createProject,
   deleteProject,
+  setProjectArchived,
   updateProject,
 } from "@/lib/services/projects";
 import { resolveActiveUserId } from "@/lib/viewer-context";
@@ -129,6 +130,33 @@ export async function deleteProjectAction(formData: FormData) {
   }
   const deleteTasks = String(formData.get("deleteTasks") ?? "") === "1";
   await deleteProject(userId, id, { deleteTasks });
+  revalidateProjects();
+}
+
+// Archive / restore a project. archived="1" archives, anything else restores.
+export async function archiveProjectAction(formData: FormData): Promise<void> {
+  const userId = await resolveActiveUserId();
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) throw new Error("Missing project id.");
+  const archived = String(formData.get("archived") ?? "") === "1";
+  await setProjectArchived(userId, id, archived);
+  revalidateProjects();
+}
+
+// Lightweight inline task capture from a project card — title only.
+export async function quickAddProjectTaskAction(
+  formData: FormData,
+): Promise<void> {
+  const userId = await resolveActiveUserId();
+  const projectId = String(formData.get("projectId") ?? "").trim();
+  const title = String(formData.get("title") ?? "").trim();
+  if (!projectId || !title) return;
+  await createDoItem(userId, {
+    title: title.slice(0, 200),
+    projectId,
+    lane: "next",
+    status: "ready",
+  });
   revalidateProjects();
 }
 

@@ -7,6 +7,7 @@ import {
   deriveEstimationAccuracy,
   deriveHabitConsistency,
   derivePlanVsActual,
+  deriveRhythmConsistency,
   deriveSpendTrends,
   deriveTimeAllocation,
   deriveWellbeingTrends,
@@ -19,6 +20,7 @@ import { listDoItems } from "@/lib/services/do";
 import { listTransactions } from "@/lib/services/finance";
 import { listHabitEntriesBetween, listHabits } from "@/lib/services/habits";
 import { listReflections } from "@/lib/services/reflect";
+import { listRecentRhythms } from "@/lib/services/rhythms";
 import { listEntriesBetween } from "@/lib/services/time";
 import { requireViewerContext } from "@/lib/viewer-context";
 import {
@@ -57,18 +59,27 @@ export default async function InsightsPage({
   to.setHours(23, 59, 59, 999);
   const sinceKey = from.toLocaleDateString("en-CA");
 
-  const [entries, reflections, habits, habitEntries, tasks, calendarItems, transactions] =
-    await Promise.all([
-      listEntriesBetween(userId, { from, to }),
-      listReflections(userId, { sinceKey, limit: 1100 }),
-      listHabits(userId),
-      listHabitEntriesBetween(userId, { from, to }),
-      listDoItems(userId, { includeDone: true }),
-      listCalendarItems(userId, { from, to }),
-      context.financeVisible
-        ? listTransactions(userId, { since: from, limit: 5000 })
-        : Promise.resolve([]),
-    ]);
+  const [
+    entries,
+    reflections,
+    habits,
+    habitEntries,
+    tasks,
+    calendarItems,
+    transactions,
+    rhythmSessions,
+  ] = await Promise.all([
+    listEntriesBetween(userId, { from, to }),
+    listReflections(userId, { sinceKey, limit: 1100 }),
+    listHabits(userId),
+    listHabitEntriesBetween(userId, { from, to }),
+    listDoItems(userId, { includeDone: true }),
+    listCalendarItems(userId, { from, to }),
+    context.financeVisible
+      ? listTransactions(userId, { since: from, limit: 5000 })
+      : Promise.resolve([]),
+    listRecentRhythms(userId, { sinceKey, limit: 2000 }),
+  ]);
 
   const allocation = deriveTimeAllocation(entries, { from, to, now });
   const wellbeing = deriveWellbeingTrends(reflections, { from, to });
@@ -96,6 +107,13 @@ export default async function InsightsPage({
     from,
     to,
   });
+  const rhythmConsistency = deriveRhythmConsistency(
+    rhythmSessions.map((session) => ({
+      type: session.type,
+      startedAt: session.startedAt,
+    })),
+    { from, to },
+  );
 
   return (
     <div className="space-y-8">
@@ -282,6 +300,62 @@ export default async function InsightsPage({
                     </p>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard
+          eyebrow="Rhythms"
+          title="Daily rhythm consistency"
+          aside={
+            rhythmConsistency.totalSessions > 0 ? (
+              <p className="text-[0.78rem]" style={{ color: "var(--text-muted)" }}>
+                {rhythmConsistency.activeDays} of {rhythmConsistency.rangeDays} days had a rhythm
+                {rhythmConsistency.busiestType
+                  ? ` · most run: ${rhythmConsistency.busiestType.name}`
+                  : ""}
+              </p>
+            ) : undefined
+          }
+        >
+          {rhythmConsistency.totalSessions === 0 ? (
+            <EmptyNote>
+              No rhythm sessions in this range yet — start a wake-up, work, or
+              wind-down flow on the Rhythms page and consistency shows up here.
+            </EmptyNote>
+          ) : (
+            <div className="space-y-4">
+              {rhythmConsistency.weekly.length > 1 ? (
+                <SimpleColumns
+                  columns={rhythmConsistency.weekly.map((week) => ({
+                    key: week.weekKey,
+                    label: week.label,
+                    value: week.count,
+                  }))}
+                  suffix=" sessions"
+                  color="#f59e0b"
+                />
+              ) : null}
+              <div className="flex flex-wrap gap-2">
+                {rhythmConsistency.perType
+                  .filter((entry) => entry.count > 0)
+                  .map((entry) => (
+                    <span
+                      key={entry.type}
+                      className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[0.78rem]"
+                      style={{
+                        borderColor: "var(--border-faint)",
+                        color: "var(--text-muted)",
+                      }}
+                    >
+                      <span aria-hidden>{entry.icon}</span>
+                      {entry.name}
+                      <span className="tabular" style={{ color: "var(--text)" }}>
+                        {entry.count}
+                      </span>
+                    </span>
+                  ))}
               </div>
             </div>
           )}

@@ -5,6 +5,8 @@ import { listDoItems, listSuggestedDoItems } from "@/lib/services/do";
 import { listAccounts, listTransactions } from "@/lib/services/finance";
 import { listHabits, listSuggestedHabits } from "@/lib/services/habits";
 import { listProjects } from "@/lib/services/projects";
+import { listActiveRhythms } from "@/lib/services/rhythms";
+import { suggestedRhythmForHour, type RhythmType } from "@/lib/rhythms";
 import { listReflections, listRecentMoods } from "@/lib/services/reflect";
 import {
   buildDayFacts,
@@ -30,6 +32,8 @@ import {
   sumSpend,
 } from "./_components/hub-derive";
 import { HubHeader } from "./_components/hub-header";
+import { RhythmNudge } from "./_components/rhythm-nudge";
+import { ProjectsProgressSection } from "./_components/projects-progress-section";
 import { QuickActionsSection } from "./_components/quick-actions-section";
 import { InsightOfTheDayCard } from "./_components/insight-of-the-day";
 import { ReflectSection } from "./_components/reflect-section";
@@ -106,8 +110,28 @@ export default async function HubPage() {
       ])
     : [null, [], [], [], [], [], [], [], [], [], [], [], [], []];
 
+  // Contextual rhythm nudge: which rhythm fits this hour, and whether one is
+  // already running. Fetched separately to keep the big tuple above intact.
+  const activeRhythms = userId
+    ? await listActiveRhythms(userId)
+    : new Map<RhythmType, never>();
+
   const now = new Date();
   const todayStart = startOfToday();
+  const localHour = Number(
+    new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      hour12: false,
+      timeZone: timezone,
+    }).format(now),
+  );
+  const suggestedRhythm = suggestedRhythmForHour(
+    Number.isFinite(localHour) ? localHour % 24 : now.getHours(),
+  );
+  const activeRhythmType =
+    activeRhythms.get(suggestedRhythm)?.type ??
+    [...activeRhythms.keys()][0] ??
+    null;
   const monthStart = startOfMonth();
   const previousMonthStart = startOfPreviousMonth();
   const weekTotalMs = sumDurations(weekEntries);
@@ -231,9 +255,16 @@ export default async function HubPage() {
       {/* Hero first: the one recommendation. Stat tiles support it below. */}
       <FocusModuleCard focus={focus} />
 
+      <RhythmNudge
+        suggestedType={suggestedRhythm}
+        activeType={activeRhythmType}
+      />
+
       <InsightOfTheDayCard insight={insightOfTheDay} />
 
       <DailyDigestSection digest={digest} />
+
+      <ProjectsProgressSection projects={projects} />
 
       <ReflectSection
         days={reflectDays}

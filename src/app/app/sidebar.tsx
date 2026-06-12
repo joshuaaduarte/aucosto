@@ -112,6 +112,15 @@ function ReflectIcon() {
     </svg>
   );
 }
+function RhythmIcon() {
+  return (
+    <svg {...ip}>
+      <path d="M1.5 7.5a6 6 0 0 1 10.5-4" />
+      <path d="M13.5 7.5a6 6 0 0 1-10.5 4" />
+      <path d="M12 1.25v2.5h-2.5M3 13.75v-2.5h2.5" />
+    </svg>
+  );
+}
 function GearIcon() {
   return (
     <svg {...ip}>
@@ -154,6 +163,7 @@ const navItems: NavItem[] = [
   { href: "/app/habits", label: "Habits", match: (p) => p.startsWith("/app/habits"), finance: false, icon: <RepeatIcon /> },
   { href: "/app/time", label: "Time", match: (p) => p.startsWith("/app/time"), finance: false, icon: <ClockIcon /> },
   { href: "/app/projects", label: "Projects", match: (p) => p.startsWith("/app/projects"), finance: false, icon: <ProjectsIcon /> },
+  { href: "/app/rhythms", label: "Rhythms", match: (p) => p.startsWith("/app/rhythms"), finance: false, icon: <RhythmIcon /> },
   { href: "/app/reflect", label: "Reflect", match: (p) => p.startsWith("/app/reflect"), finance: false, icon: <ReflectIcon /> },
   { href: "/app/insights", label: "Insights", match: (p) => p.startsWith("/app/insights"), finance: false, icon: <TrendIcon /> },
   { href: "/app/finance", label: "Finance", match: (p) => p.startsWith("/app/finance"), finance: true, icon: <WalletIcon /> },

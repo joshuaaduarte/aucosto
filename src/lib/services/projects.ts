@@ -360,6 +360,145 @@ export async function listProjects(userId: string): Promise<ProjectSummary[]> {
   );
 }
 
+export type ProjectTimeEntry = {
+  id: string;
+  label: string;
+  taskTitle: string | null;
+  startedAt: Date;
+  endedAt: Date | null;
+  minutes: number;
+};
+
+export type ProjectDetail = {
+  project: ProjectSummary;
+  timeEntries: ProjectTimeEntry[];
+};
+
+/** Single project (summary + recent linked time entries) for the detail page. */
+export async function getProjectDetail(
+  userId: string,
+  id: string,
+): Promise<ProjectDetail | null> {
+  requireCan(userId, "projects", "read");
+  const now = new Date();
+
+  const project = await prisma.project.findFirst({
+    where: { userId, id },
+    include: {
+      doItems: {
+        select: {
+          id: true,
+          title: true,
+          lane: true,
+          status: true,
+          estimatedMinutes: true,
+          lastWorkedAt: true,
+          updatedAt: true,
+          timeEntries: {
+            where: { endedAt: { not: null } },
+            select: { startedAt: true, endedAt: true },
+          },
+        },
+      },
+    },
+  });
+  if (!project) return null;
+
+  const taskIds = project.doItems.map((item) => item.id);
+  const scheduledByTask = new Map<
+    string,
+    { scheduledMinutes: number; scheduledCount: number }
+  >();
+  const blocksByProject = new Map<string, ProjectBlockSummary[]>();
+
+  if (taskIds.length > 0) {
+    const blocks = await prisma.calendarItem.findMany({
+      where: {
+        userId,
+        sourceTool: "do",
+        sourceRefId: { in: taskIds },
+        status: { not: "cancelled" },
+        endsAt: { gte: now },
+      },
+      select: {
+        id: true,
+        title: true,
+        startsAt: true,
+        endsAt: true,
+        sourceRefId: true,
+      },
+      orderBy: { startsAt: "asc" },
+    });
+
+    for (const block of blocks) {
+      if (!block.sourceRefId) continue;
+      const duration = Math.max(
+        0,
+        Math.round((block.endsAt.getTime() - block.startsAt.getTime()) / 60000),
+      );
+      const current = scheduledByTask.get(block.sourceRefId) ?? {
+        scheduledMinutes: 0,
+        scheduledCount: 0,
+      };
+      current.scheduledMinutes += duration;
+      current.scheduledCount += 1;
+      scheduledByTask.set(block.sourceRefId, current);
+
+      const list = blocksByProject.get(project.id) ?? [];
+      list.push({
+        id: block.id,
+        title: block.title,
+        startsAt: block.startsAt,
+        endsAt: block.endsAt,
+        doItemId: block.sourceRefId,
+      });
+      blocksByProject.set(project.id, list);
+    }
+  }
+
+  const summary = summarize(project, { scheduledByTask, blocksByProject, now });
+
+  let timeEntries: ProjectTimeEntry[] = [];
+  if (taskIds.length > 0) {
+    const entries = await prisma.timeEntry.findMany({
+      where: { userId, doItemId: { in: taskIds } },
+      select: {
+        id: true,
+        label: true,
+        startedAt: true,
+        endedAt: true,
+        doItem: { select: { title: true } },
+      },
+      orderBy: { startedAt: "desc" },
+      take: 25,
+    });
+    timeEntries = entries.map((entry) => ({
+      id: entry.id,
+      label: entry.label,
+      taskTitle: entry.doItem?.title ?? null,
+      startedAt: entry.startedAt,
+      endedAt: entry.endedAt,
+      minutes: entry.endedAt
+        ? Math.max(
+            0,
+            Math.round((entry.endedAt.getTime() - entry.startedAt.getTime()) / 60000),
+          )
+        : 0,
+    }));
+  }
+
+  return { project: summary, timeEntries };
+}
+
+/** Archive (or restore) a project. Stored as the "archived" status value. */
+export async function setProjectArchived(
+  userId: string,
+  id: string,
+  archived: boolean,
+): Promise<ProjectSummary | null> {
+  return updateProject(userId, id, { status: archived ? "archived" : "active" });
+}
+
 export async function createProject(
   userId: string,
   input: SaveProjectInput,

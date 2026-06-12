@@ -1,0 +1,21 @@
+// Life Rhythms: contextual guided flows at natural transition points
+// (bedtime, wake-up, work, wind-down, workout). One row per started flow;
+// endedAt/durationMinutes fill in when a timed flow (sleep, workout) closes.
+// `type` is a string enum (matches the project convention — see Habit.cadence)
+// validated through src/lib/rhythms.ts.
+
+model RhythmSession {
+  id              String    @id @default(cuid())
+  userId          String
+  type            String
+  startedAt       DateTime  @default(now())
+  endedAt         DateTime?
+  durationMinutes Int?
+  notes           String?
+  metadata        Json?
+  createdAt       DateTime  @default(now())
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startedAt])
+  @@index([userId, type, startedAt])
+}
