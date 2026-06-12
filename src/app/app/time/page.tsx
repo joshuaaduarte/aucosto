@@ -11,8 +11,9 @@ import {
 } from "@/lib/services/do";
 import { listSuggestedHabits } from "@/lib/services/habits";
 import { listCalendarItems } from "@/lib/services/calendar";
-import { getTodayMorning } from "@/lib/services/rhythms";
+import { getTodayMorning, listSleepSessions } from "@/lib/services/rhythms";
 import { formatDuration, formatHM, startOfToday, startOfWeek } from "@/lib/time";
+import { formatRhythmDuration, rhythmDurationMinutes } from "@/lib/rhythms";
 import {
   buildDailyStacks,
   clippedDurationMs,
@@ -53,6 +54,83 @@ function formatDayLabel(date: Date) {
 
 function formatShortTime(date: Date) {
   return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function startOfDay(date: Date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function dayKey(date: Date) {
+  return startOfDay(date).toISOString();
+}
+
+/** "06:17" → "6:17 AM" (or null when unparseable). */
+function formatClockString(hhmm: string | null) {
+  if (!hhmm) return null;
+  const [h, m] = hhmm.split(":").map(Number);
+  if (h === undefined || m === undefined || !Number.isFinite(h) || !Number.isFinite(m)) {
+    return null;
+  }
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  return formatShortTime(d);
+}
+
+type SleepMarker = {
+  id: string;
+  startedAt: Date;
+  endedAt: Date | null;
+  durationMinutes: number | null;
+  wakeTime: string | null;
+};
+
+/** Read-only sleep marker row: dimmed, moon icon, indigo left rail, no actions. */
+function SleepMarkerRow({
+  variant,
+  sleep,
+}: {
+  variant: "bed" | "wake";
+  sleep: SleepMarker;
+}) {
+  let text: string;
+  if (variant === "bed") {
+    text = `Went to sleep · ${formatShortTime(sleep.startedAt)}`;
+  } else {
+    const wakeLabel = sleep.endedAt
+      ? formatShortTime(sleep.endedAt)
+      : formatClockString(sleep.wakeTime);
+    const minutes =
+      sleep.durationMinutes && sleep.durationMinutes > 0
+        ? sleep.durationMinutes
+        : sleep.endedAt
+          ? rhythmDurationMinutes(sleep.startedAt, sleep.endedAt)
+          : null;
+    const durLabel = minutes ? formatRhythmDuration(minutes) : null;
+    if (durLabel && wakeLabel) text = `Slept ${durLabel} · woke up ${wakeLabel}`;
+    else if (wakeLabel) text = `Woke up ${wakeLabel}`;
+    else text = "Woke up";
+  }
+  return (
+    <li
+      className="flex items-center gap-2 rounded-md py-1.5 pl-3 pr-2"
+      style={{
+        borderTop: "1px solid var(--border-faint)",
+        borderLeft: "2px solid #818cf8",
+      }}
+    >
+      <span aria-hidden className="text-[0.8125rem] opacity-60">
+        🌙
+      </span>
+      <span
+        className="text-[0.8125rem] italic"
+        style={{ color: "var(--text-faint)" }}
+      >
+        {text}
+      </span>
+    </li>
+  );
 }
 
 export default async function TimePage() {
@@ -217,18 +295,58 @@ export default async function TimePage() {
     />
   );
 
-  const groupedEntries = recent.reduce<
-    Array<{ label: string; items: typeof recent }>
-  >((groups, entry) => {
-    const label = formatDayLabel(entry.startedAt);
-    const existing = groups.find((group) => group.label === label);
-    if (existing) {
-      existing.items.push(entry);
-      return groups;
+  // Sleep rhythm markers shown alongside entries. Fetch covers the same span
+  // the archive does (oldest recent entry's day → tomorrow), so every day group
+  // that can render gets its bedtime/wake-up bookends.
+  const sleepFrom = recent.length
+    ? startOfDay(
+        recent.reduce(
+          (min, entry) => (entry.startedAt < min ? entry.startedAt : min),
+          recent[0]!.startedAt,
+        ),
+      )
+    : todayStart;
+  const sleepSessions = await listSleepSessions(userId, {
+    from: sleepFrom,
+    to: tomorrow,
+  });
+
+  // Build day groups merging time entries with sleep markers. A sleep session
+  // contributes a bedtime marker to the day it started and a wake-up marker to
+  // the day it ended (or today, if still open with a known wake time).
+  const groupMap = new Map<
+    string,
+    {
+      date: Date;
+      label: string;
+      wake: SleepMarker[];
+      entries: typeof recent;
+      bed: SleepMarker[];
     }
-    groups.push({ label, items: [entry] });
-    return groups;
-  }, []);
+  >();
+  const ensureGroup = (date: Date) => {
+    const key = dayKey(date);
+    let group = groupMap.get(key);
+    if (!group) {
+      const day = startOfDay(date);
+      group = { date: day, label: formatDayLabel(day), wake: [], entries: [], bed: [] };
+      groupMap.set(key, group);
+    }
+    return group;
+  };
+  for (const entry of recent) {
+    ensureGroup(entry.startedAt).entries.push(entry);
+  }
+  for (const sleep of sleepSessions) {
+    ensureGroup(sleep.startedAt).bed.push(sleep);
+    // Only show a wake-up marker once there's a wake time to show.
+    if (sleep.endedAt || sleep.wakeTime) {
+      ensureGroup(sleep.endedAt ?? now).wake.push(sleep);
+    }
+  }
+  const groupedDays = [...groupMap.values()].sort(
+    (a, b) => b.date.getTime() - a.date.getTime(),
+  );
   const hasArchive = recent.length > 0;
 
   return (
@@ -401,7 +519,7 @@ export default async function TimePage() {
           <AddEntryButton tasks={linkableTasks} />
         </div>
 
-        {recent.length === 0 ? (
+        {groupedDays.length === 0 ? (
           <p
             className="text-[0.875rem]"
             style={{ color: "var(--text-muted)" }}
@@ -410,7 +528,7 @@ export default async function TimePage() {
           </p>
         ) : (
           <div className="space-y-5">
-            {groupedEntries.map((group) => (
+            {groupedDays.map((group) => (
               <div key={group.label}>
                 <h3
                   className="px-1 pb-1 text-[0.6875rem] font-semibold uppercase tracking-wider"
@@ -419,7 +537,14 @@ export default async function TimePage() {
                   {group.label}
                 </h3>
                 <ul>
-                  {group.items.map((entry) => {
+                  {group.wake.map((sleep) => (
+                    <SleepMarkerRow
+                      key={`wake-${sleep.id}`}
+                      variant="wake"
+                      sleep={sleep}
+                    />
+                  ))}
+                  {group.entries.map((entry) => {
                     const duration =
                       (entry.endedAt!.getTime() -
                         entry.startedAt.getTime()) |
@@ -530,6 +655,13 @@ export default async function TimePage() {
                       </li>
                     );
                   })}
+                  {group.bed.map((sleep) => (
+                    <SleepMarkerRow
+                      key={`bed-${sleep.id}`}
+                      variant="bed"
+                      sleep={sleep}
+                    />
+                  ))}
                 </ul>
               </div>
             ))}

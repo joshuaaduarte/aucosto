@@ -484,6 +484,51 @@ export async function completeMorning(userId: string): Promise<void> {
   }
 }
 
+export type SleepSessionRecord = {
+  id: string;
+  startedAt: Date;
+  endedAt: Date | null;
+  durationMinutes: number | null;
+  /** "HH:mm" the user reported waking (metadata), useful when endedAt is null. */
+  wakeTime: string | null;
+};
+
+/**
+ * Sleep sessions overlapping [from, to) — the time tracker list renders these
+ * as read-only bedtime / wake-up markers. Includes `metadata.wakeTime` so a
+ * still-open session can show a known wake time before it's formally ended.
+ * An open session is treated as running up to now() for the overlap test.
+ */
+export async function listSleepSessions(
+  userId: string,
+  range: { from: Date; to: Date },
+): Promise<SleepSessionRecord[]> {
+  requireCan(userId, "rhythm", "read");
+  try {
+    const rows = await prisma.$queryRaw<MetaRow[]>(Prisma.sql`
+      SELECT ${SELECT_FIELDS}, "metadata"
+      FROM "RhythmSession"
+      WHERE "userId" = ${userId}
+        AND "type" = 'sleep'
+        AND "startedAt" < ${range.to}
+        AND COALESCE("endedAt", now()) > ${range.from}
+      ORDER BY "startedAt" ASC
+    `);
+    return rows.map((row) => ({
+      id: row.id,
+      startedAt: row.startedAt,
+      endedAt: row.endedAt,
+      durationMinutes: row.durationMinutes,
+      wakeTime: readMorningMeta(row.metadata).wakeTime,
+    }));
+  } catch (error) {
+    if (!isMissingTableError(error)) {
+      console.error("[rhythms] listSleepSessions failed", error);
+    }
+    return [];
+  }
+}
+
 /**
  * Sleep + wakeup sessions overlapping [from, to) — the calendar renders these
  * as soft, read-only context blocks beside tracked time. An open session is
