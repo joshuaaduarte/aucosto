@@ -88,9 +88,10 @@ type SleepMarker = {
 };
 
 /**
- * Read-only sleep bookend — a soft indigo day-boundary callout, not a list
- * row. Moon icon, sleep duration prominent, wake/bedtime secondary. No actions,
- * no hover: it's purely informational context between time entries.
+ * Read-only sleep bookend — a day-boundary callout, not a list row. The
+ * wake-up card reads as a warm sunrise (amber), the bedtime card as a cool
+ * night sky (indigo), so morning vs. night is obvious at a glance. No actions,
+ * no hover: purely informational context between time entries.
  */
 function SleepMarkerRow({
   variant,
@@ -99,8 +100,28 @@ function SleepMarkerRow({
   variant: "bed" | "wake";
   sleep: SleepMarker;
 }) {
+  // Per-variant palette: sunrise (wake) vs. night sky (bed).
+  const theme =
+    variant === "wake"
+      ? {
+          emoji: "🌅",
+          background:
+            "linear-gradient(to right, rgba(120,53,15,0.35), rgba(180,83,9,0.15))",
+          border: "1px solid rgba(251,191,36,0.25)",
+          primary: "#fde68a", // amber-200
+          secondary: "#d97706", // amber-600
+        }
+      : {
+          emoji: "🌙",
+          background:
+            "linear-gradient(to right, rgba(30,27,75,0.6), rgba(49,46,129,0.25))",
+          border: "1px solid rgba(99,102,241,0.3)",
+          primary: "#c7d2fe", // indigo-200
+          secondary: "#818cf8", // indigo-400
+        };
+
   const dot = (
-    <span aria-hidden className="px-2" style={{ color: "var(--text-faint)" }}>
+    <span aria-hidden className="px-2" style={{ color: theme.secondary, opacity: 0.6 }}>
       ·
     </span>
   );
@@ -109,9 +130,11 @@ function SleepMarkerRow({
   if (variant === "bed") {
     content = (
       <>
-        <span style={{ color: "var(--text-muted)" }}>Went to sleep</span>
+        <span className="font-medium" style={{ color: theme.primary }}>
+          Went to sleep
+        </span>
         {dot}
-        <span className="font-medium" style={{ color: "var(--text)" }}>
+        <span className="text-[0.75rem]" style={{ color: theme.secondary }}>
           {formatShortTime(sleep.startedAt)}
         </span>
       </>
@@ -129,20 +152,20 @@ function SleepMarkerRow({
     const durLabel = minutes ? formatRhythmDuration(minutes) : null;
     content = durLabel ? (
       <>
-        <span className="font-semibold" style={{ color: "var(--text)" }}>
+        <span className="font-medium" style={{ color: theme.primary }}>
           Slept {durLabel}
         </span>
         {wakeLabel ? (
           <>
             {dot}
-            <span style={{ color: "var(--text-muted)" }}>
+            <span className="text-[0.75rem]" style={{ color: theme.secondary }}>
               woke up {wakeLabel}
             </span>
           </>
         ) : null}
       </>
     ) : (
-      <span className="font-semibold" style={{ color: "var(--text)" }}>
+      <span className="font-medium" style={{ color: theme.primary }}>
         {wakeLabel ? `Woke up ${wakeLabel}` : "Woke up"}
       </span>
     );
@@ -151,14 +174,11 @@ function SleepMarkerRow({
   return (
     <li className="list-none">
       <div
-        className="my-1.5 flex items-center gap-2.5 rounded-xl px-4 py-2.5"
-        style={{
-          background: "rgba(79, 70, 229, 0.12)",
-          border: "1px solid rgba(99, 102, 241, 0.22)",
-        }}
+        className="my-2 flex items-center gap-3 rounded-xl px-4 py-3"
+        style={{ background: theme.background, border: theme.border }}
       >
-        <span aria-hidden className="shrink-0 text-[1rem] opacity-80">
-          🌙
+        <span aria-hidden className="shrink-0 text-xl leading-none">
+          {theme.emoji}
         </span>
         <span className="text-[0.8125rem] leading-snug">{content}</span>
       </div>
