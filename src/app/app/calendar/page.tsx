@@ -33,7 +33,7 @@ import {
   CalendarTimeline,
   type CalendarColumn,
 } from "./_components/day-timeline";
-import { isCalendarView, type CalendarView } from "./_components/view-selector";
+import { isCalendarView, type CalendarView } from "./_lib/views";
 import type { TimelineBlockPayload } from "./_components/timeline-block";
 import { derivePlanVsActual } from "@/lib/insights";
 import { OpenTimeSection } from "./_components/open-time-section";

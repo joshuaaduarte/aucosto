@@ -9,9 +9,16 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import {
+  CALENDAR_VIEWS,
+  isCalendarView,
+  type CalendarView,
+} from "../_lib/views";
 
-export const CALENDAR_VIEWS = ["1d", "2d", "3d", "w"] as const;
-export type CalendarView = (typeof CALENDAR_VIEWS)[number];
+// Re-exported for existing client-side importers (e.g. day-timeline). Server
+// code must import these from ../_lib/views directly — a function exported from
+// this "use client" module cannot be called server-side.
+export { CALENDAR_VIEWS, isCalendarView, type CalendarView };
 
 const STORAGE_KEY = "aucosto:calendar-view";
 const LABELS: Record<CalendarView, string> = {
@@ -20,10 +27,6 @@ const LABELS: Record<CalendarView, string> = {
   "3d": "3D",
   w: "W",
 };
-
-export function isCalendarView(value: string | undefined): value is CalendarView {
-  return !!value && (CALENDAR_VIEWS as readonly string[]).includes(value);
-}
 
 function hrefFor(view: CalendarView, anchorDay: string) {
   return `/app/calendar?view=${view}&day=${anchorDay}`;
