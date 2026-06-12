@@ -88,6 +88,7 @@ function EntryModal({
     saveEntryAction,
     initialState,
   );
+  const [category, setCategory] = useState(entry?.category ?? "");
   const closedRef = useRef(false);
 
   useEffect(() => {
@@ -183,23 +184,45 @@ function EntryModal({
               <input
                 id="entry-editor-category"
                 name="category"
-                defaultValue={entry?.category ?? ""}
-                placeholder="Optional"
+                value={category}
+                onChange={(event) => setCategory(event.target.value)}
+                placeholder="Optional — type or tap below"
                 className="field"
-                list="entry-editor-categories"
               />
-              <datalist id="entry-editor-categories">
-                {PRESET_TIME_CATEGORIES.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.label}
-                  </option>
-                ))}
-              </datalist>
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="space-y-1.5">
+          {/* Preset chips: one swipeable row on phones, wrapping on desktop.
+              Tappable — no reliance on datalist, which iOS barely surfaces. */}
+          <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible">
+            {PRESET_TIME_CATEGORIES.map((preset) => {
+              const active = category.trim().toLowerCase() === preset.id;
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => setCategory(active ? "" : preset.id)}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded px-2 py-1.5 text-[0.75rem] font-medium transition-colors"
+                  style={{
+                    background: active ? "var(--bg-tint-strong)" : "var(--bg-tint)",
+                    color: active ? "var(--text)" : "var(--text-muted)",
+                    boxShadow: active ? `inset 0 0 0 1px ${preset.color}` : undefined,
+                  }}
+                >
+                  <span
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ background: preset.color }}
+                    aria-hidden
+                  />
+                  {preset.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Phone: date full-width, start/end side by side. Desktop: 3-up. */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="col-span-2 space-y-1.5 sm:col-span-1">
               <label
                 className="block text-[0.75rem] font-medium"
                 style={{ color: "var(--text-muted)" }}
@@ -284,7 +307,11 @@ function EntryModal({
             >
               Cancel
             </button>
-            <button type="submit" disabled={pending} className="btn-ink">
+            <button
+              type="submit"
+              disabled={pending}
+              className="btn-ink flex-1 sm:flex-none"
+            >
               {pending ? "Saving..." : entry ? "Save entry" : "Add entry"}
             </button>
           </div>

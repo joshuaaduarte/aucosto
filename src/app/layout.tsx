@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter_Tight, JetBrains_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
@@ -19,6 +19,12 @@ const jetbrains = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Aucosto | Personal workspace",
   description: "A personal workspace for time, money, calendar, and daily life.",
+};
+
+// viewport-fit=cover lets env(safe-area-inset-*) resolve on notched phones
+// (used by the bottom-sheet modals to clear the home indicator).
+export const viewport: Viewport = {
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

@@ -434,6 +434,8 @@ body > * {
   align-items: flex-end;
   justify-content: center;
   padding: 1rem;
+  /* Keep bottom-sheet actions above the iPhone home indicator. */
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
   background: rgba(15, 15, 15, 0.36);
   backdrop-filter: blur(6px);
 }
