@@ -549,7 +549,7 @@ function MultiFillModal({
   // next day (a gap can straddle midnight).
   const resolveEnd = (): Date | null => {
     const [h, m] = endValue.split(":").map(Number);
-    if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+    if (h === undefined || m === undefined || !Number.isFinite(h) || !Number.isFinite(m)) return null;
     const end = new Date(cursor);
     end.setHours(h, m, 0, 0);
     if (end.getTime() <= cursor.getTime()) end.setDate(end.getDate() + 1);
