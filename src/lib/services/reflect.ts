@@ -45,13 +45,29 @@ type Row = {
   contextSnapshot: unknown;
 };
 
-/** True when the DailyReflection table hasn't been migrated yet (42P01).
-    Reads degrade to empty so the hub/layout render before migration. */
+/**
+ * True when the DailyReflection table hasn't been migrated yet. Reads
+ * degrade to empty so the hub/layout render before migration.
+ *
+ * IMPORTANT: the pg driver adapter translates postgres 42P01 into Prisma's
+ * P2021 ("table does not exist", message uses backticks) — checking the raw
+ * pg strings here once took the whole app down, because the guard never
+ * matched and the layout's badge read threw on every request. Match on
+ * error CODES first, message text only as a fallback.
+ */
 function isMissingTableError(error: unknown): boolean {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === "P2021") return true;
+    // P2010 = raw query failed; the database code rides in meta.
+    if (error.code === "P2010") {
+      return JSON.stringify(error.meta ?? {}).includes("42P01");
+    }
+  }
   return (
     error instanceof Error &&
     (error.message.includes("42P01") ||
-      error.message.includes('"DailyReflection" does not exist'))
+      (error.message.includes("DailyReflection") &&
+        error.message.includes("does not exist")))
   );
 }
 

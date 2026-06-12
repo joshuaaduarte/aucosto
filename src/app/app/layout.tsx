@@ -25,10 +25,19 @@ export default async function AppLayout({
   };
 
   // Subtle badge on the More tab while today has no saved reflection.
-  const todayReflection =
-    context && context.isUnlocked
-      ? await getReflection(context.effectiveUserId, dayKey(new Date()))
-      : null;
+  // Belt-and-braces try/catch: a cosmetic badge read must never be able to
+  // take down every page in the app.
+  let todayReflection = null;
+  if (context && context.isUnlocked) {
+    try {
+      todayReflection = await getReflection(
+        context.effectiveUserId,
+        dayKey(new Date()),
+      );
+    } catch (error) {
+      console.error("[layout] reflection badge read failed", error);
+    }
+  }
 
   return (
     <div className="flex min-h-screen flex-1" style={{ background: "var(--bg-app)" }}>
