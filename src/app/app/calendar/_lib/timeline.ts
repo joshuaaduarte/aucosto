@@ -38,7 +38,7 @@ const MIN_END_HOUR = 22;
 type PlannedInput = Pick<
   CalendarItem,
   "id" | "title" | "startsAt" | "endsAt" | "allDay" | "status" | "kind"
->;
+> & { sourceTool?: string | null };
 
 type ActualInput = Pick<
   TimeEntry,
@@ -112,7 +112,16 @@ export function buildDayTimeline(input: {
         id: item.id,
         title: item.title,
         detail: `${formatShort(item.startsAt)}–${formatShort(item.endsAt)}`,
-        color: categoryColor(item.kind === "external" ? null : "calendar"),
+        // One color language with the rest of the app: task-sourced blocks
+        // use the "do" color, habit blocks "habit", native blocks "calendar".
+        color:
+          item.kind === "external"
+            ? categoryColor(null)
+            : item.sourceTool === "do"
+              ? categoryColor("do")
+              : item.sourceTool === "habit"
+                ? categoryColor("habit")
+                : categoryColor("calendar"),
         topPct,
         heightPct,
         running: false,

@@ -3,7 +3,7 @@ import {
   type buildWeekDays,
   formatCalendarTimeRange,
   groupForDay,
-  itemTone,
+  calendarItemColor,
 } from "../_lib/derive";
 
 export function WeekOverview({
@@ -84,7 +84,7 @@ export function WeekOverview({
                         <span
                           className="h-1.5 w-1.5 shrink-0 rounded-full"
                           style={{
-                            background: itemTone(item.kind, item.status),
+                            background: calendarItemColor(item),
                           }}
                         />
                         <p

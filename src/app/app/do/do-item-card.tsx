@@ -10,6 +10,7 @@ import {
   formatMinutes,
 } from "@/lib/do";
 import type { DoItemSummary } from "@/lib/services/do";
+import { categoryColor } from "@/lib/time-categories";
 import {
   completeDoItemAction,
   deleteDoItemAction,
@@ -191,7 +192,16 @@ export function DoItemCard({
                 >
                   {item.title}
                 </p>
-                {item.bucket ? <span className="pill">{item.bucket}</span> : null}
+                {item.bucket ? (
+                  <span className="pill inline-flex items-center gap-1">
+                    <span
+                      className="h-1.5 w-1.5 rounded-full"
+                      style={{ background: categoryColor(item.bucket) }}
+                      aria-hidden
+                    />
+                    {item.bucket}
+                  </span>
+                ) : null}
                 {item.projectName ? <span className="pill">{item.projectName}</span> : null}
                 {item.habitTitle ? <span className="pill">Linked habit</span> : null}
                 <span className="pill">

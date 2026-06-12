@@ -4,7 +4,7 @@ import {
   formatCalendarTimeRange,
   formatDateValue,
   formatTimeValue,
-  itemTone,
+  calendarItemColor,
 } from "../_lib/derive";
 import {
   completeCalendarItemAction,
@@ -56,7 +56,7 @@ export function CalendarItemCard({
             <div className="flex flex-wrap items-center gap-2">
               <span
                 className="h-1.5 w-1.5 rounded-full"
-                style={{ background: itemTone(item.kind, item.status) }}
+                style={{ background: calendarItemColor(item) }}
               />
               <p
                 className="text-[0.9375rem] font-medium"

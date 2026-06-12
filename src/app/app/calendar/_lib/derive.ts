@@ -1,4 +1,5 @@
 import { daysUntil, formatUSDFromCents } from "@/lib/money";
+import { UNCATEGORIZED_COLOR, categoryColor } from "@/lib/time-categories";
 import type { DoItemSummary } from "@/lib/services/do";
 import type {
   CalendarItem,
@@ -152,6 +153,22 @@ export function itemTone(kind: string, status: string) {
   if (kind === "suggestion") return "var(--accent)";
   if (kind === "external") return "var(--text-faint)";
   return "var(--text)";
+}
+
+/**
+ * Unified color for a calendar item, drawn from the time-category palette so
+ * the calendar, timeline, and time tool speak one color language: blocks
+ * sourced from a task use the "do" color, habit blocks the "habit" color,
+ * native blocks the "calendar" color. Done/external items stay muted.
+ */
+export function calendarItemColor(
+  item: Pick<CalendarItem, "kind" | "status" | "sourceTool">,
+): string {
+  if (item.status === "done") return "var(--text-faint)";
+  if (item.kind === "external") return UNCATEGORIZED_COLOR;
+  if (item.sourceTool === "do") return categoryColor("do");
+  if (item.sourceTool === "habit") return categoryColor("habit");
+  return categoryColor("calendar");
 }
 
 export function formatDateValue(date: Date) {
