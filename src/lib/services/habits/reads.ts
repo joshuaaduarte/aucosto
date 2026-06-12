@@ -75,3 +75,16 @@ export async function listHabitTaskItems(
     })
     .slice(0, options.limit ?? 100);
 }
+
+/** Habit entries in [from, to) — powers insights consistency charts. */
+export async function listHabitEntriesBetween(
+  userId: string,
+  range: { from: Date; to: Date },
+): Promise<Array<{ habitId: string; loggedAt: Date }>> {
+  requireCan(userId, "habit", "read");
+  return prisma.habitEntry.findMany({
+    where: { userId, loggedAt: { gte: range.from, lt: range.to } },
+    select: { habitId: true, loggedAt: true },
+    orderBy: { loggedAt: "asc" },
+  });
+}

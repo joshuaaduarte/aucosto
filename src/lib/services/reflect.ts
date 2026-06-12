@@ -97,7 +97,7 @@ export async function getReflection(
 
 export async function listReflections(
   userId: string,
-  options: { limit?: number } = {},
+  options: { limit?: number; sinceKey?: string } = {},
 ): Promise<DailyReflectionRecord[]> {
   requireCan(userId, "reflect", "read");
   try {
@@ -105,6 +105,7 @@ export async function listReflections(
       SELECT ${SELECT_FIELDS}
       FROM "DailyReflection"
       WHERE "userId" = ${userId}
+        AND (${options.sinceKey ?? null}::date IS NULL OR "date" >= ${options.sinceKey ?? null}::date)
       ORDER BY "date" DESC
       LIMIT ${options.limit ?? 60}
     `);

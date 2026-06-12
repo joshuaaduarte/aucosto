@@ -3,7 +3,7 @@
 // reorganization. Internal helpers (shared.ts, plus the non-re-exported parts
 // of derive.ts) are deliberately not re-exported.
 
-export { listHabits, listHabitTaskItems, listSuggestedHabits } from "./reads";
+export { listHabitEntriesBetween, listHabits, listHabitTaskItems, listSuggestedHabits } from "./reads";
 export {
   archiveHabit,
   createHabit,

@@ -3,7 +3,7 @@
 
 import { clippedDurationMs } from "@/lib/time-insights";
 import { average, weekStartOf } from "./shared";
-import type { DayFacts, PatternFinding } from "./patterns";
+import type { DayFacts } from "./patterns";
 import { bestDayOfWeek } from "./patterns";
 import type { EstimatedTask, InsightEntry } from "./trends";
 import { deriveEstimationAccuracy } from "./trends";
