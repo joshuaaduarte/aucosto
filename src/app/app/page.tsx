@@ -1,12 +1,16 @@
 import { auth } from "@/auth";
 import { startOfMonth, startOfPreviousMonth } from "@/lib/money";
 import { listUpcomingCalendarItems } from "@/lib/services/calendar";
-import { listSuggestedDoItems } from "@/lib/services/do";
+import { listDoItems, listSuggestedDoItems } from "@/lib/services/do";
 import { listAccounts, listTransactions } from "@/lib/services/finance";
 import { listHabits, listSuggestedHabits } from "@/lib/services/habits";
 import { listProjects } from "@/lib/services/projects";
-import { listRecentMoods } from "@/lib/services/reflect";
-import { getRunningEntry, listCompletedSince } from "@/lib/services/time";
+import { listReflections, listRecentMoods } from "@/lib/services/reflect";
+import {
+  buildDayFacts,
+  deriveInsightOfTheDay,
+} from "@/lib/insights";
+import { getRunningEntry, listCompletedSince, listEntriesBetween } from "@/lib/services/time";
 import { dayKey } from "@/lib/reflect";
 import { startOfToday, startOfWeek } from "@/lib/time";
 import { sumDurations } from "@/lib/time-summary";
@@ -27,6 +31,7 @@ import {
 } from "./_components/hub-derive";
 import { HubHeader } from "./_components/hub-header";
 import { QuickActionsSection } from "./_components/quick-actions-section";
+import { InsightOfTheDayCard } from "./_components/insight-of-the-day";
 import { ReflectSection } from "./_components/reflect-section";
 import { WorkspaceSection } from "./_components/workspace-section";
 import { deriveDailyDigest } from "./_lib/daily-digest";
@@ -55,6 +60,9 @@ export default async function HubPage() {
     projects,
     upcomingCalendar,
     recentMoods,
+    entries8w,
+    recentReflections,
+    allTasks,
   ] = userId
     ? await Promise.all([
         getRunningEntry(userId),
@@ -77,8 +85,26 @@ export default async function HubPage() {
         listProjects(userId),
         listUpcomingCalendarItems(userId, { limit: 3 }),
         listRecentMoods(userId, { days: 7 }),
+        listEntriesBetween(userId, {
+          from: (() => {
+            const start = new Date();
+            start.setHours(0, 0, 0, 0);
+            start.setDate(start.getDate() - 8 * 7);
+            return start;
+          })(),
+          to: new Date(),
+        }),
+        listReflections(userId, {
+          sinceKey: (() => {
+            const start = new Date();
+            start.setDate(start.getDate() - 60);
+            return start.toLocaleDateString("en-CA");
+          })(),
+          limit: 70,
+        }),
+        listDoItems(userId, { includeDone: true }),
       ])
-    : [null, [], [], [], [], [], [], [], [], [], []];
+    : [null, [], [], [], [], [], [], [], [], [], [], [], [], []];
 
   const now = new Date();
   const todayStart = startOfToday();
@@ -163,6 +189,27 @@ export default async function HubPage() {
   const reflectedToday = dayKey(now) in moodsByDay;
   const isEvening = now.getHours() >= 18;
 
+  // Insight of the day: rotates through whichever findings have enough data.
+  const sixtyDaysAgo = new Date(todayStart);
+  sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 59);
+  const insightOfTheDay = deriveInsightOfTheDay({
+    now,
+    entries8w,
+    tasks: allTasks.map((task) => ({
+      completedAt: task.completedAt,
+      estimatedMinutes: task.estimatedMinutes,
+      actualMinutes: task.effectiveActualMinutes,
+      bucket: task.bucket,
+    })),
+    days: buildDayFacts({
+      entries: entries8w,
+      reflections: recentReflections,
+      from: sixtyDaysAgo,
+      to: now,
+      now,
+    }),
+  });
+
   const subline = composeSubline({
     runningEntry,
     weekTotalMs,
@@ -183,6 +230,8 @@ export default async function HubPage() {
 
       {/* Hero first: the one recommendation. Stat tiles support it below. */}
       <FocusModuleCard focus={focus} />
+
+      <InsightOfTheDayCard insight={insightOfTheDay} />
 
       <DailyDigestSection digest={digest} />
 

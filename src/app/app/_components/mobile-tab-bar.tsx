@@ -113,6 +113,16 @@ const MORE_TOOLS: MoreTool[] = [
     ),
   },
   {
+    href: "/app/insights",
+    label: "Insights",
+    icon: (
+      <svg {...ip}>
+        <path d="M1.5 12 5.5 7.5l2.5 2L13.5 3" />
+        <path d="M10 3h3.5v3.5" />
+      </svg>
+    ),
+  },
+  {
     href: "/app/reflect",
     label: "Reflect",
     icon: (
