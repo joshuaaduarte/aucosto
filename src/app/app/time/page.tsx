@@ -436,6 +436,7 @@ export default async function TimePage() {
         <section className="fade-in">
           <GapBackfillCard
             gapStartIso={gap.start.toISOString()}
+            gapEndIso={gap.end.toISOString()}
             gapMinutes={gap.minutes}
             categories={quickStartCategories}
             sinceWakeup={sinceWakeup}

@@ -234,6 +234,87 @@ export async function backfillEntry(formData: FormData) {
   revalidatePath("/app/calendar");
 }
 
+// One segment of a multi-entry gap fill. Deliberately does NOT revalidate:
+// the gap card fires several of these back-to-back, and a revalidation between
+// segments would recompute the (now smaller) gap on the server and tear down
+// the open modal mid-flow. The card calls router.refresh() once on close, so
+// the new entries surface then. Returns a result instead of throwing so the
+// flow can show an inline error and keep the user's place.
+export async function backfillSegment(
+  formData: FormData,
+): Promise<{ ok: boolean; error?: string }> {
+  let userId: string;
+  try {
+    userId = await resolveActiveUserId();
+  } catch {
+    return { ok: false, error: "Not signed in." };
+  }
+
+  const parsed = backfillSchema.safeParse({
+    label: formData.get("label") ?? "",
+    category: (formData.get("category") as string) || undefined,
+    startedAt: formData.get("startedAt") ?? "",
+    endedAt: formData.get("endedAt") ?? "",
+  });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+
+  try {
+    await timeService.createPastEntry(userId, {
+      label: parsed.data.label,
+      category: parsed.data.category ?? null,
+      startedAt: new Date(parsed.data.startedAt),
+      endedAt: new Date(parsed.data.endedAt),
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Could not save entry.",
+    };
+  }
+  return { ok: true };
+}
+
+const continueSchema = z.object({
+  label: z.string().trim().min(1, "Label is required").max(200),
+  category: z.string().trim().max(80).optional(),
+  startedAt: z.string().min(1),
+});
+
+// "I'm still doing it." Log the gap from its start up to now, then immediately
+// start a fresh running timer with the same label/category so it keeps
+// counting — the "I forgot to hit start" recovery flow. The new entry ends and
+// the timer starts at the same captured moment, so there's no sliver of lost
+// time between them.
+export async function backfillAndContinue(formData: FormData) {
+  const userId = await resolveActiveUserId();
+
+  const parsed = continueSchema.safeParse({
+    label: formData.get("label") ?? "",
+    category: (formData.get("category") as string) || undefined,
+    startedAt: formData.get("startedAt") ?? "",
+  });
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? "Invalid input.");
+  }
+
+  await timeService.createPastEntry(userId, {
+    label: parsed.data.label,
+    category: parsed.data.category ?? null,
+    startedAt: new Date(parsed.data.startedAt),
+    endedAt: new Date(),
+  });
+  await timeService.startEntry(userId, {
+    label: parsed.data.label,
+    category: parsed.data.category ?? null,
+  });
+
+  revalidatePath("/app");
+  revalidatePath("/app/time");
+  revalidatePath("/app/calendar");
+}
+
 export async function stopEntry() {
   const userId = await resolveActiveUserId();
   await timeService.stopRunning(userId);
