@@ -37,9 +37,14 @@ import { CalendarQuickAddModal } from "./quick-add-modal";
 
 export const dynamic = "force-dynamic";
 
-export default async function CalendarPage() {
+export default async function CalendarPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ day?: string }>;
+}) {
   const userId = await resolveActiveUserId();
   const context = await requireViewerContext();
+  const params = await searchParams;
 
   const weekStart = startOfCalendarWeek();
   const weekEnd = addDays(weekStart, 7);
@@ -47,11 +52,20 @@ export default async function CalendarPage() {
   const todayStart = startOfDay(now);
   const todayEnd = endOfDay(now);
 
-  const [weekItems, runningEntry, completedWeek, todayEntries, accounts, suggestedTasks, suggestedHabits] = await Promise.all([
+  // Timeline day navigation: ?day=YYYY-MM-DD (local), defaulting to today.
+  const parsedDay = params.day ? new Date(`${params.day}T00:00:00`) : null;
+  const selectedDay =
+    parsedDay && !Number.isNaN(parsedDay.getTime()) ? parsedDay : now;
+  const selectedDayStart = startOfDay(selectedDay);
+  const selectedDayEnd = endOfDay(selectedDay);
+  const isTodaySelected = selectedDayStart.getTime() === todayStart.getTime();
+
+  const [weekItems, runningEntry, completedWeek, timelineItems, timelineEntries, accounts, suggestedTasks, suggestedHabits] = await Promise.all([
     listCalendarItems(userId, { from: weekStart, to: weekEnd }),
     getRunningEntry(userId),
     listCompletedSince(userId, startOfWeek()),
-    listEntriesBetween(userId, { from: todayStart, to: todayEnd }),
+    listCalendarItems(userId, { from: selectedDayStart, to: selectedDayEnd }),
+    listEntriesBetween(userId, { from: selectedDayStart, to: selectedDayEnd }),
     context.financeVisible ? listAccounts(userId) : Promise.resolve([]),
     listSuggestedDoItems(userId, { limit: 5 }),
     listSuggestedHabits(userId, { limit: 4 }),
@@ -77,11 +91,24 @@ export default async function CalendarPage() {
     limit: 3,
   });
   const timeline = buildDayTimeline({
-    items: todayItems,
-    entries: todayEntries,
-    day: now,
+    items: timelineItems,
+    entries: timelineEntries,
+    day: selectedDay,
     now,
   });
+  const timelineNav = {
+    dayLabel: isTodaySelected
+      ? "Today"
+      : selectedDayStart.toLocaleDateString([], {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        }),
+    prevHref: `/app/calendar?day=${formatDateValue(addDays(selectedDayStart, -1))}`,
+    nextHref: `/app/calendar?day=${formatDateValue(addDays(selectedDayStart, 1))}`,
+    todayHref: "/app/calendar",
+    isToday: isTodaySelected,
+  };
 
   return (
     <div className="space-y-8 pb-28 sm:space-y-10 sm:pb-8">
@@ -94,7 +121,7 @@ export default async function CalendarPage() {
 
       <SignalsSection signals={signals} />
 
-      <DayTimeline model={timeline} />
+      <DayTimeline model={timeline} nav={timelineNav} />
 
       <OpenTimeSection gapSuggestions={gapSuggestions} />
 

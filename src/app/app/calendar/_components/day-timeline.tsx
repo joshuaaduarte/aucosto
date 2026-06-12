@@ -2,19 +2,31 @@
 // on a shared hour axis, so the plan and reality line up visually.
 // All positioning math lives in ../_lib/timeline.ts (pure, tested).
 
+import Link from "next/link";
 import type { DayTimelineModel, TimelineBlock } from "../_lib/timeline";
 import { TimelineNowLine } from "./timeline-now-line";
 
 const PX_PER_HOUR = 44;
 
-export function DayTimeline({ model }: { model: DayTimelineModel }) {
+export type DayTimelineNav = {
+  dayLabel: string;
+  prevHref: string;
+  nextHref: string;
+  todayHref: string;
+  isToday: boolean;
+};
+
+export function DayTimeline({
+  model,
+  nav,
+}: {
+  model: DayTimelineModel;
+  nav: DayTimelineNav;
+}) {
   const hours =
     (model.windowEnd.getTime() - model.windowStart.getTime()) / 3_600_000;
   const height = Math.round(hours * PX_PER_HOUR);
-
-  if (model.planned.length === 0 && model.actual.length === 0) {
-    return null;
-  }
+  const isEmpty = model.planned.length === 0 && model.actual.length === 0;
 
   return (
     <section
@@ -24,21 +36,62 @@ export function DayTimeline({ model }: { model: DayTimelineModel }) {
         background: "var(--bg-page)",
       }}
     >
-      <header className="mb-4">
-        <p
-          className="text-[0.6875rem] font-semibold uppercase tracking-wider"
-          style={{ color: "var(--text-faint)" }}
-        >
-          Plan vs actual
-        </p>
-        <h2
-          className="mt-1 text-[1.0625rem] font-semibold tracking-tight"
-          style={{ color: "var(--text)" }}
-        >
-          How today is really going
-        </h2>
+      <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p
+            className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+            style={{ color: "var(--text-faint)" }}
+          >
+            Plan vs actual
+          </p>
+          <h2
+            className="mt-1 text-[1.0625rem] font-semibold tracking-tight"
+            style={{ color: "var(--text)" }}
+          >
+            {nav.isToday ? "How today is really going" : nav.dayLabel}
+          </h2>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <Link
+            href={nav.prevHref}
+            aria-label="Previous day"
+            className="btn-icon rounded-md border"
+            style={{ borderColor: "var(--border-faint)" }}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M7.5 2.5 4 6l3.5 3.5" />
+            </svg>
+          </Link>
+          <span
+            className="min-w-[5.5rem] text-center text-[0.8125rem] font-medium tabular"
+            style={{ color: "var(--text)" }}
+          >
+            {nav.dayLabel}
+          </span>
+          <Link
+            href={nav.nextHref}
+            aria-label="Next day"
+            className="btn-icon rounded-md border"
+            style={{ borderColor: "var(--border-faint)" }}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M4.5 2.5 8 6 4.5 9.5" />
+            </svg>
+          </Link>
+          {!nav.isToday ? (
+            <Link href={nav.todayHref} className="btn-ghost h-8 px-2.5 text-[0.75rem]">
+              Today
+            </Link>
+          ) : null}
+        </div>
       </header>
 
+      {isEmpty ? (
+        <p className="text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
+          Nothing planned or tracked on {nav.isToday ? "this day yet" : "this day"}.
+        </p>
+      ) : (
       <div className="grid grid-cols-[3rem_1fr_1fr] gap-x-2">
         <div />
         <p
@@ -80,6 +133,7 @@ export function DayTimeline({ model }: { model: DayTimelineModel }) {
           variant="actual"
         />
       </div>
+      )}
     </section>
   );
 }
