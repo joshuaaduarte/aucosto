@@ -75,8 +75,8 @@ export default async function CalendarPage({
   const columnDays = Array.from({ length: viewDays }, (_, index) =>
     startOfDay(addDays(selectedDayStart, index)),
   );
-  const rangeStart = columnDays[0];
-  const rangeEnd = endOfDay(columnDays[columnDays.length - 1]);
+  const rangeStart = selectedDayStart;
+  const rangeEnd = endOfDay(addDays(selectedDayStart, viewDays - 1));
 
   const sevenDaysAgo = new Date(todayStart);
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
@@ -199,8 +199,8 @@ export default async function CalendarPage({
     now,
   });
 
-  const firstColumn = columnDays[0];
-  const lastColumn = columnDays[columnDays.length - 1];
+  const firstColumn = selectedDayStart;
+  const lastColumn = addDays(selectedDayStart, viewDays - 1);
   const rangeLabel =
     viewDays === 1
       ? isTodaySelected
