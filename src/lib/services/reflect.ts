@@ -106,8 +106,11 @@ export async function getReflection(
     `);
     return rows[0] ? toRecord(rows[0]) : null;
   } catch (error) {
-    if (isMissingTableError(error)) return null;
-    throw error;
+    // Reads degrade to empty: a reflection lookup must never 500 a page.
+    if (!isMissingTableError(error)) {
+      console.error("[reflect] getReflection failed", error);
+    }
+    return null;
   }
 }
 
@@ -127,8 +130,11 @@ export async function listReflections(
     `);
     return rows.map(toRecord);
   } catch (error) {
-    if (isMissingTableError(error)) return [];
-    throw error;
+    // Reads degrade to empty: a reflection lookup must never 500 a page.
+    if (!isMissingTableError(error)) {
+      console.error("[reflect] listReflections failed", error);
+    }
+    return [];
   }
 }
 
@@ -254,6 +260,17 @@ export async function listRecentMoods(
 ): Promise<Array<{ dateKey: string; mood: number }>> {
   requireCan(userId, "reflect", "read");
   const days = options.days ?? 7;
+  // Compute the boundary in JS and pass it as a cast date string.
+  // NEVER do parameterized date arithmetic like `now()::date - ${n}`:
+  // postgres types the unknown param as `date` (matching the left
+  // operand), making the expression date - date = integer, and the
+  // comparison fails with 42883 "operator does not exist: date >= integer"
+  // — this took production down. JS-side also uses the app's pinned
+  // timezone instead of the DB server's UTC `now()`.
+  const since = new Date();
+  since.setHours(0, 0, 0, 0);
+  since.setDate(since.getDate() - (days - 1));
+  const sinceKey = dayKey(since);
   try {
     const rows = await prisma.$queryRaw<
       Array<{ dateKey: string; mood: number }>
@@ -261,12 +278,14 @@ export async function listRecentMoods(
       SELECT to_char("date", 'YYYY-MM-DD') AS "dateKey", "mood"
       FROM "DailyReflection"
       WHERE "userId" = ${userId}
-        AND "date" >= (now()::date - ${days - 1})
+        AND "date" >= ${sinceKey}::date
       ORDER BY "date" ASC
     `);
     return rows;
   } catch (error) {
-    if (isMissingTableError(error)) return [];
-    throw error;
+    if (!isMissingTableError(error)) {
+      console.error("[reflect] listRecentMoods failed", error);
+    }
+    return [];
   }
 }
