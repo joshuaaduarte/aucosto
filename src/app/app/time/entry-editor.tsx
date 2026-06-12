@@ -5,6 +5,7 @@
 // (edit) and the "Add entry" button in the section header (add).
 
 import { useActionState, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { PRESET_TIME_CATEGORIES } from "@/lib/time-categories";
 import { fillIsoWindowFields } from "@/lib/wall-clock";
 import { saveEntryAction, type EntryFormState } from "./actions";
@@ -100,7 +101,10 @@ function EntryModal({
 
   const todayValue = new Date().toLocaleDateString("en-CA");
 
-  return (
+  // Portal to <body>: ancestor transforms/filters (e.g. animated page
+  // sections) would otherwise become the containing block for this
+  // fixed-position backdrop and drag the modal into the document flow.
+  return createPortal(
     <div
       className="calendar-modal-backdrop"
       role="presentation"
@@ -317,6 +321,7 @@ function EntryModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
