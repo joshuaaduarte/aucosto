@@ -44,13 +44,22 @@ export async function getRunningEntry(
   });
 }
 
+export type RecentTimeEntry = TimeEntry & {
+  doItem: Pick<DoItem, "id" | "title"> | null;
+  habit: Pick<Habit, "id" | "title"> | null;
+};
+
 export async function listRecentEntries(
   userId: string,
   options: { limit?: number } = {},
-): Promise<TimeEntry[]> {
+): Promise<RecentTimeEntry[]> {
   requireCan(userId, "time", "read");
   return prisma.timeEntry.findMany({
     where: { userId, endedAt: { not: null } },
+    include: {
+      doItem: { select: { id: true, title: true } },
+      habit: { select: { id: true, title: true } },
+    },
     orderBy: { startedAt: "desc" },
     take: options.limit ?? 30,
   });
@@ -88,6 +97,7 @@ export async function createPastEntry(
   input: {
     label: string;
     category?: string | null;
+    doItemId?: string | null;
     startedAt: Date;
     endedAt: Date;
   },
@@ -110,6 +120,7 @@ export async function createPastEntry(
       userId,
       label: input.label,
       category: input.category ?? null,
+      doItemId: input.doItemId ?? null,
       startedAt: input.startedAt,
       endedAt: input.endedAt,
     },
@@ -160,6 +171,7 @@ export async function updateEntry(
   input: {
     label?: string;
     category?: string | null;
+    doItemId?: string | null;
     startedAt?: Date;
     endedAt?: Date;
   },
@@ -185,6 +197,7 @@ export async function updateEntry(
     data: {
       label: input.label === undefined ? undefined : input.label,
       category: input.category === undefined ? undefined : input.category,
+      doItemId: input.doItemId === undefined ? undefined : input.doItemId,
       startedAt: input.startedAt === undefined ? undefined : input.startedAt,
       endedAt: input.endedAt === undefined ? undefined : input.endedAt,
     },

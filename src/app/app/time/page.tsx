@@ -4,7 +4,11 @@ import {
   listEntriesBetween,
   listRecentEntries,
 } from "@/lib/services/time";
-import { getDoItemSummary, listSuggestedDoItems } from "@/lib/services/do";
+import {
+  getDoItemSummary,
+  listDoItems,
+  listSuggestedDoItems,
+} from "@/lib/services/do";
 import { listSuggestedHabits } from "@/lib/services/habits";
 import { listCalendarItems } from "@/lib/services/calendar";
 import { formatDuration, formatHM, startOfToday, startOfWeek } from "@/lib/time";
@@ -60,17 +64,24 @@ export default async function TimePage() {
   tomorrow.setDate(tomorrow.getDate() + 1);
 
   const running = await getRunningEntry(userId);
-  const [recent, windowEntries, todayCalendarItems, suggestedTasks, suggestedHabits, runningDoSummary] =
+  const [recent, windowEntries, todayCalendarItems, suggestedTasks, suggestedHabits, openTasks, runningDoSummary] =
     await Promise.all([
       listRecentEntries(userId, { limit: 30 }),
       listEntriesBetween(userId, { from: sevenDaysAgo, to: tomorrow }),
       listCalendarItems(userId, { from: todayStart, to: tomorrow }),
       listSuggestedDoItems(userId, { limit: 4 }),
       listSuggestedHabits(userId, { limit: 4 }),
+      listDoItems(userId, { includeDone: false }),
       running?.doItem
         ? getDoItemSummary(userId, running.doItem.id)
         : Promise.resolve(null),
     ]);
+
+  // Open tasks the entry editor can link entries to.
+  const linkableTasks = openTasks.map((task) => ({
+    id: task.id,
+    title: task.title,
+  }));
 
   // Insights windows (live: running entry counts up to render time).
   const todayCategories = summarizeCategoriesWindow(windowEntries, {
@@ -311,7 +322,7 @@ export default async function TimePage() {
           >
             Recent sessions
           </p>
-          <AddEntryButton />
+          <AddEntryButton tasks={linkableTasks} />
         </div>
 
         {recent.length === 0 ? (
@@ -371,6 +382,32 @@ export default async function TimePage() {
                                 {entry.category}
                               </span>
                             )}
+                            {entry.doItem && (
+                              <a
+                                href="/app/do"
+                                className="inline-flex max-w-[12rem] items-center gap-1 truncate rounded px-1.5 py-0.5 text-[0.625rem] font-medium"
+                                style={{
+                                  background: "var(--bg-tint)",
+                                  color: "var(--text-muted)",
+                                }}
+                                title={`Linked task: ${entry.doItem.title}`}
+                              >
+                                ↗ {entry.doItem.title}
+                              </a>
+                            )}
+                            {!entry.doItem && entry.habit && (
+                              <a
+                                href="/app/habits"
+                                className="inline-flex max-w-[12rem] items-center gap-1 truncate rounded px-1.5 py-0.5 text-[0.625rem] font-medium"
+                                style={{
+                                  background: "var(--bg-tint)",
+                                  color: "var(--text-muted)",
+                                }}
+                                title={`Linked habit: ${entry.habit.title}`}
+                              >
+                                ↗ {entry.habit.title}
+                              </a>
+                            )}
                           </div>
                           <p
                             className="mt-0.5 text-[0.75rem]"
@@ -395,9 +432,19 @@ export default async function TimePage() {
                             id: entry.id,
                             label: entry.label,
                             category: entry.category,
+                            doItemId: entry.doItemId,
                             startedAtIso: entry.startedAt.toISOString(),
                             endedAtIso: entry.endedAt!.toISOString(),
                           }}
+                          tasks={
+                            entry.doItem &&
+                            !linkableTasks.some((t) => t.id === entry.doItem!.id)
+                              ? [
+                                  { id: entry.doItem.id, title: entry.doItem.title },
+                                  ...linkableTasks,
+                                ]
+                              : linkableTasks
+                          }
                         />
                         <EntryDeleteButton id={entry.id} />
                       </li>

@@ -107,6 +107,7 @@ const entryFormSchema = z.object({
   id: z.string().trim().optional(),
   label: z.string().trim().min(1, "Label is required").max(200),
   category: z.string().trim().max(80).optional(),
+  doItemId: z.string().trim().optional(),
 });
 
 // Edit an existing completed entry, or manually add one (no id).
@@ -126,6 +127,7 @@ export async function saveEntryAction(
     id: (formData.get("id") as string) || undefined,
     label: formData.get("label") ?? "",
     category: (formData.get("category") as string) || undefined,
+    doItemId: (formData.get("doItemId") as string) || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
@@ -143,6 +145,7 @@ export async function saveEntryAction(
       const updated = await timeService.updateEntry(userId, parsed.data.id, {
         label: parsed.data.label,
         category: parsed.data.category ?? null,
+        doItemId: parsed.data.doItemId ?? null,
         startedAt,
         endedAt,
       });
@@ -153,6 +156,7 @@ export async function saveEntryAction(
       await timeService.createPastEntry(userId, {
         label: parsed.data.label,
         category: parsed.data.category ?? null,
+        doItemId: parsed.data.doItemId ?? null,
         startedAt,
         endedAt,
       });

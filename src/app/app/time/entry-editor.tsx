@@ -15,8 +15,14 @@ export type EditableEntry = {
   id: string;
   label: string;
   category: string | null;
+  doItemId: string | null;
   startedAtIso: string;
   endedAtIso: string;
+};
+
+export type LinkableTask = {
+  id: string;
+  title: string;
 };
 
 function dateValue(iso: string) {
@@ -31,7 +37,13 @@ function timeValue(iso: string) {
   });
 }
 
-export function EntryEditButton({ entry }: { entry: EditableEntry }) {
+export function EntryEditButton({
+  entry,
+  tasks = [],
+}: {
+  entry: EditableEntry;
+  tasks?: LinkableTask[];
+}) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -50,6 +62,7 @@ export function EntryEditButton({ entry }: { entry: EditableEntry }) {
         <EntryModal
           title={`Edit ${entry.label}`}
           entry={entry}
+          tasks={tasks}
           onClose={() => setOpen(false)}
         />
       ) : null}
@@ -57,7 +70,7 @@ export function EntryEditButton({ entry }: { entry: EditableEntry }) {
   );
 }
 
-export function AddEntryButton() {
+export function AddEntryButton({ tasks = [] }: { tasks?: LinkableTask[] }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -68,6 +81,7 @@ export function AddEntryButton() {
         <EntryModal
           title="Log a missed session"
           entry={null}
+          tasks={tasks}
           onClose={() => setOpen(false)}
         />
       ) : null}
@@ -80,10 +94,12 @@ const initialState: EntryFormState = undefined;
 function EntryModal({
   title,
   entry,
+  tasks,
   onClose,
 }: {
   title: string;
   entry: EditableEntry | null;
+  tasks: LinkableTask[];
   onClose: () => void;
 }) {
   const [state, formAction, pending] = useActionState(
@@ -91,8 +107,17 @@ function EntryModal({
     initialState,
   );
   const [category, setCategory] = useState(entry?.category ?? "");
+  const [doItemId, setDoItemId] = useState(entry?.doItemId ?? "");
+  const [taskQuery, setTaskQuery] = useState("");
   const closedRef = useRef(false);
   useBodyScrollLock();
+
+  const linkedTask = tasks.find((task) => task.id === doItemId) ?? null;
+  const filteredTasks = taskQuery.trim()
+    ? tasks.filter((task) =>
+        task.title.toLowerCase().includes(taskQuery.trim().toLowerCase()),
+      )
+    : tasks;
 
   useEffect(() => {
     if (state && "ok" in state && state.ok && !closedRef.current) {
@@ -225,6 +250,78 @@ function EntryModal({
               );
             })}
           </div>
+
+          {/* Optional task link — credits the task's tracked time. */}
+          <input type="hidden" name="doItemId" value={doItemId} />
+          {tasks.length > 0 || doItemId ? (
+            <div className="space-y-1.5">
+              <p
+                className="text-[0.75rem] font-medium"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Linked task{" "}
+                <span style={{ color: "var(--text-faint)" }}>
+                  (optional — credits its tracked time)
+                </span>
+              </p>
+              {doItemId ? (
+                <div
+                  className="flex items-center justify-between gap-2 rounded-md border px-3 py-2"
+                  style={{ borderColor: "var(--border-faint)" }}
+                >
+                  <span
+                    className="truncate text-[0.8125rem] font-medium"
+                    style={{ color: "var(--text)" }}
+                  >
+                    {linkedTask?.title ?? "Linked task"}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn-ghost h-7 shrink-0 px-2 text-[0.6875rem]"
+                    onClick={() => setDoItemId("")}
+                  >
+                    Unlink
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    value={taskQuery}
+                    onChange={(event) => setTaskQuery(event.target.value)}
+                    placeholder="Search open tasks..."
+                    className="field"
+                  />
+                  {filteredTasks.length > 0 ? (
+                    <ul
+                      className="max-h-36 space-y-1 overflow-y-auto rounded-md border p-1"
+                      style={{ borderColor: "var(--border-faint)" }}
+                    >
+                      {filteredTasks.map((task) => (
+                        <li key={task.id}>
+                          <button
+                            type="button"
+                            onClick={() => setDoItemId(task.id)}
+                            className="w-full truncate rounded px-2 py-1.5 text-left text-[0.8125rem] transition-colors hover:bg-bg-hover"
+                            style={{ color: "var(--text)" }}
+                          >
+                            {task.title}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p
+                      className="text-[0.75rem]"
+                      style={{ color: "var(--text-faint)" }}
+                    >
+                      No open tasks match.
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          ) : null}
 
           {/* Phone: date full-width, start/end side by side. Desktop: 3-up. */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
