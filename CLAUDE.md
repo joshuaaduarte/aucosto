@@ -14,7 +14,7 @@ aucosto is a personal day-to-day dashboard / hub of tools. Single-user (Josh); p
 
 ## Tool map — go here first
 
-Nine tools, one row each. Every tool follows the same shape: schema → service → page/actions → widget.
+Ten tools, one row each. Every tool follows the same shape: schema → service → page/actions → widget.
 
 | Tool | Schema (`prisma/schema/`) | Service (`src/lib/services/`) | UI (`src/app/app/`) | Widget (`src/lib/widgets/`) | Pure helpers (`src/lib/`) |
 |---|---|---|---|---|---|
@@ -25,6 +25,7 @@ Nine tools, one row each. Every tool follows the same shape: schema → service 
 | habits | `habits.prisma` (Habit, HabitEntry) | `habits/` (split: `derive`, `reads`, `mutations`, `shared`, barrel `index.ts`) | `habits/` | `habits.tsx` | `habits.ts`, `habit-templates.ts` (one-tap presets, emoji-in-title icon convention) |
 | projects | `projects.prisma` (Project) | `projects.ts` | `projects/` | — (no widget) | `projects.ts` |
 | reflect | `reflect.prisma` (DailyReflection) | `reflect.ts` (⚠️ raw SQL — see "Known technical debt") | `reflect/` (+ `reflect/history/`) | — (hub `ReflectSection`) | `reflect.ts` (mood scale, dayKey, snapshot types) |
+| rhythms | `rhythms.prisma` (RhythmSession) | `rhythms.ts` (⚠️ raw SQL — same reflect pattern; fallback `scripts/create-rhythm-table.sql`) | `rhythms/` (+ hub `rhythm-nudge.tsx`, `sleep-backfill-card.tsx`) | — (hub nudge) | `rhythms.ts` (5 rhythm defs + checklists, hour→rhythm suggestion, duration fmt); `insights/rhythms.ts` (weekly consistency) |
 | insights | — (reads everything) | — (queries via other services) | `insights/` | — (hub `InsightOfTheDayCard`) | `insights/` (shared buckets, trends, patterns, daily — all pure + tested) |
 | events (activity log) | `events.prisma` (Event) | `events.ts` (`recordEvent`) | — | `activity.tsx` | `event-types.ts` (label map) |
 
