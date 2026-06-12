@@ -34,15 +34,14 @@ export function DecisionPromptsSection({ prompts }: { prompts: HubPrompt[] }) {
 function SignalRow({ prompt }: { prompt: HubPrompt }) {
   return (
     <li
-      className="grid grid-cols-[14px_1fr] gap-3 rounded-lg border px-3 py-3 sm:grid-cols-[14px_1fr_auto] sm:items-start"
-      style={{ borderColor: "var(--border-faint)", background: "var(--bg-page)" }}
+      className="grid grid-cols-[1fr] gap-3 rounded-lg border px-3.5 py-3 sm:grid-cols-[1fr_auto] sm:items-start"
+      style={{
+        borderColor: "var(--border-faint)",
+        background: "var(--bg-page)",
+        // Tone accent as a scannable left edge instead of a tiny dot.
+        borderLeft: `3px solid ${toneAccent[prompt.tone] ?? "var(--text)"}`,
+      }}
     >
-      <span
-        className="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full"
-        style={{
-          background: toneAccent[prompt.tone] ?? "var(--text)",
-        }}
-      />
       <p
         className="min-w-0 text-[0.92rem] leading-[1.55]"
         style={{ color: "var(--text)" }}

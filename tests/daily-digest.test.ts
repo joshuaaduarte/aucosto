@@ -36,11 +36,15 @@ describe("deriveDailyDigest", () => {
     expect(time.value).toBe("0m");
     expect(time.detail).toBe("nothing tracked yet today");
     expect(time.href).toBe("/app/time");
+    expect(time.progress).toBe(0);
+    expect(time.subtle).toBe(true);
 
     const habits = digest.lines.find((line) => line.key === "habits")!;
     expect(habits.value).toBe("All clear");
     expect(habits.detail).toBe("no habits due today");
     expect(habits.href).toBe("/app/habits");
+    expect(habits.progress).toBeNull();
+    expect(habits.subtle).toBe(true);
   });
 
   it("sums completed entries and adds the running entry's elapsed time", () => {
@@ -55,6 +59,9 @@ describe("deriveDailyDigest", () => {
     // 90m + 30m completed + 15m running = 135m = 2h 15m
     expect(time.value).toBe("2h 15m");
     expect(time.detail).toBe("tracked today, timer still live");
+    // Coverage of the waking window so far: 135m over 6h (06:00→12:00).
+    expect(time.progress).toBeCloseTo(135 / 360, 5);
+    expect(time.subtle).toBe(false);
   });
 
   it("counts only due habits and reports partial completion", () => {
@@ -72,6 +79,8 @@ describe("deriveDailyDigest", () => {
     const habits = digest.lines.find((line) => line.key === "habits")!;
     expect(habits.value).toBe("1 of 2");
     expect(habits.detail).toBe("due habits handled so far");
+    expect(habits.progress).toBe(0.5);
+    expect(habits.subtle).toBe(false);
   });
 
   it("reports all due habits handled", () => {
@@ -109,16 +118,15 @@ describe("deriveDailyDigest", () => {
     expect(finance!.value).toBe("$100");
     expect(finance!.detail).toBe("on pace for $300 this month");
     expect(finance!.href).toBe("/app/finance");
+    expect(finance!.progress).toBeCloseTo(100 / 300, 5);
   });
 
-  it("shows a quiet finance line when there is no spend yet", () => {
+  it("collapses the finance tile entirely when there is no spend yet", () => {
     const digest = deriveDailyDigest(
       digestInput({ finance: { monthTransactions: [] } }),
     );
 
-    const finance = digest.lines.find((line) => line.key === "finance")!;
-    expect(finance.value).toBe("$0");
-    expect(finance.detail).toBe("no spending recorded this month");
+    expect(digest.lines.some((line) => line.key === "finance")).toBe(false);
   });
 
   it("omits the finance line when finance is hidden or not fetched", () => {

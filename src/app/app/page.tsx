@@ -163,9 +163,10 @@ export default async function HubPage() {
         actions={topActions}
       />
 
-      <DailyDigestSection digest={digest} />
-
+      {/* Hero first: the one recommendation. Stat tiles support it below. */}
       <FocusModuleCard focus={focus} />
+
+      <DailyDigestSection digest={digest} />
 
       <CrossToolCallout
         runningEntry={runningEntry}

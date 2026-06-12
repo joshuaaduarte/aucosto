@@ -33,6 +33,10 @@ export type DailyDigestLine = {
   value: string;
   detail: string;
   href: string;
+  /** 0..1 fill for the tile's progress indicator; null = nothing to show. */
+  progress: number | null;
+  /** Zero-value placeholder — tiles render this subdued. */
+  subtle: boolean;
 };
 
 export type DailyDigest = {
@@ -47,6 +51,16 @@ export function deriveDailyDigest(input: DailyDigestInput): DailyDigest {
     ? Math.max(0, input.now.getTime() - input.runningEntry.startedAt.getTime())
     : 0;
   const trackedMs = completedMs + runningMs;
+  // Coverage of today's waking hours so far (06:00–23:00), mirroring the
+  // time page's coverage stat — powers the tile's progress bar.
+  const wake = new Date(input.now);
+  wake.setHours(6, 0, 0, 0);
+  const sleep = new Date(input.now);
+  sleep.setHours(23, 0, 0, 0);
+  const wakingWindowMs = Math.max(
+    0,
+    Math.min(input.now.getTime(), sleep.getTime()) - wake.getTime(),
+  );
   lines.push({
     key: "time",
     label: "Time",
@@ -57,6 +71,9 @@ export function deriveDailyDigest(input: DailyDigestInput): DailyDigest {
         ? "tracked today"
         : "nothing tracked yet today",
     href: "/app/time",
+    progress:
+      wakingWindowMs > 0 ? Math.min(1, trackedMs / wakingWindowMs) : null,
+    subtle: trackedMs === 0,
   });
 
   const dueHabits = input.habits.filter((habit) => habit.dueToday);
@@ -75,6 +92,8 @@ export function deriveDailyDigest(input: DailyDigestInput): DailyDigest {
           : "due habits handled so far"
         : "no habits due today",
     href: "/app/habits",
+    progress: dueHabits.length > 0 ? hitHabits.length / dueHabits.length : null,
+    subtle: dueHabits.length === 0,
   });
 
   if (input.finance) {
@@ -82,16 +101,22 @@ export function deriveDailyDigest(input: DailyDigestInput): DailyDigest {
       input.finance.monthTransactions,
       input.now,
     );
-    lines.push({
-      key: "finance",
-      label: "Spend",
-      value: formatCents(projection.spentCents),
-      detail:
-        projection.spentCents > 0
-          ? `on pace for ${formatCents(projection.projectedCents)} this month`
-          : "no spending recorded this month",
-      href: "/app/finance",
-    });
+    // Zero-spend months collapse the tile entirely — an empty $0 card is
+    // noise, and finance stays one tap away in quick actions.
+    if (projection.spentCents > 0) {
+      lines.push({
+        key: "finance",
+        label: "Spend",
+        value: formatCents(projection.spentCents),
+        detail: `on pace for ${formatCents(projection.projectedCents)} this month`,
+        href: "/app/finance",
+        progress:
+          projection.projectedCents > 0
+            ? Math.min(1, projection.spentCents / projection.projectedCents)
+            : null,
+        subtle: false,
+      });
+    }
   }
 
   return { lines };

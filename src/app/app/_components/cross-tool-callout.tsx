@@ -44,11 +44,12 @@ export function CrossToolCallout({
       style={{
         background: "var(--bg-tint)",
         border: "1px solid var(--border-faint)",
+        borderLeft: "3px solid var(--text-faint)",
       }}
     >
       <span
         className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded"
-        style={{ color: "var(--text)" }}
+        style={{ color: "var(--text-muted)" }}
       >
         <ConnectionIcon />
       </span>
