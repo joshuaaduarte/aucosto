@@ -4,8 +4,9 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 // Shared "start a timer from X" button. The caller passes the tool-specific
-// server action (e.g. startDoItemTimerAction, startHabitTimerAction); the
-// button handles pending state and the hop to /app/time.
+// server action (e.g. startDoItemTimerAction, startHabitTimerAction). The
+// timer starts in place — no navigation — and shows up in the global
+// running-timer bar; starting auto-stops any previous timer.
 export function StartTimerButton({
   id,
   action,
@@ -26,12 +27,11 @@ export function StartTimerButton({
           const formData = new FormData();
           formData.set("id", id);
           await action(formData);
-          router.push("/app/time");
           router.refresh();
         });
       }}
     >
-      {pending ? "Opening timer..." : "Start timer"}
+      {pending ? "Starting..." : "Start timer"}
     </button>
   );
 }

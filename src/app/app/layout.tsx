@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getViewerContext } from "@/lib/viewer-context";
 import { AppSidebar, MobileNav } from "./sidebar";
+import { RunningTimerBar } from "./_components/running-timer-bar";
 
 export default async function AppLayout({
   children,
@@ -34,6 +35,11 @@ export default async function AppLayout({
           {children}
         </main>
       </div>
+
+      {/* Global running-timer bar — never on the lock screen. */}
+      {context && context.isUnlocked ? (
+        <RunningTimerBar userId={context.effectiveUserId} />
+      ) : null}
     </div>
   );
 }
