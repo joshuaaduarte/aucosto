@@ -17,10 +17,18 @@ describe("rhythm helpers", () => {
   });
 
   it("suggests the rhythm that fits the hour", () => {
+    expect(suggestedRhythmForHour(5)).toBe("wakeup"); // morning starts at 5am
     expect(suggestedRhythmForHour(7)).toBe("wakeup");
+    expect(suggestedRhythmForHour(9)).toBe("wakeup");
+    expect(suggestedRhythmForHour(10)).toBe("work");
     expect(suggestedRhythmForHour(13)).toBe("work");
+    expect(suggestedRhythmForHour(17)).toBe("work");
+    expect(suggestedRhythmForHour(18)).toBe("winddown");
     expect(suggestedRhythmForHour(19)).toBe("winddown");
+    expect(suggestedRhythmForHour(20)).toBe("winddown");
+    expect(suggestedRhythmForHour(21)).toBe("sleep");
     expect(suggestedRhythmForHour(22)).toBe("sleep");
+    expect(suggestedRhythmForHour(4)).toBe("sleep"); // still sleep before 5am
     expect(suggestedRhythmForHour(3)).toBe("sleep");
   });
 

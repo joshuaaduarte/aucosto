@@ -5,7 +5,7 @@ import { listDoItems, listSuggestedDoItems } from "@/lib/services/do";
 import { listAccounts, listTransactions } from "@/lib/services/finance";
 import { listHabits, listSuggestedHabits } from "@/lib/services/habits";
 import { listProjects } from "@/lib/services/projects";
-import { listActiveRhythms } from "@/lib/services/rhythms";
+import { listActiveRhythms, listRecentRhythms } from "@/lib/services/rhythms";
 import { suggestedRhythmForHour, type RhythmType } from "@/lib/rhythms";
 import { listReflections, listRecentMoods } from "@/lib/services/reflect";
 import {
@@ -33,6 +33,7 @@ import {
 } from "./_components/hub-derive";
 import { HubHeader } from "./_components/hub-header";
 import { RhythmNudge } from "./_components/rhythm-nudge";
+import { SleepBackfillCard } from "./_components/sleep-backfill-card";
 import { ProjectsProgressSection } from "./_components/projects-progress-section";
 import { QuickActionsSection } from "./_components/quick-actions-section";
 import { InsightOfTheDayCard } from "./_components/insight-of-the-day";
@@ -110,11 +111,15 @@ export default async function HubPage() {
       ])
     : [null, [], [], [], [], [], [], [], [], [], [], [], [], []];
 
-  // Contextual rhythm nudge: which rhythm fits this hour, and whether one is
-  // already running. Fetched separately to keep the big tuple above intact.
+  // Contextual rhythm nudge: which rhythm fits this hour, whether one is
+  // already running, and (on a morning) whether last night's sleep went
+  // unlogged. Fetched separately to keep the big tuple above intact.
   const activeRhythms = userId
     ? await listActiveRhythms(userId)
     : new Map<RhythmType, never>();
+  const recentRhythms = userId
+    ? await listRecentRhythms(userId, { limit: 40 })
+    : [];
 
   const now = new Date();
   const todayStart = startOfToday();
@@ -132,6 +137,18 @@ export default async function HubPage() {
     activeRhythms.get(suggestedRhythm)?.type ??
     [...activeRhythms.keys()][0] ??
     null;
+
+  // Missed-sleep detection: on a morning, look for any sleep session (active
+  // or completed) started since ~6pm yesterday. None → prompt a backfill.
+  const sleepWindowStart = new Date(now);
+  sleepWindowStart.setDate(sleepWindowStart.getDate() - 1);
+  sleepWindowStart.setHours(18, 0, 0, 0);
+  const hasRecentSleep = recentRhythms.some(
+    (session) =>
+      session.type === "sleep" && session.startedAt >= sleepWindowStart,
+  );
+  const showSleepBackfill =
+    Boolean(userId) && suggestedRhythm === "wakeup" && !hasRecentSleep;
   const monthStart = startOfMonth();
   const previousMonthStart = startOfPreviousMonth();
   const weekTotalMs = sumDurations(weekEntries);
@@ -255,10 +272,21 @@ export default async function HubPage() {
       {/* Hero first: the one recommendation. Stat tiles support it below. */}
       <FocusModuleCard focus={focus} />
 
-      <RhythmNudge
-        suggestedType={suggestedRhythm}
-        activeType={activeRhythmType}
-      />
+      {showSleepBackfill ? (
+        <SleepBackfillCard
+          fallback={
+            <RhythmNudge
+              suggestedType={suggestedRhythm}
+              activeType={activeRhythmType}
+            />
+          }
+        />
+      ) : (
+        <RhythmNudge
+          suggestedType={suggestedRhythm}
+          activeType={activeRhythmType}
+        />
+      )}
 
       <InsightOfTheDayCard insight={insightOfTheDay} />
 

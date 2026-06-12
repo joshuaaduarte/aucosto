@@ -102,14 +102,14 @@ export function rhythmDefinition(type: string): RhythmDefinition | null {
 /**
  * The rhythm that best fits the current hour, used for the hub's contextual
  * nudge. Time bands (local hour):
- *   06:00–09:59 → Morning Wake-up
+ *   05:00–09:59 → Morning Wake-up
  *   10:00–17:59 → Work Session
  *   18:00–20:59 → Evening Wind-down
- *   21:00–05:59 → Sleep / Bedtime
+ *   21:00–04:59 → Sleep / Bedtime
  * (Workout has no natural time slot, so it's never auto-suggested.)
  */
 export function suggestedRhythmForHour(hour: number): RhythmType {
-  if (hour >= 6 && hour < 10) return "wakeup";
+  if (hour >= 5 && hour < 10) return "wakeup";
   if (hour >= 10 && hour < 18) return "work";
   if (hour >= 18 && hour < 21) return "winddown";
   return "sleep";

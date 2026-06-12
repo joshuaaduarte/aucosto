@@ -196,6 +196,60 @@ export async function startRhythm(
   };
 }
 
+/**
+ * Backfill an already-completed session with explicit start/end timestamps
+ * (e.g. a forgotten sleep log). Duration is computed in JS — never DB date
+ * math. Both timestamps are passed as JS Dates and bound as params.
+ */
+export async function logRhythmSession(
+  userId: string,
+  type: RhythmType,
+  startedAt: Date,
+  endedAt: Date,
+  notes?: string | null,
+): Promise<RhythmSessionRecord | null> {
+  requireCan(userId, "rhythm", "write");
+  const id = randomUUID();
+  const trimmedNotes = notes?.trim() || null;
+  // Guard against inverted ranges: clamp so the session is never negative.
+  const start = startedAt.getTime() <= endedAt.getTime() ? startedAt : endedAt;
+  const end = startedAt.getTime() <= endedAt.getTime() ? endedAt : startedAt;
+  const duration = rhythmDurationMinutes(start, end);
+  try {
+    await prisma.$executeRaw(Prisma.sql`
+      INSERT INTO "RhythmSession" (
+        "id", "userId", "type", "startedAt", "endedAt",
+        "durationMinutes", "notes", "createdAt"
+      ) VALUES (
+        ${id}, ${userId}, ${type}, ${start}, ${end},
+        ${duration}, ${trimmedNotes}, now()
+      )
+    `);
+  } catch (error) {
+    if (isMissingTableError(error)) {
+      throw new Error(
+        "The rhythms table isn't migrated yet — apply scripts/create-rhythm-table.sql first.",
+      );
+    }
+    throw error;
+  }
+  await recordEvent({
+    userId,
+    tool: "rhythm",
+    type: "rhythm.ended",
+    refId: id,
+    meta: { rhythm: type, durationMinutes: duration, backfilled: true },
+  });
+  return {
+    id,
+    type,
+    startedAt: start,
+    endedAt: end,
+    durationMinutes: duration,
+    notes: trimmedNotes,
+  };
+}
+
 /** End a running session, computing duration in JS (never DB date math). */
 export async function endRhythm(
   userId: string,

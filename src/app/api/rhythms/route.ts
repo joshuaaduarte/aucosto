@@ -14,6 +14,7 @@ import {
   getActiveRhythm,
   listActiveRhythms,
   listRecentRhythms,
+  logRhythmSession,
   startRhythm,
 } from "@/lib/services/rhythms";
 
@@ -66,6 +67,8 @@ export async function POST(request: Request) {
     action?: string;
     type?: string;
     sessionId?: string;
+    startedAt?: string;
+    endedAt?: string;
     notes?: string | null;
   };
 
@@ -73,6 +76,27 @@ export async function POST(request: Request) {
     if (payload.action === "start") {
       if (!isRhythmType(payload.type)) {
         return NextResponse.json({ error: "Unknown rhythm type." }, { status: 400 });
+      }
+      // Backfill path: both timestamps present → create an already-completed
+      // session (e.g. a forgotten sleep log). startedAt alone still starts a
+      // live timer at that instant.
+      if (payload.startedAt && payload.endedAt) {
+        const start = new Date(payload.startedAt);
+        const end = new Date(payload.endedAt);
+        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+          return NextResponse.json(
+            { error: "startedAt and endedAt must be valid timestamps." },
+            { status: 400 },
+          );
+        }
+        const session = await logRhythmSession(
+          userId,
+          payload.type,
+          start,
+          end,
+          payload.notes ?? null,
+        );
+        return NextResponse.json({ session }, { status: 201 });
       }
       const session = await startRhythm(userId, payload.type, payload.notes ?? null);
       return NextResponse.json({ session }, { status: 201 });
