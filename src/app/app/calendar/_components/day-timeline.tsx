@@ -8,6 +8,7 @@
 import {
   type PointerEvent as ReactPointerEvent,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -25,6 +26,18 @@ const HEADER_PX = 26;
 const SWIPE_THRESHOLD = 40; // px of horizontal travel before a swipe commits
 // Ease-out-quad: snappy without being abrupt. Used for both commit + snap-back.
 const SWIPE_TRANSITION = "transform 280ms cubic-bezier(0.25, 0.46, 0.45, 0.94)";
+
+// Mobile pager: a 3-wide track (prev · current · next), each panel 1/3 of the
+// track. Centring the current panel parks the track at -1/3 of its own width.
+const PAGER_CENTER = "translateX(-33.3333%)";
+const PAGER_PREV = "translateX(0)";
+const PAGER_NEXT = "translateX(-66.6667%)";
+
+// useLayoutEffect warns during SSR; this client component is server-rendered,
+// so fall back to useEffect on the server and use the layout variant in the
+// browser (needed: the pager re-centres synchronously, before paint).
+const useIsoLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 function shiftIso(iso: string, days: number): string {
   const d = new Date(`${iso}T00:00:00`);
@@ -55,6 +68,7 @@ export function CalendarTimeline({
   anchorDay,
   today,
   columns,
+  mobilePanels,
   payloads,
   tasks,
   nav,
@@ -65,6 +79,9 @@ export function CalendarTimeline({
   /** Today, YYYY-MM-DD — drives the mobile date strip's dot indicator. */
   today: string;
   columns: CalendarColumn[];
+  /** Mobile-only triple-panel pager: [previous, current, next] day, sharing
+      one y-axis so swipes between them are instant and pre-rendered. */
+  mobilePanels: CalendarColumn[];
   payloads: Record<string, TimelineBlockPayload>;
   tasks: LinkableTask[];
   nav: CalendarTimelineNav;
@@ -233,6 +250,96 @@ export function CalendarTimeline({
     }
   };
 
+  // ── Mobile triple-panel pager ──────────────────────────────────────────
+  // prev/current/next are already rendered side by side, so a committed swipe
+  // just slides the track to the neighbour (instant — no fetch). Only after the
+  // slide settles do we router.push to re-hydrate fresh prev/next data; the
+  // re-centre is invisible because the new centre panel holds the exact day
+  // that was just slid into view.
+  const pagerRef = useRef<HTMLDivElement>(null);
+  const pagerStartRef = useRef<{ x: number; y: number } | null>(null);
+  const pagerAxisRef = useRef<"h" | "v" | null>(null);
+  const pagerAnimatingRef = useRef(false);
+
+  // Snap the track back to centre whenever the day settles — after a committed
+  // swipe's router.push lands, or after any external nav (arrows, date strip).
+  // No animation: the freshly-mounted centre panel already shows the right day.
+  useIsoLayoutEffect(() => {
+    const el = pagerRef.current;
+    if (!el) return;
+    el.style.transition = "none";
+    el.style.transform = PAGER_CENTER;
+    pagerAnimatingRef.current = false;
+  }, [anchorDay]);
+
+  const onPagerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (pagerAnimatingRef.current) return;
+    pagerStartRef.current = { x: e.clientX, y: e.clientY };
+    pagerAxisRef.current = null;
+    const el = pagerRef.current;
+    if (el) el.style.transition = "none"; // follow the finger 1:1
+  };
+  const onPagerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!pagerStartRef.current) return;
+    const dx = e.clientX - pagerStartRef.current.x;
+    const dy = e.clientY - pagerStartRef.current.y;
+    if (
+      pagerAxisRef.current === null &&
+      (Math.abs(dx) > 8 || Math.abs(dy) > 8)
+    ) {
+      pagerAxisRef.current = Math.abs(dx) > Math.abs(dy) * 1.5 ? "h" : "v";
+    }
+    if (pagerAxisRef.current === "h") {
+      const el = pagerRef.current;
+      // Centre is -33.3333% of the track's own width; offset by the px drag.
+      if (el) el.style.transform = `translateX(calc(-33.3333% + ${dx}px))`;
+    }
+  };
+  const onPagerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!pagerStartRef.current) return;
+    const dx = e.clientX - pagerStartRef.current.x;
+    const dy = e.clientY - pagerStartRef.current.y;
+    const wasHorizontal = pagerAxisRef.current === "h";
+    pagerStartRef.current = null;
+    pagerAxisRef.current = null;
+    const el = pagerRef.current;
+    if (!el) return;
+
+    const committed =
+      wasHorizontal &&
+      Math.abs(dx) > SWIPE_THRESHOLD &&
+      Math.abs(dx) > Math.abs(dy) * 1.5;
+
+    if (!committed) {
+      el.style.transition = SWIPE_TRANSITION;
+      el.style.transform = PAGER_CENTER;
+      return;
+    }
+
+    // Commit: slide to the neighbour panel (already rendered), then on
+    // transitionend re-hydrate via router.push. The [anchorDay] layout effect
+    // re-centres once the new day mounts.
+    pagerAnimatingRef.current = true;
+    const dir = dx < 0 ? -1 : 1; // -1 = next day, +1 = previous day
+    el.style.transition = SWIPE_TRANSITION;
+    el.style.transform = dir === -1 ? PAGER_NEXT : PAGER_PREV;
+    const onEnd = (event: TransitionEvent) => {
+      if (event.target !== el || event.propertyName !== "transform") return;
+      el.removeEventListener("transitionend", onEnd);
+      router.push(dir === -1 ? nextDayHref : prevDayHref, { scroll: false });
+    };
+    el.addEventListener("transitionend", onEnd);
+  };
+  const onPagerCancel = () => {
+    pagerStartRef.current = null;
+    pagerAxisRef.current = null;
+    const el = pagerRef.current;
+    if (el) {
+      el.style.transition = SWIPE_TRANSITION;
+      el.style.transform = PAGER_CENTER;
+    }
+  };
+
   const weekOnPhone = view === "w" && isNarrow && !isMobile;
   const displayColumns = isMobile
     ? columns.slice(0, 1)
@@ -247,6 +354,16 @@ export function CalendarTimeline({
     : 15;
   const height = Math.round(hours * PX_PER_HOUR);
   const hourMarks = base?.hourMarks ?? [];
+
+  // Mobile pager axis: all three panels share one window, so the centre
+  // panel's model drives the fixed hour axis on the left.
+  const mobileBase = mobilePanels[1]?.model ?? mobilePanels[0]?.model;
+  const mobileHours = mobileBase
+    ? (mobileBase.windowEnd.getTime() - mobileBase.windowStart.getTime()) /
+      3_600_000
+    : 15;
+  const mobileHeight = Math.round(mobileHours * PX_PER_HOUR);
+  const mobileHourMarks = mobileBase?.hourMarks ?? [];
 
   return (
     <section
@@ -359,59 +476,118 @@ export function CalendarTimeline({
         </p>
       ) : null}
 
-      {/* Clip so a committed swipe can slide the day fully off-screen. */}
-      <div className="overflow-hidden">
-      <div
-        ref={swipeRef}
-        className="flex gap-2 sm:gap-3"
-        onPointerDown={isTouch ? onPointerDown : undefined}
-        onPointerMove={isTouch ? onPointerMove : undefined}
-        onPointerUp={isTouch ? onPointerUp : undefined}
-        onPointerCancel={isTouch ? onPointerCancel : undefined}
-        style={{
-          touchAction: isTouch ? "pan-y" : undefined,
-          willChange: isTouch ? "transform" : undefined,
-        }}
-      >
-        {/* Shared hour axis. The matching p-1 keeps its labels aligned with the
-            day columns, which carry p-1 for the today-highlight halo. */}
-        <div className="flex shrink-0 flex-col p-1" style={{ width: "2.5rem" }}>
-          <div style={{ height: HEADER_PX }} />
-          <div className="relative" style={{ height }}>
-            {hourMarks.map((mark) => (
-              <span
-                key={mark.hour}
-                className="absolute right-1 -translate-y-1/2 text-[0.625rem] tabular"
-                style={{ top: `${mark.topPct}%`, color: "var(--text-faint)" }}
-              >
-                {mark.label}
-              </span>
-            ))}
+      {isMobile ? (
+        // Triple-panel pager: fixed hour axis on the left, a 3-wide track
+        // (prev · current · next) clipped to one panel. Swipes slide the track;
+        // the neighbours are pre-rendered, so there's no fetch gap.
+        <div className="flex gap-2 sm:gap-3">
+          <div
+            className="flex shrink-0 flex-col p-1"
+            style={{ width: "2.5rem" }}
+          >
+            <div style={{ height: HEADER_PX }} />
+            <div className="relative" style={{ height: mobileHeight }}>
+              {mobileHourMarks.map((mark) => (
+                <span
+                  key={mark.hour}
+                  className="absolute right-1 -translate-y-1/2 text-[0.625rem] tabular"
+                  style={{ top: `${mark.topPct}%`, color: "var(--text-faint)" }}
+                >
+                  {mark.label}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <div
+              ref={pagerRef}
+              className="flex"
+              onPointerDown={isTouch ? onPagerDown : undefined}
+              onPointerMove={isTouch ? onPagerMove : undefined}
+              onPointerUp={isTouch ? onPagerUp : undefined}
+              onPointerCancel={isTouch ? onPagerCancel : undefined}
+              style={{
+                width: "300%",
+                transform: PAGER_CENTER,
+                touchAction: isTouch ? "pan-y" : undefined,
+                willChange: "transform",
+              }}
+            >
+              {mobilePanels.map((panel) => (
+                <div key={panel.dayIso} className="w-1/3 shrink-0">
+                  <DayColumn
+                    column={panel}
+                    height={mobileHeight}
+                    hourMarks={mobileHourMarks}
+                    multiDay={false}
+                    allowCreate={false}
+                    payloads={payloads}
+                    tasks={tasks}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
+      ) : (
+        // Clip so a committed swipe can slide the day fully off-screen.
+        <div className="overflow-hidden">
+          <div
+            ref={swipeRef}
+            className="flex gap-2 sm:gap-3"
+            onPointerDown={isTouch ? onPointerDown : undefined}
+            onPointerMove={isTouch ? onPointerMove : undefined}
+            onPointerUp={isTouch ? onPointerUp : undefined}
+            onPointerCancel={isTouch ? onPointerCancel : undefined}
+            style={{
+              touchAction: isTouch ? "pan-y" : undefined,
+              willChange: isTouch ? "transform" : undefined,
+            }}
+          >
+            {/* Shared hour axis. The matching p-1 keeps its labels aligned with
+                the day columns, which carry p-1 for the today-highlight halo. */}
+            <div
+              className="flex shrink-0 flex-col p-1"
+              style={{ width: "2.5rem" }}
+            >
+              <div style={{ height: HEADER_PX }} />
+              <div className="relative" style={{ height }}>
+                {hourMarks.map((mark) => (
+                  <span
+                    key={mark.hour}
+                    className="absolute right-1 -translate-y-1/2 text-[0.625rem] tabular"
+                    style={{ top: `${mark.topPct}%`, color: "var(--text-faint)" }}
+                  >
+                    {mark.label}
+                  </span>
+                ))}
+              </div>
+            </div>
 
-        {/* Day columns. */}
-        <div
-          className="grid min-w-0 flex-1 gap-2 sm:gap-3"
-          style={{
-            gridTemplateColumns: `repeat(${displayColumns.length}, minmax(0, 1fr))`,
-          }}
-        >
-          {displayColumns.map((column) => (
-            <DayColumn
-              key={column.dayIso}
-              column={column}
-              height={height}
-              hourMarks={hourMarks}
-              multiDay={multiDay}
-              allowCreate={!isTouch}
-              payloads={payloads}
-              tasks={tasks}
-            />
-          ))}
+            {/* Day columns. */}
+            <div
+              className="grid min-w-0 flex-1 gap-2 sm:gap-3"
+              style={{
+                gridTemplateColumns: `repeat(${displayColumns.length}, minmax(0, 1fr))`,
+              }}
+            >
+              {displayColumns.map((column) => (
+                <DayColumn
+                  key={column.dayIso}
+                  column={column}
+                  height={height}
+                  hourMarks={hourMarks}
+                  multiDay={multiDay}
+                  allowCreate={!isTouch}
+                  payloads={payloads}
+                  tasks={tasks}
+                />
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
-      </div>
+      )}
     </section>
   );
 }

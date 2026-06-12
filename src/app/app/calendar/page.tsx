@@ -78,6 +78,12 @@ export default async function CalendarPage({
   const rangeStart = selectedDayStart;
   const rangeEnd = endOfDay(addDays(selectedDayStart, viewDays - 1));
 
+  // Widen the timeline data fetch one day on each side of the view so the
+  // mobile single-day pager can pre-render the previous and next day — making
+  // a committed swipe land instantly with no fetch gap.
+  const panelRangeStart = startOfDay(addDays(selectedDayStart, -1));
+  const panelRangeEnd = endOfDay(addDays(selectedDayStart, viewDays));
+
   const sevenDaysAgo = new Date(todayStart);
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
 
@@ -85,9 +91,9 @@ export default async function CalendarPage({
     listCalendarItems(userId, { from: weekStart, to: weekEnd }),
     getRunningEntry(userId),
     listCompletedSince(userId, startOfWeek()),
-    listCalendarItems(userId, { from: rangeStart, to: rangeEnd }),
-    listEntriesBetween(userId, { from: rangeStart, to: rangeEnd }),
-    listRhythmSessionsBetween(userId, { from: rangeStart, to: rangeEnd }),
+    listCalendarItems(userId, { from: panelRangeStart, to: panelRangeEnd }),
+    listEntriesBetween(userId, { from: panelRangeStart, to: panelRangeEnd }),
+    listRhythmSessionsBetween(userId, { from: panelRangeStart, to: panelRangeEnd }),
     listCalendarItems(userId, { from: sevenDaysAgo, to: todayEnd }),
     listEntriesBetween(userId, { from: sevenDaysAgo, to: todayEnd }),
     context.financeVisible ? listAccounts(userId) : Promise.resolve([]),
@@ -151,6 +157,44 @@ export default async function CalendarPage({
       day,
       now,
       bounds: sharedBounds,
+    }),
+  }));
+
+  // Mobile single-day pager: [prev, current, next] day panels, all sharing one
+  // y-axis (union of their windows) so they line up against the fixed hour
+  // axis. Pre-rendering the neighbours makes a swipe instant — the panel is
+  // already on screen; only the post-settle re-hydration touches the server.
+  const mobilePanelDays = [
+    startOfDay(addDays(selectedDayStart, -1)),
+    selectedDayStart,
+    startOfDay(addDays(selectedDayStart, 1)),
+  ];
+  let mobileStartHour = 24;
+  let mobileEndHour = 0;
+  for (const day of mobilePanelDays) {
+    const { startHour, endHour } = dayWindowHours({
+      items: timelineItems,
+      entries: timelineEntries,
+      rhythms: rhythmInputs,
+      day,
+      now,
+    });
+    mobileStartHour = Math.min(mobileStartHour, startHour);
+    mobileEndHour = Math.max(mobileEndHour, endHour);
+  }
+  const mobileBounds = { startHour: mobileStartHour, endHour: mobileEndHour };
+  const mobilePanels: CalendarColumn[] = mobilePanelDays.map((day) => ({
+    dayIso: formatDateValue(day),
+    weekday: day.toLocaleDateString([], { weekday: "short" }),
+    dayNum: day.getDate(),
+    isToday: day.getTime() === todayStart.getTime(),
+    model: buildDayTimeline({
+      items: timelineItems,
+      entries: timelineEntries,
+      rhythms: rhythmInputs,
+      day,
+      now,
+      bounds: mobileBounds,
     }),
   }));
 
@@ -237,6 +281,7 @@ export default async function CalendarPage({
         anchorDay={formatDateValue(selectedDayStart)}
         today={todayDateValue}
         columns={columns}
+        mobilePanels={mobilePanels}
         payloads={timelinePayloads}
         tasks={linkableTasks}
         nav={timelineNav}
