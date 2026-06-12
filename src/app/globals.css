@@ -66,6 +66,9 @@
   --safe-area-right:  env(safe-area-inset-right, 0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-left:   env(safe-area-inset-left, 0px);
+  /* Content height of the mobile bottom tab bar (excludes the safe-area
+     inset). 0 on desktop so dependent offsets collapse. */
+  --mobile-tabbar-height: 0px;
 }
 
 /* ━━━ Dark mode (via OS preference) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
@@ -384,10 +387,30 @@ body > * {
   &:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 
+/* ━━━ Mobile bottom tab bar ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+@media (max-width: 1023.98px) {
+  :root {
+    --mobile-tabbar-height: 3.25rem;
+  }
+}
+
+.mobile-tabbar {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 40;
+  display: flex;
+  align-items: stretch;
+  height: calc(var(--mobile-tabbar-height) + var(--safe-area-bottom));
+  padding-bottom: var(--safe-area-bottom);
+  background: var(--bg-page);
+  border-top: 1px solid var(--border-faint);
+}
+
 .calendar-fab {
   position: fixed;
   right: calc(1rem + var(--safe-area-right));
-  bottom: calc(1rem + var(--safe-area-bottom));
+  bottom: calc(1rem + var(--safe-area-bottom) + var(--mobile-tabbar-height));
   z-index: 40;
   display: inline-flex;
   align-items: center;

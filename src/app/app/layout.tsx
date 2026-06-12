@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getViewerContext } from "@/lib/viewer-context";
 import { AppSidebar, MobileNav } from "./sidebar";
+import { MobileTabBar } from "./_components/mobile-tab-bar";
 import { RunningTimerBar } from "./_components/running-timer-bar";
 
 export default async function AppLayout({
@@ -31,14 +32,23 @@ export default async function AppLayout({
       >
         <MobileNav {...navProps} />
 
-        <main className="flex-1 w-full max-w-[940px] mx-auto px-6 py-10 pb-safe sm:px-12 sm:py-14 lg:px-20 lg:py-14">
+        <main
+          className="flex-1 w-full max-w-[940px] mx-auto px-6 py-10 sm:px-12 sm:py-14 lg:px-20 lg:py-14"
+          style={{
+            paddingBottom:
+              "calc(3.5rem + var(--mobile-tabbar-height) + var(--safe-area-bottom))",
+          }}
+        >
           {children}
         </main>
       </div>
 
-      {/* Global running-timer bar — never on the lock screen. */}
+      {/* Mobile bottom tabs + global running-timer bar — not on the lock screen. */}
       {context && context.isUnlocked ? (
-        <RunningTimerBar userId={context.effectiveUserId} />
+        <>
+          <MobileTabBar />
+          <RunningTimerBar userId={context.effectiveUserId} />
+        </>
       ) : null}
     </div>
   );
