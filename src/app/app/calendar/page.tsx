@@ -235,6 +235,7 @@ export default async function CalendarPage({
         view={view}
         hasExplicitView={hasExplicitView}
         anchorDay={formatDateValue(selectedDayStart)}
+        today={todayDateValue}
         columns={columns}
         payloads={timelinePayloads}
         tasks={linkableTasks}
