@@ -11,8 +11,10 @@ import {
   startTimerForDoItem,
   updateDoItem,
 } from "@/lib/services/do";
+import { createCalendarItem } from "@/lib/services/calendar";
 import { getRunningEntry, stopRunning } from "@/lib/services/time";
 import { resolveActiveUserId } from "@/lib/viewer-context";
+import { windowFromFormData } from "@/lib/wall-clock";
 
 const laneEnum = z.enum(DO_LANES);
 const statusEnum = z.enum(DO_STATUSES);
@@ -156,4 +158,51 @@ export async function reflectDoItemSessionAction(formData: FormData) {
     notes: nullableString(formData, "notes"),
   });
   revalidateDo();
+}
+
+export type ScheduleDoItemState = { error?: string } | undefined;
+
+// Put a task on the calendar as a linked block (sourceTool "do"), then mark
+// it scheduled. Completing the block later syncs back to the task.
+export async function scheduleDoItemAction(
+  _prev: ScheduleDoItemState,
+  formData: FormData,
+): Promise<ScheduleDoItemState> {
+  let userId: string;
+  try {
+    userId = await resolveActiveUserId();
+  } catch {
+    return { error: "Not signed in." };
+  }
+
+  const id = String(formData.get("id") ?? "").trim();
+  const title = String(formData.get("title") ?? "").trim();
+  if (!id || !title) {
+    return { error: "Missing task." };
+  }
+
+  const window = windowFromFormData(formData);
+  if (!window) {
+    return { error: "Date and time are required." };
+  }
+
+  try {
+    await createCalendarItem(userId, {
+      title,
+      startsAt: window.startsAt,
+      endsAt: window.endsAt,
+      kind: "block",
+      status: "confirmed",
+      sourceTool: "do",
+      sourceRefId: id,
+    });
+    await updateDoItem(userId, id, { status: "scheduled" });
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Could not schedule.",
+    };
+  }
+
+  revalidateDo();
+  return undefined;
 }

@@ -19,6 +19,7 @@ import {
 } from "./actions";
 import { StartTimerButton } from "../_components/start-timer-button";
 import { useBodyScrollLock } from "../_components/use-body-scroll-lock";
+import { ScheduleTaskModal } from "./schedule-modal";
 
 function DetailRow({
   label,
@@ -172,6 +173,7 @@ export function DoItemCard({
   projects: Array<{ id: string; name: string }>;
 }) {
   const [completeOpen, setCompleteOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
 
   return (
     <>
@@ -226,6 +228,16 @@ export function DoItemCard({
             <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:justify-end">
               {item.status !== "done" ? (
                 <StartTimerButton id={item.id} action={startDoItemTimerAction} />
+              ) : null}
+
+              {item.status !== "done" && item.scheduledMinutes === 0 ? (
+                <button
+                  type="button"
+                  className="btn-ghost h-8 w-full px-2.5 text-[0.75rem]"
+                  onClick={() => setScheduleOpen(true)}
+                >
+                  Schedule
+                </button>
               ) : null}
 
               {item.status !== "done" ? (
@@ -452,6 +464,16 @@ export function DoItemCard({
       </li>
 
       {completeOpen ? <CompletionModal item={item} onClose={() => setCompleteOpen(false)} /> : null}
+      {scheduleOpen ? (
+        <ScheduleTaskModal
+          item={{
+            id: item.id,
+            title: item.title,
+            estimatedMinutes: item.estimatedMinutes,
+          }}
+          onClose={() => setScheduleOpen(false)}
+        />
+      ) : null}
     </>
   );
 }
