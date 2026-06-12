@@ -23,7 +23,8 @@ import { MobileDateStrip } from "./mobile-date-strip";
 const PX_PER_HOUR = 44;
 const HEADER_PX = 26;
 const SWIPE_THRESHOLD = 40; // px of horizontal travel before a swipe commits
-const SWIPE_NUDGE = 36; // px the timeline slides on a committed swipe
+// Ease-out-quad: snappy without being abrupt. Used for both commit + snap-back.
+const SWIPE_TRANSITION = "transform 280ms cubic-bezier(0.25, 0.46, 0.45, 0.94)";
 
 function shiftIso(iso: string, days: number): string {
   const d = new Date(`${iso}T00:00:00`);
@@ -112,37 +113,63 @@ export function CalendarTimeline({
           day: "numeric",
         });
 
-  // Swipe-to-navigate (touch only). We follow the finger (dampened) on the
-  // horizontal axis and commit a day change past the threshold; vertical
-  // gestures fall through to normal page scroll (touch-action: pan-y).
-  const [dragX, setDragX] = useState(0);
-  const [transitionOn, setTransitionOn] = useState(false);
+  // Swipe-to-navigate (touch only). The drag is driven by *direct DOM
+  // mutation* — never React state — so the finger-follow runs at 60fps on the
+  // compositor with zero re-renders. Vertical gestures fall through to normal
+  // page scroll (touch-action: pan-y). Sign convention: a left swipe (dx < 0)
+  // goes to the next day; right swipe to the previous.
+  const swipeRef = useRef<HTMLDivElement>(null);
   const startRef = useRef<{ x: number; y: number } | null>(null);
   const axisRef = useRef<"h" | "v" | null>(null);
   const pendingDirRef = useRef(0);
+  const animatingRef = useRef(false);
 
-  // After a committed swipe re-renders with the new day, slide it in from the
-  // opposite edge for a subtle hint of motion.
+  // After a committed swipe navigates and the new day's content mounts, slide
+  // it in from the parked off-screen edge for a true pager feel.
   useEffect(() => {
     const dir = pendingDirRef.current;
     if (dir === 0) return;
     pendingDirRef.current = 0;
-    setTransitionOn(false);
-    setDragX(-dir * SWIPE_NUDGE);
-    const id = requestAnimationFrame(() => {
+    const el = swipeRef.current;
+    if (!el) {
+      animatingRef.current = false;
+      return;
+    }
+    // el is parked at ±100% (off-screen, holding the freshly-mounted day).
+    // Two frames of settle, then transition it home.
+    const raf = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        setTransitionOn(true);
-        setDragX(0);
+        el.style.transition = SWIPE_TRANSITION;
+        el.style.transform = "translateX(0)";
       });
     });
-    return () => cancelAnimationFrame(id);
+    const settle = (event: TransitionEvent) => {
+      if (event.target !== el || event.propertyName !== "transform") return;
+      el.removeEventListener("transitionend", settle);
+      el.style.transition = "none";
+      el.style.transform = "translateX(0)";
+      animatingRef.current = false;
+    };
+    el.addEventListener("transitionend", settle);
+    return () => {
+      cancelAnimationFrame(raf);
+      el.removeEventListener("transitionend", settle);
+    };
   }, [anchorDay]);
 
-  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+  // Warm the adjacent days so a committed swipe lands with minimal blank.
+  useEffect(() => {
     if (!isTouch) return;
+    router.prefetch(prevDayHref);
+    router.prefetch(nextDayHref);
+  }, [isTouch, prevDayHref, nextDayHref, router]);
+
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!isTouch || animatingRef.current) return;
     startRef.current = { x: e.clientX, y: e.clientY };
     axisRef.current = null;
-    setTransitionOn(false);
+    const el = swipeRef.current;
+    if (el) el.style.transition = "none"; // follow the finger 1:1, no easing
   };
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!startRef.current) return;
@@ -152,8 +179,8 @@ export function CalendarTimeline({
       axisRef.current = Math.abs(dx) > Math.abs(dy) * 1.5 ? "h" : "v";
     }
     if (axisRef.current === "h") {
-      const followed = dx * 0.35;
-      setDragX(Math.max(-60, Math.min(60, followed)));
+      const el = swipeRef.current;
+      if (el) el.style.transform = `translateX(${dx}px)`; // direct DOM, no setState
     }
   };
   const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -163,18 +190,46 @@ export function CalendarTimeline({
     const wasHorizontal = axisRef.current === "h";
     startRef.current = null;
     axisRef.current = null;
-    setTransitionOn(true);
-    if (
+    const el = swipeRef.current;
+    if (!el) return;
+
+    const committed =
       wasHorizontal &&
       Math.abs(dx) > SWIPE_THRESHOLD &&
-      Math.abs(dx) > Math.abs(dy) * 1.5
-    ) {
-      const dir = dx < 0 ? -1 : 1; // left swipe → next day, right → previous
-      pendingDirRef.current = dir;
-      setDragX(dir * SWIPE_NUDGE);
-      router.push(dir < 0 ? nextDayHref : prevDayHref);
-    } else {
-      setDragX(0); // snap back
+      Math.abs(dx) > Math.abs(dy) * 1.5;
+
+    if (!committed) {
+      // Snap back to centre with the same easing.
+      el.style.transition = SWIPE_TRANSITION;
+      el.style.transform = "translateX(0)";
+      return;
+    }
+
+    // Commit: slide the current day fully off-screen, then on transitionend
+    // park the container on the opposite edge and navigate. The [anchorDay]
+    // effect slides the new day in once it mounts.
+    animatingRef.current = true;
+    const dir = dx < 0 ? -1 : 1; // -1 = next day, +1 = previous day
+    const outPct = dir === -1 ? -100 : 100;
+    el.style.transition = SWIPE_TRANSITION;
+    el.style.transform = `translateX(${outPct}%)`;
+    pendingDirRef.current = dir;
+    const onEnd = (event: TransitionEvent) => {
+      if (event.target !== el || event.propertyName !== "transform") return;
+      el.removeEventListener("transitionend", onEnd);
+      el.style.transition = "none";
+      el.style.transform = `translateX(${-outPct}%)`; // park opposite, off-screen
+      router.push(dir === -1 ? nextDayHref : prevDayHref);
+    };
+    el.addEventListener("transitionend", onEnd);
+  };
+  const onPointerCancel = () => {
+    startRef.current = null;
+    axisRef.current = null;
+    const el = swipeRef.current;
+    if (el) {
+      el.style.transition = SWIPE_TRANSITION;
+      el.style.transform = "translateX(0)";
     }
   };
 
@@ -300,25 +355,18 @@ export function CalendarTimeline({
         </p>
       ) : null}
 
+      {/* Clip so a committed swipe can slide the day fully off-screen. */}
+      <div className="overflow-hidden">
       <div
+        ref={swipeRef}
         className="flex gap-2 sm:gap-3"
         onPointerDown={isTouch ? onPointerDown : undefined}
         onPointerMove={isTouch ? onPointerMove : undefined}
         onPointerUp={isTouch ? onPointerUp : undefined}
-        onPointerCancel={
-          isTouch
-            ? () => {
-                startRef.current = null;
-                axisRef.current = null;
-                setTransitionOn(true);
-                setDragX(0);
-              }
-            : undefined
-        }
+        onPointerCancel={isTouch ? onPointerCancel : undefined}
         style={{
           touchAction: isTouch ? "pan-y" : undefined,
-          transform: dragX ? `translateX(${dragX}px)` : undefined,
-          transition: transitionOn ? "transform 150ms ease-out" : "none",
+          willChange: isTouch ? "transform" : undefined,
         }}
       >
         {/* Shared hour axis. The matching p-1 keeps its labels aligned with the
@@ -358,6 +406,7 @@ export function CalendarTimeline({
             />
           ))}
         </div>
+      </div>
       </div>
     </section>
   );
