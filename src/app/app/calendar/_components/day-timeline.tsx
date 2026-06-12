@@ -515,7 +515,17 @@ export function CalendarTimeline({
               }}
             >
               {mobilePanels.map((panel) => (
-                <div key={panel.dayIso} className="w-1/3 shrink-0">
+                // Explicit 1/3-of-track width + min-w-0 so a panel can never be
+                // widened by its content's min-content size (flexbox's auto
+                // minimum). If panels could expand unevenly, PAGER_CENTER's
+                // track-relative translate would park each day at a different
+                // pixel offset — making the centred empty-state text jump
+                // horizontally between swipes. The literal 33.3333% matches the
+                // PAGER_* transform constants exactly (w-1/3 = 33.3333333%).
+                <div
+                  key={panel.dayIso}
+                  className="w-[33.3333%] shrink-0 min-w-0"
+                >
                   <DayColumn
                     column={panel}
                     height={mobileHeight}
