@@ -282,11 +282,11 @@ const continueSchema = z.object({
   startedAt: z.string().min(1),
 });
 
-// "I'm still doing it." Log the gap from its start up to now, then immediately
-// start a fresh running timer with the same label/category so it keeps
-// counting — the "I forgot to hit start" recovery flow. The new entry ends and
-// the timer starts at the same captured moment, so there's no sliver of lost
-// time between them.
+// "I'm still doing it." The activity ran the whole untracked gap and is still
+// going — it's the "I forgot to hit start" recovery flow. Start a single
+// running timer backdated to the gap start, so its elapsed time immediately
+// reflects the full duration already spent. No separate completed entry is
+// created (that would split one continuous activity into two rows).
 export async function backfillAndContinue(formData: FormData) {
   const userId = await resolveActiveUserId();
 
@@ -299,15 +299,10 @@ export async function backfillAndContinue(formData: FormData) {
     throw new Error(parsed.error.issues[0]?.message ?? "Invalid input.");
   }
 
-  await timeService.createPastEntry(userId, {
-    label: parsed.data.label,
-    category: parsed.data.category ?? null,
-    startedAt: new Date(parsed.data.startedAt),
-    endedAt: new Date(),
-  });
   await timeService.startEntry(userId, {
     label: parsed.data.label,
     category: parsed.data.category ?? null,
+    startedAt: new Date(parsed.data.startedAt),
   });
 
   revalidatePath("/app");

@@ -139,12 +139,32 @@ export async function createPastEntry(
 
 export async function startEntry(
   userId: string,
-  input: { label: string; category?: string | null; doItemId?: string | null; habitId?: string | null },
+  input: {
+    label: string;
+    category?: string | null;
+    doItemId?: string | null;
+    habitId?: string | null;
+    // Backdate the running timer (e.g. "I'm still doing it" — the activity
+    // actually began at the start of the untracked gap, not now). Defaults to
+    // now. Capped at 24h in the past to mirror the backfill ceiling.
+    startedAt?: Date;
+  },
 ): Promise<TimeEntry> {
   requireCan(userId, "time", "write");
+  const now = new Date();
+  const startedAt = input.startedAt ?? now;
+  if (Number.isNaN(startedAt.getTime())) {
+    throw new Error("Start time is invalid.");
+  }
+  if (startedAt.getTime() > now.getTime()) {
+    throw new Error("Start time cannot be in the future.");
+  }
+  if (now.getTime() - startedAt.getTime() > 24 * 60 * 60 * 1000) {
+    throw new Error("A running timer can't be backdated more than 24 hours.");
+  }
   await prisma.timeEntry.updateMany({
     where: { userId, endedAt: null },
-    data: { endedAt: new Date() },
+    data: { endedAt: now },
   });
   const entry = await prisma.timeEntry.create({
     data: {
@@ -153,7 +173,7 @@ export async function startEntry(
       category: input.category ?? null,
       doItemId: input.doItemId ?? null,
       habitId: input.habitId ?? null,
-      startedAt: new Date(),
+      startedAt,
     },
   });
   await recordEvent({

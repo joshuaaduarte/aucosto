@@ -4,7 +4,7 @@
 // 9:30 AM – 11:45 AM") it offers three honest paths instead of one guess:
 //   1. Fill with one entry      — one activity covered the whole block.
 //   2. Fill with multiple entries — split the block, one chunk at a time.
-//   3. I'm still doing it        — log up to now AND keep a timer running.
+//   3. I'm still doing it        — one timer, backdated to the gap start.
 // Each opens a focused bottom-sheet (centered dialog on desktop). Dismiss
 // hides the card until the next gap.
 
@@ -96,7 +96,7 @@ export function GapBackfillCard({
     {
       mode: "continue",
       title: "I'm still doing it",
-      description: "Log up to now and keep the timer running.",
+      description: "Start a timer backdated to when this began.",
       icon: <IconPlay />,
     },
   ];
@@ -437,7 +437,7 @@ function SimpleFillModal({
             style={{ color: "var(--text-muted)" }}
           >
             {isContinue
-              ? "We'll log this much, then start a fresh timer for the same thing."
+              ? "We'll start your timer back at the gap's start, so it already shows this much."
               : "One entry will cover the whole block."}
           </p>
         </div>
@@ -495,7 +495,7 @@ function SimpleFillModal({
             {pending
               ? "Saving..."
               : isContinue
-                ? "Log & start timer"
+                ? "Start timer"
                 : "Save entry"}
           </button>
         </div>
