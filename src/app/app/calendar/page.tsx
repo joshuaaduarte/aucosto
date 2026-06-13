@@ -66,23 +66,40 @@ export default async function CalendarPage({
   const selectedDayStart = startOfDay(selectedDay);
   const isTodaySelected = selectedDayStart.getTime() === todayStart.getTime();
 
-  // View span: ?view=1d|2d|3d|w → 1/2/3/7 columns starting at the anchor day.
+  // View span: ?view=1d|2d|3d|5d|w. 1/2/3-day and week views run forward N days
+  // from the anchor; 5d is special — it pins to Mon–Fri of the *selected day's*
+  // calendar week rather than "5 days from today".
   const hasExplicitView = isCalendarView(params.view);
   const view: CalendarView = hasExplicitView
     ? (params.view as CalendarView)
     : "1d";
-  const viewDays = { "1d": 1, "2d": 2, "3d": 3, w: 7 }[view];
+  const VIEW_DAYS: Record<CalendarView, number> = {
+    "1d": 1,
+    "2d": 2,
+    "3d": 3,
+    "5d": 5,
+    w: 7,
+  };
+  const isWorkWeek = view === "5d";
+  const viewDays = VIEW_DAYS[view];
+  const columnStart = isWorkWeek
+    ? startOfCalendarWeek(selectedDay)
+    : selectedDayStart;
   const columnDays = Array.from({ length: viewDays }, (_, index) =>
-    startOfDay(addDays(selectedDayStart, index)),
+    startOfDay(addDays(columnStart, index)),
   );
-  const rangeStart = selectedDayStart;
-  const rangeEnd = endOfDay(addDays(selectedDayStart, viewDays - 1));
 
-  // Widen the timeline data fetch one day on each side of the view so the
-  // mobile single-day pager can pre-render the previous and next day — making
-  // a committed swipe land instantly with no fetch gap.
-  const panelRangeStart = startOfDay(addDays(selectedDayStart, -1));
-  const panelRangeEnd = endOfDay(addDays(selectedDayStart, viewDays));
+  // Widen the timeline data fetch to cover both the desktop columns (which for
+  // 5d can start before the selected day) and the mobile pager's prev/current/
+  // next window — padded one day each side so a committed swipe lands instantly
+  // with no fetch gap.
+  const firstNeeded =
+    columnStart < selectedDayStart ? columnStart : selectedDayStart;
+  const lastColumnDay = addDays(columnStart, viewDays - 1);
+  const mobileLastDay = addDays(selectedDayStart, 1);
+  const lastNeeded = lastColumnDay > mobileLastDay ? lastColumnDay : mobileLastDay;
+  const panelRangeStart = startOfDay(addDays(firstNeeded, -1));
+  const panelRangeEnd = endOfDay(lastNeeded);
 
   const sevenDaysAgo = new Date(todayStart);
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
@@ -150,6 +167,7 @@ export default async function CalendarPage({
     weekday: day.toLocaleDateString([], { weekday: "short" }),
     dayNum: day.getDate(),
     isToday: day.getTime() === todayStart.getTime(),
+    isWeekend: day.getDay() === 0 || day.getDay() === 6,
     model: buildDayTimeline({
       items: timelineItems,
       entries: timelineEntries,
@@ -188,6 +206,7 @@ export default async function CalendarPage({
     weekday: day.toLocaleDateString([], { weekday: "short" }),
     dayNum: day.getDate(),
     isToday: day.getTime() === todayStart.getTime(),
+    isWeekend: day.getDay() === 0 || day.getDay() === 6,
     model: buildDayTimeline({
       items: timelineItems,
       entries: timelineEntries,
@@ -243,8 +262,8 @@ export default async function CalendarPage({
     now,
   });
 
-  const firstColumn = selectedDayStart;
-  const lastColumn = addDays(selectedDayStart, viewDays - 1);
+  const firstColumn = columnStart;
+  const lastColumn = lastColumnDay;
   const rangeLabel =
     viewDays === 1
       ? isTodaySelected
@@ -256,9 +275,12 @@ export default async function CalendarPage({
           })
       : `${firstColumn.toLocaleDateString([], { month: "short", day: "numeric" })} – ${lastColumn.toLocaleDateString([], { month: "short", day: "numeric" })}`;
 
+  // 5d steps a whole week at a time (Mon→Mon); every other view steps by its
+  // own span. The step anchors off columnStart so 5d lands on Mondays.
+  const navStep = isWorkWeek ? 7 : viewDays;
   const timelineNav = {
-    prevHref: `/app/calendar?view=${view}&day=${formatDateValue(addDays(selectedDayStart, -viewDays))}`,
-    nextHref: `/app/calendar?view=${view}&day=${formatDateValue(addDays(selectedDayStart, viewDays))}`,
+    prevHref: `/app/calendar?view=${view}&day=${formatDateValue(addDays(columnStart, -navStep))}`,
+    nextHref: `/app/calendar?view=${view}&day=${formatDateValue(addDays(columnStart, navStep))}`,
     todayHref: `/app/calendar?view=${view}`,
     rangeLabel,
     isToday: isTodaySelected,

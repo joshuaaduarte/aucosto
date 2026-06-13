@@ -25,6 +25,7 @@ const LABELS: Record<CalendarView, string> = {
   "1d": "1D",
   "2d": "2D",
   "3d": "3D",
+  "5d": "5D",
   w: "W",
 };
 

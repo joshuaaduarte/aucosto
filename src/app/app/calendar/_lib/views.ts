@@ -6,7 +6,7 @@
 // fine, then throws at request time). Keeping the constant, type, and guard
 // here lets page.tsx (server) and view-selector.tsx (client) share one source.
 
-export const CALENDAR_VIEWS = ["1d", "2d", "3d", "w"] as const;
+export const CALENDAR_VIEWS = ["1d", "2d", "3d", "5d", "w"] as const;
 export type CalendarView = (typeof CALENDAR_VIEWS)[number];
 
 export function isCalendarView(

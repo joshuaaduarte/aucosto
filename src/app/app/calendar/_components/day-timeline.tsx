@@ -51,6 +51,8 @@ export type CalendarColumn = {
   weekday: string; // "Fri"
   dayNum: number; // 13
   isToday: boolean;
+  /** Saturday or Sunday — dimmed in week/5d views. */
+  isWeekend: boolean;
   model: DayTimelineModel;
 };
 
@@ -348,6 +350,17 @@ export function CalendarTimeline({
       : columns;
   const multiDay = displayColumns.length > 1;
 
+  // Compact blocks (thin colour strip + single line, hover for details) kick in
+  // whenever columns are narrow — i.e. any multi-day view. 1D stays full.
+  const compact = multiDay;
+  // Weekend dimming only reads as signal in the week-grain views.
+  const showWeekend = view === "w" || view === "5d";
+  // Desktop (mouse) multi-day views scroll horizontally with a min column width
+  // rather than squishing. Touch keeps the swipe-driven grid; the swipe
+  // container's will-change: transform would fight a horizontal scroller.
+  const horizontalScroll = !isTouch && multiDay;
+  const minColPx = view === "w" || view === "5d" ? 140 : 160;
+
   const base = displayColumns[0]?.model;
   const hours = base
     ? (base.windowEnd.getTime() - base.windowStart.getTime()) / 3_600_000
@@ -534,7 +547,66 @@ export function CalendarTimeline({
                     height={mobileHeight}
                     hourMarks={mobileHourMarks}
                     multiDay={false}
+                    compact={false}
+                    weekend={false}
                     allowCreate={false}
+                    payloads={payloads}
+                    tasks={tasks}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : horizontalScroll ? (
+        // Desktop multi-day: horizontal scroll with a min column width so days
+        // never squish. The hour axis is sticky-left so it stays pinned while
+        // the columns scroll beneath it. Scrollbar hidden (no-scrollbar) for a
+        // clean trackpad scroll.
+        <div
+          className="no-scrollbar overflow-x-auto"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
+          <div className="flex">
+            {/* Sticky hour axis — pinned to the left edge of the scroll
+                viewport, opaque page background so columns scroll cleanly
+                beneath it. */}
+            <div
+              className="sticky left-0 z-10 flex shrink-0 flex-col p-1"
+              style={{ width: "2.5rem", background: "var(--bg-page)" }}
+            >
+              <div style={{ height: HEADER_PX }} />
+              <div className="relative" style={{ height }}>
+                {hourMarks.map((mark) => (
+                  <span
+                    key={mark.hour}
+                    className="absolute right-1 -translate-y-1/2 text-[0.625rem] tabular"
+                    style={{ top: `${mark.topPct}%`, color: "var(--text-faint)" }}
+                  >
+                    {mark.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Columns grow to fill when there's room (flex-1) but never shrink
+                below minColPx — past that the row overflows and the container
+                scrolls horizontally. */}
+            <div className="flex flex-1 gap-2 pl-2 sm:gap-3 sm:pl-3">
+              {displayColumns.map((column) => (
+                <div
+                  key={column.dayIso}
+                  className="flex-1"
+                  style={{ minWidth: minColPx }}
+                >
+                  <DayColumn
+                    column={column}
+                    height={height}
+                    hourMarks={hourMarks}
+                    multiDay={multiDay}
+                    compact={compact}
+                    weekend={showWeekend && column.isWeekend}
+                    allowCreate={!isTouch}
                     payloads={payloads}
                     tasks={tasks}
                   />
@@ -594,6 +666,8 @@ export function CalendarTimeline({
                   height={height}
                   hourMarks={hourMarks}
                   multiDay={multiDay}
+                  compact={compact}
+                  weekend={showWeekend && column.isWeekend}
                   allowCreate={!isTouch}
                   payloads={payloads}
                   tasks={tasks}
@@ -612,6 +686,8 @@ function DayColumn({
   height,
   hourMarks,
   multiDay,
+  compact,
+  weekend,
   allowCreate,
   payloads,
   tasks,
@@ -620,6 +696,10 @@ function DayColumn({
   height: number;
   hourMarks: DayTimelineModel["hourMarks"];
   multiDay: boolean;
+  /** Narrow column — render thin colour-strip blocks with hover details. */
+  compact: boolean;
+  /** Saturday/Sunday in a week-grain view — dim the column slightly. */
+  weekend: boolean;
   /** Drag-to-create on the tracked lane (mouse/desktop only). */
   allowCreate: boolean;
   payloads: Record<string, TimelineBlockPayload>;
@@ -635,7 +715,9 @@ function DayColumn({
       style={{
         background: isToday
           ? "color-mix(in srgb, var(--accent) 8%, transparent)"
-          : undefined,
+          : weekend
+            ? "color-mix(in srgb, var(--bg-page) 93%, #000)"
+            : undefined,
       }}
     >
       <div style={{ height: HEADER_PX }} className="flex items-end">
@@ -680,6 +762,7 @@ function DayColumn({
           windowEndIso={windowEndIso}
           height={height}
           variant="planned"
+          narrow={compact}
           payloads={payloads}
           tasks={tasks}
         />
@@ -690,6 +773,7 @@ function DayColumn({
           windowEndIso={windowEndIso}
           height={height}
           variant="actual"
+          narrow={compact}
           payloads={payloads}
           tasks={tasks}
           context={model.context}

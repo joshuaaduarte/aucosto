@@ -5,7 +5,13 @@
 // (title/time, mark done, delete); tapping the running block jumps to the
 // time page where the live session controls are.
 
-import { useEffect, useState, useTransition } from "react";
+import {
+  type MouseEvent as ReactMouseEvent,
+  useEffect,
+  useState,
+  useTransition,
+} from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   EntryModal,
@@ -38,18 +44,51 @@ export type TimelineBlockPayload =
 export function TimelineBlockButton({
   block,
   variant,
-  compact,
+  heightPx,
+  narrow,
   payload,
   tasks,
 }: {
   block: TimelineBlock;
   variant: "planned" | "actual";
-  compact: boolean;
+  /** Rendered pixel height — drives how much detail the block can show. */
+  heightPx: number;
+  /** Narrow column: thin colour strip + single line, full detail on hover. */
+  narrow: boolean;
   payload: TimelineBlockPayload;
   tasks: LinkableTask[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  // Hover popover (narrow columns only). Captured in viewport coords and
+  // portalled to <body> so the lane's overflow-clip can't trap it.
+  const [pop, setPop] = useState<{
+    left: number;
+    top: number;
+    flip: boolean;
+  } | null>(null);
+
+  // Detail tiers for full (1D) blocks: tiny (label only) under ~30px, time on a
+  // second line under ~62px, category chip once there's real room.
+  const showTime = !narrow && heightPx >= 30;
+  const showCategory = !narrow && heightPx >= 62;
+
+  const category = payload.type === "entry" ? payload.entry.category : null;
+  const notes = payload.type === "entry" ? payload.entry.notes : null;
+
+  const onEnter = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    if (!narrow) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const CARD_W = 240;
+    let left = rect.left;
+    if (left + CARD_W > window.innerWidth - 8) {
+      left = window.innerWidth - 8 - CARD_W;
+    }
+    left = Math.max(8, left);
+    // Flip above the block when there isn't comfortable room below.
+    const flip = rect.bottom + 160 > window.innerHeight;
+    setPop({ left, top: flip ? rect.top : rect.bottom, flip });
+  };
 
   return (
     <>
@@ -57,15 +96,20 @@ export function TimelineBlockButton({
         type="button"
         // Keep block taps from starting a drag-create on the lane underneath.
         onPointerDown={(event) => event.stopPropagation()}
+        onMouseEnter={onEnter}
+        onMouseLeave={() => setPop(null)}
         onClick={(event) => {
           event.stopPropagation();
+          setPop(null);
           if (payload.type === "running") {
             router.push("/app/time");
             return;
           }
           setOpen(true);
         }}
-        className="absolute overflow-hidden rounded px-1.5 py-0.5 text-left"
+        className={`absolute overflow-hidden rounded text-left ${
+          narrow ? "px-1 py-0.5" : "px-1.5 py-0.5"
+        }`}
         style={{
           top: `${block.topPct}%`,
           height: `${block.heightPct}%`,
@@ -73,12 +117,14 @@ export function TimelineBlockButton({
           width: `calc(${block.widthPct}% - 8px)`,
           minHeight: "15px",
           background:
-            variant === "actual"
-              ? `color-mix(in srgb, ${block.color} 22%, var(--bg-page))`
-              : "var(--bg-page)",
+            narrow || variant === "planned"
+              ? "var(--bg-page)"
+              : `color-mix(in srgb, ${block.color} 22%, var(--bg-page))`,
           border:
-            variant === "planned" ? "1px solid var(--border-soft)" : undefined,
-          borderLeftWidth: "3px",
+            !narrow && variant === "planned"
+              ? "1px solid var(--border-soft)"
+              : undefined,
+          borderLeftWidth: narrow ? "6px" : "3px",
           borderLeftStyle: "solid",
           borderLeftColor: block.color,
           opacity: block.muted ? 0.55 : 1,
@@ -98,7 +144,7 @@ export function TimelineBlockButton({
           ) : null}
           {block.title}
         </p>
-        {!compact ? (
+        {showTime ? (
           <p
             className="truncate text-[0.625rem] leading-tight"
             style={{ color: "var(--text-faint)" }}
@@ -106,7 +152,70 @@ export function TimelineBlockButton({
             {block.detail}
           </p>
         ) : null}
+        {showCategory && category ? (
+          <span
+            className="mt-1 inline-flex max-w-full items-center gap-1 truncate rounded-sm px-1 py-0.5 text-[0.5625rem] font-semibold uppercase tracking-wide"
+            style={{
+              background: `color-mix(in srgb, ${block.color} 16%, transparent)`,
+              color: "var(--text-muted)",
+            }}
+          >
+            {category}
+          </span>
+        ) : null}
       </button>
+
+      {pop && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="pointer-events-none fixed z-50 rounded-md border p-2.5 shadow-lg"
+              style={{
+                left: pop.left,
+                top: pop.top,
+                width: 240,
+                transform: pop.flip
+                  ? "translateY(calc(-100% - 6px))"
+                  : "translateY(6px)",
+                background: "var(--bg-page)",
+                borderColor: "var(--border-soft)",
+              }}
+              role="tooltip"
+            >
+              <p
+                className="text-[0.8125rem] font-semibold leading-snug"
+                style={{ color: "var(--text)" }}
+              >
+                {block.title}
+              </p>
+              <p
+                className="mt-0.5 text-[0.6875rem] tabular"
+                style={{ color: "var(--text-muted)" }}
+              >
+                {block.detail}
+              </p>
+              <p
+                className="mt-1 flex items-center gap-1.5 text-[0.6875rem]"
+                style={{ color: "var(--text-faint)" }}
+              >
+                <span
+                  className="inline-block h-2 w-2 shrink-0 rounded-full"
+                  style={{ background: block.color }}
+                  aria-hidden
+                />
+                {category ?? (variant === "planned" ? "Planned" : "Tracked")}
+              </p>
+              {notes ? (
+                <p
+                  className="mt-1.5 line-clamp-3 text-[0.6875rem] leading-snug"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {notes}
+                </p>
+              ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
 
       {open && payload.type === "entry" ? (
         <EntryModal

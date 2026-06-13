@@ -49,6 +49,7 @@ export function TimelineLane({
   windowEndIso,
   height,
   variant,
+  narrow = false,
   payloads,
   tasks,
   context = [],
@@ -60,6 +61,8 @@ export function TimelineLane({
   windowEndIso: string;
   height: number;
   variant: "planned" | "actual";
+  /** Narrow column: thin colour-strip blocks with a hover popover. */
+  narrow?: boolean;
   payloads: Record<string, TimelineBlockPayload>;
   tasks: LinkableTask[];
   /** Read-only rhythm context drawn behind the tracked blocks. */
@@ -232,7 +235,8 @@ export function TimelineLane({
               key={block.id}
               block={block}
               variant={variant}
-              compact={blockPx < 30}
+              heightPx={blockPx}
+              narrow={narrow}
               payload={payload}
               tasks={tasks}
             />
