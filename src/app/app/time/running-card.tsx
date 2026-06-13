@@ -272,7 +272,7 @@ export function RunningCard({
                 onClick={() => setReflectOpen(false)}
                 aria-label="Close reflection modal"
               >
-                x
+                ×
               </button>
             </div>
 
@@ -433,7 +433,7 @@ export function RunningCard({
                 onClick={() => setReflectOpen(false)}
                 aria-label="Close habit reflection modal"
               >
-                x
+                ×
               </button>
             </div>
 

@@ -222,6 +222,24 @@ export default async function TimePage() {
     now,
   });
 
+  // Sleep rhythm markers shown alongside entries. Fetch covers the same span
+  // the archive does (oldest recent entry's day → tomorrow), so every day group
+  // that can render gets its bedtime/wake-up bookends. Fetched up here because
+  // the untracked-gap baseline below also reads it (a closed sleep session is a
+  // wake-up signal — the gap must start there, not span the night).
+  const sleepFrom = recent.length
+    ? startOfDay(
+        recent.reduce(
+          (min, entry) => (entry.startedAt < min ? entry.startedAt : min),
+          recent[0]!.startedAt,
+        ),
+      )
+    : todayStart;
+  const sleepSessions = await listSleepSessions(userId, {
+    from: sleepFrom,
+    to: tomorrow,
+  });
+
   // Open tasks the entry editor can link entries to.
   const linkableTasks = openTasks.map((task) => ({
     id: task.id,
@@ -300,11 +318,13 @@ export default async function TimePage() {
         : latest,
     null,
   );
-  // "Since you woke up" baseline: when the morning check-in logged a wake
-  // time and nothing's been tracked since, anchor the untracked gap at wake
-  // time instead of the last entry's end. Wake time is "HH:mm" from the
-  // browser; resolve it against today in the (LA-pinned) server clock.
-  const wakeAnchor = (() => {
+  // "Since you woke up" baseline: anchor the untracked gap at this morning's
+  // wake-up instead of the last entry's end, so the gap never spans the night.
+  // Wake-up is known two ways — the morning check-in's reported time, or a
+  // sleep session that's since been closed (auto-tracked wake). Take the later
+  // of the two. The morning time is "HH:mm" from the browser; resolve it
+  // against today in the (LA-pinned) server clock.
+  const morningWakeAt = (() => {
     if (!todayMorning?.wakeTime) return null;
     const [h, m] = todayMorning.wakeTime.split(":").map(Number);
     if (h === undefined || m === undefined || !Number.isFinite(h) || !Number.isFinite(m)) return null;
@@ -312,6 +332,18 @@ export default async function TimePage() {
     at.setHours(h, m, 0, 0);
     return at.getTime() <= now.getTime() ? at : null;
   })();
+  const sleepWakeAt = sleepSessions.reduce<Date | null>(
+    (latest, sleep) =>
+      sleep.endedAt && sleep.endedAt <= now && (!latest || sleep.endedAt > latest)
+        ? sleep.endedAt
+        : latest,
+    null,
+  );
+  const wakeAnchor = [morningWakeAt, sleepWakeAt].reduce<Date | null>(
+    (latest, candidate) =>
+      candidate && (!latest || candidate > latest) ? candidate : latest,
+    null,
+  );
   const sinceWakeup =
     wakeAnchor !== null && (!lastEndedAt || lastEndedAt < wakeAnchor);
   const gap = running
@@ -347,22 +379,6 @@ export default async function TimePage() {
       }))}
     />
   );
-
-  // Sleep rhythm markers shown alongside entries. Fetch covers the same span
-  // the archive does (oldest recent entry's day → tomorrow), so every day group
-  // that can render gets its bedtime/wake-up bookends.
-  const sleepFrom = recent.length
-    ? startOfDay(
-        recent.reduce(
-          (min, entry) => (entry.startedAt < min ? entry.startedAt : min),
-          recent[0]!.startedAt,
-        ),
-      )
-    : todayStart;
-  const sleepSessions = await listSleepSessions(userId, {
-    from: sleepFrom,
-    to: tomorrow,
-  });
 
   // Build day groups merging time entries with sleep markers. A sleep session
   // contributes a bedtime marker to the day it started and a wake-up marker to
@@ -603,9 +619,7 @@ export default async function TimePage() {
                   ))}
                   {group.entries.map((entry) => {
                     const duration =
-                      (entry.endedAt!.getTime() -
-                        entry.startedAt.getTime()) |
-                      0;
+                      entry.endedAt!.getTime() - entry.startedAt.getTime();
                     return (
                       <li
                         key={entry.id}
@@ -617,7 +631,7 @@ export default async function TimePage() {
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-baseline gap-2">
                             <p
-                              className="truncate text-[0.9375rem] font-medium"
+                              className="min-w-0 truncate text-[0.9375rem] font-medium"
                               style={{ color: "var(--text)" }}
                             >
                               {entry.label}

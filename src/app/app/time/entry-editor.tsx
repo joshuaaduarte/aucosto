@@ -192,7 +192,7 @@ export function EntryModal({
             onClick={onClose}
             aria-label="Close entry editor"
           >
-            x
+            ×
           </button>
         </div>
 

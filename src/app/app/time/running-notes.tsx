@@ -23,6 +23,9 @@ export function RunningNotes({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSaved = useRef(initialNotes ?? "");
+  // Mirrors the latest text so the unmount flush (which can't read fresh state
+  // from its empty-deps closure) saves what's actually in the box.
+  const latest = useRef(initialNotes ?? "");
 
   const resize = () => {
     const el = textareaRef.current;
@@ -36,12 +39,17 @@ export function RunningNotes({
     if (expanded) resize();
   }, [expanded, notes]);
 
-  // Flush any pending debounce if the card unmounts (e.g. timer stopped).
+  // Flush any pending edit if the card unmounts (e.g. timer stopped or the
+  // user switched to a new session before the debounce fired or a blur landed).
   useEffect(() => {
     return () => {
       if (timer.current) clearTimeout(timer.current);
+      if (latest.current !== lastSaved.current) {
+        lastSaved.current = latest.current;
+        void updateEntryNotes(entryId, latest.current);
+      }
     };
-  }, []);
+  }, [entryId]);
 
   const save = (value: string) => {
     if (value === lastSaved.current) return;
@@ -52,6 +60,7 @@ export function RunningNotes({
   const handleChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = event.target.value;
     setNotes(value);
+    latest.current = value;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => save(value), 1000);
   };

@@ -141,7 +141,7 @@ export function GapBackfillCard({
             onClick={() => setDismissed(true)}
             aria-label="Dismiss untracked time"
           >
-            x
+            ×
           </button>
         </div>
 
@@ -273,7 +273,7 @@ function ModalShell({
             onClick={onClose}
             aria-label="Close"
           >
-            x
+            ×
           </button>
         </div>
         {children}
