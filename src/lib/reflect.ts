@@ -63,6 +63,9 @@ export function dayKey(date: Date): string {
 export function reflectionDayLabel(dateKey: string, todayKey: string): string {
   if (dateKey === todayKey) return "today";
   const [year, month, day] = todayKey.split("-").map(Number);
+  if (year === undefined || month === undefined || day === undefined) {
+    return "that day";
+  }
   // day - 1 rolls back across month/year boundaries via the Date constructor.
   const yesterdayKey = dayKey(new Date(year, month - 1, day - 1));
   if (dateKey === yesterdayKey) return "yesterday";
