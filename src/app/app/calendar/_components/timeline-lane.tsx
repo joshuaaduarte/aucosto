@@ -143,11 +143,11 @@ export function TimelineLane({
     <>
       <div
         ref={laneRef}
-        // overflow-clip (not -hidden) so this box clips blocks to its rounded
-        // bounds WITHOUT becoming a scroll container — that lets the sticky
-        // empty-state below resolve against the page scroll (the viewport)
-        // rather than getting trapped and pinned to this lane's own height.
-        className="relative overflow-clip rounded"
+        // flex-col so the empty-state child can grow (flex-1) and centre itself
+        // within the lane's fixed height. overflow-hidden clips the absolutely
+        // positioned blocks to the rounded bounds. The grid/blocks are absolute,
+        // so they're out of flow and unaffected by the flex layout.
+        className="relative flex flex-col overflow-hidden rounded"
         style={{
           height,
           background: "var(--bg-tint)",
@@ -244,23 +244,24 @@ export function TimelineLane({
         })}
 
         {blocks.length === 0 && !drag ? (
-          // Sticky (not absolute) + top-[50vh] so the hint floats to the
-          // centre of the *viewport*, not the centre of this lane. Each day's
-          // window covers a different span of hours, so the lane height varies
-          // — absolute top-1/2 put the text at a different on-screen position
-          // every day. Sticky to the viewport keeps it visually consistent
-          // regardless of timeline height or scroll position. pointer-events
-          // stay off so taps fall through to the lane (drag-to-create) beneath.
-          <p
-            className="pointer-events-none sticky top-[50vh] -translate-y-1/2 px-2 text-center text-[0.6875rem]"
-            style={{ color: "var(--text-faint)" }}
-          >
-            {variant === "planned"
-              ? "Nothing planned"
-              : enableCreate
-                ? "Drag to log time"
-                : "Nothing tracked yet"}
-          </p>
+          // Grow to fill the lane and centre the hint statically within it.
+          // flex-1 makes this the only flow child that expands to the lane's
+          // full height; items/justify-center park the text in the middle. It
+          // scrolls naturally with the page rather than tracking the viewport.
+          // pointer-events stay off so taps fall through to the lane
+          // (drag-to-create) beneath.
+          <div className="pointer-events-none flex flex-1 items-center justify-center px-2">
+            <p
+              className="text-center text-[0.6875rem]"
+              style={{ color: "var(--text-faint)" }}
+            >
+              {variant === "planned"
+                ? "Nothing planned"
+                : enableCreate
+                  ? "Drag to log time"
+                  : "Nothing tracked yet"}
+            </p>
+          </div>
         ) : null}
       </div>
 

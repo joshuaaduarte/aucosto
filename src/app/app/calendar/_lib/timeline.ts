@@ -240,11 +240,13 @@ export function buildDayTimeline(
 
   const { startHour, endHour } = input.bounds ?? dayWindowHours(input);
 
-  const windowStart = new Date(dayStart);
-  windowStart.setHours(startHour, 0, 0, 0);
-  const windowEnd = new Date(dayStart);
-  windowEnd.setHours(0, 0, 0, 0);
-  windowEnd.setTime(dayStart.getTime() + endHour * 3_600_000);
+  // dayStart is the single wall-clock anchor (local midnight). Derive the
+  // window bounds AND the hour marks as plain epoch offsets from it so block
+  // positions (also epoch-based) line up exactly with the axis. Mixing a
+  // wall-clock setHours() for the start with epoch math for the end/marks
+  // drifts them apart by an hour across a DST boundary.
+  const windowStart = new Date(dayStart.getTime() + startHour * 3_600_000);
+  const windowEnd = new Date(dayStart.getTime() + endHour * 3_600_000);
   const windowMs = windowEnd.getTime() - windowStart.getTime();
 
   const windowStartMs = windowStart.getTime();
