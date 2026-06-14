@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { dayKey, moodColor, summarizeSnapshot } from "@/lib/reflect";
+import {
+  dayKey,
+  moodColor,
+  reflectionDayLabel,
+  summarizeSnapshot,
+} from "@/lib/reflect";
 import {
   buildReflectionSnapshot,
   getReflection,
@@ -30,6 +35,10 @@ export default async function ReflectPage({
       ? params.date
       : todayKey;
   const isToday = targetKey === todayKey;
+  // Natural inline phrase for the targeted day ("today"/"yesterday"/"that
+  // day"), used by the form's question + status copy so it never says "today"
+  // while reflecting on an earlier day.
+  const dayLabel = reflectionDayLabel(targetKey, todayKey);
   // The instant we snapshot "the day" from: now for today (the day so far),
   // end-of-day for a past day (the whole day). Parsed without a Z → LA local,
   // since the server runtime is pinned to LA.
@@ -158,7 +167,11 @@ export default async function ReflectPage({
       </section>
 
       <section className="fade-in-delay-2">
-        <ReflectionForm existing={existing} dateKey={targetKey} />
+        <ReflectionForm
+          existing={existing}
+          dateKey={targetKey}
+          dayLabel={dayLabel}
+        />
       </section>
     </div>
   );

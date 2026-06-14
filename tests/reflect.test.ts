@@ -6,6 +6,7 @@ import {
   isValidRating,
   moodColor,
   moodEmoji,
+  reflectionDayLabel,
   summarizeSnapshot,
 } from "@/lib/reflect";
 
@@ -46,6 +47,23 @@ describe("dayKey", () => {
   it("produces a local YYYY-MM-DD key", () => {
     expect(dayKey(new Date(2026, 5, 12, 23, 30))).toBe("2026-06-12");
     expect(dayKey(new Date(2026, 0, 1, 0, 5))).toBe("2026-01-01");
+  });
+});
+
+describe("reflectionDayLabel", () => {
+  it("labels the current day", () => {
+    expect(reflectionDayLabel("2026-06-14", "2026-06-14")).toBe("today");
+  });
+
+  it("labels the prior day, including across month boundaries", () => {
+    expect(reflectionDayLabel("2026-06-13", "2026-06-14")).toBe("yesterday");
+    expect(reflectionDayLabel("2026-05-31", "2026-06-01")).toBe("yesterday");
+    expect(reflectionDayLabel("2025-12-31", "2026-01-01")).toBe("yesterday");
+  });
+
+  it("collapses older days to 'that day'", () => {
+    expect(reflectionDayLabel("2026-06-12", "2026-06-14")).toBe("that day");
+    expect(reflectionDayLabel("2026-01-01", "2026-06-14")).toBe("that day");
   });
 });
 

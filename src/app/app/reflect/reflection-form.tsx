@@ -19,6 +19,7 @@ type Ratings = Record<ReflectionRatingField, number | null>;
 export function ReflectionForm({
   existing,
   dateKey,
+  dayLabel,
 }: {
   existing: {
     mood: number;
@@ -31,6 +32,9 @@ export function ReflectionForm({
   } | null;
   /** The day being reflected on ("YYYY-MM-DD"); submitted so saving targets it. */
   dateKey: string;
+  /** Natural phrase for that day ("today"/"yesterday"/"that day") — drives the
+   *  question + status copy so they match the day instead of assuming today. */
+  dayLabel: string;
 }) {
   const [state, formAction, pending] = useActionState(
     saveReflectionAction,
@@ -63,7 +67,7 @@ export function ReflectionForm({
               className="text-[0.8125rem]"
               style={{ color: "var(--text-muted)" }}
             >
-              {question}
+              {field === "mood" ? `How did ${dayLabel} feel?` : question}
             </span>
           </legend>
           <input type="hidden" name={field} value={ratings[field] ?? ""} />
@@ -108,7 +112,7 @@ export function ReflectionForm({
         id="reflect-carry-forward"
         name="carryForward"
         label="What to carry forward?"
-        placeholder="Something to bring into tomorrow..."
+        placeholder="Something to bring into the days ahead..."
         defaultValue={existing?.carryForward ?? ""}
       />
       <TextField
@@ -135,9 +139,9 @@ export function ReflectionForm({
       <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-[0.78rem]" style={{ color: "var(--text-faint)" }}>
           {saved
-            ? "Saved. Edit any time today — it stays one reflection per day."
+            ? "Saved. Edit any time — it stays one reflection per day."
             : existing
-              ? "Editing today's reflection."
+              ? `Editing ${dayLabel}'s reflection.`
               : allRated
                 ? "Ready to save."
                 : "Tap a face on each scale."}

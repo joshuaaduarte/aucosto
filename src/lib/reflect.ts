@@ -29,7 +29,7 @@ export const RATING_FIELDS: Array<{
   label: string;
   question: string;
 }> = [
-  { field: "mood", label: "Mood", question: "How did today feel?" },
+  { field: "mood", label: "Mood", question: "How did the day feel?" },
   { field: "energyLevel", label: "Energy", question: "How was your energy?" },
   {
     field: "productivityRating",
@@ -51,6 +51,22 @@ export function moodEmoji(value: number): string {
     timezone, so this is stable across server and browser. */
 export function dayKey(date: Date): string {
   return date.toLocaleDateString("en-CA");
+}
+
+/** A natural inline phrase for the day a reflection targets, relative to
+ *  `todayKey`: "today" | "yesterday" | "that day". Reads correctly both as a
+ *  question ("How did {label} feel?") and a possessive ("{label}'s
+ *  reflection"). The page header already shows the full date, so older days
+ *  collapse to "that day" rather than an awkward "on Jun 12" mid-sentence.
+ *  `todayKey` is passed in (not derived from `new Date()`) so callers stay
+ *  pure and the result agrees with their own day math. */
+export function reflectionDayLabel(dateKey: string, todayKey: string): string {
+  if (dateKey === todayKey) return "today";
+  const [year, month, day] = todayKey.split("-").map(Number);
+  // day - 1 rolls back across month/year boundaries via the Date constructor.
+  const yesterdayKey = dayKey(new Date(year, month - 1, day - 1));
+  if (dateKey === yesterdayKey) return "yesterday";
+  return "that day";
 }
 
 export function isValidRating(value: number): value is 1 | 2 | 3 | 4 | 5 {
