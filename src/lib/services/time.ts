@@ -98,6 +98,7 @@ export async function createPastEntry(
     label: string;
     category?: string | null;
     doItemId?: string | null;
+    habitId?: string | null;
     notes?: string | null;
     startedAt: Date;
     endedAt: Date;
@@ -122,6 +123,7 @@ export async function createPastEntry(
       label: input.label,
       category: input.category ?? null,
       doItemId: input.doItemId ?? null,
+      habitId: input.habitId ?? null,
       notes: input.notes ?? null,
       startedAt: input.startedAt,
       endedAt: input.endedAt,

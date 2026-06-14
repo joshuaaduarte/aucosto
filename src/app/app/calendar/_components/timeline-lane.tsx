@@ -9,11 +9,16 @@
 import { type PointerEvent as ReactPointerEvent, useRef, useState } from "react";
 import type { LinkableTask } from "../../time/entry-editor";
 import { EntryModal } from "../../time/entry-editor";
-import type { TimelineBlock, TimelineHourMark } from "../_lib/timeline";
+import type {
+  HabitGhostBlock as HabitGhost,
+  TimelineBlock,
+  TimelineHourMark,
+} from "../_lib/timeline";
 import {
   TimelineBlockButton,
   type TimelineBlockPayload,
 } from "./timeline-block";
+import { HabitGhostBlock } from "./habit-ghost-block";
 import { TimelineNowLine } from "./timeline-now-line";
 
 const SNAP_MINUTES = 15;
@@ -53,6 +58,7 @@ export function TimelineLane({
   payloads,
   tasks,
   context = [],
+  habits = [],
   enableCreate = false,
 }: {
   blocks: TimelineBlock[];
@@ -67,6 +73,8 @@ export function TimelineLane({
   tasks: LinkableTask[];
   /** Read-only rhythm context drawn behind the tracked blocks. */
   context?: TimelineBlock[];
+  /** Habit reminder ghosts drawn behind the planned blocks. */
+  habits?: HabitGhost[];
   /** Tracked lane only: allow dragging out a new entry. */
   enableCreate?: boolean;
 }) {
@@ -195,6 +203,12 @@ export function TimelineLane({
           </div>
         ))}
 
+        {/* Habit ghosts: rendered before the real blocks so the blocks paint
+            on top of them (lower visual priority). */}
+        {habits.map((ghost) => (
+          <HabitGhostBlock key={ghost.id} block={ghost} narrow={narrow} />
+        ))}
+
         <TimelineNowLine
           windowStartIso={windowStartIso}
           windowEndIso={windowEndIso}
@@ -243,7 +257,7 @@ export function TimelineLane({
           );
         })}
 
-        {blocks.length === 0 && !drag ? (
+        {blocks.length === 0 && habits.length === 0 && !drag ? (
           // Grow to fill the lane and centre the hint statically within it.
           // flex-1 makes this the only flow child that expands to the lane's
           // full height; items/justify-center park the text in the middle. It

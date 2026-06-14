@@ -144,6 +144,45 @@ export async function startTimerFromCalendarItemAction(formData: FormData) {
   redirect("/app/time");
 }
 
+// Habit ghost block → start a live timer for the habit, then jump to the time
+// page where the running controls live (mirrors startTimerFromCalendarItem).
+export async function startHabitTimerAction(formData: FormData) {
+  const userId = await resolveActiveUserId();
+  const habitId = parseOptionalString(formData.get("habitId"));
+  if (!habitId) {
+    throw new Error("Missing habit id.");
+  }
+  await startTimerForHabit(userId, habitId);
+  revalidateCalendar();
+  revalidatePath("/app/time");
+  redirect("/app/time");
+}
+
+// Habit ghost block → log the reminder window as a completed time entry on that
+// day, linked back to the habit so it counts toward progress/streaks.
+export async function logHabitBlockDoneAction(formData: FormData) {
+  const userId = await resolveActiveUserId();
+  const habitId = parseOptionalString(formData.get("habitId"));
+  const title = String(formData.get("title") ?? "").trim();
+  const category = parseOptionalString(formData.get("category"));
+  const startIso = String(formData.get("startIso") ?? "");
+  const endIso = String(formData.get("endIso") ?? "");
+  if (!habitId || !title) {
+    throw new Error("Missing habit.");
+  }
+
+  await timeService.createPastEntry(userId, {
+    label: title,
+    category: category ?? "habit",
+    habitId,
+    startedAt: new Date(startIso),
+    endedAt: new Date(endIso),
+  });
+
+  revalidateCalendar();
+  revalidatePath("/app/time");
+}
+
 export async function deleteCalendarItemAction(formData: FormData) {
   const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "");

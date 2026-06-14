@@ -5,7 +5,7 @@ import {
 } from "@/lib/services/time";
 import { listAccounts } from "@/lib/services/finance";
 import { listDoItems, listSuggestedDoItems } from "@/lib/services/do";
-import { listSuggestedHabits } from "@/lib/services/habits";
+import { listHabits, listSuggestedHabits } from "@/lib/services/habits";
 import { listCalendarItems } from "@/lib/services/calendar";
 import { listRhythmSessionsBetween } from "@/lib/services/rhythms";
 import {
@@ -21,6 +21,7 @@ import {
   deriveGapSuggestions,
   deriveTodayBuckets,
   endOfDay,
+  habitGhostsForDay,
   formatDateValue,
   formatShortTime,
   formatTimeValue,
@@ -104,7 +105,7 @@ export default async function CalendarPage({
   const sevenDaysAgo = new Date(todayStart);
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
 
-  const [weekItems, runningEntry, completedWeek, timelineItems, timelineEntries, timelineRhythms, trailingItems, trailingEntries, accounts, suggestedTasks, suggestedHabits, openTasks] = await Promise.all([
+  const [weekItems, runningEntry, completedWeek, timelineItems, timelineEntries, timelineRhythms, trailingItems, trailingEntries, accounts, suggestedTasks, suggestedHabits, openTasks, allHabits] = await Promise.all([
     listCalendarItems(userId, { from: weekStart, to: weekEnd }),
     getRunningEntry(userId),
     listCompletedSince(userId, startOfWeek()),
@@ -117,6 +118,7 @@ export default async function CalendarPage({
     listSuggestedDoItems(userId, { limit: 5 }),
     listSuggestedHabits(userId, { limit: 4 }),
     listDoItems(userId, { includeDone: false }),
+    listHabits(userId),
   ]);
 
   const todayItems = weekItems.filter(
@@ -172,6 +174,7 @@ export default async function CalendarPage({
       items: timelineItems,
       entries: timelineEntries,
       rhythms: rhythmInputs,
+      habits: habitGhostsForDay(allHabits, day),
       day,
       now,
       bounds: sharedBounds,
@@ -211,6 +214,7 @@ export default async function CalendarPage({
       items: timelineItems,
       entries: timelineEntries,
       rhythms: rhythmInputs,
+      habits: habitGhostsForDay(allHabits, day),
       day,
       now,
       bounds: mobileBounds,

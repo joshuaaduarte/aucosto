@@ -36,7 +36,43 @@ export type DayTimelineModel = {
   actual: TimelineBlock[];
   /** Read-only rhythm context (sleep / morning) behind the tracked lane. */
   context: TimelineBlock[];
+  /** Habit reminder templates as ghost blocks behind the planned lane. */
+  habits: HabitGhostBlock[];
   nowPct: number | null;
+};
+
+/**
+ * A recurring habit projected onto a single day. `reminderMinutes` is minutes
+ * since local midnight (the server runtime is TZ-pinned, so this maps to a
+ * wall-clock time); `durationMinutes` defaults are resolved by the caller.
+ */
+export type HabitGhostInput = {
+  id: string;
+  title: string;
+  /** Category/colour key (the habit's bucket, falling back to "habit"). */
+  category: string;
+  reminderMinutes: number;
+  durationMinutes: number;
+};
+
+/**
+ * A positioned habit ghost block. Carries the absolute ISO window for that day
+ * so the action popover can start a timer or log a past entry without
+ * recomputing wall-clock math on the client.
+ */
+export type HabitGhostBlock = {
+  id: string;
+  habitId: string;
+  title: string;
+  category: string;
+  color: string;
+  timeLabel: string;
+  startIso: string;
+  endIso: string;
+  topPct: number;
+  heightPct: number;
+  leftPct: number;
+  widthPct: number;
 };
 
 /** Soft, read-only context colors for rhythm sessions on the timeline. */
@@ -176,6 +212,8 @@ export type DayTimelineInput = {
   items: PlannedInput[];
   entries: ActualInput[];
   rhythms?: RhythmInput[];
+  /** Habit reminder templates due on this day (caller filters by weekday). */
+  habits?: HabitGhostInput[];
   day: Date;
   now: Date;
 };
@@ -332,6 +370,41 @@ export function buildDayTimeline(
     muted: true,
   }));
 
+  // Habit ghosts: project each due habit's reminder window onto this day and
+  // lay them out (side-by-side if they overlap) within the same window. They
+  // don't expand the axis — they're templates, clipped to whatever the real
+  // items/entries already opened up.
+  const habitGhosts = input.habits ?? [];
+  const habits: HabitGhostBlock[] = layoutLane(
+    habitGhosts
+      .map((habit) => {
+        const startMs = dayStart.getTime() + habit.reminderMinutes * 60_000;
+        const endMs = startMs + Math.max(1, habit.durationMinutes) * 60_000;
+        return { data: { habit, startMs, endMs }, startMs, endMs };
+      })
+      .filter(
+        ({ startMs, endMs }) =>
+          endMs > windowStartMs && startMs < windowEnd.getTime(),
+      ),
+    windowStartMs,
+    windowMs,
+  ).map(({ data, ...placement }) => {
+    const { habit, startMs, endMs } = data;
+    const start = new Date(startMs);
+    const end = new Date(endMs);
+    return {
+      id: `habit-${habit.id}`,
+      habitId: habit.id,
+      title: habit.title,
+      category: habit.category,
+      color: categoryColor(habit.category),
+      timeLabel: `${formatShort(start)}–${formatShort(end)}`,
+      startIso: start.toISOString(),
+      endIso: end.toISOString(),
+      ...placement,
+    };
+  });
+
   const hourCount = endHour - startHour;
   const step = hourCount > 12 ? 2 : 1;
   const hourMarks: TimelineHourMark[] = [];
@@ -351,5 +424,5 @@ export function buildDayTimeline(
         )
       : null;
 
-  return { windowStart, windowEnd, hourMarks, planned, actual, context, nowPct };
+  return { windowStart, windowEnd, hourMarks, planned, actual, context, habits, nowPct };
 }

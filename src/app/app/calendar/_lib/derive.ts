@@ -1,6 +1,8 @@
 import { daysUntil, formatUSDFromCents } from "@/lib/money";
+import { parseHabitDays } from "@/lib/habits";
 import { UNCATEGORIZED_COLOR, categoryColor } from "@/lib/time-categories";
 import type { DoItemSummary } from "@/lib/services/do";
+import type { HabitGhostInput } from "./timeline";
 import type {
   CalendarItem,
   FinanceAccount,
@@ -387,4 +389,77 @@ export function deriveGapSuggestions(input: {
   }
 
   return suggestions.slice(0, input.limit ?? 3);
+}
+
+// ── Habit ghost blocks ────────────────────────────────────────────────────
+
+const DEFAULT_HABIT_GHOST_MINUTES = 30;
+
+/** Minimal habit shape needed to project a reminder onto a day. */
+type HabitGhostSource = {
+  id: string;
+  title: string;
+  bucket: string | null;
+  cadence: string;
+  daysOfWeek: string | null;
+  reminderTime: string | null;
+  defaultDurationMinutes: number | null;
+  archivedAt: Date | null;
+};
+
+function parseReminderMinutes(reminderTime: string | null): number | null {
+  if (!reminderTime) return null;
+  const match = /^(\d{1,2}):(\d{2})$/.exec(reminderTime.trim());
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
+/**
+ * Whether a habit's schedule lands on the given weekday (0=Sun…6=Sat).
+ * Explicit `daysOfWeek` wins; otherwise fall back to the cadence. Weekly and
+ * day-less custom habits have no fixed slot, so they don't ghost.
+ */
+function habitOccursOnWeekday(habit: HabitGhostSource, weekday: number): boolean {
+  const days = parseHabitDays(habit.daysOfWeek);
+  if (days.length > 0) return days.includes(weekday);
+  switch (habit.cadence) {
+    case "daily":
+      return true;
+    case "weekdays":
+      return weekday >= 1 && weekday <= 5;
+    default:
+      return false;
+  }
+}
+
+/**
+ * Project the active habits with a reminder time onto a single day, returning
+ * the ghost templates due that day. Pure — the timeline positions them.
+ */
+export function habitGhostsForDay(
+  habits: HabitGhostSource[],
+  day: Date,
+): HabitGhostInput[] {
+  const weekday = day.getDay();
+  const ghosts: HabitGhostInput[] = [];
+  for (const habit of habits) {
+    if (habit.archivedAt) continue;
+    const reminderMinutes = parseReminderMinutes(habit.reminderTime);
+    if (reminderMinutes === null) continue;
+    if (!habitOccursOnWeekday(habit, weekday)) continue;
+    ghosts.push({
+      id: habit.id,
+      title: habit.title,
+      category: habit.bucket && habit.bucket.trim() ? habit.bucket : "habit",
+      reminderMinutes,
+      durationMinutes:
+        habit.defaultDurationMinutes && habit.defaultDurationMinutes > 0
+          ? habit.defaultDurationMinutes
+          : DEFAULT_HABIT_GHOST_MINUTES,
+    });
+  }
+  return ghosts;
 }

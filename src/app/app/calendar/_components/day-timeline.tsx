@@ -761,6 +761,7 @@ function DayColumn({
           narrow={compact}
           payloads={payloads}
           tasks={tasks}
+          habits={model.habits}
         />
         <TimelineLane
           blocks={model.actual}
