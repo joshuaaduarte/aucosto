@@ -18,6 +18,7 @@ type Ratings = Record<ReflectionRatingField, number | null>;
 
 export function ReflectionForm({
   existing,
+  dateKey,
 }: {
   existing: {
     mood: number;
@@ -28,6 +29,8 @@ export function ReflectionForm({
     carryForward: string | null;
     freeNotes: string | null;
   } | null;
+  /** The day being reflected on ("YYYY-MM-DD"); submitted so saving targets it. */
+  dateKey: string;
 }) {
   const [state, formAction, pending] = useActionState(
     saveReflectionAction,
@@ -46,6 +49,7 @@ export function ReflectionForm({
 
   return (
     <form action={formAction} className="space-y-6">
+      <input type="hidden" name="dateKey" value={dateKey} />
       {RATING_FIELDS.map(({ field, label, question }) => (
         <fieldset key={field}>
           <legend className="flex items-baseline gap-2">

@@ -36,6 +36,8 @@ import {
 } from "./_components/hub-derive";
 import { HubHeader } from "./_components/hub-header";
 import { RhythmHubCard } from "./_components/rhythm-hub-card";
+import { SleepStatusCard } from "./_components/sleep-status-card";
+import { ReflectionPromptCard } from "./_components/reflection-prompt-card";
 import { ProjectsProgressSection } from "./_components/projects-progress-section";
 import { QuickActionsSection } from "./_components/quick-actions-section";
 import { InsightOfTheDayCard } from "./_components/insight-of-the-day";
@@ -113,12 +115,11 @@ export default async function HubPage() {
       ])
     : [null, [], [], [], [], [], [], [], [], [], [], [], [], []];
 
-  // Rhythm hub card inputs: today's morning check-in, a running sleep
-  // session, and (on a morning) whether last night's sleep went unlogged.
-  // Fetched separately to keep the big tuple above intact. The time-of-day
-  // gating itself happens in the BROWSER (see RhythmHubCard) — the server is
-  // pinned to America/Los_Angeles, so deriving the hour here would mislabel
-  // anyone in another zone.
+  // Rhythm inputs: today's morning check-in, any running sleep session, and
+  // recent sessions (to find the current night's sleep). Fetched separately to
+  // keep the big tuple above intact. The morning card still gates its window in
+  // the BROWSER (see RhythmHubCard); the always-on sleep card derives its state
+  // here from the LA-pinned server clock — single-user, owner in LA.
   const [todayMorning, activeSleep, recentRhythms] = userId
     ? await Promise.all([
         getTodayMorning(userId),
@@ -130,17 +131,36 @@ export default async function HubPage() {
   const now = new Date();
   const todayStart = startOfToday();
 
-  // Missed-sleep detection: look for any sleep session (active or completed)
-  // started since ~6pm yesterday. None → the morning card prompts a backfill.
-  // Bedtimes (9pm–1am) sit well past 6pm in any US zone, so the server-local
-  // window boundary is robust enough; the morning gate itself is client-side.
-  const sleepWindowStart = new Date(now);
-  sleepWindowStart.setDate(sleepWindowStart.getDate() - 1);
-  sleepWindowStart.setHours(18, 0, 0, 0);
-  const hasRecentSleep = recentRhythms.some(
-    (session) =>
-      session.type === "sleep" && session.startedAt >= sleepWindowStart,
-  );
+  // Sleep is always surfaced (like the running-timer bar) — never gated behind
+  // a time-of-day window. We track the current night's "sleep cycle": the
+  // boundary sits at 18:00 local (server is pinned to LA), so from 6pm on the
+  // active cycle is tonight, and before 6pm it's last night. A sleep session
+  // started within the cycle is the one the card reflects.
+  const nowHour = now.getHours();
+  const sleepCycleStart = new Date(now);
+  if (nowHour < 18) {
+    sleepCycleStart.setDate(sleepCycleStart.getDate() - 1);
+  }
+  sleepCycleStart.setHours(18, 0, 0, 0);
+
+  const cycleSleep =
+    (activeSleep && activeSleep.startedAt >= sleepCycleStart
+      ? activeSleep
+      : null) ??
+    recentRhythms.find(
+      (session) =>
+        session.type === "sleep" && session.startedAt >= sleepCycleStart,
+    ) ??
+    null;
+  const sleepCardState: "running" | "logged" | "none" = cycleSleep
+    ? cycleSleep.endedAt === null
+      ? "running"
+      : "logged"
+    : "none";
+  // No session yet: before 6pm the natural prompt is "log last night"; from
+  // 6pm on it's "going to bed".
+  const sleepCardMode: "bedtime" | "backfill" =
+    nowHour >= 18 ? "bedtime" : "backfill";
   const monthStart = startOfMonth();
   const previousMonthStart = startOfPreviousMonth();
   const weekTotalMs = sumDurations(weekEntries);
@@ -222,6 +242,16 @@ export default async function HubPage() {
   const reflectedToday = dayKey(now) in moodsByDay;
   const isEvening = now.getHours() >= 18;
 
+  // Yesterday's reflection nags persistently until it's done — a passed day
+  // left unreflected is a gap to close, and the morning (before noon) is the
+  // natural time to do it, so it's loudest then.
+  const yesterday = new Date(todayStart);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayKey = dayKey(yesterday);
+  const reflectedYesterday = yesterdayKey in moodsByDay;
+  const yesterdayLabel = yesterday.toLocaleDateString([], { weekday: "long" });
+  const beforeNoon = now.getHours() < 12;
+
   // Insight of the day: rotates through whichever findings have enough data.
   const sixtyDaysAgo = new Date(todayStart);
   sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 59);
@@ -265,28 +295,40 @@ export default async function HubPage() {
       <FocusModuleCard focus={focus} />
 
       {userId ? (
-        <RhythmHubCard
-          morning={
-            todayMorning
-              ? {
-                  started: true,
-                  completed: todayMorning.completed,
-                  wakeTime: todayMorning.wakeTime,
-                  sleepMinutes: todayMorning.sleepMinutes,
-                }
-              : null
-          }
-          morningHabits={allHabits
-            .filter((habit) => habit.dayPart === "morning")
-            .map((habit) => ({
-              id: habit.id,
-              title: habit.title,
-              completedToday: habit.completedToday,
-            }))}
-          hasReflectionToday={reflectedToday}
-          hasRecentSleep={hasRecentSleep}
-          activeSleepStartedAtMs={activeSleep?.startedAt.getTime() ?? null}
-        />
+        <>
+          <SleepStatusCard
+            state={sleepCardState}
+            mode={sleepCardMode}
+            startedAtMs={cycleSleep?.startedAt.getTime() ?? null}
+            sleepMinutes={cycleSleep?.durationMinutes ?? null}
+            sessionId={cycleSleep?.id ?? null}
+          />
+          <ReflectionPromptCard
+            reflectedYesterday={reflectedYesterday}
+            prominent={beforeNoon}
+            yesterdayKey={yesterdayKey}
+            yesterdayLabel={yesterdayLabel}
+          />
+          <RhythmHubCard
+            morning={
+              todayMorning
+                ? {
+                    started: true,
+                    completed: todayMorning.completed,
+                    wakeTime: todayMorning.wakeTime,
+                    sleepMinutes: todayMorning.sleepMinutes,
+                  }
+                : null
+            }
+            morningHabits={allHabits
+              .filter((habit) => habit.dayPart === "morning")
+              .map((habit) => ({
+                id: habit.id,
+                title: habit.title,
+                completedToday: habit.completedToday,
+              }))}
+          />
+        </>
       ) : null}
 
       <InsightOfTheDayCard insight={insightOfTheDay} />

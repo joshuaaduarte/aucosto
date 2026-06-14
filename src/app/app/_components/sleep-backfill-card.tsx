@@ -1,11 +1,15 @@
 "use client";
 
-// Shown on the hub on a morning where no sleep session was logged the night
-// before. Two wall-clock inputs (bed time, wake time) backfill a completed
-// sleep RhythmSession via POST /api/rhythms. Wall-clock → absolute conversion
-// happens here in the browser (lessons #10): the server must not reinterpret
-// naive times. Skip or a successful log hands off to `fallback` — the normal
-// morning nudge — without a full navigation.
+// Shown on the hub on a morning/day where no sleep session was logged the
+// night before. Two wall-clock inputs (bed time, wake time) backfill a
+// completed sleep RhythmSession via POST /api/rhythms. Wall-clock → absolute
+// conversion happens here in the browser (lessons #10): the server must not
+// reinterpret naive times.
+//
+// With a `fallback` node, a Skip button hands off to it without a navigation.
+// Without one (the always-on SleepStatusCard case) the card is persistent:
+// there's no Skip, and a successful log just refreshes so the hub re-derives
+// the sleep state to "logged".
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
@@ -52,7 +56,7 @@ function resolveWindow(bed: string, wake: string): { startedAt: string; endedAt:
   return { startedAt: bedDate.toISOString(), endedAt: wakeDate.toISOString() };
 }
 
-export function SleepBackfillCard({ fallback }: { fallback: ReactNode }) {
+export function SleepBackfillCard({ fallback }: { fallback?: ReactNode }) {
   const router = useRouter();
   const [dismissed, setDismissed] = useState(false);
   const [bed, setBed] = useState("23:00");
@@ -66,7 +70,7 @@ export function SleepBackfillCard({ fallback }: { fallback: ReactNode }) {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  if (dismissed) return <>{fallback}</>;
+  if (dismissed && fallback) return <>{fallback}</>;
 
   async function logIt() {
     if (pending) return;
@@ -92,7 +96,7 @@ export function SleepBackfillCard({ fallback }: { fallback: ReactNode }) {
         const data = (await res.json().catch(() => null)) as { error?: string } | null;
         throw new Error(data?.error ?? "Couldn't save the sleep log.");
       }
-      // The hub re-derives hasRecentSleep on refresh → falls back to the nudge.
+      // The hub re-derives the sleep state on refresh → "logged".
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save the sleep log.");
@@ -154,15 +158,17 @@ export function SleepBackfillCard({ fallback }: { fallback: ReactNode }) {
           <button type="button" onClick={logIt} disabled={pending} className="btn-ink">
             {pending ? "Logging…" : "Log it"}
           </button>
-          <button
-            type="button"
-            onClick={() => setDismissed(true)}
-            disabled={pending}
-            className="btn-ghost"
-            style={{ color: "var(--text-faint)" }}
-          >
-            Skip
-          </button>
+          {fallback ? (
+            <button
+              type="button"
+              onClick={() => setDismissed(true)}
+              disabled={pending}
+              className="btn-ghost"
+              style={{ color: "var(--text-faint)" }}
+            >
+              Skip
+            </button>
+          ) : null}
         </div>
       </div>
 

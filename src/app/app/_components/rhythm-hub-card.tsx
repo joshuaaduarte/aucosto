@@ -1,12 +1,13 @@
 "use client";
 
-// The hub's contextual Rhythm card. Rhythms aren't a page — they're the
-// connective tissue the hub grows at the day's edges. Two flows live here:
+// The hub's contextual morning Rhythm card. Rhythms aren't a page — they're
+// the connective tissue the hub grows at the day's edges. The morning check-in
+// (05:00–10:00) lives here: log your wake time, knock out morning habits, then
+// wrap it up.
 //
-//   • Morning check-in (05:00–10:00): log your wake time, knock out morning
-//     habits, then wrap it up.
-//   • Bedtime check-in (21:00–05:00): a reflection nudge and a "going to bed"
-//     toggle that opens a sleep session.
+// Sleep state and the reflection nudge used to share this card behind the same
+// time-of-day gate; they're now always-on (SleepStatusCard,
+// ReflectionPromptCard) and no longer hidden when the hour is "wrong".
 //
 // The time-of-day decision MUST happen in the browser: the server runtime is
 // pinned to America/Los_Angeles, so a server-derived hour mislabels anyone in
@@ -23,7 +24,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { quickLogHabitAction } from "../habits/actions";
 import { formatRhythmDuration } from "@/lib/rhythms";
-import { SleepBackfillCard } from "./sleep-backfill-card";
 
 export type MorningCardState = {
   /** A wakeup session exists for today (the morning was started). */
@@ -276,111 +276,14 @@ function MorningInProgress({
   );
 }
 
-/* ── Bedtime check-in ────────────────────────────────────────────── */
-
-function BedtimeCard({
-  hasReflectionToday,
-  activeSleepStartedAtMs,
-}: {
-  hasReflectionToday: boolean;
-  activeSleepStartedAtMs: number | null;
-}) {
-  const router = useRouter();
-  const [pending, setPending] = useState(false);
-
-  async function goToBed() {
-    if (pending) return;
-    setPending(true);
-    try {
-      await fetch("/api/rhythms", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "start", type: "sleep" }),
-      });
-    } finally {
-      router.refresh();
-    }
-  }
-
-  // Sleep already running → minimal "rest well" state.
-  if (activeSleepStartedAtMs !== null) {
-    const startLabel = new Date(activeSleepStartedAtMs).toLocaleTimeString([], {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-    return (
-      <CardShell accent="#6366f1">
-        <div className="flex items-start gap-3">
-          <span aria-hidden className="text-[1.375rem] leading-none">
-            🌙
-          </span>
-          <div className="min-w-0">
-            <p className="text-[0.875rem] font-semibold" style={{ color: "var(--text)" }}>
-              Sleep started. Rest well.
-            </p>
-            <p className="mt-0.5 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
-              Since {startLabel}
-            </p>
-          </div>
-        </div>
-      </CardShell>
-    );
-  }
-
-  return (
-    <CardShell accent="#6366f1">
-      <div className="flex items-start gap-3">
-        <span aria-hidden className="text-[1.375rem] leading-none">
-          🌇
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[0.875rem] font-semibold" style={{ color: "var(--text)" }}>
-            Time to wind down.
-          </p>
-          {hasReflectionToday ? (
-            <p
-              className="mt-0.5 text-[0.8125rem] font-medium"
-              style={{ color: "#10b981" }}
-            >
-              Reflection done ✓
-            </p>
-          ) : (
-            <Link
-              href="/app/reflect"
-              className="mt-0.5 inline-block text-[0.8125rem] underline-offset-2 hover:underline"
-              style={{ color: "var(--accent-strong)" }}
-            >
-              Daily reflection not done →
-            </Link>
-          )}
-        </div>
-      </div>
-
-      <div className="mt-3">
-        <button type="button" onClick={goToBed} disabled={pending} className="btn-ink">
-          {pending ? "…" : "Going to bed"}
-        </button>
-      </div>
-    </CardShell>
-  );
-}
-
 /* ── Time-of-day router ──────────────────────────────────────────── */
 
 export function RhythmHubCard({
   morning,
   morningHabits,
-  hasReflectionToday,
-  hasRecentSleep,
-  activeSleepStartedAtMs,
 }: {
   morning: MorningCardState | null;
   morningHabits: MorningHabit[];
-  hasReflectionToday: boolean;
-  /** Whether a sleep session was logged since ~6pm yesterday. */
-  hasRecentSleep: boolean;
-  /** Start time (ms) of a running sleep session, or null. */
-  activeSleepStartedAtMs: number | null;
 }) {
   const [hour, setHour] = useState<number | null>(null);
 
@@ -398,27 +301,11 @@ export function RhythmHubCard({
   if (hour === null) return null;
 
   const inMorning = hour >= 5 && hour < 10;
-  const inBedtime = hour >= 21 || hour < 5;
+  if (!inMorning) return null; // outside the morning window → no morning card
 
-  if (inMorning) {
-    if (morning?.completed) return null; // State C — wrapped up, gone for the day
-    if (morning?.started) {
-      return <MorningInProgress morning={morning} habits={morningHabits} />;
-    }
-    const start = <MorningStart />;
-    // Forgot to log sleep last night → offer a backfill first, then the
-    // wake-time prompt (reuses the existing card's fallback composition).
-    return hasRecentSleep ? start : <SleepBackfillCard fallback={start} />;
+  if (morning?.completed) return null; // wrapped up, gone for the day
+  if (morning?.started) {
+    return <MorningInProgress morning={morning} habits={morningHabits} />;
   }
-
-  if (inBedtime) {
-    return (
-      <BedtimeCard
-        hasReflectionToday={hasReflectionToday}
-        activeSleepStartedAtMs={activeSleepStartedAtMs}
-      />
-    );
-  }
-
-  return null; // 10:00–21:00 → normal work-mode hub
+  return <MorningStart />;
 }
