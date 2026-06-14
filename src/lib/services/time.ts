@@ -242,6 +242,13 @@ export async function updateEntry(
 // forgot to hit stop until 3pm"); omit it for the fast happy path (stop = now),
 // which stays a single query. A backdated stop is validated against the running
 // entry's start so the entry never ends before it began.
+//
+// Overnight stops (fell asleep at 11pm, stop it the next morning) are allowed:
+// the only floor is the running entry's actual `startedAt`, and a running timer
+// can't be backdated more than 24h at start (see `startEntry`), so a same-night
+// stop comfortably fits inside that window. We deliberately do NOT cap the stop
+// at "24h before now" — a genuinely long-running session (started >24h ago,
+// never stopped) must still be stoppable at its true end.
 export async function stopRunning(
   userId: string,
   endedAt?: Date,

@@ -6,6 +6,13 @@
 // account for the 2pm–3pm stretch it left behind (fill it, split it, "still
 // doing it", or skip) — so the recovery flow is reused, not rebuilt.
 //
+// Overnight case: Josh falls asleep without stopping a timer at 11pm, wakes at
+// 7am, and wants the stop backdated to 11pm *last night*. A native time field
+// only carries an HH:mm, so a "Yesterday / Today" toggle picks which calendar
+// day those hours land on. The toggle only appears when an overnight stop is
+// actually possible (the timer started before today), and the live preview
+// spells out the dates whenever the entry straddles midnight.
+//
 // Mobile-first: a native time field (big native wheel on phones) plus large
 // "−15m / −30m / −1h / −2h" nudge chips, all clamped between the timer's start
 // and now. A live preview shows the resulting duration and how much time is
@@ -18,6 +25,29 @@ import { stopEntryAt } from "./actions";
 
 function fmtTime(date: Date) {
   return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function fmtDate(date: Date) {
+  return date.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+// "11:00 PM Jun 13" — time with its date, for ranges that cross midnight.
+function fmtTimeDate(date: Date) {
+  return `${fmtTime(date)} ${fmtDate(date)}`;
+}
+
+function startOfDay(date: Date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function sameCalendarDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
 }
 
 // "HH:mm" in the browser's timezone — keeps wall-clock math in the browser,
@@ -61,17 +91,35 @@ export function BackdatedStopModal({
   const [now] = useState(() => new Date());
   const startedAt = useMemo(() => new Date(startedAtIso), [startedAtIso]);
 
+  // The two calendar days the HH:mm field can land on. Midnight today, and
+  // midnight yesterday — `setHours` on these gives an absolute time on the
+  // chosen day.
+  const todayStart = useMemo(() => startOfDay(now), [now]);
+  const yesterdayStart = useMemo(() => {
+    const d = new Date(todayStart);
+    d.setDate(d.getDate() - 1);
+    return d;
+  }, [todayStart]);
+
+  // "Yesterday" can only ever be a valid stop if the timer started before
+  // today — otherwise the stop would land before the timer began. That single
+  // condition also captures the overnight situation the toggle exists for
+  // (fell asleep last night, woke this morning), so it's the visibility gate.
+  const startedBeforeToday = startedAt.getTime() < todayStart.getTime();
+  const showDayToggle = startedBeforeToday;
+
   // Default to 15 minutes ago, but never earlier than the timer's start.
   const defaultEnd = useMemo(() => {
     const fifteenAgo = new Date(now.getTime() - 15 * 60000);
     return fifteenAgo.getTime() < startedAt.getTime() ? startedAt : fifteenAgo;
   }, [now, startedAt]);
 
+  const [day, setDay] = useState<"today" | "yesterday">(() =>
+    defaultEnd.getTime() < todayStart.getTime() ? "yesterday" : "today",
+  );
   const [value, setValue] = useState(() => hhmm(defaultEnd));
 
-  // Resolve the "HH:mm" field to an absolute time. If it reads as "in the
-  // future" (picking 11pm at 1am), roll back a day — the timer may have started
-  // the previous evening.
+  // Resolve the "HH:mm" field against the selected day to an absolute time.
   const resolved = useMemo(() => {
     const [h, m] = value.split(":").map(Number);
     if (
@@ -82,13 +130,11 @@ export function BackdatedStopModal({
     ) {
       return null;
     }
-    const candidate = new Date(now);
+    const base = day === "yesterday" ? yesterdayStart : todayStart;
+    const candidate = new Date(base);
     candidate.setHours(h, m, 0, 0);
-    if (candidate.getTime() > now.getTime()) {
-      candidate.setDate(candidate.getDate() - 1);
-    }
     return candidate;
-  }, [value, now]);
+  }, [value, day, todayStart, yesterdayStart]);
 
   const valid =
     resolved !== null &&
@@ -97,12 +143,17 @@ export function BackdatedStopModal({
 
   const newDurationMs = resolved ? resolved.getTime() - startedAt.getTime() : 0;
   const untrackedMs = resolved ? now.getTime() - resolved.getTime() : 0;
+  // True when the entry spans midnight, so the preview spells out the dates.
+  const crossesMidnight =
+    resolved !== null && !sameCalendarDay(startedAt, resolved);
 
   const setMinutesAgo = (mins: number) => {
     const candidate = new Date(now.getTime() - mins * 60000);
     const clamped =
       candidate.getTime() < startedAt.getTime() ? startedAt : candidate;
     setValue(hhmm(clamped));
+    // Keep the day toggle in sync — a nudge can cross back over midnight.
+    setDay(clamped.getTime() < todayStart.getTime() ? "yesterday" : "today");
   };
 
   // Only offer nudges that still land after the timer started.
@@ -175,9 +226,58 @@ export function BackdatedStopModal({
 
         <div className="mt-4 space-y-4">
           <p className="text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
-            Started at {fmtTime(startedAt)}. We&apos;ll end it at the time you
-            pick, then help you account for the gap up to now.
+            Started at{" "}
+            {startedBeforeToday ? fmtTimeDate(startedAt) : fmtTime(startedAt)}.
+            We&apos;ll end it at the time you pick, then help you account for the
+            gap up to now.
           </p>
+
+          {showDayToggle ? (
+            <div className="space-y-1.5">
+              <label
+                className="block text-[0.75rem] font-medium"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Which day did you finish?
+              </label>
+              <div
+                className="inline-flex rounded-lg p-0.5"
+                role="group"
+                aria-label="Stop day"
+                style={{ background: "var(--bg-tint)" }}
+              >
+                {(["yesterday", "today"] as const).map((option) => {
+                  const active = day === option;
+                  const base =
+                    option === "yesterday" ? yesterdayStart : todayStart;
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => setDay(option)}
+                      className="flex min-h-[44px] flex-col items-center justify-center rounded-md px-4 text-[0.8125rem] font-semibold transition-colors"
+                      style={{
+                        background: active ? "var(--bg-page)" : "transparent",
+                        color: active ? "var(--text)" : "var(--text-muted)",
+                        boxShadow: active
+                          ? "0 1px 2px rgba(0,0,0,0.12)"
+                          : undefined,
+                      }}
+                    >
+                      {option === "yesterday" ? "Yesterday" : "Today"}
+                      <span
+                        className="text-[0.625rem] font-medium"
+                        style={{ color: "var(--text-faint)" }}
+                      >
+                        {fmtDate(base)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
 
           <div className="space-y-1.5">
             <label
@@ -224,7 +324,9 @@ export function BackdatedStopModal({
                   style={{ color: "var(--text)" }}
                 >
                   {formatDuration(newDurationMs)} tracked ·{" "}
-                  {fmtTime(startedAt)} – {fmtTime(resolved)}
+                  {crossesMidnight
+                    ? `${fmtTimeDate(startedAt)} – ${fmtTimeDate(resolved)}`
+                    : `${fmtTime(startedAt)} – ${fmtTime(resolved)}`}
                 </p>
                 <p
                   className="mt-0.5 text-[0.75rem]"
@@ -240,7 +342,9 @@ export function BackdatedStopModal({
                 className="text-[0.8125rem]"
                 style={{ color: "var(--text-muted)" }}
               >
-                Pick a time between {fmtTime(startedAt)} and now.
+                Pick a time between{" "}
+                {startedBeforeToday ? fmtTimeDate(startedAt) : fmtTime(startedAt)}{" "}
+                and now.
               </p>
             )}
           </div>

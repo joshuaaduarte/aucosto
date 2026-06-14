@@ -34,6 +34,26 @@ function fmtTime(date: Date) {
   return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
+function sameCalendarDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+// Range label for a gap. Same-day stays compact ("9:00 AM – 11:15 AM"); a gap
+// that straddles midnight spells out the dates so the overnight context is
+// obvious ("Jun 13 11:00 PM – Jun 14 7:30 AM").
+function formatGapRange(start: Date, end: Date) {
+  if (sameCalendarDay(start, end)) {
+    return `${fmtTime(start)} – ${fmtTime(end)}`;
+  }
+  const fmtDate = (date: Date) =>
+    date.toLocaleDateString([], { month: "short", day: "numeric" });
+  return `${fmtDate(start)} ${fmtTime(start)} – ${fmtDate(end)} ${fmtTime(end)}`;
+}
+
 // "HH:mm" in the browser's timezone — matches the entry editor's convention so
 // wall-clock math stays in the browser, never the (possibly mismatched) server.
 function hhmm(date: Date) {
@@ -68,7 +88,7 @@ export function GapBackfillCard({
   const gapStart = new Date(gapStartIso);
   const gapEnd = new Date(gapEndIso);
   const durationLabel = formatDuration(gapMinutes);
-  const rangeLabel = `${fmtTime(gapStart)} – ${fmtTime(gapEnd)}`;
+  const rangeLabel = formatGapRange(gapStart, gapEnd);
 
   const close = (refresh: boolean) => {
     setMode(null);
