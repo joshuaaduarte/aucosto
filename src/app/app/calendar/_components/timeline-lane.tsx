@@ -203,8 +203,11 @@ export function TimelineLane({
           </div>
         ))}
 
-        {/* Habit ghosts: rendered before the real blocks so the blocks paint
-            on top of them (lower visual priority). */}
+        {/* Habit ghosts: dashed reminder templates on the planned lane. They're
+            rendered before the real blocks so a real entry visually wins where
+            they overlap, but each ghost carries its own z-index (see
+            HabitGhostBlock) so it still receives taps and can open its action
+            popover even when a planned block shares the slot. */}
         {habits.map((ghost) => (
           <HabitGhostBlock key={ghost.id} block={ghost} narrow={narrow} />
         ))}

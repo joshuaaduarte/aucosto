@@ -75,7 +75,12 @@ export function HabitGhostBlock({
           event.stopPropagation();
           openPopover(event.currentTarget);
         }}
-        className={`absolute flex items-start justify-between gap-1 overflow-hidden rounded text-left [@media(pointer:coarse)]:min-h-[44px] ${
+        // z-[5] lifts the ghost above the real planned blocks (which render
+        // later in DOM with z-auto), so a habit reminder that shares a slot with
+        // a planned item still receives the tap instead of the opaque block
+        // swallowing it. min-h is set via classes (not inline style) so the
+        // coarse-pointer 44px tap target isn't clobbered by inline specificity.
+        className={`absolute z-[5] flex items-start justify-between gap-1 overflow-hidden rounded text-left min-h-[16px] [@media(pointer:coarse)]:min-h-[44px] ${
           narrow ? "px-1 py-0.5" : "px-1.5 py-0.5"
         }`}
         style={{
@@ -83,7 +88,6 @@ export function HabitGhostBlock({
           height: `${block.heightPct}%`,
           left: `calc(${block.leftPct}% + 4px)`,
           width: `calc(${block.widthPct}% - 8px)`,
-          minHeight: "16px",
           background: `color-mix(in srgb, ${block.color} 10%, var(--bg-page))`,
           border: `1px dashed ${block.color}`,
           color: "var(--text-muted)",
