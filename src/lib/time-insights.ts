@@ -190,6 +190,69 @@ export type UntrackedGap = {
   minutes: number;
 };
 
+export type DayGap = {
+  /** Id of the entry this gap immediately precedes (gap.end === entry.startedAt). */
+  beforeEntryId: string;
+  start: Date;
+  end: Date;
+  minutes: number;
+};
+
+export type GappableEntry = Pick<TimeEntry, "id" | "startedAt" | "endedAt">;
+
+/**
+ * Untracked gaps within a single day: the empty stretches between consecutive
+ * completed entries, plus an optional leading gap from a morning anchor (wake
+ * time, or a fallback like 06:00) to the first entry. Each gap is tagged with
+ * the entry it precedes so the list can render it just before that row.
+ *
+ * Running entries (no `endedAt`) are ignored — the live "most recent gap" card
+ * owns the stretch up to now. Gaps are clamped to [dayStart, dayEnd) so none
+ * spans midnight, and anything shorter than `minMinutes` (default 5) is dropped
+ * to ignore rounding noise.
+ */
+export function findDayGaps(
+  entries: GappableEntry[],
+  options: {
+    dayStart: Date;
+    dayEnd: Date;
+    /** Wake time / 06:00 anchor for the leading morning gap; null to skip it. */
+    morningAnchor?: Date | null;
+    minMinutes?: number;
+  },
+): DayGap[] {
+  const minMinutes = options.minMinutes ?? 5;
+  const sorted = entries
+    .filter((entry): entry is GappableEntry & { endedAt: Date } =>
+      entry.endedAt != null,
+    )
+    .sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime());
+
+  const gaps: DayGap[] = [];
+  const pushGap = (start: Date, end: Date, beforeEntryId: string) => {
+    const startMs = start.getTime();
+    const endMs = end.getTime();
+    // Never let a gap escape the day it belongs to.
+    if (startMs < options.dayStart.getTime()) return;
+    if (endMs > options.dayEnd.getTime()) return;
+    const minutes = Math.floor((endMs - startMs) / 60000);
+    if (minutes < minMinutes) return;
+    gaps.push({ beforeEntryId, start, end, minutes });
+  };
+
+  const first = sorted[0];
+  if (first && options.morningAnchor) {
+    pushGap(options.morningAnchor, first.startedAt, first.id);
+  }
+  for (let i = 1; i < sorted.length; i += 1) {
+    const prev = sorted[i - 1]!;
+    const curr = sorted[i]!;
+    pushGap(prev.endedAt, curr.startedAt, curr.id);
+  }
+
+  return gaps;
+}
+
 /**
  * The open gap since the last completed entry, when it's big enough to be
  * worth backfilling but small enough to plausibly be one stretch of the day.

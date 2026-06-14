@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import {
   getRunningEntry,
@@ -18,17 +18,20 @@ import { formatRhythmDuration, rhythmDurationMinutes } from "@/lib/rhythms";
 import {
   buildDailyStacks,
   clippedDurationMs,
+  findDayGaps,
   findUntrackedGap,
   recentLabelsForCategory,
   summarizeCategoriesWindow,
   trackedCoverage,
 } from "@/lib/time-insights";
+import type { DayGap } from "@/lib/time-insights";
 import { weeklyTrackedSparkline } from "@/lib/insights";
 import { Sparkline } from "../insights/_components/charts";
 import { PRESET_TIME_CATEGORIES, categoryColor } from "@/lib/time-categories";
 import { EntryDeleteButton, EntryNoteIndicator } from "./entry-row";
 import { AddEntryButton, EntryEditButton } from "./entry-editor";
 import { GapBackfillCard } from "./gap-backfill-card";
+import { GapSlotRow } from "./gap-slot";
 import { InsightsSection } from "./insights-section";
 import { QuickStartChips } from "./quick-start-chips";
 import { RunningCard } from "./running-card";
@@ -418,6 +421,30 @@ export default async function TimePage() {
   );
   const hasArchive = recent.length > 0;
 
+  // Inline gap slots: untracked stretches between (and before) a day's entries,
+  // keyed by the entry each gap precedes so the list can drop a slot in right
+  // below that row. Today gets a leading morning gap anchored at wake time (or
+  // 6am); past days only get the between-entry gaps. The live "most recent gap"
+  // card still owns the open stretch up to now, so we never reach past the last
+  // entry here.
+  const sixAmToday = new Date(todayStart);
+  sixAmToday.setHours(6, 0, 0, 0);
+  const gapsByEntryId = new Map<string, DayGap>();
+  for (const group of groupedDays) {
+    const isToday = group.date.getTime() === todayStart.getTime();
+    const dayEnd = new Date(group.date);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+    const morningAnchor = isToday ? (wakeAnchor ?? sixAmToday) : null;
+    for (const dayGap of findDayGaps(group.entries, {
+      dayStart: group.date,
+      dayEnd,
+      morningAnchor,
+      minMinutes: 5,
+    })) {
+      gapsByEntryId.set(dayGap.beforeEntryId, dayGap);
+    }
+  }
+
   return (
     <div className="space-y-10">
       <header className="fade-in flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -620,9 +647,12 @@ export default async function TimePage() {
                   {group.entries.map((entry) => {
                     const duration =
                       entry.endedAt!.getTime() - entry.startedAt.getTime();
+                    const gap = gapsByEntryId.get(entry.id);
+                    const isUncategorized =
+                      !entry.category || !entry.category.trim();
                     return (
+                      <Fragment key={entry.id}>
                       <li
-                        key={entry.id}
                         className="group grid grid-cols-[1fr_auto_auto_auto] items-baseline gap-2 rounded-md px-2 py-2 transition-colors hover:bg-bg-hover sm:gap-3"
                         style={{
                           borderTop: "1px solid var(--border-faint)",
@@ -636,7 +666,23 @@ export default async function TimePage() {
                             >
                               {entry.label}
                             </p>
-                            {entry.category && (
+                            {isUncategorized ? (
+                              <span
+                                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.625rem] font-medium"
+                                style={{
+                                  background: "var(--bg-tint)",
+                                  color: "var(--text-faint)",
+                                }}
+                                title="No category yet — tap the pencil to set one"
+                              >
+                                <span
+                                  className="h-1.5 w-1.5 rounded-full"
+                                  style={{ background: categoryColor(null) }}
+                                  aria-hidden
+                                />
+                                uncategorized
+                              </span>
+                            ) : (
                               <span
                                 className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.625rem] font-medium"
                                 style={{
@@ -724,6 +770,17 @@ export default async function TimePage() {
                         />
                         <EntryDeleteButton id={entry.id} />
                       </li>
+                      {/* Gap slot sits below the entry it precedes — the list
+                          is newest-first, so "earlier in the day" is "lower". */}
+                      {gap ? (
+                        <GapSlotRow
+                          gapStartIso={gap.start.toISOString()}
+                          gapEndIso={gap.end.toISOString()}
+                          gapMinutes={gap.minutes}
+                          categories={quickStartCategories}
+                        />
+                      ) : null}
+                      </Fragment>
                     );
                   })}
                   {/* Wake-up sits at the bottom: it's the earliest event of

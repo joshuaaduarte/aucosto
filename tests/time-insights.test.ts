@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildDailyStacks,
   clippedDurationMs,
+  findDayGaps,
   findUntrackedGap,
   recentLabelsForCategory,
   summarizeCategoriesWindow,
@@ -239,5 +240,82 @@ describe("findUntrackedGap", () => {
 
   it("returns null with no prior entry", () => {
     expect(findUntrackedGap({ lastEndedAt: null, now })).toBeNull();
+  });
+});
+
+describe("findDayGaps", () => {
+  const dayStart = at("2026-06-10T00:00:00Z");
+  const dayEnd = at("2026-06-11T00:00:00Z");
+  const entry = (id: string, start: string, end: string | null) => ({
+    id,
+    startedAt: at(start),
+    endedAt: end ? at(end) : null,
+  });
+
+  it("finds gaps between consecutive entries", () => {
+    const gaps = findDayGaps(
+      [
+        entry("a", "2026-06-10T09:00:00Z", "2026-06-10T10:00:00Z"),
+        entry("b", "2026-06-10T11:30:00Z", "2026-06-10T12:00:00Z"),
+      ],
+      { dayStart, dayEnd },
+    );
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0]).toMatchObject({ beforeEntryId: "b", minutes: 90 });
+    expect(gaps[0]!.start.toISOString()).toBe("2026-06-10T10:00:00.000Z");
+    expect(gaps[0]!.end.toISOString()).toBe("2026-06-10T11:30:00.000Z");
+  });
+
+  it("ignores gaps shorter than the minimum", () => {
+    const gaps = findDayGaps(
+      [
+        entry("a", "2026-06-10T09:00:00Z", "2026-06-10T10:00:00Z"),
+        entry("b", "2026-06-10T10:03:00Z", "2026-06-10T11:00:00Z"),
+      ],
+      { dayStart, dayEnd },
+    );
+    expect(gaps).toHaveLength(0);
+  });
+
+  it("emits a leading morning gap from the anchor to the first entry", () => {
+    const gaps = findDayGaps(
+      [entry("a", "2026-06-10T09:00:00Z", "2026-06-10T10:00:00Z")],
+      { dayStart, dayEnd, morningAnchor: at("2026-06-10T07:00:00Z") },
+    );
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0]).toMatchObject({ beforeEntryId: "a", minutes: 120 });
+  });
+
+  it("skips the morning gap when no anchor is given", () => {
+    const gaps = findDayGaps(
+      [entry("a", "2026-06-10T09:00:00Z", "2026-06-10T10:00:00Z")],
+      { dayStart, dayEnd },
+    );
+    expect(gaps).toHaveLength(0);
+  });
+
+  it("ignores running entries and accepts entries in any order", () => {
+    const gaps = findDayGaps(
+      [
+        entry("b", "2026-06-10T11:30:00Z", "2026-06-10T12:00:00Z"),
+        entry("running", "2026-06-10T13:00:00Z", null),
+        entry("a", "2026-06-10T09:00:00Z", "2026-06-10T10:00:00Z"),
+      ],
+      { dayStart, dayEnd },
+    );
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0]).toMatchObject({ beforeEntryId: "b" });
+  });
+
+  it("does not emit a gap for overlapping entries", () => {
+    const gaps = findDayGaps(
+      [
+        entry("a", "2026-06-10T09:00:00Z", "2026-06-10T11:00:00Z"),
+        // Starts before the previous one ended — overlap, not a gap.
+        entry("b", "2026-06-10T10:30:00Z", "2026-06-10T12:00:00Z"),
+      ],
+      { dayStart, dayEnd },
+    );
+    expect(gaps).toHaveLength(0);
   });
 });
