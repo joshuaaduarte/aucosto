@@ -1,21 +1,72 @@
-// Lightweight project planning.
-// Projects stay above tasks: clear outcome, next milestone, linked Do items.
+// Project planning — rebuilt as a "command center" that plugs into the rest of
+// aucosto (time, calendar, habits, sleep, reflection).
+//
+// NOTE: the new fields/models below (Area, ProjectTask, and the extra Project
+// columns + TimeEntry.projectId) are applied to the live DB via raw SQL in
+// `ensureProjectBoardTables()` (src/lib/services/projects.ts), NOT via
+// `prisma migrate`. They live here so a regular `prisma generate` (which Vercel
+// runs on build) picks up the types. Until generate runs, the service reads and
+// writes these through raw SQL — mirroring the reflect.ts pattern.
+
+model Area {
+  id        String    @id @default(cuid())
+  userId    String
+  name      String
+  color     String    @default("#6366f1")
+  createdAt DateTime  @default(now())
+  projects  Project[]
+
+  @@index([userId])
+}
 
 model Project {
-  id            String    @id @default(cuid())
-  userId        String
-  name          String
-  status        String    @default("active")
-  bucket        String?
-  summary       String?
-  nextMilestone String?
-  targetDate    DateTime?
-  notes         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  doItems       DoItem[]
+  id                String        @id @default(cuid())
+  userId            String
+  areaId            String?
+  name              String
+  // One-sentence "why does this exist?".
+  intent            String?
+  // exploring | active | final_push | done | paused
+  status            String        @default("active")
+  // deep | light | creative | admin
+  energyType        String        @default("deep")
+  // Optional estimated hours × 60.
+  timeBudgetMinutes Int?
+  targetDate        DateTime?
+  // Single next task surfaced on the card (auto-synced to the first open task).
+  nextAction        String?
+  // --- legacy planning fields (kept so old hub/Do surfaces keep reading) ---
+  bucket            String?
+  summary           String?
+  nextMilestone     String?
+  notes             String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  area              Area?         @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  doItems           DoItem[]
+  tasks             ProjectTask[]
+  timeEntries       TimeEntry[]
 
   @@index([userId, status, updatedAt])
   @@index([userId, targetDate])
+  @@index([userId, areaId])
 }
+
+model ProjectTask {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  title     String
+  done      Boolean  @default(false)
+  // Pulled into today's focus.
+  isToday   Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([userId])
+}
+</content>
+</invoke>

@@ -60,6 +60,11 @@ const EVENT_LABELS: Record<string, string> = {
   "project.created": "added a project",
   "project.updated": "updated a project",
   "project.deleted": "deleted a project",
+  "project.area_created": "added a project area",
+  "project.task_created": "added a project task",
+  "project.task_completed": "completed a project task",
+  "project.entry_tagged": "tagged a time entry to a project",
+  "project.timer_started": "started a timer for a project",
 
   // rhythms
   "rhythm.started": "started a rhythm",

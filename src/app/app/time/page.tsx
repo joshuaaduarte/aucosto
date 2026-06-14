@@ -12,6 +12,10 @@ import {
 } from "@/lib/services/do";
 import { listSuggestedHabits } from "@/lib/services/habits";
 import { listCalendarItems } from "@/lib/services/calendar";
+import {
+  listEntryProjectTags,
+  listProjectPickerOptions,
+} from "@/lib/services/projects";
 import { getTodayMorning, listSleepSessions } from "@/lib/services/rhythms";
 import { formatDuration, formatHM, startOfToday, startOfWeek } from "@/lib/time";
 import { formatRhythmDuration, rhythmDurationMinutes } from "@/lib/rhythms";
@@ -31,6 +35,7 @@ import { PRESET_TIME_CATEGORIES, categoryColor } from "@/lib/time-categories";
 import { EntryDeleteButton, EntryNoteIndicator } from "./entry-row";
 import { AddEntryButton, EntryEditButton } from "./entry-editor";
 import { GapBackfillCard } from "./gap-backfill-card";
+import { TagProjectButton } from "./tag-project-button";
 import { GapSlotRow } from "./gap-slot";
 import { InsightsSection } from "./insights-section";
 import { QuickStartChips } from "./quick-start-chips";
@@ -224,6 +229,14 @@ export default async function TimePage() {
     weeks: 8,
     now,
   });
+
+  // Project tags for the recent-entry chips + the "tag a project" picker. Both
+  // degrade to empty if the projects board schema isn't in place yet.
+  const [projectTagRows, projectOptions] = await Promise.all([
+    listEntryProjectTags(userId, recent.map((entry) => entry.id)),
+    listProjectPickerOptions(userId),
+  ]);
+  const projectTagByEntry = new Map(projectTagRows.map((tag) => [tag.entryId, tag]));
 
   // Sleep rhythm markers shown alongside entries. Fetch covers the same span
   // the archive does (oldest recent entry's day → tomorrow), so every day group
@@ -650,6 +663,7 @@ export default async function TimePage() {
                     const gap = gapsByEntryId.get(entry.id);
                     const isUncategorized =
                       !entry.category || !entry.category.trim();
+                    const projectTag = projectTagByEntry.get(entry.id);
                     return (
                       <Fragment key={entry.id}>
                       <li
@@ -725,6 +739,29 @@ export default async function TimePage() {
                               >
                                 ↗ {entry.habit.title}
                               </a>
+                            )}
+                            {projectTag ? (
+                              <a
+                                href={`/app/projects/${projectTag.projectId}`}
+                                className="inline-flex max-w-[12rem] items-center gap-1 truncate rounded px-1.5 py-0.5 text-[0.625rem] font-medium"
+                                style={{
+                                  background: "var(--bg-tint)",
+                                  color: "var(--text-muted)",
+                                }}
+                                title={`Project: ${projectTag.name}`}
+                              >
+                                <span
+                                  className="h-1.5 w-1.5 rounded-full"
+                                  style={{ background: projectTag.color }}
+                                  aria-hidden
+                                />
+                                {projectTag.name}
+                              </a>
+                            ) : (
+                              <TagProjectButton
+                                entryId={entry.id}
+                                options={projectOptions}
+                              />
                             )}
                             {entry.notes ? (
                               <EntryNoteIndicator note={entry.notes} />

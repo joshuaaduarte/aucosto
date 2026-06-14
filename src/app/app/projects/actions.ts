@@ -1,227 +1,268 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
-import { DO_LANES } from "@/lib/do";
-import { PROJECT_STATUSES } from "@/lib/projects";
-import { createCalendarItem } from "@/lib/services/calendar";
-import { createDoItem, updateDoItem } from "@/lib/services/do";
-import {
-  createProject,
-  deleteProject,
-  setProjectArchived,
-  updateProject,
-} from "@/lib/services/projects";
 import { resolveActiveUserId } from "@/lib/viewer-context";
-import { windowFromFormData } from "@/lib/wall-clock";
+import {
+  archiveBoardProject,
+  completeProjectTask,
+  completeTopOpenTask,
+  createArea,
+  createBoardProject,
+  createProjectTask,
+  reorderProjectTasks,
+  startTimerForProject,
+  tagTimeEntry,
+  updateBoardProject,
+  updateProjectTask,
+  type AreaRecord,
+} from "@/lib/services/projects";
 
-const projectSchema = z.object({
-  name: z.string().trim().min(1, "Project name is required").max(120),
-  status: z.enum(PROJECT_STATUSES).default("active"),
-  bucket: z.string().trim().max(80).nullable(),
-  summary: z.string().trim().max(240).nullable(),
-  nextMilestone: z.string().trim().max(160).nullable(),
-  targetDate: z.coerce.date().nullable(),
-  notes: z.string().trim().max(1200).nullable(),
-});
-
-export type ProjectState = { error?: string } | undefined;
-export type ProjectTaskState = { error?: string } | undefined;
-export type ProjectScheduleState = { error?: string } | undefined;
-
-const projectTaskSchema = z.object({
-  projectId: z.string().trim().min(1, "Project is required."),
-  title: z.string().trim().min(1, "Task title is required.").max(200),
-  lane: z.enum(DO_LANES).default("next"),
-  estimatedMinutes: z.coerce.number().int().positive().max(24 * 60).nullable(),
-  notes: z.string().trim().max(600).nullable(),
-});
-
-const projectScheduleSchema = z.object({
-  projectId: z.string().trim().min(1, "Project is required."),
-  doItemId: z.string().trim().min(1, "Pick a task to schedule."),
-  title: z.string().trim().min(1, "Block title is required.").max(200),
-  date: z.string().trim().min(1, "Date is required."),
-  start: z.string().trim().min(1, "Start time is required."),
-  end: z.string().trim().min(1, "End time is required."),
-  location: z.string().trim().max(120).nullable(),
-  notes: z.string().trim().max(600).nullable(),
-});
-
-function nullableString(formData: FormData, key: string) {
-  const value = String(formData.get(key) ?? "").trim();
-  return value.length > 0 ? value : null;
-}
-
-function nullableDate(formData: FormData, key: string) {
-  const raw = String(formData.get(key) ?? "").trim();
-  if (!raw) return null;
-  const value = new Date(raw);
-  return Number.isNaN(value.getTime()) ? null : value;
-}
-
-function nullableNumber(formData: FormData, key: string) {
-  const raw = String(formData.get(key) ?? "").trim();
-  if (!raw) return null;
-  const value = Number(raw);
-  return Number.isFinite(value) ? value : null;
-}
-
-function revalidateProjects() {
+function revalidateProjects(id?: string) {
   revalidatePath("/app");
-  revalidatePath("/app/do");
   revalidatePath("/app/projects");
-  revalidatePath("/app/calendar");
   revalidatePath("/app/time");
+  if (id) revalidatePath(`/app/projects/${id}`);
+}
+
+/** "YYYY-MM-DD" → a Date at local noon (avoids TZ day-slip). null when blank. */
+function parseTargetDate(raw: string | undefined): Date | null {
+  if (!raw) return null;
+  const [y, m, d] = raw.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d, 12, 0, 0, 0);
+}
+
+const projectFormSchema = z.object({
+  name: z.string().trim().min(1, "Project name is required").max(160),
+  areaId: z.string().trim().optional(),
+  intent: z.string().trim().max(280).optional(),
+  status: z.string().trim().optional(),
+  energyType: z.string().trim().optional(),
+  timeBudgetHours: z.string().trim().optional(),
+  targetDate: z.string().trim().optional(),
+});
+
+export type ProjectFormState = { error?: string } | undefined;
+
+function readProjectForm(formData: FormData) {
+  return projectFormSchema.safeParse({
+    name: formData.get("name") ?? "",
+    areaId: (formData.get("areaId") as string) || undefined,
+    intent: (formData.get("intent") as string) || undefined,
+    status: (formData.get("status") as string) || undefined,
+    energyType: (formData.get("energyType") as string) || undefined,
+    timeBudgetHours: (formData.get("timeBudgetHours") as string) || undefined,
+    targetDate: (formData.get("targetDate") as string) || undefined,
+  });
+}
+
+function budgetMinutesFromHours(raw: string | undefined): number | null {
+  if (!raw) return null;
+  const hours = Number(raw);
+  return Number.isFinite(hours) && hours > 0 ? Math.round(hours * 60) : null;
 }
 
 export async function createProjectAction(
-  _prev: ProjectState,
+  _prev: ProjectFormState,
   formData: FormData,
-): Promise<ProjectState> {
-  const userId = await resolveActiveUserId();
-  const parsed = projectSchema.safeParse({
-    name: formData.get("name") ?? "",
-    status: (formData.get("status") as string) ?? "active",
-    bucket: nullableString(formData, "bucket"),
-    summary: nullableString(formData, "summary"),
-    nextMilestone: nullableString(formData, "nextMilestone"),
-    targetDate: nullableDate(formData, "targetDate"),
-    notes: nullableString(formData, "notes"),
-  });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Invalid project." };
+): Promise<ProjectFormState> {
+  let userId: string;
+  try {
+    userId = await resolveActiveUserId();
+  } catch {
+    return { error: "Not signed in." };
   }
 
-  await createProject(userId, parsed.data);
-  revalidateProjects();
+  const parsed = readProjectForm(formData);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+
+  let newId: string;
+  try {
+    newId = await createBoardProject(userId, {
+      name: parsed.data.name,
+      areaId: parsed.data.areaId ?? null,
+      intent: parsed.data.intent ?? null,
+      status: parsed.data.status ?? null,
+      energyType: parsed.data.energyType ?? null,
+      timeBudgetMinutes: budgetMinutesFromHours(parsed.data.timeBudgetHours),
+      targetDate: parseTargetDate(parsed.data.targetDate),
+    });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not create project." };
+  }
+
+  revalidateProjects(newId);
+  redirect(`/app/projects/${newId}`);
 }
 
 export async function updateProjectAction(
-  _prev: ProjectState,
+  _prev: ProjectFormState,
   formData: FormData,
-): Promise<ProjectState> {
-  const userId = await resolveActiveUserId();
-  const id = String(formData.get("id") ?? "");
-  const parsed = projectSchema.safeParse({
-    name: formData.get("name") ?? "",
-    status: (formData.get("status") as string) ?? "active",
-    bucket: nullableString(formData, "bucket"),
-    summary: nullableString(formData, "summary"),
-    nextMilestone: nullableString(formData, "nextMilestone"),
-    targetDate: nullableDate(formData, "targetDate"),
-    notes: nullableString(formData, "notes"),
-  });
+): Promise<ProjectFormState> {
+  let userId: string;
+  try {
+    userId = await resolveActiveUserId();
+  } catch {
+    return { error: "Not signed in." };
+  }
+
+  const id = (formData.get("id") as string) || "";
+  if (!id) return { error: "Missing project id." };
+
+  const parsed = readProjectForm(formData);
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Invalid project." };
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
 
-  await updateProject(userId, id, parsed.data);
-  revalidateProjects();
-}
-
-// Deleting a project: the form says whether linked tasks go with it
-// (deleteTasks="1") or stay in Do as standalone items.
-export async function deleteProjectAction(formData: FormData) {
-  const userId = await resolveActiveUserId();
-  const id = String(formData.get("id") ?? "").trim();
-  if (!id) {
-    throw new Error("Missing project id.");
+  try {
+    await updateBoardProject(userId, id, {
+      name: parsed.data.name,
+      areaId: parsed.data.areaId ?? null,
+      intent: parsed.data.intent ?? null,
+      status: parsed.data.status ?? null,
+      energyType: parsed.data.energyType ?? null,
+      timeBudgetMinutes: budgetMinutesFromHours(parsed.data.timeBudgetHours),
+      targetDate: parseTargetDate(parsed.data.targetDate),
+    });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not update project." };
   }
-  const deleteTasks = String(formData.get("deleteTasks") ?? "") === "1";
-  await deleteProject(userId, id, { deleteTasks });
-  revalidateProjects();
+
+  revalidateProjects(id);
+  return undefined;
 }
 
-// Archive / restore a project. archived="1" archives, anything else restores.
-export async function archiveProjectAction(formData: FormData): Promise<void> {
+const areaSchema = z.object({
+  name: z.string().trim().min(1, "Area name is required").max(60),
+  color: z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, "Pick a color").optional(),
+});
+
+export type CreateAreaResult =
+  | { ok: true; area: AreaRecord }
+  | { ok: false; error: string };
+
+export async function createAreaAction(
+  name: string,
+  color: string,
+): Promise<CreateAreaResult> {
+  let userId: string;
+  try {
+    userId = await resolveActiveUserId();
+  } catch {
+    return { ok: false, error: "Not signed in." };
+  }
+  const parsed = areaSchema.safeParse({ name, color });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+  try {
+    const area = await createArea(userId, {
+      name: parsed.data.name,
+      color: parsed.data.color ?? "#6366f1",
+    });
+    revalidateProjects();
+    return { ok: true, area };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not create area." };
+  }
+}
+
+export async function archiveProjectAction(id: string): Promise<void> {
   const userId = await resolveActiveUserId();
-  const id = String(formData.get("id") ?? "").trim();
-  if (!id) throw new Error("Missing project id.");
-  const archived = String(formData.get("archived") ?? "") === "1";
-  await setProjectArchived(userId, id, archived);
-  revalidateProjects();
+  await archiveBoardProject(userId, id);
+  revalidateProjects(id);
 }
 
-// Lightweight inline task capture from a project card — title only.
-export async function quickAddProjectTaskAction(
-  formData: FormData,
+export async function createTaskAction(
+  projectId: string,
+  title: string,
+  isToday = false,
+): Promise<void> {
+  const clean = title.trim();
+  if (!clean) return;
+  const userId = await resolveActiveUserId();
+  await createProjectTask(userId, projectId, clean, { isToday });
+  revalidateProjects(projectId);
+}
+
+export async function toggleTaskAction(
+  projectId: string,
+  taskId: string,
+  done: boolean,
 ): Promise<void> {
   const userId = await resolveActiveUserId();
-  const projectId = String(formData.get("projectId") ?? "").trim();
-  const title = String(formData.get("title") ?? "").trim();
-  if (!projectId || !title) return;
-  await createDoItem(userId, {
-    title: title.slice(0, 200),
-    projectId,
-    lane: "next",
-    status: "ready",
-  });
-  revalidateProjects();
+  await updateProjectTask(userId, taskId, { done });
+  revalidateProjects(projectId);
 }
 
-export async function createProjectTaskAction(
-  _prev: ProjectTaskState,
-  formData: FormData,
-): Promise<ProjectTaskState> {
+export async function renameTaskAction(
+  projectId: string,
+  taskId: string,
+  title: string,
+): Promise<void> {
+  const clean = title.trim();
+  if (!clean) return;
   const userId = await resolveActiveUserId();
-  const parsed = projectTaskSchema.safeParse({
-    projectId: formData.get("projectId") ?? "",
-    title: formData.get("title") ?? "",
-    lane: (formData.get("lane") as string) ?? "next",
-    estimatedMinutes: nullableNumber(formData, "estimatedMinutes"),
-    notes: nullableString(formData, "notes"),
-  });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Invalid task." };
-  }
-
-  await createDoItem(userId, {
-    title: parsed.data.title,
-    projectId: parsed.data.projectId,
-    lane: parsed.data.lane,
-    estimatedMinutes: parsed.data.estimatedMinutes,
-    notes: parsed.data.notes,
-    status: "ready",
-  });
-  revalidateProjects();
+  await updateProjectTask(userId, taskId, { title: clean });
+  revalidateProjects(projectId);
 }
 
-export async function createProjectScheduleAction(
-  _prev: ProjectScheduleState,
-  formData: FormData,
-): Promise<ProjectScheduleState> {
+export async function setTaskTodayAction(
+  projectId: string,
+  taskId: string,
+  isToday: boolean,
+): Promise<void> {
   const userId = await resolveActiveUserId();
-  const parsed = projectScheduleSchema.safeParse({
-    projectId: formData.get("projectId") ?? "",
-    doItemId: formData.get("doItemId") ?? "",
-    title: formData.get("title") ?? "",
-    date: formData.get("date") ?? "",
-    start: formData.get("start") ?? "",
-    end: formData.get("end") ?? "",
-    location: nullableString(formData, "location"),
-    notes: nullableString(formData, "notes"),
-  });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Invalid block." };
-  }
+  await updateProjectTask(userId, taskId, { isToday });
+  revalidateProjects(projectId);
+}
 
-  const window = windowFromFormData(formData);
-  if (!window) {
-    return { error: "Date and time are required." };
-  }
+export async function completeTaskAction(projectId: string, taskId: string): Promise<void> {
+  const userId = await resolveActiveUserId();
+  await completeProjectTask(userId, taskId);
+  revalidateProjects(projectId);
+}
 
-  await createCalendarItem(userId, {
-    title: parsed.data.title,
-    startsAt: window.startsAt,
-    endsAt: window.endsAt,
-    location: parsed.data.location,
-    notes: parsed.data.notes,
-    kind: "block",
-    status: "confirmed",
-    sourceTool: "do",
-    sourceRefId: parsed.data.doItemId,
-  });
-  await updateDoItem(userId, parsed.data.doItemId, { status: "scheduled" });
-  revalidateProjects();
+export async function completeNextActionAction(projectId: string): Promise<void> {
+  const userId = await resolveActiveUserId();
+  await completeTopOpenTask(userId, projectId);
+  revalidateProjects(projectId);
+}
+
+export async function reorderTasksAction(
+  projectId: string,
+  orderedIds: string[],
+): Promise<void> {
+  const userId = await resolveActiveUserId();
+  await reorderProjectTasks(userId, projectId, orderedIds);
+  revalidateProjects(projectId);
+}
+
+export async function startProjectTimerAction(projectId: string): Promise<void> {
+  const userId = await resolveActiveUserId();
+  await startTimerForProject(userId, projectId);
+  revalidateProjects(projectId);
+}
+
+export async function tagTimeEntryAction(
+  entryId: string,
+  projectId: string | null,
+): Promise<{ ok: boolean; error?: string }> {
+  let userId: string;
+  try {
+    userId = await resolveActiveUserId();
+  } catch {
+    return { ok: false, error: "Not signed in." };
+  }
+  try {
+    await tagTimeEntry(userId, entryId, projectId);
+    revalidateProjects();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not tag entry." };
+  }
 }
