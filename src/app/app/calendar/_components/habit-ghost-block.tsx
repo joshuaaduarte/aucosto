@@ -68,6 +68,39 @@ export function HabitGhostBlock({
 
   return (
     <>
+      {/* Flexible-window band: the full window range at very low opacity, non-
+          interactive (z-auto, painted before the ghost so the dashed slot and
+          real blocks sit on top). A matched window — a real tracked entry
+          overlapped it that day — gets more fill, a thin solid border, and a
+          ✓: the "ideal week" hit treatment. */}
+      {block.band ? (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute overflow-hidden rounded"
+          style={{
+            top: `${block.band.topPct}%`,
+            height: `${block.band.heightPct}%`,
+            left: `calc(${block.leftPct}% + 4px)`,
+            width: `calc(${block.widthPct}% - 8px)`,
+            background: `color-mix(in srgb, ${block.color} ${
+              block.band.matched ? 16 : 9
+            }%, transparent)`,
+            border: block.band.matched
+              ? `1px solid color-mix(in srgb, ${block.color} 55%, transparent)`
+              : "none",
+          }}
+        >
+          {block.band.matched ? (
+            <span
+              className="absolute right-1 top-0.5 text-[0.625rem] leading-none"
+              style={{ color: block.color }}
+            >
+              ✓
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       <button
         type="button"
         onPointerDown={(event) => event.stopPropagation()}

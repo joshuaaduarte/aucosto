@@ -82,8 +82,12 @@ export default async function CalendarPage({
     w: 7,
   };
   const isWorkWeek = view === "5d";
+  // 5d (Mon–Fri) and the full week (Mon–Sun) both pin to the selected day's
+  // calendar week so the "ideal week" template always reads Monday-first;
+  // 1/2/3-day views run forward from the anchor.
+  const isWeekAligned = view === "5d" || view === "w";
   const viewDays = VIEW_DAYS[view];
-  const columnStart = isWorkWeek
+  const columnStart = isWeekAligned
     ? startOfCalendarWeek(selectedDay)
     : selectedDayStart;
   const columnDays = Array.from({ length: viewDays }, (_, index) =>

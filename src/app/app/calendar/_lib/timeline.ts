@@ -53,6 +53,9 @@ export type HabitGhostInput = {
   category: string;
   reminderMinutes: number;
   durationMinutes: number;
+  /** Optional flexible window (minutes since midnight). Both set ⇒ draw a band. */
+  windowStartMinutes?: number | null;
+  windowEndMinutes?: number | null;
 };
 
 /**
@@ -73,6 +76,16 @@ export type HabitGhostBlock = {
   heightPct: number;
   leftPct: number;
   widthPct: number;
+  /**
+   * The flexible window drawn as a translucent band behind the ghost. Shares
+   * the ghost's horizontal column (leftPct/widthPct). `matched` ⇒ a real
+   * tracked entry overlapped the window that day (the "ideal week" hit mark).
+   */
+  band: {
+    topPct: number;
+    heightPct: number;
+    matched: boolean;
+  } | null;
 };
 
 /** Soft, read-only context colors for rhythm sessions on the timeline. */
@@ -392,6 +405,36 @@ export function buildDayTimeline(
     const { habit, startMs, endMs } = data;
     const start = new Date(startMs);
     const end = new Date(endMs);
+
+    // Flexible window band: position the full window (clipped to the visible
+    // axis) and flag it matched when any tracked entry overlapped it that day.
+    let band: HabitGhostBlock["band"] = null;
+    if (
+      habit.windowStartMinutes != null &&
+      habit.windowEndMinutes != null &&
+      habit.windowEndMinutes > habit.windowStartMinutes
+    ) {
+      const bandStartMs = dayStart.getTime() + habit.windowStartMinutes * 60_000;
+      const bandEndMs = dayStart.getTime() + habit.windowEndMinutes * 60_000;
+      if (bandEndMs > windowStartMs && bandStartMs < windowEnd.getTime()) {
+        const topPct = clampPct(((bandStartMs - windowStartMs) / windowMs) * 100);
+        const bottomPct = clampPct(
+          ((Math.min(bandEndMs, windowEnd.getTime()) - windowStartMs) / windowMs) *
+            100,
+        );
+        const matched = input.entries.some((entry) => {
+          const eStart = entry.startedAt.getTime();
+          const eEnd = (entry.endedAt ?? input.now).getTime();
+          return eStart < bandEndMs && eEnd > bandStartMs;
+        });
+        band = {
+          topPct,
+          heightPct: Math.max(bottomPct - topPct, 1.5),
+          matched,
+        };
+      }
+    }
+
     return {
       id: `habit-${habit.id}`,
       habitId: habit.id,
@@ -402,6 +445,7 @@ export function buildDayTimeline(
       startIso: start.toISOString(),
       endIso: end.toISOString(),
       ...placement,
+      band,
     };
   });
 

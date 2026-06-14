@@ -26,6 +26,24 @@ const GOAL_UNIT_OPTIONS: Array<{ value: HabitGoalUnit; label: string; hint: stri
   { value: "minutes", label: "Minutes", hint: "pairs with the timer" },
 ];
 
+/** Clamp minutes-since-midnight to a 24-hour HH:MM string for <input type="time">. */
+function clampClock24(totalMinutes: number): string {
+  const value = Math.max(0, Math.min(1439, Math.round(totalMinutes)));
+  const hours = Math.floor(value / 60);
+  const mins = value % 60;
+  return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+}
+
+/** Parse an HH:MM string to minutes-since-midnight, or null if malformed. */
+function parseClock24(value: string): number | null {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const mins = Number(match[2]);
+  if (hours < 0 || hours > 23 || mins < 0 || mins > 59) return null;
+  return hours * 60 + mins;
+}
+
 export function HabitCreateForm() {
   const [state, formAction, pending] = useActionState(createHabitAction, initialState);
   const [open, setOpen] = useState(false);
@@ -34,6 +52,10 @@ export function HabitCreateForm() {
   const [dayPart, setDayPart] = useState<HabitDayPart>("anytime");
   const [goalUnit, setGoalUnit] = useState<HabitGoalUnit>("check");
   const [target, setTarget] = useState("1");
+  const [reminder, setReminder] = useState("");
+  const [showWindow, setShowWindow] = useState(false);
+  const [windowStart, setWindowStart] = useState("");
+  const [windowEnd, setWindowEnd] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
   const submittedRef = useRef(false);
 
@@ -50,6 +72,10 @@ export function HabitCreateForm() {
         setDayPart("anytime");
         setGoalUnit("check");
         setTarget("1");
+        setReminder("");
+        setShowWindow(false);
+        setWindowStart("");
+        setWindowEnd("");
         setOpen(false);
       }, 0);
       return () => window.clearTimeout(timer);
@@ -59,6 +85,22 @@ export function HabitCreateForm() {
   const pickUnit = (unit: HabitGoalUnit) => {
     setGoalUnit(unit);
     setTarget(unit === "minutes" ? "15" : unit === "count" ? "3" : "1");
+  };
+
+  // Toggling the window on pre-fills ±1h around the reminder time (the section's
+  // default) so the common case is one tap; the user can still adjust.
+  const toggleWindow = () => {
+    setShowWindow((prev) => {
+      const next = !prev;
+      if (next && !windowStart && !windowEnd) {
+        const base = parseClock24(reminder);
+        if (base !== null) {
+          setWindowStart(clampClock24(base - 60));
+          setWindowEnd(clampClock24(base + 60));
+        }
+      }
+      return next;
+    });
   };
 
   return (
@@ -263,8 +305,64 @@ export function HabitCreateForm() {
                       <label htmlFor="habit-reminder" className="block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
                         Reminder time
                       </label>
-                      <input id="habit-reminder" name="reminderTime" type="time" className="field" />
+                      <input
+                        id="habit-reminder"
+                        name="reminderTime"
+                        type="time"
+                        className="field"
+                        value={reminder}
+                        onChange={(event) => setReminder(event.target.value)}
+                      />
                     </div>
+                  </div>
+
+                  {/* Flexible time window — collapsed by default. The reminder is
+                      the ideal slot; the window is the acceptable range around it. */}
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={toggleWindow}
+                      aria-pressed={showWindow}
+                      className="inline-flex items-center gap-1.5 text-[0.75rem] font-medium"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      <span aria-hidden>{showWindow ? "−" : "+"}</span> Add time window
+                    </button>
+                    {showWindow ? (
+                      <>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-1.5">
+                            <label htmlFor="habit-window-start" className="block text-[0.72rem]" style={{ color: "var(--text-faint)" }}>
+                              Earliest start
+                            </label>
+                            <input
+                              id="habit-window-start"
+                              name="windowStart"
+                              type="time"
+                              className="field"
+                              value={windowStart}
+                              onChange={(event) => setWindowStart(event.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label htmlFor="habit-window-end" className="block text-[0.72rem]" style={{ color: "var(--text-faint)" }}>
+                              Latest end
+                            </label>
+                            <input
+                              id="habit-window-end"
+                              name="windowEnd"
+                              type="time"
+                              className="field"
+                              value={windowEnd}
+                              onChange={(event) => setWindowEnd(event.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <p className="text-[0.72rem]" style={{ color: "var(--text-faint)" }}>
+                          Shows as a soft band on the calendar — the reminder stays the ideal slot inside it.
+                        </p>
+                      </>
+                    ) : null}
                   </div>
 
                   <div className="space-y-1.5">

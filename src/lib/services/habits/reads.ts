@@ -12,12 +12,14 @@ import {
   resolveHabitTaskLane,
   summarizeHabit,
 } from "./derive";
+import { ensureHabitWindowColumns } from "./shared";
 
 export async function listHabits(
   userId: string,
   options: { includeArchived?: boolean } = {},
 ): Promise<HabitSummary[]> {
   requireCan(userId, "habit", "read");
+  await ensureHabitWindowColumns();
   const habits = await prisma.habit.findMany({
     where: {
       userId,

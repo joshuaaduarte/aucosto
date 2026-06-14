@@ -15,3 +15,4 @@ export {
   type SaveHabitInput,
 } from "./mutations";
 export type { HabitSummary, HabitTaskSummary } from "./derive";
+export { ensureHabitWindowColumns } from "./shared";

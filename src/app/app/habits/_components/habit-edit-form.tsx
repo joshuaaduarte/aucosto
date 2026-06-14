@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   HABIT_CADENCE_LABELS,
   HABIT_CADENCES,
@@ -13,7 +14,47 @@ import {
 import type { HabitSummary } from "@/lib/services/habits";
 import { updateHabitAction } from "../actions";
 
+/** Clamp minutes-since-midnight to a 24-hour HH:MM string for <input type="time">. */
+function clampClock24(totalMinutes: number): string {
+  const value = Math.max(0, Math.min(1439, Math.round(totalMinutes)));
+  const hours = Math.floor(value / 60);
+  const mins = value % 60;
+  return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+}
+
+/** Parse an HH:MM string to minutes-since-midnight, or null if malformed. */
+function parseClock24(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const mins = Number(match[2]);
+  if (hours < 0 || hours > 23 || mins < 0 || mins > 59) return null;
+  return hours * 60 + mins;
+}
+
 export function HabitEditForm({ habit }: { habit: HabitSummary }) {
+  const [showWindow, setShowWindow] = useState(
+    Boolean(habit.windowStart || habit.windowEnd),
+  );
+  const [windowStart, setWindowStart] = useState(habit.windowStart ?? "");
+  const [windowEnd, setWindowEnd] = useState(habit.windowEnd ?? "");
+
+  // Enabling the window pre-fills ±1h around the reminder (the default range).
+  const toggleWindow = () => {
+    setShowWindow((prev) => {
+      const next = !prev;
+      if (next && !windowStart && !windowEnd) {
+        const base = parseClock24(habit.reminderTime);
+        if (base !== null) {
+          setWindowStart(clampClock24(base - 60));
+          setWindowEnd(clampClock24(base + 60));
+        }
+      }
+      return next;
+    });
+  };
+
   return (
     <details className="rounded-[0.95rem] border" style={{ borderColor: "var(--border-faint)" }}>
       <summary className="cursor-pointer list-none px-3 py-2 text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
@@ -123,6 +164,54 @@ export function HabitEditForm({ habit }: { habit: HabitSummary }) {
           <p className="text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
             Optional. Leave blank if this habit should stay flexible inside its day part.
           </p>
+        </div>
+
+        {/* Flexible time window — the acceptable range around the reminder. */}
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={toggleWindow}
+            aria-pressed={showWindow}
+            className="inline-flex items-center gap-1.5 text-[0.75rem] font-medium"
+            style={{ color: "var(--text-muted)" }}
+          >
+            <span aria-hidden>{showWindow ? "−" : "+"}</span> Add time window
+          </button>
+          {showWindow ? (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label htmlFor={`window-start-${habit.id}`} className="block text-[0.72rem]" style={{ color: "var(--text-faint)" }}>
+                    Earliest start
+                  </label>
+                  <input
+                    id={`window-start-${habit.id}`}
+                    name="windowStart"
+                    type="time"
+                    className="field"
+                    value={windowStart}
+                    onChange={(event) => setWindowStart(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor={`window-end-${habit.id}`} className="block text-[0.72rem]" style={{ color: "var(--text-faint)" }}>
+                    Latest end
+                  </label>
+                  <input
+                    id={`window-end-${habit.id}`}
+                    name="windowEnd"
+                    type="time"
+                    className="field"
+                    value={windowEnd}
+                    onChange={(event) => setWindowEnd(event.target.value)}
+                  />
+                </div>
+              </div>
+              <p className="text-[0.72rem]" style={{ color: "var(--text-faint)" }}>
+                Shows as a soft band on the calendar — the reminder stays the ideal slot inside it.
+              </p>
+            </>
+          ) : null}
         </div>
 
         <div className="space-y-1.5">

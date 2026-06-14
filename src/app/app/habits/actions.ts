@@ -9,6 +9,7 @@ import {
   archiveHabit,
   createHabit,
   deleteHabit,
+  ensureHabitWindowColumns,
   listHabits,
   logHabitProgress,
   removeTodayHabitEntries,
@@ -35,6 +36,8 @@ const habitSchema = z.object({
   goalUnit: goalUnitEnum.default("check"),
   defaultDurationMinutes: z.coerce.number().int().positive().max(24 * 60).nullable(),
   reminderTime: z.string().trim().max(10).nullable(),
+  windowStart: z.string().trim().max(10).nullable(),
+  windowEnd: z.string().trim().max(10).nullable(),
   daysOfWeek: z.array(z.coerce.number().int().min(0).max(6)).default([]),
 });
 
@@ -61,6 +64,16 @@ export type HabitState = { error?: string } | undefined;
 export type HabitLogState = { error?: string } | undefined;
 export type HabitScheduleState = { error?: string } | undefined;
 
+// One-time, idempotent application of the flexible-window columns. The habit
+// reads/mutations already call ensureHabitWindowColumns() internally (so the
+// columns exist on the first habits/calendar render after deploy); this action
+// is the explicit, manually-invocable entry point for the same DDL.
+export async function ensureHabitWindowColumnsAction(): Promise<{ ok: true }> {
+  await resolveActiveUserId();
+  await ensureHabitWindowColumns();
+  return { ok: true };
+}
+
 export async function createHabitAction(
   _prev: HabitState,
   formData: FormData,
@@ -78,6 +91,8 @@ export async function createHabitAction(
     goalUnit: formData.get("goalUnit") ?? "check",
     defaultDurationMinutes: nullableNumber(formData, "defaultDurationMinutes"),
     reminderTime: nullableString(formData, "reminderTime"),
+    windowStart: nullableString(formData, "windowStart"),
+    windowEnd: nullableString(formData, "windowEnd"),
     daysOfWeek: formData.getAll("daysOfWeek"),
   });
   if (!parsed.success) {
@@ -106,6 +121,8 @@ export async function updateHabitAction(formData: FormData) {
     goalUnit: formData.get("goalUnit") ?? "check",
     defaultDurationMinutes: nullableNumber(formData, "defaultDurationMinutes"),
     reminderTime: nullableString(formData, "reminderTime"),
+    windowStart: nullableString(formData, "windowStart"),
+    windowEnd: nullableString(formData, "windowEnd"),
     daysOfWeek: formData.getAll("daysOfWeek"),
   });
   if (!parsed.success) {

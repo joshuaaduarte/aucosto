@@ -44,6 +44,16 @@ export type HabitSummary = Habit & {
   cadenceLabel: string;
   targetLabel: string;
   dayPartLabel: string;
+  /**
+   * This-week adherence for the card chip: how many scheduled days the habit
+   * actually ran, out of how many it was due, and the average local
+   * start-of-day clock minutes across the days it ran (null if none yet).
+   */
+  weekAdherence: {
+    ranDays: number;
+    dueDays: number;
+    avgStartMinutes: number | null;
+  };
 };
 
 export type HabitTaskSummary = HabitSummary & {
@@ -324,6 +334,58 @@ function keptAliveStreakForHabit(habit: HabitWithRelations, now: Date) {
   return current;
 }
 
+/**
+ * This-week adherence: across the seven days of the current week, how many
+ * scheduled days the habit ran (had a full entry or any tracked time) and the
+ * average local start time on those days. Future days count toward `dueDays`
+ * but never as ran. The server runtime is TZ-pinned, so getHours/getMinutes
+ * read local wall-clock time.
+ */
+function weekAdherenceForHabit(habit: HabitWithRelations, now: Date) {
+  const weekStart = startOfWeek(now);
+  let dueDays = 0;
+  let ranDays = 0;
+  const startMinutes: number[] = [];
+
+  for (let offset = 0; offset < 7; offset += 1) {
+    const day = new Date(weekStart);
+    day.setDate(day.getDate() + offset);
+    if (!isDueOnDate(habit, day)) continue;
+    dueDays += 1;
+
+    const dayEnd = endOfDay(day);
+    const dayFullEntries = fullEntries(habit.entries).filter(
+      (entry) => entry.loggedAt >= day && entry.loggedAt < dayEnd,
+    );
+    const dayTimeEntries = habit.timeEntries.filter(
+      (entry) => entry.startedAt >= day && entry.startedAt < dayEnd,
+    );
+    if (dayFullEntries.length === 0 && dayTimeEntries.length === 0) continue;
+
+    ranDays += 1;
+    // Earliest signal that day — prefer tracked-time starts (when it actually
+    // happened), fall back to manual log timestamps.
+    const stamps = [
+      ...dayTimeEntries.map((entry) => entry.startedAt),
+      ...dayFullEntries.map((entry) => entry.loggedAt),
+    ];
+    const earliest = stamps.reduce((best, current) =>
+      current < best ? current : best,
+    );
+    startMinutes.push(earliest.getHours() * 60 + earliest.getMinutes());
+  }
+
+  const avgStartMinutes =
+    startMinutes.length > 0
+      ? Math.round(
+          startMinutes.reduce((sum, value) => sum + value, 0) /
+            startMinutes.length,
+        )
+      : null;
+
+  return { ranDays, dueDays, avgStartMinutes };
+}
+
 export function summarizeHabit(habit: HabitWithRelations, now: Date): HabitSummary {
   const todayStart = startOfDay(now);
   const tomorrow = endOfDay(now);
@@ -399,6 +461,7 @@ export function summarizeHabit(habit: HabitWithRelations, now: Date): HabitSumma
     keptAliveToday,
     needsSaveToday,
     salvageLabel: habit.fallbackTitle ?? (habit.rescuePrompt ? "Run recovery" : null),
+    weekAdherence: weekAdherenceForHabit(habit, now),
     recentDays,
     dayPartLabel: HABIT_DAY_PART_LABELS[normalizeDayPart(habit.dayPart)],
     cadenceLabel:

@@ -404,6 +404,8 @@ type HabitGhostSource = {
   daysOfWeek: string | null;
   reminderTime: string | null;
   defaultDurationMinutes: number | null;
+  windowStart: string | null;
+  windowEnd: string | null;
   archivedAt: Date | null;
 };
 
@@ -450,6 +452,16 @@ export function habitGhostsForDay(
     const reminderMinutes = parseReminderMinutes(habit.reminderTime);
     if (reminderMinutes === null) continue;
     if (!habitOccursOnWeekday(habit, weekday)) continue;
+
+    // A band is drawn only when an explicit, well-formed window is set
+    // (start before end). Habits with no window keep the bare ghost block.
+    const windowStartMinutes = parseReminderMinutes(habit.windowStart);
+    const windowEndMinutes = parseReminderMinutes(habit.windowEnd);
+    const hasWindow =
+      windowStartMinutes !== null &&
+      windowEndMinutes !== null &&
+      windowEndMinutes > windowStartMinutes;
+
     ghosts.push({
       id: habit.id,
       title: habit.title,
@@ -459,6 +471,8 @@ export function habitGhostsForDay(
         habit.defaultDurationMinutes && habit.defaultDurationMinutes > 0
           ? habit.defaultDurationMinutes
           : DEFAULT_HABIT_GHOST_MINUTES,
+      windowStartMinutes: hasWindow ? windowStartMinutes : null,
+      windowEndMinutes: hasWindow ? windowEndMinutes : null,
     });
   }
   return ghosts;

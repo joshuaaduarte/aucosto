@@ -13,6 +13,8 @@ model Habit {
   goalUnit               String      @default("check")
   defaultDurationMinutes Int?
   reminderTime           String?
+  windowStart            String?
+  windowEnd              String?
   archivedAt             DateTime?
   createdAt              DateTime    @default(now())
   updatedAt              DateTime    @updatedAt

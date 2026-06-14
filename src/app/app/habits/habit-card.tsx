@@ -10,7 +10,7 @@
 import { useState, useTransition } from "react";
 import { categoryColor } from "@/lib/time-categories";
 import { splitLeadingEmoji } from "@/lib/habit-templates";
-import { formatHabitQuantity, type HabitGoalUnit } from "@/lib/habits";
+import { formatClockMinutes, formatHabitQuantity, type HabitGoalUnit } from "@/lib/habits";
 import type { HabitSummary } from "@/lib/services/habits";
 import {
   quickLogHabitAction,
@@ -57,6 +57,7 @@ export function HabitCard({ habit }: { habit: HabitSummary }) {
   const done = isWeekly ? habit.completedThisWeek : habit.completedToday;
   const last7 = habit.recentDays.slice(-7);
   const streak = Math.max(habit.currentStreak, habit.keptAliveStreak);
+  const adherence = habit.weekAdherence;
 
   const quickLog = (quantity?: number) => {
     if (logPending) return;
@@ -155,6 +156,19 @@ export function HabitCard({ habit }: { habit: HabitSummary }) {
             ))}
           </span>
         </div>
+
+        {/* This-week adherence: days ran out of days due + avg start time. */}
+        {adherence.dueDays > 0 ? (
+          <p className="mt-1.5 text-[0.65rem]" style={{ color: "var(--text-faint)" }}>
+            <span className="tabular font-medium" style={{ color: "var(--text-muted)" }}>
+              {adherence.ranDays}/{adherence.dueDays}
+            </span>{" "}
+            day{adherence.dueDays === 1 ? "" : "s"} this week
+            {adherence.avgStartMinutes !== null
+              ? ` · avg ${formatClockMinutes(adherence.avgStartMinutes)}`
+              : ""}
+          </p>
+        ) : null}
 
         {/* One-tap actions */}
         {!habit.archivedAt ? (

@@ -78,3 +78,13 @@ export function describeHabitCadence(cadence: HabitCadence, daysOfWeek: string |
 export function weekdayName(value: number) {
   return HABIT_WEEKDAY_OPTIONS.find((option) => option.value === value)?.label ?? String(value);
 }
+
+/** Format minutes-since-local-midnight as a short 12-hour clock, e.g. "7:12am". */
+export function formatClockMinutes(minutes: number): string {
+  const normalized = ((Math.round(minutes) % 1440) + 1440) % 1440;
+  const hours24 = Math.floor(normalized / 60);
+  const mins = normalized % 60;
+  const period = hours24 < 12 ? "am" : "pm";
+  const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
+  return `${hours12}:${String(mins).padStart(2, "0")}${period}`;
+}

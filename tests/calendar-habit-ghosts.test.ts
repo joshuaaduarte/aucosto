@@ -15,6 +15,8 @@ function habit(overrides: Partial<Record<string, unknown>> = {}) {
     daysOfWeek: null,
     reminderTime: "07:00",
     defaultDurationMinutes: 60,
+    windowStart: null,
+    windowEnd: null,
     archivedAt: null,
     ...overrides,
   } as Parameters<typeof habitGhostsForDay>[0][number];
@@ -70,6 +72,110 @@ describe("habitGhostsForDay", () => {
     expect(
       habitGhostsForDay([habit({ cadence: "weekly", daysOfWeek: null })], wednesday),
     ).toHaveLength(0);
+  });
+
+  it("emits window minutes only when both bounds parse and start < end", () => {
+    const withWindow = habitGhostsForDay(
+      [habit({ windowStart: "06:00", windowEnd: "09:00" })],
+      wednesday,
+    );
+    expect(withWindow[0]).toMatchObject({
+      windowStartMinutes: 6 * 60,
+      windowEndMinutes: 9 * 60,
+    });
+
+    // No window set → null (no band drawn).
+    expect(habitGhostsForDay([habit()], wednesday)[0]).toMatchObject({
+      windowStartMinutes: null,
+      windowEndMinutes: null,
+    });
+
+    // Inverted / malformed window → null.
+    expect(
+      habitGhostsForDay([habit({ windowStart: "09:00", windowEnd: "06:00" })], wednesday)[0],
+    ).toMatchObject({ windowStartMinutes: null, windowEndMinutes: null });
+    expect(
+      habitGhostsForDay([habit({ windowStart: "06:00", windowEnd: "nope" })], wednesday)[0],
+    ).toMatchObject({ windowStartMinutes: null, windowEndMinutes: null });
+  });
+});
+
+describe("buildDayTimeline habit window bands", () => {
+  const dayAt = (hour: number, minute = 0) => new Date(2026, 5, 10, hour, minute, 0);
+
+  it("has no band when the habit has no window", () => {
+    const model = buildDayTimeline({
+      items: [],
+      entries: [],
+      habits: habitGhostsForDay([habit()], wednesday),
+      day: wednesday,
+      now: dayAt(9),
+    });
+    expect(model.habits[0]!.band).toBeNull();
+  });
+
+  it("draws a band spanning the window, unmatched when no entry overlaps", () => {
+    const model = buildDayTimeline({
+      items: [],
+      entries: [],
+      habits: habitGhostsForDay(
+        [habit({ windowStart: "06:00", windowEnd: "09:00" })],
+        wednesday,
+      ),
+      day: wednesday,
+      now: dayAt(12),
+    });
+    const band = model.habits[0]!.band;
+    expect(band).not.toBeNull();
+    expect(band!.matched).toBe(false);
+    // 06:00 in a 06:00–22:00 window (expanded to fit the early band? no — ghosts
+    // don't expand the axis; default starts 07:00) → band top clamps to 0.
+    expect(band!.topPct).toBeCloseTo(0, 1);
+    expect(band!.heightPct).toBeGreaterThan(0);
+  });
+
+  it("marks the band matched when a tracked entry overlaps the window", () => {
+    const model = buildDayTimeline({
+      items: [],
+      entries: [
+        {
+          id: "e1",
+          label: "Run",
+          category: "exercise",
+          startedAt: dayAt(7, 30),
+          endedAt: dayAt(8, 0),
+        },
+      ],
+      habits: habitGhostsForDay(
+        [habit({ windowStart: "06:00", windowEnd: "09:00" })],
+        wednesday,
+      ),
+      day: wednesday,
+      now: dayAt(12),
+    });
+    expect(model.habits[0]!.band!.matched).toBe(true);
+  });
+
+  it("does not match an entry that falls entirely outside the window", () => {
+    const model = buildDayTimeline({
+      items: [],
+      entries: [
+        {
+          id: "e1",
+          label: "Late work",
+          category: "work",
+          startedAt: dayAt(14, 0),
+          endedAt: dayAt(15, 0),
+        },
+      ],
+      habits: habitGhostsForDay(
+        [habit({ windowStart: "06:00", windowEnd: "09:00" })],
+        wednesday,
+      ),
+      day: wednesday,
+      now: dayAt(16),
+    });
+    expect(model.habits[0]!.band!.matched).toBe(false);
   });
 });
 
