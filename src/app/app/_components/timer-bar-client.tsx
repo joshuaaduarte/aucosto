@@ -15,6 +15,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { formatDuration } from "@/lib/time";
 import { stopEntry, updateEntryNotes } from "../time/actions";
+import {
+  BackdatedStopModal,
+  ClockRewindIcon,
+} from "../time/backdated-stop-modal";
 
 export function TimerBarClient({
   entryId,
@@ -36,6 +40,7 @@ export function TimerBarClient({
   const [now, setNow] = useState(() => Date.now());
 
   const [noteOpen, setNoteOpen] = useState(false);
+  const [stopAtOpen, setStopAtOpen] = useState(false);
   const [notes, setNotes] = useState(initialNotes ?? "");
   // notesRef mirrors the latest text so the document-level outside-click
   // listener (bound once per open) always flushes the current value, not the
@@ -186,6 +191,21 @@ export function TimerBarClient({
           >
             Switch
           </Link>
+          {/* Secondary stop: end the entry at an earlier time. Kept as a small
+              icon so the primary "Stop now" stays the fast, obvious action. */}
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => {
+              flush();
+              setStopAtOpen(true);
+            }}
+            aria-label="Stop at an earlier time"
+            className="btn-icon h-8 w-8 shrink-0 rounded-full"
+            style={{ color: "var(--text-muted)" }}
+          >
+            <ClockRewindIcon />
+          </button>
           <button
             type="button"
             disabled={pending}
@@ -203,6 +223,19 @@ export function TimerBarClient({
         </div>
       </div>
       </div>
+
+      {stopAtOpen ? (
+        <BackdatedStopModal
+          startedAtIso={startedAtIso}
+          onClose={() => setStopAtOpen(false)}
+          onStopped={() => {
+            setStopAtOpen(false);
+            // Off the time page here — send Josh to it so the gap-backfill card
+            // for the freshly opened gap is right in front of him.
+            router.push("/app/time");
+          }}
+        />
+      ) : null}
     </>
   );
 }

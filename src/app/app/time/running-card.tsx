@@ -12,6 +12,10 @@ import {
 import { formatDuration } from "@/lib/time";
 import { DescribeRow } from "./describe-row";
 import { RunningNotes } from "./running-notes";
+import {
+  BackdatedStopModal,
+  ClockRewindIcon,
+} from "./backdated-stop-modal";
 import { useBodyScrollLock } from "../_components/use-body-scroll-lock";
 
 export function RunningCard({
@@ -51,6 +55,7 @@ export function RunningCard({
   const [now, setNow] = useState(() => Date.now());
   const [pending, startTransition] = useTransition();
   const [reflectOpen, setReflectOpen] = useState(false);
+  const [stopAtOpen, setStopAtOpen] = useState(false);
   useBodyScrollLock(reflectOpen);
 
   useEffect(() => {
@@ -151,7 +156,23 @@ export function RunningCard({
               />
             ) : null}
           </div>
-          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            {/* Secondary stop: end this entry at an earlier time. A quiet icon
+                so the primary stop actions stay front and center. */}
+            <button
+              type="button"
+              onClick={() => setStopAtOpen(true)}
+              disabled={pending}
+              aria-label="Stop at an earlier time"
+              title="Stop at an earlier time"
+              className="btn-icon h-9 w-9 rounded-full border"
+              style={{
+                borderColor: "var(--border-faint)",
+                color: "var(--text-muted)",
+              }}
+            >
+              <ClockRewindIcon />
+            </button>
             {doItem ? (
               <>
                 <form action={stopEntryAndCompleteDoItem}>
@@ -506,6 +527,19 @@ export function RunningCard({
             </form>
           </div>
         </div>
+      ) : null}
+
+      {stopAtOpen ? (
+        <BackdatedStopModal
+          startedAtIso={startedAtIso}
+          onClose={() => setStopAtOpen(false)}
+          onStopped={() => {
+            setStopAtOpen(false);
+            // Already on /app/time — refreshing surfaces the gap-backfill card
+            // for the stretch between the backdated stop and now.
+            router.refresh();
+          }}
+        />
       ) : null}
     </>
   );

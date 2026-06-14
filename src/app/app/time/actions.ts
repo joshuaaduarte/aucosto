@@ -321,6 +321,27 @@ export async function stopEntry() {
   revalidatePath("/app/calendar");
 }
 
+// Stop the running timer at an earlier moment than now — the "I finished at 2pm
+// but forgot to hit stop" recovery. `endedAtIso` is an absolute timestamp built
+// in the BROWSER's timezone (the picker resolves wall-clock → ISO there, so the
+// server's timezone never reinterprets it). The service validates that it sits
+// between the entry's start and now; the untracked stretch it leaves behind
+// surfaces as the usual gap-backfill card on /app/time.
+export async function stopEntryAt(endedAtIso: string) {
+  const userId = await resolveActiveUserId();
+  const endedAt = new Date(endedAtIso);
+  if (Number.isNaN(endedAt.getTime())) {
+    throw new Error("Stop time is invalid.");
+  }
+  await timeService.stopRunning(userId, endedAt);
+
+  revalidatePath("/app");
+  revalidatePath("/app/do");
+  revalidatePath("/app/habits");
+  revalidatePath("/app/time");
+  revalidatePath("/app/calendar");
+}
+
 export async function stopEntryAndCompleteDoItem(formData: FormData) {
   const userId = await resolveActiveUserId();
   const doItemId = String(formData.get("doItemId") ?? "").trim();

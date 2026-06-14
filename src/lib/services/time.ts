@@ -238,18 +238,44 @@ export async function updateEntry(
   return entry;
 }
 
-export async function stopRunning(userId: string): Promise<void> {
+// Stop the running timer. `endedAt` backdates the stop ("finished at 2pm but
+// forgot to hit stop until 3pm"); omit it for the fast happy path (stop = now),
+// which stays a single query. A backdated stop is validated against the running
+// entry's start so the entry never ends before it began.
+export async function stopRunning(
+  userId: string,
+  endedAt?: Date,
+): Promise<void> {
   requireCan(userId, "time", "write");
+  const now = new Date();
+  const stoppedAt = endedAt ?? now;
+  if (Number.isNaN(stoppedAt.getTime())) {
+    throw new Error("Stop time is invalid.");
+  }
+  // Small tolerance for clock skew; a backdated stop must not land in the future.
+  if (stoppedAt.getTime() > now.getTime() + 60_000) {
+    throw new Error("Stop time cannot be in the future.");
+  }
+  if (endedAt) {
+    const running = await prisma.timeEntry.findFirst({
+      where: { userId, endedAt: null },
+      orderBy: { startedAt: "desc" },
+      select: { startedAt: true },
+    });
+    if (running && stoppedAt.getTime() < running.startedAt.getTime()) {
+      throw new Error("Stop time can't be before the timer started.");
+    }
+  }
   const { count } = await prisma.timeEntry.updateMany({
     where: { userId, endedAt: null },
-    data: { endedAt: new Date() },
+    data: { endedAt: stoppedAt },
   });
   if (count > 0) {
     await recordEvent({
       userId,
       tool: "time",
       type: "time.stopped",
-      meta: { count },
+      meta: endedAt ? { count, backdated: true } : { count },
     });
   }
 }
