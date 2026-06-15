@@ -173,6 +173,16 @@ npm run dev
 
 Then open <http://localhost:3000>.
 
+### 6. Install the git pre-push hook
+
+```bash
+npm run setup-hooks
+```
+
+Run this once after cloning. It installs a `pre-push` hook that runs
+`prisma generate && tsc --noEmit` before every push and blocks the push on any
+type error — preventing bad deploys from ever reaching Vercel.
+
 ## Useful commands
 
 ```bash

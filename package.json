@@ -14,6 +14,7 @@
     "db:generate": "prisma generate",
     "db:seed": "tsx --env-file=.env prisma/seed.ts",
     "db:studio": "prisma studio",
+    "setup-hooks": "sh scripts/setup-hooks.sh",
     "db:backfill-finance-categories": "tsx --env-file=.env scripts/backfill-finance-categories.ts",
     "smoke": "tsx --env-file=.env scripts/smoke.ts",
     "smoke:demo": "tsx --env-file=.env scripts/smoke.ts --write-demo"

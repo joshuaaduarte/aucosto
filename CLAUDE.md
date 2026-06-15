@@ -77,7 +77,14 @@ npm run db:seed      # tsx prisma/seed.ts — upserts the single user from SEED_
 npm run db:studio    # prisma studio GUI
 npm run smoke        # non-destructive smoke verification
 npm run smoke:demo   # destructive demo-fixture load for seeded user
+npm run setup-hooks  # install the git pre-push type-check hook (run once after cloning)
 ```
+
+## Pre-push hook
+
+Run `npm run setup-hooks` once after cloning to install the git pre-push hook.
+The hook runs `prisma generate && tsc --noEmit` before every push and blocks the
+push on any type error — preventing bad deploys from ever reaching Vercel.
 
 `tsx` scripts (seed, `scripts/*.ts`) do **not** auto-load `.env` — run via `tsx --env-file=.env ...`. Maintenance/diagnostic scripts live in `scripts/` — each has a header comment explaining what it does and when to run it. Notable: `check-reflect.ts` (post-migration health check), `create-reflect-table.sql` (idempotent fallback if the reflect migration is stuck), `shift-times.ts` (repair timezone-shifted timestamps, dry-run by default).
 
