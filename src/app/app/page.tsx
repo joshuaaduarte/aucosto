@@ -7,7 +7,7 @@ import { listHabits, listSuggestedHabits } from "@/lib/services/habits";
 import { listProjects } from "@/lib/services/projects";
 import {
   getActiveRhythm,
-  getTodayMorning,
+  getTodayWakeStatus,
   listRecentRhythms,
 } from "@/lib/services/rhythms";
 import { listReflections, listRecentMoods } from "@/lib/services/reflect";
@@ -120,9 +120,9 @@ export default async function HubPage() {
   // keep the big tuple above intact. The morning card still gates its window in
   // the BROWSER (see RhythmHubCard); the always-on sleep card derives its state
   // here from the LA-pinned server clock — single-user, owner in LA.
-  const [todayMorning, activeSleep, recentRhythms] = userId
+  const [wakeStatus, activeSleep, recentRhythms] = userId
     ? await Promise.all([
-        getTodayMorning(userId),
+        getTodayWakeStatus(userId),
         getActiveRhythm(userId, "sleep"),
         listRecentRhythms(userId, { limit: 40 }),
       ])
@@ -311,14 +311,26 @@ export default async function HubPage() {
           />
           <RhythmHubCard
             morning={
-              todayMorning
+              // Skip the "what time did you wake up?" prompt whenever a wake
+              // time is already known — from a morning check-in OR a sleep
+              // session that ended today. A real check-in carries its own
+              // completed state; a sleep-derived wake shows the in-progress
+              // flow (habits + "Done with morning") instead of re-prompting.
+              wakeStatus?.morning
                 ? {
                     started: true,
-                    completed: todayMorning.completed,
-                    wakeTime: todayMorning.wakeTime,
-                    sleepMinutes: todayMorning.sleepMinutes,
+                    completed: wakeStatus.morning.completed,
+                    wakeTime: wakeStatus.wakeTime,
+                    sleepMinutes: wakeStatus.sleepMinutes,
                   }
-                : null
+                : wakeStatus?.captured
+                  ? {
+                      started: true,
+                      completed: false,
+                      wakeTime: wakeStatus.wakeTime,
+                      sleepMinutes: wakeStatus.sleepMinutes,
+                    }
+                  : null
             }
             morningHabits={allHabits
               .filter((habit) => habit.dayPart === "morning")

@@ -339,6 +339,93 @@ function readMorningMeta(metadata: unknown): {
   };
 }
 
+/** "HH:mm" in the server's (LA-pinned) local clock — owner is in LA. */
+function toHhMm(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/**
+ * The most recent sleep session that ENDED today — stopping the sleep timer is
+ * itself a wake event, so its `endedAt` is an auto-tracked wake time. Degrades
+ * to null if the table's missing.
+ */
+async function getLatestSleepEndedToday(
+  userId: string,
+): Promise<RhythmSessionRecord | null> {
+  try {
+    const rows = await prisma.$queryRaw<Row[]>(Prisma.sql`
+      SELECT ${SELECT_FIELDS}
+      FROM "RhythmSession"
+      WHERE "userId" = ${userId}
+        AND "type" = 'sleep'
+        AND "endedAt" IS NOT NULL
+        AND "endedAt" >= ${startOfToday()}
+      ORDER BY "endedAt" DESC
+      LIMIT 1
+    `);
+    return rows[0] ? toRecord(rows[0]) : null;
+  } catch (error) {
+    if (!isMissingTableError(error)) {
+      console.error("[rhythms] getLatestSleepEndedToday failed", error);
+    }
+    return null;
+  }
+}
+
+export type WakeStatus = {
+  /**
+   * A wake time has been captured today by ANY source — a morning check-in OR
+   * a sleep session that ended today. When true, the hub must NOT prompt for
+   * the wake time again.
+   */
+  captured: boolean;
+  /** Best-known wake time as "HH:mm" for display, or null. */
+  wakeTime: string | null;
+  /** Where the displayed wake time came from. */
+  source: "morning" | "sleep" | null;
+  /** The morning (wakeup) check-in session, when one exists. */
+  morning: MorningStatus | null;
+  /** Sleep carried over from last night, in minutes, when known. */
+  sleepMinutes: number | null;
+};
+
+/**
+ * "Have we captured a wake time today?" — the single source of truth the hub
+ * uses to decide whether to prompt. Unions the two ways wake-up is known, the
+ * same sources the time tool's gap detection anchors on (see
+ * `src/app/app/time/page.tsx`): the morning check-in's reported time, and a
+ * sleep session that's since been closed (stopping the sleep timer = waking).
+ *
+ * Display priority: an explicit morning check-in wake time wins; the sleep
+ * session's `endedAt` is the auto-tracked fallback.
+ */
+export async function getTodayWakeStatus(userId: string): Promise<WakeStatus> {
+  requireCan(userId, "rhythm", "read");
+  const [morning, sleep] = await Promise.all([
+    getTodayMorning(userId),
+    getLatestSleepEndedToday(userId),
+  ]);
+
+  let wakeTime: string | null = null;
+  let source: "morning" | "sleep" | null = null;
+  if (morning?.wakeTime) {
+    wakeTime = morning.wakeTime;
+    source = "morning";
+  } else if (sleep?.endedAt) {
+    wakeTime = toHhMm(sleep.endedAt);
+    source = "sleep";
+  }
+
+  return {
+    captured: morning !== null || sleep !== null,
+    wakeTime,
+    source,
+    morning,
+    sleepMinutes: morning?.sleepMinutes ?? sleep?.durationMinutes ?? null,
+  };
+}
+
 /** Today's morning (wakeup) session, or null before the day's first check-in. */
 export async function getTodayMorning(
   userId: string,
@@ -473,11 +560,29 @@ export async function completeMorning(userId: string): Promise<void> {
       WHERE "userId" = ${userId}
         AND "type" = 'wakeup'
         AND "startedAt" >= ${startOfToday()}
-        AND "endedAt" IS NULL
       ORDER BY "startedAt" DESC
       LIMIT 1
     `);
-    if (rows[0]) await endRhythm(userId, rows[0].id);
+    const existing = rows[0];
+    if (existing) {
+      if (existing.endedAt === null) await endRhythm(userId, existing.id);
+      return;
+    }
+    // No morning check-in today — wake was auto-tracked from the sleep timer.
+    // Record an already-completed wakeup marker (carrying the sleep-derived
+    // wake time) so the hub's morning card dismisses itself on refresh.
+    const sleep = await getLatestSleepEndedToday(userId);
+    const metaJson = JSON.stringify({
+      wakeTime: sleep?.endedAt ? toHhMm(sleep.endedAt) : null,
+      sleepMinutes: sleep?.durationMinutes ?? null,
+    });
+    await prisma.$executeRaw(Prisma.sql`
+      INSERT INTO "RhythmSession" (
+        "id", "userId", "type", "startedAt", "endedAt", "metadata", "createdAt"
+      ) VALUES (
+        ${randomUUID()}, ${userId}, 'wakeup', now(), now(), ${metaJson}::jsonb, now()
+      )
+    `);
   } catch (error) {
     if (isMissingTableError(error)) return;
     throw error;
