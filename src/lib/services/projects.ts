@@ -8,7 +8,6 @@ import { normalizeDoStatus } from "@/lib/do";
 import { deleteDoItemsByProject } from "@/lib/services/do";
 import { recordEvent } from "@/lib/services/events";
 import { listHabits } from "@/lib/services/habits";
-import { startOfWeek } from "@/lib/time";
 import {
   computeMomentum,
   normalizeBoardStatus,
@@ -93,7 +92,9 @@ function cleanString(value: string | null | undefined) {
   return trimmed ? trimmed : null;
 }
 
-function startOfWeek(value: Date) {
+// Monday-based start of the week containing `value` (defaults to now, matching
+// the no-arg signature the board queries below rely on).
+function startOfWeek(value: Date = new Date()) {
   const next = new Date(value);
   next.setHours(0, 0, 0, 0);
   const day = next.getDay();
