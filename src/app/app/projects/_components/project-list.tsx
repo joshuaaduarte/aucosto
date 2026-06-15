@@ -14,6 +14,8 @@ import {
 } from "../actions";
 import { useBodyScrollLock } from "../../_components/use-body-scroll-lock";
 import { ProjectCard, type ProjectCardView } from "./project-card";
+import { ProjectFocusCard } from "./project-focus-card";
+import { ProjectRow } from "./project-row";
 import { TimeAllocationBar, type AllocationSegmentView } from "./time-allocation-bar";
 import { EditProjectSheet, type ProjectEditView } from "./edit-project-sheet";
 import type { AreaView } from "./area-badge";
@@ -29,6 +31,31 @@ function toEditView(view: ProjectCardView): ProjectEditView {
     timeBudgetHours: view.timeBudgetHours,
     targetDateValue: view.targetDateValue,
   };
+}
+
+/** Higher = more momentum; used only to break ties when picking the focus card. */
+function momentumRank(view: ProjectCardView): number {
+  switch (view.momentum?.level) {
+    case "alive":
+      return 3;
+    case "slowing":
+      return 2;
+    case "stalled":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+/** The most recently-worked active project (momentum breaks ties), or null. */
+function pickFocus(active: ProjectCardView[]): ProjectCardView | null {
+  if (active.length === 0) return null;
+  return active.reduce((best, candidate) => {
+    if (candidate.lastWorkedMs !== best.lastWorkedMs) {
+      return candidate.lastWorkedMs > best.lastWorkedMs ? candidate : best;
+    }
+    return momentumRank(candidate) > momentumRank(best) ? candidate : best;
+  });
 }
 
 export function ProjectList({
@@ -61,6 +88,24 @@ export function ProjectList({
     return <EmptyState />;
   }
 
+  // Mobile: a single focus card, then every other active project as a flat row.
+  const focus = pickFocus(active);
+  const rows = focus ? active.filter((project) => project.id !== focus.id) : active;
+
+  const doneToggle =
+    done.length > 0 ? (
+      <div className="flex justify-center pt-1">
+        <button
+          type="button"
+          onClick={() => setShowDone((value) => !value)}
+          className="text-[0.8125rem] font-medium transition-colors hover:underline [@media(pointer:coarse)]:min-h-[2.75rem]"
+          style={{ color: "var(--text-faint)" }}
+        >
+          {showDone ? "Hide done" : `Show done (${done.length})`}
+        </button>
+      </div>
+    ) : null;
+
   return (
     <div className="space-y-5">
       <TimeAllocationBar
@@ -87,51 +132,82 @@ export function ProjectList({
         </div>
       ) : null}
 
-      {active.length === 0 ? (
-        <p className="py-8 text-center text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
-          Nothing here for this filter.
-        </p>
-      ) : (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-          {active.map((project, index) => (
-            <ProjectCard
-              key={project.id}
-              view={project}
-              index={index}
-              highlighted={highlightedId !== null && highlightedId === project.id}
-              onQuickAction={setQuickProject}
-            />
-          ))}
-        </div>
-      )}
+      {/* ── Mobile: focus card + single-column swipeable list ─────────────── */}
+      <div className="md:hidden">
+        {active.length === 0 && done.length === 0 ? (
+          <p className="py-8 text-center text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
+            Nothing here for this filter.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {focus ? <ProjectFocusCard view={focus} /> : null}
 
-      {done.length > 0 ? (
-        <div className="space-y-3">
-          <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={() => setShowDone((value) => !value)}
-              className="text-[0.8125rem] font-medium transition-colors hover:underline"
-              style={{ color: "var(--text-faint)" }}
-            >
-              {showDone ? "Hide done" : `Show done (${done.length})`}
-            </button>
+            {active.length > 0 ? (
+              <div className="space-y-2">
+                <p
+                  className="px-0.5 text-[0.6875rem] font-semibold uppercase tracking-wider"
+                  style={{ color: "var(--text-faint)" }}
+                >
+                  All Projects ({active.length})
+                </p>
+                {rows.map((project) => (
+                  <ProjectRow key={project.id} view={project} onQuickAction={setQuickProject} />
+                ))}
+              </div>
+            ) : null}
+
+            {showDone ? (
+              <div className="space-y-2">
+                {done.map((project) => (
+                  <ProjectRow key={project.id} view={project} muted onQuickAction={setQuickProject} />
+                ))}
+              </div>
+            ) : null}
+
+            {doneToggle}
           </div>
-          {showDone ? (
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-              {done.map((project, index) => (
-                <ProjectCard
-                  key={project.id}
-                  view={project}
-                  index={index}
-                  highlighted={highlightedId !== null && highlightedId === project.id}
-                  onQuickAction={setQuickProject}
-                />
-              ))}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
+        )}
+      </div>
+
+      {/* ── Desktop: multi-column card grid ──────────────────────────────── */}
+      <div className="hidden md:block">
+        {active.length === 0 ? (
+          <p className="py-8 text-center text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
+            Nothing here for this filter.
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            {active.map((project, index) => (
+              <ProjectCard
+                key={project.id}
+                view={project}
+                index={index}
+                highlighted={highlightedId !== null && highlightedId === project.id}
+                onQuickAction={setQuickProject}
+              />
+            ))}
+          </div>
+        )}
+
+        {done.length > 0 ? (
+          <div className="mt-5 space-y-3">
+            {doneToggle}
+            {showDone ? (
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+                {done.map((project, index) => (
+                  <ProjectCard
+                    key={project.id}
+                    view={project}
+                    index={index}
+                    highlighted={highlightedId !== null && highlightedId === project.id}
+                    onQuickAction={setQuickProject}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
 
       {quickProject ? (
         <QuickActionSheet
@@ -355,7 +431,7 @@ function EmptyState() {
           (document.querySelector(".calendar-fab") as HTMLButtonElement | null)?.click();
         }}
       >
-        Start your first one
+        Create your first
       </button>
     </div>
   );

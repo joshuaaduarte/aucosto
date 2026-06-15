@@ -14,6 +14,8 @@ export type ProjectCardView = {
   weekMinutes: number;
   weekMinutesLabel: string;
   lastWorkedShort: string;
+  /** Epoch ms of the most recent time entry (0 if never) — sort key for the focus card. */
+  lastWorkedMs: number;
   nextAction: string | null;
   openTaskCount: number;
   status: BoardStatus;

@@ -37,6 +37,7 @@ export default async function ProjectsPage() {
     weekMinutes: card.weekMinutes,
     weekMinutesLabel: formatBudgetMinutes(card.weekMinutes),
     lastWorkedShort: formatLastWorkedShort(card.lastWorkedAt, now),
+    lastWorkedMs: card.lastWorkedAt ? card.lastWorkedAt.getTime() : 0,
     nextAction: card.nextAction,
     openTaskCount: card.openTaskCount,
     status: card.status,
