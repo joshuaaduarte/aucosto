@@ -139,6 +139,7 @@ export async function listDoItems(
           notes: true,
           doItemId: true,
           habitId: true,
+          projectId: true,
         },
       },
     },
