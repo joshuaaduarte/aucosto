@@ -22,4 +22,3 @@ model TimeEntry {
   @@index([habitId, startedAt])
   @@index([projectId, startedAt])
 }
-</content>

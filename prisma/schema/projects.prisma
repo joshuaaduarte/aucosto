@@ -68,5 +68,3 @@ model ProjectTask {
   @@index([projectId])
   @@index([userId])
 }
-</content>
-</invoke>
