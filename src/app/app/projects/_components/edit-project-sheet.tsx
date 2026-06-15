@@ -33,12 +33,25 @@ const initialState: ProjectFormState = undefined;
 export function EditProjectSheet({
   project,
   areas: initialAreas,
+  open: openProp,
+  onOpenChange,
+  hideTrigger = false,
 }: {
   project: ProjectEditView;
   areas: AreaView[];
+  /** Controlled open state (omit for the self-managed trigger button). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Hide the built-in pencil trigger (when opened from elsewhere). */
+  hideTrigger?: boolean;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const open = openProp ?? openState;
+  const setOpen = (value: boolean) => {
+    if (onOpenChange) onOpenChange(value);
+    else setOpenState(value);
+  };
   useBodyScrollLock(open);
 
   const [state, formAction, pending] = useActionState(updateProjectAction, initialState);
@@ -80,18 +93,20 @@ export function EditProjectSheet({
 
   return (
     <>
-      <button
-        type="button"
-        className="btn-icon h-8 w-8 rounded-md border"
-        style={{ borderColor: "var(--border-faint)" }}
-        onClick={() => setOpen(true)}
-        aria-label="Edit project"
-        title="Edit project"
-      >
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M9.5 2.5l2 2L5 11l-2.5.5L3 9z" />
-        </svg>
-      </button>
+      {hideTrigger ? null : (
+        <button
+          type="button"
+          className="btn-icon h-8 w-8 rounded-md border"
+          style={{ borderColor: "var(--border-faint)" }}
+          onClick={() => setOpen(true)}
+          aria-label="Edit project"
+          title="Edit project"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M9.5 2.5l2 2L5 11l-2.5.5L3 9z" />
+          </svg>
+        </button>
+      )}
 
       {open ? (
         <div className="calendar-modal-backdrop" role="presentation" onClick={() => setOpen(false)}>

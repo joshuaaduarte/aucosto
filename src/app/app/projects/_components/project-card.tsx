@@ -1,189 +1,162 @@
 "use client";
 
-import { useTransition } from "react";
+import { useRef } from "react";
 import { useRouter } from "next/navigation";
-import type { Momentum } from "@/lib/projects";
-import { completeNextActionAction } from "../actions";
-import { AreaBadge } from "./area-badge";
-import { MomentumBadge } from "./momentum-badge";
+import type { BoardStatus, Momentum } from "@/lib/projects";
+import { momentumDotColor } from "@/lib/projects";
 
 export type ProjectCardView = {
   id: string;
   name: string;
-  intent: string | null;
-  statusLabel: string;
-  statusColor: string;
-  statusBg: string;
-  energyEmoji: string;
-  energyLabel: string;
-  area: { id: string; name: string; color: string } | null;
-  areaId: string | null;
+  /** Band + accent color: the area color, or a cycled default. */
   stripColor: string;
   momentum: Momentum;
+  weekMinutes: number;
   weekMinutesLabel: string;
-  lastWorkedLabel: string;
+  lastWorkedShort: string;
   nextAction: string | null;
   openTaskCount: number;
-  daysUntilTarget: number | null;
+  status: BoardStatus;
+  statusLabel: string;
+  /** Paused / done → rendered at 60% opacity. */
+  dimmed: boolean;
+  // Carried so the quick-action sheet + edit sheet can act without a refetch.
+  intent: string | null;
+  areaId: string | null;
+  area: { id: string; name: string; color: string } | null;
+  energyType: string;
+  timeBudgetHours: string;
+  targetDateValue: string;
 };
 
-function targetCountdown(days: number | null): { text: string; tone: "soon" | "overdue" | "normal" } | null {
-  if (days === null) return null;
-  if (days < 0) {
-    const abs = Math.abs(days);
-    return { text: `${abs} day${abs === 1 ? "" : "s"} overdue`, tone: "overdue" };
-  }
-  if (days === 0) return { text: "Due today", tone: "overdue" };
-  if (days === 1) return { text: "1 day left", tone: "soon" };
-  if (days <= 14) return { text: `${days} days left`, tone: "soon" };
-  return { text: `${days} days left`, tone: "normal" };
-}
-
+/**
+ * One square-ish tile in the project grid. Color and shape do the talking:
+ * a color band, a momentum dot, the week's hours in the accent color, and an
+ * abbreviated "last worked" — no labels. Tap opens detail; long-press (or
+ * right-click, or the ⋯ button) opens the quick-action sheet.
+ */
 export function ProjectCard({
   view,
+  index,
   highlighted,
+  onQuickAction,
 }: {
   view: ProjectCardView;
+  index: number;
   highlighted: boolean;
+  onQuickAction: (view: ProjectCardView) => void;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressed = useRef(false);
 
-  const go = () => router.push(`/app/projects/${view.id}`, { scroll: false });
-  const countdown = targetCountdown(view.daysUntilTarget);
+  const dotColor = momentumDotColor(view.momentum);
+  const alive = view.momentum?.level === "alive";
+
+  const open = () => router.push(`/app/projects/${view.id}`, { scroll: false });
+
+  const startPress = () => {
+    longPressed.current = false;
+    longPressTimer.current = setTimeout(() => {
+      longPressed.current = true;
+      onQuickAction(view);
+    }, 450);
+  };
+  const cancelPress = () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  };
 
   return (
-    <div
+    <article
       role="link"
       tabIndex={0}
-      onClick={go}
+      onClick={() => {
+        if (longPressed.current) return;
+        open();
+      }}
       onKeyDown={(event) => {
-        if (event.key === "Enter") go();
+        if (event.key === "Enter") open();
       }}
-      className="group relative cursor-pointer overflow-hidden rounded-lg border pl-4 pr-4 py-3.5 transition-all hover:shadow-sm focus:outline-none"
+      onContextMenu={(event) => {
+        event.preventDefault();
+        onQuickAction(view);
+      }}
+      onTouchStart={startPress}
+      onTouchEnd={cancelPress}
+      onTouchMove={cancelPress}
       style={{
-        borderColor: highlighted ? view.stripColor : "var(--border-soft)",
+        animationDelay: `${index * 30}ms`,
+        opacity: view.dimmed ? 0.6 : 1,
         background: "var(--bg-page)",
-        boxShadow: highlighted ? `0 0 0 1px ${view.stripColor}` : undefined,
+        boxShadow: highlighted ? `0 0 0 2px ${view.stripColor}` : "var(--shadow-card)",
       }}
+      className="card-in group relative flex min-h-[8.5rem] cursor-pointer flex-col overflow-hidden rounded-2xl transition-transform duration-200 active:scale-[0.97] focus:outline-none"
     >
-      {/* Area / status color strip on the left edge */}
-      <span
-        aria-hidden
-        className="absolute inset-y-0 left-0 w-1"
-        style={{ background: view.stripColor }}
-      />
+      {/* Top color band */}
+      <span aria-hidden className="h-1.5 w-full shrink-0" style={{ background: view.stripColor }} />
 
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3
-              className="truncate text-[0.9375rem] font-semibold tracking-tight"
-              style={{ color: "var(--text)" }}
-            >
-              {view.name}
-            </h3>
+      {/* Quick-action affordance for fine pointers; touch uses long-press */}
+      <button
+        type="button"
+        aria-label="Quick actions"
+        onClick={(event) => {
+          event.stopPropagation();
+          onQuickAction(view);
+        }}
+        className="absolute right-1.5 top-3 z-10 hidden h-7 w-7 items-center justify-center rounded-full text-[1rem] leading-none opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 [@media(pointer:fine)]:flex"
+        style={{ color: "var(--text-faint)", background: "var(--bg-tint)" }}
+      >
+        ⋯
+      </button>
+
+      <div className="flex flex-1 flex-col gap-2 p-3">
+        {/* Momentum dot + name */}
+        <div className="flex items-start gap-2">
+          <span className="relative mt-[3px] flex h-3 w-3 shrink-0 items-center justify-center">
+            {alive ? (
+              <span
+                aria-hidden
+                className="absolute inline-flex h-full w-full animate-ping rounded-full"
+                style={{ background: dotColor, opacity: 0.2 }}
+              />
+            ) : null}
             <span
-              className="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wider"
-              style={{ background: view.statusBg, color: view.statusColor }}
-            >
-              {view.statusLabel}
-            </span>
-            <MomentumBadge momentum={view.momentum} />
-          </div>
-
-          {view.intent ? (
-            <p
-              className="mt-1 line-clamp-1 text-[0.8125rem]"
-              style={{ color: "var(--text-muted)" }}
-            >
-              {view.intent}
-            </p>
-          ) : null}
-        </div>
-
-        <span
-          className="shrink-0 text-base leading-none"
-          title={view.energyLabel}
-          aria-label={view.energyLabel}
-        >
-          {view.energyEmoji}
-        </span>
-      </div>
-
-      {/* Signals row */}
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
-        <span>
-          <span className="font-semibold tabular" style={{ color: "var(--text-muted)" }}>
-            {view.weekMinutesLabel}
-          </span>{" "}
-          this week
-        </span>
-        <span>
-          Last worked{" "}
-          <span style={{ color: "var(--text-muted)" }}>{view.lastWorkedLabel}</span>
-        </span>
-        {view.area ? <AreaBadge area={view.area} /> : null}
-        {countdown ? (
-          <span
-            className="font-medium"
-            style={{
-              color:
-                countdown.tone === "overdue"
-                  ? "#ef4444"
-                  : countdown.tone === "soon"
-                    ? "var(--accent-strong)"
-                    : "var(--text-faint)",
-            }}
-          >
-            {countdown.text}
+              className="relative inline-flex h-3 w-3 rounded-full"
+              style={{ background: dotColor }}
+              title={view.momentum?.hint ?? view.statusLabel}
+            />
           </span>
-        ) : null}
-      </div>
-
-      {/* Next action — tap the check to complete + clear */}
-      {view.nextAction ? (
-        <div
-          className="mt-3 flex items-center gap-2 rounded-md px-2.5 py-2"
-          style={{ background: "var(--bg-tint)" }}
-        >
-          <button
-            type="button"
-            disabled={pending}
-            onClick={(event) => {
-              event.stopPropagation();
-              startTransition(() => completeNextActionAction(view.id));
-            }}
-            aria-label="Mark next action done"
-            title="Mark next action done"
-            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors hover:bg-bg-hover"
-            style={{ borderColor: "var(--border)" }}
-          >
-            {pending ? (
-              <span className="text-[0.625rem]" style={{ color: "var(--text-faint)" }}>
-                …
-              </span>
-            ) : (
-              <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="var(--text-faint)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M2.5 6.2l2.3 2.3 4.7-5" />
-              </svg>
-            )}
-          </button>
-          <span
-            className="min-w-0 flex-1 truncate text-[0.8125rem]"
+          <h3
+            className="line-clamp-2 text-[0.9375rem] font-semibold leading-snug tracking-tight"
             style={{ color: "var(--text)" }}
           >
-            <span className="font-medium" style={{ color: "var(--text-faint)" }}>
-              Next:{" "}
-            </span>
-            {view.nextAction}
+            {view.name}
+          </h3>
+        </div>
+
+        <div className="flex-1" />
+
+        {/* Hours this week (accent) · last worked (muted) */}
+        <div className="flex items-baseline justify-between gap-2">
+          <span
+            className="tabular text-[0.9375rem] font-semibold"
+            style={{ color: view.weekMinutes > 0 ? view.stripColor : "var(--text-ghost)" }}
+          >
+            {view.weekMinutes > 0 ? view.weekMinutesLabel : "—"}
+          </span>
+          <span className="tabular text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+            {view.lastWorkedShort}
           </span>
         </div>
-      ) : (
-        <p className="mt-3 text-[0.75rem]" style={{ color: "var(--text-ghost)" }}>
-          {view.openTaskCount === 0 ? "No tasks yet — open to add the first." : "No next action set."}
-        </p>
-      )}
-    </div>
+
+        {/* Next action */}
+        {view.nextAction ? (
+          <p className="truncate text-[0.75rem]" style={{ color: "var(--text-muted)" }}>
+            <span style={{ color: "var(--text-ghost)" }}>▸ </span>
+            {view.nextAction}
+          </p>
+        ) : null}
+      </div>
+    </article>
   );
 }

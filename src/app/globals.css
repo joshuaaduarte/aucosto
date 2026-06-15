@@ -708,6 +708,14 @@ input.field[type="time"]::-webkit-datetime-edit {
 @utility fade-in-delay-3 { animation: blockFade 0.28s cubic-bezier(0.25, 0.1, 0.25, 1) 0.15s both; }
 @utility fade-in-delay-4 { animation: blockFade 0.28s cubic-bezier(0.25, 0.1, 0.25, 1) 0.20s both; }
 
+/* Project cards fade + scale in (staggered via inline animation-delay).
+   Final keyframe is `transform: none` — see the blockFade note above. */
+@keyframes cardIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+@utility card-in { animation: cardIn 0.32s cubic-bezier(0.25, 0.1, 0.25, 1) both; }
+
 /* Satisfying pop when a habit gets logged — keyed elements re-animate on
    every progress change. */
 @keyframes habitPop {

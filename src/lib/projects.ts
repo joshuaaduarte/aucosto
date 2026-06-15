@@ -160,6 +160,26 @@ export function energyTypeMeta(value: string | null | undefined) {
   return ENERGY_TYPES.find((type) => type.value === normalized) ?? ENERGY_TYPES[0];
 }
 
+/**
+ * Default colors for projects with no area assigned. Cycled by the project's
+ * position in the list so even "uncategorized" projects look distinct and the
+ * grid stays colorful: indigo → violet → rose → amber → emerald → sky.
+ */
+export const DEFAULT_PROJECT_COLORS = [
+  "#6366f1", // indigo
+  "#8b5cf6", // violet
+  "#f43f5e", // rose
+  "#f59e0b", // amber
+  "#10b981", // emerald
+  "#0ea5e9", // sky
+] as const;
+
+export function defaultProjectColor(index: number): string {
+  const palette = DEFAULT_PROJECT_COLORS;
+  const i = ((index % palette.length) + palette.length) % palette.length;
+  return palette[i] ?? palette[0];
+}
+
 /** Stable, pleasant default palette for areas the user creates. */
 export const AREA_COLOR_PALETTE = [
   "#6366f1",
@@ -257,6 +277,42 @@ export function formatBudgetMinutes(minutes: number | null | undefined): string 
   if (hours === 0) return `${mins}m`;
   if (mins === 0) return `${hours}h`;
   return `${hours}h ${mins}m`;
+}
+
+/**
+ * Momentum as a single dot color (no text). 🟢 alive / 🟡 slowing / 🔴 stalled;
+ * gray for done/paused projects (momentum === null).
+ */
+export function momentumDotColor(momentum: Momentum): string {
+  if (!momentum) return "#9ca3af";
+  switch (momentum.level) {
+    case "alive":
+      return "#22c55e";
+    case "slowing":
+      return "#eab308";
+    case "stalled":
+      return "#ef4444";
+    default:
+      return "#9ca3af";
+  }
+}
+
+/** Compact relative day for cards: "Today", "3d", "2w", "5mo", "1y+", or "—". */
+export function formatLastWorkedShort(value: Date | null | undefined, now: Date): string {
+  if (!value) return "—";
+  const startOfDay = (d: Date) => {
+    const next = new Date(d);
+    next.setHours(0, 0, 0, 0);
+    return next;
+  };
+  const diffDays = Math.round(
+    (startOfDay(now).getTime() - startOfDay(value).getTime()) / 86_400_000,
+  );
+  if (diffDays <= 0) return "Today";
+  if (diffDays < 7) return `${diffDays}d`;
+  if (diffDays < 30) return `${Math.round(diffDays / 7)}w`;
+  if (diffDays < 365) return `${Math.round(diffDays / 30)}mo`;
+  return "1y+";
 }
 
 /** "Today", "2 days ago", "3 weeks ago", or "Never". LA-pinned server clock. */

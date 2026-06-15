@@ -53,8 +53,17 @@ export function NewProjectSheet({ areas: initialAreas }: { areas: AreaView[] }) 
 
   return (
     <>
-      <button type="button" className="btn-ink" onClick={() => setOpen(true)}>
-        ＋ New project
+      <button
+        type="button"
+        className="calendar-fab"
+        style={{ width: "3.5rem", padding: 0, justifyContent: "center" }}
+        onClick={() => setOpen(true)}
+        aria-label="New project"
+        title="New project"
+      >
+        <span style={{ fontSize: "1.6rem", lineHeight: 1 }} aria-hidden>
+          ＋
+        </span>
       </button>
 
       {open ? (

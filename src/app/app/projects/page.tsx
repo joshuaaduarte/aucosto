@@ -1,9 +1,9 @@
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import {
   boardStatusMeta,
-  energyTypeMeta,
+  defaultProjectColor,
   formatBudgetMinutes,
-  formatLastWorked,
+  formatLastWorkedShort,
 } from "@/lib/projects";
 import {
   ensureProjectBoardTables,
@@ -29,29 +29,26 @@ export default async function ProjectsPage() {
     getWeekAllocation(userId),
   ]);
 
-  const views: ProjectCardView[] = cards.map((card) => {
-    const status = boardStatusMeta(card.status);
-    const energy = energyTypeMeta(card.energyType);
-    return {
-      id: card.id,
-      name: card.name,
-      intent: card.intent,
-      statusLabel: status.label,
-      statusColor: status.color,
-      statusBg: status.bg,
-      energyEmoji: energy.emoji,
-      energyLabel: energy.label,
-      area: card.area,
-      areaId: card.area?.id ?? null,
-      stripColor: card.area?.color ?? status.color,
-      momentum: card.momentum,
-      weekMinutesLabel: formatBudgetMinutes(card.weekMinutes),
-      lastWorkedLabel: formatLastWorked(card.lastWorkedAt, now),
-      nextAction: card.nextAction,
-      openTaskCount: card.openTaskCount,
-      daysUntilTarget: card.daysUntilTarget,
-    };
-  });
+  const views: ProjectCardView[] = cards.map((card, index) => ({
+    id: card.id,
+    name: card.name,
+    stripColor: card.area?.color ?? defaultProjectColor(index),
+    momentum: card.momentum,
+    weekMinutes: card.weekMinutes,
+    weekMinutesLabel: formatBudgetMinutes(card.weekMinutes),
+    lastWorkedShort: formatLastWorkedShort(card.lastWorkedAt, now),
+    nextAction: card.nextAction,
+    openTaskCount: card.openTaskCount,
+    status: card.status,
+    statusLabel: boardStatusMeta(card.status).label,
+    dimmed: card.status === "paused" || card.status === "done",
+    intent: card.intent,
+    areaId: card.area?.id ?? null,
+    area: card.area,
+    energyType: card.energyType,
+    timeBudgetHours: card.timeBudgetMinutes ? String(card.timeBudgetMinutes / 60) : "",
+    targetDateValue: card.targetDate ? card.targetDate.toLocaleDateString("en-CA") : "",
+  }));
 
   const total = allocation.totalMinutes;
   const allocationSegments: AllocationSegmentView[] = allocation.segments.map((segment) => ({
@@ -63,29 +60,17 @@ export default async function ProjectsPage() {
     pct: total > 0 ? (segment.minutes / total) * 100 : 0,
   }));
 
-  const activeCount = cards.filter((card) => card.status !== "done").length;
-  const attentionCount = cards.filter((card) => card.momentum && card.momentum.level !== "alive").length;
   const weekTotalLabel = formatBudgetMinutes(total);
 
   return (
-    <div className="space-y-8">
-      <header className="fade-in flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-[0.75rem] font-medium uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>
-            Projects
-          </p>
-          <h1
-            className="mt-1 text-[1.5rem] font-bold tracking-tight sm:text-[1.875rem]"
-            style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
-          >
-            Command center
-          </h1>
-          <p className="mt-1 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
-            {activeCount} active · {weekTotalLabel} logged this week
-            {attentionCount > 0 ? ` · ${attentionCount} need attention` : " · all moving"}
-          </p>
-        </div>
-        <NewProjectSheet areas={areas} />
+    <div className="space-y-6">
+      <header className="fade-in">
+        <h1
+          className="text-[1.5rem] font-bold tracking-tight sm:text-[1.875rem]"
+          style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
+        >
+          Projects
+        </h1>
       </header>
 
       <div className="fade-in-delay-1">
@@ -95,6 +80,8 @@ export default async function ProjectsPage() {
           allocation={{ totalLabel: weekTotalLabel, segments: allocationSegments }}
         />
       </div>
+
+      <NewProjectSheet areas={areas} />
     </div>
   );
 }
