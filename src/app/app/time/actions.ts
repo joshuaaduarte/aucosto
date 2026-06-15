@@ -4,15 +4,36 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import * as timeService from "@/lib/services/time";
 import { reflectOnDoItemSession } from "@/lib/services/do";
-import { logHabitProgress } from "@/lib/services/habits";
+import { logHabitProgress, markHabitDoneFromTimer } from "@/lib/services/habits";
+import {
+  createTimeCategory,
+  reorderTimeCategories,
+  updateTimeCategory,
+} from "@/lib/services/time-categories";
+import { tagTimeEntry } from "@/lib/services/projects";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import { windowFromFormData } from "@/lib/wall-clock";
+
+// "Logging time IS logging the habit": after any stop, credit the habit that
+// the (now-stopped) entry was linked to. Capture the habitId BEFORE stopping —
+// getRunningEntry filters on endedAt IS NULL, so it returns null once stopped.
+// markHabitDoneFromTimer is idempotent, so this is safe to call broadly.
+async function autoLogHabitOnStop(userId: string, habitId: string | null) {
+  if (!habitId) return;
+  try {
+    await markHabitDoneFromTimer(userId, habitId);
+  } catch (error) {
+    // A failed auto-log must never block the stop itself.
+    console.error("[time] autoLogHabitOnStop failed", error);
+  }
+}
 
 const startSchema = z.object({
   label: z.string().trim().min(1, "Label is required").max(200),
   category: z.string().trim().max(80).optional(),
   doItemId: z.string().trim().optional(),
   habitId: z.string().trim().optional(),
+  projectId: z.string().trim().optional(),
 });
 
 export type StartState = { error?: string } | undefined;
@@ -63,17 +84,28 @@ export async function quickStartEntry(formData: FormData) {
     category: (formData.get("category") as string) || undefined,
     doItemId: (formData.get("doItemId") as string) || undefined,
     habitId: (formData.get("habitId") as string) || undefined,
+    projectId: (formData.get("projectId") as string) || undefined,
   });
   if (!parsed.success) {
     throw new Error(parsed.error.issues[0]?.message ?? "Invalid input.");
   }
 
-  await timeService.startEntry(userId, {
+  const entry = await timeService.startEntry(userId, {
     label: parsed.data.label,
     category: parsed.data.category ?? null,
     doItemId: parsed.data.doItemId ?? null,
     habitId: parsed.data.habitId ?? null,
   });
+
+  // Tag the entry to its task's project (when started from a task chip) so it
+  // surfaces a project chip in the list and feeds the project's time rollups.
+  if (parsed.data.projectId) {
+    try {
+      await tagTimeEntry(userId, entry.id, parsed.data.projectId);
+    } catch (error) {
+      console.error("[time] quickStartEntry project tag failed", error);
+    }
+  }
 
   revalidatePath("/app");
   revalidatePath("/app/do");
@@ -312,7 +344,9 @@ export async function backfillAndContinue(formData: FormData) {
 
 export async function stopEntry() {
   const userId = await resolveActiveUserId();
+  const habitId = (await timeService.getRunningEntry(userId))?.habitId ?? null;
   await timeService.stopRunning(userId);
+  await autoLogHabitOnStop(userId, habitId);
 
   revalidatePath("/app");
   revalidatePath("/app/do");
@@ -333,7 +367,9 @@ export async function stopEntryAt(endedAtIso: string) {
   if (Number.isNaN(endedAt.getTime())) {
     throw new Error("Stop time is invalid.");
   }
+  const habitId = (await timeService.getRunningEntry(userId))?.habitId ?? null;
   await timeService.stopRunning(userId, endedAt);
+  await autoLogHabitOnStop(userId, habitId);
 
   revalidatePath("/app");
   revalidatePath("/app/do");
@@ -351,11 +387,13 @@ export async function stopEntryAndCompleteDoItem(formData: FormData) {
     throw new Error("Missing task id.");
   }
 
+  const habitId = (await timeService.getRunningEntry(userId))?.habitId ?? null;
   await timeService.stopRunning(userId);
   await reflectOnDoItemSession(userId, doItemId, {
     outcome: "done",
     actualMinutes: actualRaw ? Number(actualRaw) : undefined,
   });
+  await autoLogHabitOnStop(userId, habitId);
 
   revalidatePath("/app");
   revalidatePath("/app/do");
@@ -372,7 +410,9 @@ export async function stopEntryWithReflection(formData: FormData) {
   const remainingRaw = String(formData.get("remainingMinutes") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
 
+  const habitId = (await timeService.getRunningEntry(userId))?.habitId ?? null;
   await timeService.stopRunning(userId);
+  await autoLogHabitOnStop(userId, habitId);
 
   if (doItemId) {
     if (outcome !== "done" && outcome !== "continue" && outcome !== "waiting") {
@@ -430,4 +470,112 @@ export async function deleteEntry(id: string) {
 
   revalidatePath("/app");
   revalidatePath("/app/time");
+}
+
+// ── Custom categories ─────────────────────────────────────────────
+// Used by the "Manage categories" sheet. Each returns a result instead of
+// throwing so the sheet can show inline errors and keep the user's place.
+
+export type CategoryActionState = { ok: boolean; error?: string };
+
+const categorySchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(40),
+  color: z
+    .string()
+    .trim()
+    .regex(/^#[0-9a-fA-F]{6}$/, "Pick a color")
+    .optional(),
+  emoji: z.string().trim().max(8).optional(),
+});
+
+export async function createCategoryAction(
+  formData: FormData,
+): Promise<CategoryActionState> {
+  let userId: string;
+  try {
+    userId = await resolveActiveUserId();
+  } catch {
+    return { ok: false, error: "Not signed in." };
+  }
+  const parsed = categorySchema.safeParse({
+    name: formData.get("name") ?? "",
+    color: (formData.get("color") as string) || undefined,
+    emoji: (formData.get("emoji") as string) || undefined,
+  });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+  try {
+    await createTimeCategory(userId, {
+      name: parsed.data.name,
+      color: parsed.data.color ?? null,
+      emoji: parsed.data.emoji ?? null,
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Could not add category.",
+    };
+  }
+  revalidatePath("/app");
+  revalidatePath("/app/time");
+  return { ok: true };
+}
+
+export async function updateCategoryAction(
+  formData: FormData,
+): Promise<CategoryActionState> {
+  let userId: string;
+  try {
+    userId = await resolveActiveUserId();
+  } catch {
+    return { ok: false, error: "Not signed in." };
+  }
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return { ok: false, error: "Missing category id." };
+
+  const rawName = formData.get("name");
+  const rawColor = formData.get("color");
+  const rawEmoji = formData.get("emoji");
+  const rawHidden = formData.get("isHidden");
+
+  try {
+    await updateTimeCategory(userId, id, {
+      name: rawName === null ? undefined : String(rawName).trim() || undefined,
+      color: rawColor === null ? undefined : String(rawColor).trim() || undefined,
+      emoji: rawEmoji === null ? undefined : String(rawEmoji).trim(),
+      isHidden:
+        rawHidden === null ? undefined : String(rawHidden) === "true",
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Could not save category.",
+    };
+  }
+  revalidatePath("/app");
+  revalidatePath("/app/time");
+  return { ok: true };
+}
+
+export async function reorderCategoriesAction(
+  orderedIds: string[],
+): Promise<CategoryActionState> {
+  let userId: string;
+  try {
+    userId = await resolveActiveUserId();
+  } catch {
+    return { ok: false, error: "Not signed in." };
+  }
+  try {
+    await reorderTimeCategories(userId, orderedIds);
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Could not reorder.",
+    };
+  }
+  revalidatePath("/app");
+  revalidatePath("/app/time");
+  return { ok: true };
 }

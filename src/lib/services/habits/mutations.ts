@@ -233,6 +233,48 @@ export async function logHabitProgress(
   return summarizeHabit(refreshed, new Date());
 }
 
+/**
+ * Auto-credit a habit after a linked timer stops — "logging time IS logging
+ * the habit". Idempotent and conservative:
+ *  - no-op if the habit is already complete / kept alive today (or this week
+ *    for weekly cadence), so it never double-logs;
+ *  - no-op for minutes-based habits, whose tracked time already counts toward
+ *    progress via the summary (faking a manual entry would double-count);
+ *  - otherwise logs a single full entry sufficient to hit the target.
+ */
+export async function markHabitDoneFromTimer(
+  userId: string,
+  habitId: string,
+): Promise<void> {
+  requireCan(userId, "habit", "write");
+  await ensureHabitWindowColumns();
+  const habit = await prisma.habit.findFirst({
+    where: { userId, id: habitId, archivedAt: null },
+    include: {
+      entries: true,
+      timeEntries: { where: { endedAt: { not: null } } },
+    },
+  });
+  if (!habit) return;
+
+  const summary = summarizeHabit(habit, new Date());
+  const alreadyDone =
+    habit.cadence === "weekly"
+      ? summary.completedThisWeek
+      : summary.completedToday;
+  if (alreadyDone || summary.keptAliveToday) return;
+  if (habit.goalUnit === "minutes") return;
+
+  const progress =
+    habit.cadence === "weekly" ? summary.progressThisWeek : summary.progressToday;
+  const remaining = Math.max(1, habit.targetCount - progress);
+  await logHabitProgress(userId, habitId, {
+    quantity: remaining,
+    notes: "Logged from the time tracker.",
+    mode: "full",
+  });
+}
+
 export async function startTimerForHabit(userId: string, habitId: string) {
   requireCan(userId, "habit", "write");
   await ensureHabitWindowColumns();

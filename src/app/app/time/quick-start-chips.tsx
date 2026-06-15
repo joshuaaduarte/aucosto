@@ -3,8 +3,12 @@
 // One-tap start surface shared by the start form (idle) and the running
 // card's switch panel. Every chip starts a session instantly — the service
 // auto-stops whatever is running, so switching activities is a single tap.
+//
+// Section order is tuned for "open app → tap → tracking": today's habits and
+// tasks come first (the highest-intent, zero-typing cases), then what's on the
+// calendar, then recent sessions, then the life categories for free-form time.
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { formatMinutes } from "@/lib/do";
 import { quickStartEntry } from "./actions";
@@ -26,12 +30,21 @@ export type QuickStartTask = {
   id: string;
   title: string;
   estimatedMinutes: number | null;
+  projectName?: string | null;
+  projectId?: string | null;
 };
 
 export type QuickStartHabit = {
   id: string;
   title: string;
   targetLabel: string;
+  color: string;
+};
+
+export type QuickStartRecent = {
+  label: string;
+  category: string | null;
+  color: string;
 };
 
 type StartPayload = {
@@ -39,6 +52,7 @@ type StartPayload = {
   category?: string;
   doItemId?: string;
   habitId?: string;
+  projectId?: string;
 };
 
 export function QuickStartChips({
@@ -46,11 +60,15 @@ export function QuickStartChips({
   calendarItems = [],
   tasks = [],
   habits = [],
+  recents = [],
+  categoryManage,
 }: {
   categories?: QuickStartCategory[];
   calendarItems?: QuickStartCalendarItem[];
   tasks?: QuickStartTask[];
   habits?: QuickStartHabit[];
+  recents?: QuickStartRecent[];
+  categoryManage?: ReactNode;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -65,6 +83,7 @@ export function QuickStartChips({
       if (payload.category) formData.set("category", payload.category);
       if (payload.doItemId) formData.set("doItemId", payload.doItemId);
       if (payload.habitId) formData.set("habitId", payload.habitId);
+      if (payload.projectId) formData.set("projectId", payload.projectId);
       await quickStartEntry(formData);
       setStartingKey(null);
       router.refresh();
@@ -79,6 +98,76 @@ export function QuickStartChips({
 
   return (
     <div className="space-y-3">
+      {habits.length > 0 && (
+        <ChipGroup label="Habits">
+          {habits.map((habit) => {
+            const key = `habit:${habit.id}`;
+            return (
+              <button
+                key={key}
+                type="button"
+                disabled={pending}
+                onClick={() =>
+                  start(key, {
+                    label: habit.title,
+                    category: "habit",
+                    habitId: habit.id,
+                  })
+                }
+                className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
+                style={chipStyle(startingKey === key)}
+              >
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ background: habit.color }}
+                  aria-hidden
+                />
+                {startingKey === key ? "Starting..." : habit.title}
+                <span style={{ color: "var(--text-faint)" }}>
+                  {habit.targetLabel}
+                </span>
+              </button>
+            );
+          })}
+        </ChipGroup>
+      )}
+
+      {tasks.length > 0 && (
+        <ChipGroup label="Tasks">
+          {tasks.map((task) => {
+            const key = `task:${task.id}`;
+            return (
+              <button
+                key={key}
+                type="button"
+                disabled={pending}
+                onClick={() =>
+                  start(key, {
+                    label: task.title,
+                    category: "do",
+                    doItemId: task.id,
+                    projectId: task.projectId ?? undefined,
+                  })
+                }
+                className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
+                style={chipStyle(startingKey === key)}
+              >
+                {startingKey === key ? "Starting..." : task.title}
+                {task.projectName ? (
+                  <span style={{ color: "var(--text-faint)" }}>
+                    {task.projectName}
+                  </span>
+                ) : task.estimatedMinutes ? (
+                  <span style={{ color: "var(--text-faint)" }}>
+                    {formatMinutes(task.estimatedMinutes)}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </ChipGroup>
+      )}
+
       {calendarItems.length > 0 && (
         <ChipGroup label="On the calendar">
           {calendarItems.map((item) => {
@@ -109,10 +198,10 @@ export function QuickStartChips({
         </ChipGroup>
       )}
 
-      {tasks.length > 0 && (
-        <ChipGroup label="Tasks">
-          {tasks.map((task) => {
-            const key = `task:${task.id}`;
+      {recents.length > 0 && (
+        <ChipGroup label="Recent">
+          {recents.map((recent, index) => {
+            const key = `recent:${index}:${recent.label}`;
             return (
               <button
                 key={key}
@@ -120,45 +209,19 @@ export function QuickStartChips({
                 disabled={pending}
                 onClick={() =>
                   start(key, {
-                    label: task.title,
-                    category: "do",
-                    doItemId: task.id,
+                    label: recent.label,
+                    category: recent.category ?? undefined,
                   })
                 }
-                className="inline-flex items-center rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
+                className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
                 style={chipStyle(startingKey === key)}
               >
-                {startingKey === key ? "Starting..." : task.title}
-                {task.estimatedMinutes
-                  ? ` · ${formatMinutes(task.estimatedMinutes)}`
-                  : ""}
-              </button>
-            );
-          })}
-        </ChipGroup>
-      )}
-
-      {habits.length > 0 && (
-        <ChipGroup label="Habits">
-          {habits.map((habit) => {
-            const key = `habit:${habit.id}`;
-            return (
-              <button
-                key={key}
-                type="button"
-                disabled={pending}
-                onClick={() =>
-                  start(key, {
-                    label: habit.title,
-                    category: "habit",
-                    habitId: habit.id,
-                  })
-                }
-                className="inline-flex items-center rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
-                style={chipStyle(startingKey === key)}
-              >
-                {startingKey === key ? "Starting..." : habit.title}
-                {` · ${habit.targetLabel}`}
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ background: recent.color }}
+                  aria-hidden
+                />
+                {startingKey === key ? "Starting..." : recent.label}
               </button>
             );
           })}
@@ -166,7 +229,7 @@ export function QuickStartChips({
       )}
 
       {categories.length > 0 && (
-        <ChipGroup label="Life">
+        <ChipGroup label="Life" action={categoryManage}>
           {categories.map((category) => {
             const key = `category:${category.id}`;
             return (
@@ -200,19 +263,24 @@ export function QuickStartChips({
 
 function ChipGroup({
   label,
+  action,
   children,
 }: {
   label: string;
+  action?: ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div className="space-y-1.5">
-      <p
-        className="text-[0.6875rem] font-medium uppercase tracking-wider"
-        style={{ color: "var(--text-faint)" }}
-      >
-        {label}
-      </p>
+      <div className="flex items-center justify-between gap-2">
+        <p
+          className="text-[0.6875rem] font-medium uppercase tracking-wider"
+          style={{ color: "var(--text-faint)" }}
+        >
+          {label}
+        </p>
+        {action ?? null}
+      </div>
       <div className="flex flex-wrap gap-1.5">{children}</div>
     </div>
   );

@@ -11,6 +11,8 @@ const EVENT_LABELS: Record<string, string> = {
   "time.deleted": "deleted a time entry",
   "time.logged": "backfilled a time entry",
   "time.updated": "edited a time entry",
+  "time.category_created": "added a time category",
+  "time.category_updated": "updated a time category",
 
   // reflect
   "reflect.saved": "saved a daily reflection",

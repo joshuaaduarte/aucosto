@@ -22,3 +22,24 @@ model TimeEntry {
   @@index([habitId, startedAt])
   @@index([projectId, startedAt])
 }
+
+// User-manageable life categories for the time tracker.
+//
+// NOTE: like the projects board, this table is created via raw SQL
+// (`ensureTimeCategoryTable()` in src/lib/services/time-categories.ts), NOT via
+// `prisma migrate`. It lives here so a regular `prisma generate` picks up the
+// types; until then the service reads/writes through raw SQL (reflect.ts
+// pattern). The stored TimeEntry.category value stays the normalized name, so
+// the pure `categoryColor`/`categoryLabel` helpers keep resolving presets.
+model TimeCategory {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  color     String   @default("#6366f1")
+  emoji     String?
+  isHidden  Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([userId, sortOrder])
+}

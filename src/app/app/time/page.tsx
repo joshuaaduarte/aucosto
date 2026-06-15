@@ -10,12 +10,13 @@ import {
   listDoItems,
   listSuggestedDoItems,
 } from "@/lib/services/do";
-import { listSuggestedHabits } from "@/lib/services/habits";
+import { listHabits } from "@/lib/services/habits";
 import { listCalendarItems } from "@/lib/services/calendar";
 import {
   listEntryProjectTags,
   listProjectPickerOptions,
 } from "@/lib/services/projects";
+import { listTimeCategories } from "@/lib/services/time-categories";
 import { getTodayMorning, listSleepSessions } from "@/lib/services/rhythms";
 import { formatDuration, formatHM, startOfToday, startOfWeek } from "@/lib/time";
 import { formatRhythmDuration, rhythmDurationMinutes } from "@/lib/rhythms";
@@ -31,13 +32,14 @@ import {
 import type { DayGap } from "@/lib/time-insights";
 import { weeklyTrackedSparkline } from "@/lib/insights";
 import { Sparkline } from "../insights/_components/charts";
-import { PRESET_TIME_CATEGORIES, categoryColor } from "@/lib/time-categories";
+import { categoryColor, normalizeCategory } from "@/lib/time-categories";
 import { EntryDeleteButton, EntryNoteIndicator } from "./entry-row";
 import { AddEntryButton, EntryEditButton } from "./entry-editor";
 import { GapBackfillCard } from "./gap-backfill-card";
 import { TagProjectButton } from "./tag-project-button";
 import { GapSlotRow } from "./gap-slot";
 import { InsightsSection } from "./insights-section";
+import { ManageCategories } from "./manage-categories";
 import { QuickStartChips } from "./quick-start-chips";
 import { RunningCard } from "./running-card";
 import { StartForm } from "./start-form";
@@ -208,18 +210,19 @@ export default async function TimePage() {
   eightWeeksAgo.setDate(eightWeeksAgo.getDate() - 8 * 7);
 
   const running = await getRunningEntry(userId);
-  const [recent, windowEntries, todayCalendarItems, suggestedTasks, suggestedHabits, openTasks, runningDoSummary, todayMorning] =
+  const [recent, windowEntries, todayCalendarItems, suggestedTasks, habitList, openTasks, runningDoSummary, todayMorning, allCategories] =
     await Promise.all([
       listRecentEntries(userId, { limit: 30 }),
       listEntriesBetween(userId, { from: sevenDaysAgo, to: tomorrow }),
       listCalendarItems(userId, { from: todayStart, to: tomorrow }),
       listSuggestedDoItems(userId, { limit: 4 }),
-      listSuggestedHabits(userId, { limit: 4 }),
+      listHabits(userId),
       listDoItems(userId, { includeDone: false }),
       running?.doItem
         ? getDoItemSummary(userId, running.doItem.id)
         : Promise.resolve(null),
       getTodayMorning(userId),
+      listTimeCategories(userId, { includeHidden: true }),
     ]);
   const eightWeekEntries = await listEntriesBetween(userId, {
     from: eightWeeksAgo,
@@ -288,24 +291,34 @@ export default async function TimePage() {
     (entry) => entry.endedAt && entry.startedAt >= todayStart,
   ).length;
 
-  // Quick-start chips: presets ordered by how much they were used this week.
-  const weekUsage = new Map(
-    weekCategories.map((item) => [item.category, item.totalMs]),
+  // Visible categories (DB-managed) in the user's chosen order, plus a color
+  // lookup so the entry list / recents resolve custom colors too — categoryColor
+  // alone only knows presets and a stable hash for unknown strings.
+  const visibleCategories = allCategories.filter((category) => !category.isHidden);
+  const customColors = new Map(
+    allCategories.map((category) => [normalizeCategory(category.name), category.color]),
   );
-  const quickStartCategories = [...PRESET_TIME_CATEGORIES]
-    .sort(
-      (a, b) => (weekUsage.get(b.id) ?? 0) - (weekUsage.get(a.id) ?? 0),
-    )
-    .map(({ id, label, color }) => ({ id, label, color }));
+  const colorFor = (category: string | null | undefined) => {
+    const norm = normalizeCategory(category);
+    return (norm && customColors.get(norm)) || categoryColor(category);
+  };
+  const quickStartCategories = visibleCategories.map((category) => ({
+    id: normalizeCategory(category.name),
+    label: category.emoji ? `${category.emoji} ${category.name}` : category.name,
+    color: category.color,
+  }));
 
-  // Custom categories (non-preset) used this week still prefill the form.
-  const presetIds = new Set(PRESET_TIME_CATEGORIES.map((preset) => preset.id));
+  // Ad-hoc categories used this week that aren't in the managed list still
+  // prefill the free-form form's "Recent" row.
+  const knownCategoryIds = new Set(
+    allCategories.map((category) => normalizeCategory(category.name)),
+  );
   const suggestedCategories = weekCategories
     .map((item) => item.category)
     .filter(
       (category) =>
         category !== "uncategorized" &&
-        !presetIds.has(category) &&
+        !knownCategoryIds.has(category) &&
         !["do", "habit", "calendar"].includes(category),
     );
 
@@ -379,20 +392,72 @@ export default async function TimePage() {
       }).filter((label) => label !== running.label)
     : [];
 
+  // Today's habits (due today, not yet done/kept-alive) lead the surface.
+  const dueHabits = habitList
+    .filter(
+      (habit) =>
+        habit.dueToday && !habit.completedToday && !habit.keptAliveToday,
+    )
+    .slice(0, 6)
+    .map((habit) => ({
+      id: habit.id,
+      title: habit.title,
+      targetLabel: habit.targetLabel,
+      color: colorFor(habit.bucket ?? "habit"),
+    }));
+
+  // Today's tasks: prefer the ones laned for today, fall back to suggestions.
+  const todayLaneTasks = openTasks.filter(
+    (task) => task.lane === "today" && task.status !== "waiting",
+  );
+  const taskChoices = (
+    todayLaneTasks.length > 0 ? todayLaneTasks : suggestedTasks
+  ).slice(0, 6);
+  const quickStartTasks = taskChoices.map((task) => ({
+    id: task.id,
+    title: task.title,
+    estimatedMinutes: task.estimatedMinutes,
+    projectName: task.projectName,
+    projectId: task.projectId,
+  }));
+
+  // Recent sessions: last 5 unique labels for true one-tap repeats.
+  const recentSeen = new Set<string>();
+  const recentChips: Array<{
+    label: string;
+    category: string | null;
+    color: string;
+  }> = [];
+  for (const entry of recent) {
+    const labelKey = entry.label.trim().toLowerCase();
+    if (!labelKey || recentSeen.has(labelKey)) continue;
+    recentSeen.add(labelKey);
+    recentChips.push({
+      label: entry.label,
+      category: entry.category,
+      color: colorFor(entry.category),
+    });
+    if (recentChips.length >= 5) break;
+  }
+
   const quickStart = (
     <QuickStartChips
       categories={quickStartCategories}
       calendarItems={calendarSuggestions}
-      tasks={suggestedTasks.map((task) => ({
-        id: task.id,
-        title: task.title,
-        estimatedMinutes: task.estimatedMinutes,
-      }))}
-      habits={suggestedHabits.map((habit) => ({
-        id: habit.id,
-        title: habit.title,
-        targetLabel: habit.targetLabel,
-      }))}
+      tasks={quickStartTasks}
+      habits={dueHabits}
+      recents={recentChips}
+      categoryManage={
+        <ManageCategories
+          categories={allCategories.map((category) => ({
+            id: category.id,
+            name: category.name,
+            color: category.color,
+            emoji: category.emoji,
+            isHidden: category.isHidden,
+          }))}
+        />
+      }
     />
   );
 
@@ -707,7 +772,7 @@ export default async function TimePage() {
                                 <span
                                   className="h-1.5 w-1.5 rounded-full"
                                   style={{
-                                    background: categoryColor(entry.category),
+                                    background: colorFor(entry.category),
                                   }}
                                   aria-hidden
                                 />
