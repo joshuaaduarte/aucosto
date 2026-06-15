@@ -72,6 +72,11 @@ export function TimelineBlockButton({
   // second line under ~62px, category chip once there's real room.
   const showTime = !narrow && heightPx >= 30;
   const showCategory = !narrow && heightPx >= 62;
+  // Below ~18px the 11px title line can't render without being clipped to an
+  // unreadable sliver, so hide it entirely and leave just the colour strip
+  // (hover/tap still surfaces the detail). Narrow columns are a designed
+  // single-line strip affordance, so they always keep their label.
+  const showTitle = narrow || heightPx >= 18;
 
   const category = payload.type === "entry" ? payload.entry.category : null;
   const notes = payload.type === "entry" ? payload.entry.notes : null;
@@ -131,19 +136,21 @@ export function TimelineBlockButton({
         }}
         title={`${block.title} · ${block.detail}`}
       >
-        <p
-          className="truncate text-[0.6875rem] font-medium leading-tight"
-          style={{ color: "var(--text)" }}
-        >
-          {block.running ? (
-            <span
-              className="ink-pulse mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
-              style={{ background: "var(--accent)" }}
-              aria-hidden
-            />
-          ) : null}
-          {block.title}
-        </p>
+        {showTitle ? (
+          <p
+            className="truncate text-[0.6875rem] font-medium leading-tight"
+            style={{ color: "var(--text)" }}
+          >
+            {block.running ? (
+              <span
+                className="ink-pulse mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
+                style={{ background: "var(--accent)" }}
+                aria-hidden
+              />
+            ) : null}
+            {block.title}
+          </p>
+        ) : null}
         {showTime ? (
           <p
             className="truncate text-[0.625rem] leading-tight"

@@ -195,8 +195,14 @@ export function TimelineLane({
             aria-hidden
           >
             <span
-              className="text-[0.5625rem] font-semibold uppercase tracking-wider"
-              style={{ color: block.color }}
+              className="max-w-full truncate rounded-sm px-1 py-0.5 text-[0.5625rem] font-semibold uppercase leading-none tracking-wider"
+              style={{
+                color: block.color,
+                // Translucent page-coloured backing: lifts the saturated label
+                // off the same-hue striped fill so it stays legible, while the
+                // parent's overflow-hidden keeps it clipped to the block.
+                background: "color-mix(in srgb, var(--bg-page) 78%, transparent)",
+              }}
             >
               {block.title}
             </span>
