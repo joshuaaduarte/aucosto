@@ -185,7 +185,9 @@ export function TimelineLane({
           />
         ))}
 
-        {/* Rhythm context: soft, striped, non-interactive backdrop. */}
+        {/* Rhythm context: a near-invisible solid tint + thin left rule, so it
+            reads as quiet background and never competes with the tracked blocks
+            painted on top. (Previously a diagonal hatch — far too noisy.) */}
         {context.map((block) => (
           <div
             key={block.id}
@@ -193,8 +195,8 @@ export function TimelineLane({
             style={{
               top: `${block.topPct}%`,
               height: `${block.heightPct}%`,
-              background: `repeating-linear-gradient(45deg, ${block.color}1f, ${block.color}1f 6px, ${block.color}0f 6px, ${block.color}0f 12px)`,
-              borderLeft: `2px solid ${block.color}66`,
+              background: `color-mix(in srgb, ${block.color} 6%, transparent)`,
+              borderLeft: `2px solid color-mix(in srgb, ${block.color} 30%, transparent)`,
               pointerEvents: "none",
             }}
             aria-hidden
