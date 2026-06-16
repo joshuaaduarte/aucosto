@@ -14,6 +14,25 @@ const QUICK_TEMPLATES = [
   { title: "Wedding planning", start: "19:00", end: "20:00" },
 ];
 
+function pad2(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+/**
+ * Sensible default window when the modal opens cold (no drag): start at the
+ * next upcoming half-hour mark (:00 or :30, carrying into the next hour), and
+ * run for one hour. e.g. 2:17 → 2:30–3:30, 2:45 → 3:00–4:00.
+ */
+function nextHalfHourWindow(): { start: string; end: string } {
+  const start = new Date();
+  start.setMinutes(Math.ceil(start.getMinutes() / 30) * 30, 0, 0);
+  const end = new Date(start.getTime() + 60 * 60 * 1000);
+  return {
+    start: `${pad2(start.getHours())}:${pad2(start.getMinutes())}`,
+    end: `${pad2(end.getHours())}:${pad2(end.getMinutes())}`,
+  };
+}
+
 export function CalendarQuickAddModal({
   todayDateValue,
   categories = [],
@@ -49,10 +68,19 @@ export function CalendarQuickAddModal({
   const [habitId, setHabitId] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [date, setDate] = useState(todayDateValue);
-  const [start, setStart] = useState("09:00");
-  const [end, setEnd] = useState("10:00");
+  const [start, setStart] = useState(() => nextHalfHourWindow().start);
+  const [end, setEnd] = useState(() => nextHalfHourWindow().end);
   const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
+
+  // Recompute the default window each time the modal opens cold, so it always
+  // anchors to the next half-hour from *now*, not from page load.
+  function openModal() {
+    const range = nextHalfHourWindow();
+    setStart(range.start);
+    setEnd(range.end);
+    setOpen(true);
+  }
 
   function applyTemplate(template: (typeof QUICK_TEMPLATES)[number]) {
     setTitle(template.title);
@@ -119,8 +147,9 @@ export function CalendarQuickAddModal({
     setHabitId("");
     setCategoryId("");
     setDate(todayDateValue);
-    setStart("09:00");
-    setEnd("10:00");
+    const range = nextHalfHourWindow();
+    setStart(range.start);
+    setEnd(range.end);
     setLocation("");
     setNotes("");
   }
@@ -130,7 +159,7 @@ export function CalendarQuickAddModal({
       <button
         type="button"
         className="calendar-fab"
-        onClick={() => setOpen(true)}
+        onClick={openModal}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls="calendar-quick-add"
