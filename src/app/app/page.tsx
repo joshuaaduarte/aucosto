@@ -161,6 +161,12 @@ export default async function HubPage() {
   // 6pm on it's "going to bed".
   const sleepCardMode: "bedtime" | "backfill" =
     nowHour >= 18 ? "bedtime" : "backfill";
+  // The sleep card is currently rendering the backfill form (no session for the
+  // cycle, before the evening bedtime window). It already prompts for a wake
+  // time, so the morning check-in card must not show its own "what time did you
+  // wake up?" prompt at the same time (they were duplicative at dawn).
+  const sleepBackfillShowing =
+    sleepCardState === "none" && sleepCardMode === "backfill";
   const monthStart = startOfMonth();
   const previousMonthStart = startOfPreviousMonth();
   const weekTotalMs = sumDurations(weekEntries);
@@ -339,6 +345,7 @@ export default async function HubPage() {
                 title: habit.title,
                 completedToday: habit.completedToday,
               }))}
+            sleepBackfillShowing={sleepBackfillShowing}
           />
         </>
       ) : null}

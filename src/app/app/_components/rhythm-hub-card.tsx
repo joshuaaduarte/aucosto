@@ -281,9 +281,18 @@ function MorningInProgress({
 export function RhythmHubCard({
   morning,
   morningHabits,
+  sleepBackfillShowing,
 }: {
   morning: MorningCardState | null;
   morningHabits: MorningHabit[];
+  /**
+   * The always-on sleep card is currently rendering the backfill form (no sleep
+   * logged for the cycle, before the evening bedtime window). It already prompts
+   * for a wake time, so the morning "What time did you wake up?" start card must
+   * not duplicate it — logging sleep there captures wake time and advances this
+   * card to the in-progress flow on the next refresh.
+   */
+  sleepBackfillShowing: boolean;
 }) {
   const [hour, setHour] = useState<number | null>(null);
 
@@ -307,5 +316,8 @@ export function RhythmHubCard({
   if (morning?.started) {
     return <MorningInProgress morning={morning} habits={morningHabits} />;
   }
+  // No wake time captured yet. If the sleep backfill card is already asking for
+  // it, defer to that one card rather than showing a second wake-time prompt.
+  if (sleepBackfillShowing) return null;
   return <MorningStart />;
 }
