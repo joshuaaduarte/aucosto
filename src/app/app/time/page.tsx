@@ -44,7 +44,7 @@ import { QuickStartChips } from "./quick-start-chips";
 import { RunningCard } from "./running-card";
 import { StartForm } from "./start-form";
 import { PipLaunchButton } from "./pip-launch-button";
-import { completedMsBetween, toPipHabits } from "../_components/pip-data";
+import { loadPipState } from "../_components/pip-data";
 
 export const dynamic = "force-dynamic";
 
@@ -525,20 +525,10 @@ export default async function TimePage() {
     }
   }
 
-  // Floating Picture-in-Picture pop-out: the running entry, today's due habits,
-  // and today's completed total. Reuses data already fetched above.
-  const pipEntry = running
-    ? {
-        id: running.id,
-        name: running.label,
-        startedAtMs: running.startedAt.getTime(),
-        category: running.category,
-        color: colorFor(running.category),
-        habitId: running.habitId,
-      }
-    : null;
-  const pipHabits = toPipHabits(habitList);
-  const pipTotalMs = completedMsBetween(windowEntries, todayStart);
+  // Floating Picture-in-Picture mini-app snapshot (running entry, today's
+  // habits, categories, total, upcoming events). Self-contained so the timer
+  // bar can pop the same window from any page.
+  const pipState = await loadPipState(userId);
 
   return (
     <div className="space-y-10">
@@ -558,11 +548,7 @@ export default async function TimePage() {
           </h1>
         </div>
         <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end">
-          <PipLaunchButton
-            entry={pipEntry}
-            habits={pipHabits}
-            totalMsToday={pipTotalMs}
-          />
+          <PipLaunchButton state={pipState} />
           <p
             className="text-[0.8125rem] sm:max-w-[38rem] sm:text-right"
             style={{ color: "var(--text-muted)" }}

@@ -1,21 +1,20 @@
 "use client";
 
-// The "pop out" trigger for the floating Picture-in-Picture timer. Shared by
+// The "pop out" trigger for the floating Picture-in-Picture mini-app. Shared by
 // the time page (labelled) and the global timer bar (icon-only, desktop).
 //
 // Lifetime is deliberately decoupled from React: the PiP root and window live
 // at MODULE scope, not in component state. Next.js navigations unmount/remount
-// this button (it lives in the layout's timer bar and on the time page), but
-// the floating window must survive that — so nothing here calls root.unmount()
-// on a component cleanup. The window only goes away when the user closes it,
-// the timer ends, or it's replaced by a fresh pop-out. `pagehide` clears the
-// module refs whenever the window dies for any reason.
+// this button, but the floating window must survive that — so nothing here
+// calls root.unmount() on a component cleanup. The window only closes when the
+// user closes it or it's replaced by a fresh pop-out; `pagehide` clears the
+// module refs whenever it dies.
 //
-// Because the rendered widget's callbacks can outlive the render that created
-// them (the root persists across navigations), they must NOT close over a
-// Next.js router — those refs go stale. Switch does a hard `location.href`
-// navigation, and refreshes route through `refreshMain`, which a mounted
-// instance keeps pointing at a live router.
+// The widget owns its own running/idle view and re-renders from the PipState
+// each action returns, so the window keeps working after stop/start without a
+// remount. The wired actions reference module-stable server actions (never a
+// captured router), plus `refreshMain` — a pointer a mounted instance keeps
+// aimed at a live router — so the main tab refreshes too, even across nav.
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -24,19 +23,20 @@ import {
   requestStyledPipWindow,
   usePictureInPicture,
 } from "@/hooks/use-picture-in-picture";
+import { PipTimerWidget, type PipActions } from "@/components/pip-timer-widget";
+import type { PipState } from "../_components/pip-data";
+import { updateEntryNotes } from "./actions";
 import {
-  PipTimerWidget,
-  type PipEntry,
-  type PipHabit,
-} from "@/components/pip-timer-widget";
-import { stopEntry } from "./actions";
-import { logHabitDone } from "../habits/actions";
+  pipLogHabit,
+  pipStartCategory,
+  pipStartHabit,
+  pipStop,
+} from "./pip-actions";
 
 // ── Module-scope PiP state (survives navigation) ──────────────────
 let activePipRoot: Root | null = null;
 let activePipWindow: Window | null = null;
-// Kept pointed at a live router by whichever button instance is mounted, so
-// the persisted widget's callbacks always refresh through a fresh router.
+// Kept pointed at a live router by whichever button instance is mounted.
 let refreshMain: (() => void) | null = null;
 
 function clearPipRefs(forWindow: Window) {
@@ -48,20 +48,45 @@ function clearPipRefs(forWindow: Window) {
 
 function closeActivePip() {
   // close() fires pagehide, which clears the refs. Never unmount the root from
-  // a React cleanup — that's exactly what blanked the window on navigation.
+  // a React cleanup — that's what blanked the window on navigation.
   activePipWindow?.close();
 }
 
+// Wire the PiP widget's actions to the server actions. Defined at module scope
+// so the closures the widget keeps can't capture a stale router. After each
+// mutation, nudge the main tab to re-fetch via the live `refreshMain` pointer.
+const actions: PipActions = {
+  stop: async () => {
+    const next = await pipStop();
+    refreshMain?.();
+    return next;
+  },
+  startCategory: async (categoryId, title) => {
+    const next = await pipStartCategory(categoryId, title);
+    refreshMain?.();
+    return next;
+  },
+  startHabit: async (habitId) => {
+    const next = await pipStartHabit(habitId);
+    refreshMain?.();
+    return next;
+  },
+  logHabit: async (habitId) => {
+    const next = await pipLogHabit(habitId);
+    refreshMain?.();
+    return next;
+  },
+  saveNotes: async (id, notes) => {
+    await updateEntryNotes(id, notes);
+  },
+};
+
 export function PipLaunchButton({
-  entry,
-  habits,
-  totalMsToday,
+  state,
   iconOnly = false,
   className,
 }: {
-  entry: PipEntry | null;
-  habits: PipHabit[];
-  totalMsToday: number;
+  state: PipState;
   iconOnly?: boolean;
   className?: string;
 }) {
@@ -69,57 +94,26 @@ export function PipLaunchButton({
   const router = useRouter();
 
   // Keep the module-level refresher aimed at this instance's live router.
+  // Assign inside the effect (not during render) so we never mutate a ref while
+  // rendering; running every commit keeps the router reference fresh.
   const refreshRef = useRef(router);
-  refreshRef.current = router;
   useEffect(() => {
+    refreshRef.current = router;
     refreshMain = () => refreshRef.current.refresh();
-  }, []);
-
-  // If the running timer ends (here or elsewhere), close any open window.
-  useEffect(() => {
-    if (!entry && activePipWindow && !activePipWindow.closed) {
-      closeActivePip();
-    }
-  }, [entry]);
+  });
 
   if (!isSupported) return null;
 
-  const disabled = !entry;
-
   async function handleOpen() {
-    if (!entry) return;
-    const activeEntry = entry;
+    const widget = <PipTimerWidget initialState={state} actions={actions} />;
 
-    const widget = (
-      <PipTimerWidget
-        entry={activeEntry}
-        habits={habits}
-        totalMsToday={totalMsToday}
-        onStop={async () => {
-          await stopEntry();
-          closeActivePip();
-          refreshMain?.();
-        }}
-        onSwitch={() => {
-          closeActivePip();
-          // Hard navigation: the persisted root can't trust a captured router.
-          window.location.href = "/app/time";
-        }}
-        onLogHabit={async (habitId) => {
-          await logHabitDone(habitId);
-          refreshMain?.();
-        }}
-      />
-    );
-
-    // Already open? Re-render fresh data into the existing window and focus it.
+    // Already open? Re-render with the latest snapshot and focus it.
     if (activePipWindow && !activePipWindow.closed && activePipRoot) {
       activePipRoot.render(widget);
       activePipWindow.focus?.();
       return;
     }
 
-    // Otherwise replace any stale window and open a new one.
     closeActivePip();
     const pipWindow = await requestStyledPipWindow();
     if (!pipWindow) return;
@@ -138,12 +132,11 @@ export function PipLaunchButton({
     <button
       type="button"
       onClick={handleOpen}
-      disabled={disabled}
-      title={disabled ? "Start a timer to pop it out" : "Pop out a floating timer"}
+      title="Pop out a floating timer"
       aria-label="Pop out floating timer"
       className={
         className ??
-        "btn-ghost inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[0.75rem] disabled:opacity-45"
+        "btn-ghost inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[0.75rem]"
       }
     >
       <PictureInPictureIcon />

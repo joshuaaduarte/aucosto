@@ -15,8 +15,11 @@
 import { useEffect, useState } from "react";
 
 export function usePictureInPicture() {
+  // Detect after mount so SSR (window-less) and first client render agree, then
+  // flip to the real answer — avoids a hydration mismatch on the trigger.
   const [isSupported, setIsSupported] = useState(false);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsSupported(
       typeof window !== "undefined" && "documentPictureInPicture" in window,
     );
@@ -34,8 +37,8 @@ export async function requestStyledPipWindow(): Promise<Window | null> {
   }
 
   const pipWindow = await window.documentPictureInPicture.requestWindow({
-    width: 320,
-    height: 520,
+    width: 340,
+    height: 580,
   });
   const pipDoc = pipWindow.document;
 
