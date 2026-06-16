@@ -80,10 +80,14 @@ export function GapBackfillCard({
   sinceWakeup?: boolean;
 }) {
   const router = useRouter();
-  const [dismissed, setDismissed] = useState(false);
+  // Track which gap was dismissed by its start ISO, not a bare boolean. When an
+  // entry is deleted the server recomputes a *different* gap (new startIso) and
+  // re-sends props; a boolean would keep suppressing the card. Keying on the
+  // start ISO means dismissing gap A never hides gap B.
+  const [dismissedGapStart, setDismissedGapStart] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode | null>(null);
 
-  if (dismissed) return null;
+  if (dismissedGapStart === gapStartIso) return null;
 
   const gapStart = new Date(gapStartIso);
   const gapEnd = new Date(gapEndIso);
@@ -158,7 +162,7 @@ export function GapBackfillCard({
               borderColor: "var(--border-faint)",
               color: "var(--text-faint)",
             }}
-            onClick={() => setDismissed(true)}
+            onClick={() => setDismissedGapStart(gapStartIso)}
             aria-label="Dismiss untracked time"
           >
             ×
@@ -215,7 +219,7 @@ export function GapBackfillCard({
 
         <button
           type="button"
-          onClick={() => setDismissed(true)}
+          onClick={() => setDismissedGapStart(gapStartIso)}
           className="mt-3 text-[0.75rem] font-medium underline-offset-2 hover:underline"
           style={{ color: "var(--text-faint)" }}
         >
