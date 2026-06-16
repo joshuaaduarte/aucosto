@@ -11,6 +11,14 @@ model CalendarItem {
   startsAt   DateTime
   endsAt     DateTime
   allDay     Boolean  @default(false)
+  // Optional link to a user-managed TimeCategory (tints the block; pre-selects
+  // the timer category when the block is happening now). Like TimeCategory
+  // itself, this column is created via raw SQL (`ensureCalendarCategoryColumn`
+  // in src/lib/services/calendar.ts), NOT `prisma migrate` — the generated
+  // client predates it, so the service reads/writes it through $queryRaw /
+  // $executeRaw until the next `prisma generate`. Declared here so that
+  // generate eventually picks up the type and the raw queries can be retired.
+  categoryId String?
   sourceTool String?
   sourceRefId String?
   notes      String?

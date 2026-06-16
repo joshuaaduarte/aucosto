@@ -28,6 +28,7 @@ export async function createCalendarBlockAction(formData: FormData) {
   const title = String(formData.get("title") ?? "");
   const doItemId = parseOptionalString(formData.get("doItemId"));
   const habitId = parseOptionalString(formData.get("habitId"));
+  const categoryId = parseOptionalString(formData.get("categoryId"));
   const notes = parseOptionalString(formData.get("notes"));
   const location = parseOptionalString(formData.get("location"));
 
@@ -42,6 +43,7 @@ export async function createCalendarBlockAction(formData: FormData) {
     endsAt: window.endsAt,
     notes,
     location,
+    categoryId,
     kind: "block",
     status: "confirmed",
     sourceTool: doItemId ? "do" : habitId ? "habit" : null,
@@ -89,6 +91,11 @@ export async function updateCalendarBlockAction(formData: FormData) {
   const title = String(formData.get("title") ?? "");
   const notes = parseOptionalString(formData.get("notes"));
   const location = parseOptionalString(formData.get("location"));
+  // The edit sheet always submits the categoryId field (empty = clear), so
+  // read it as a tri-state: present field → set/clear; absent → leave alone.
+  const categoryId = formData.has("categoryId")
+    ? parseOptionalString(formData.get("categoryId"))
+    : undefined;
 
   const window = windowFromFormData(formData);
   if (!window) {
@@ -101,6 +108,7 @@ export async function updateCalendarBlockAction(formData: FormData) {
     endsAt: window.endsAt,
     notes,
     location,
+    categoryId,
     status: "confirmed",
   });
   revalidateCalendar();

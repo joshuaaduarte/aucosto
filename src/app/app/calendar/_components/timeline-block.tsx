@@ -8,6 +8,7 @@
 import {
   type MouseEvent as ReactMouseEvent,
   useEffect,
+  useRef,
   useState,
   useTransition,
 } from "react";
@@ -22,9 +23,11 @@ import { fillIsoWindowFields } from "@/lib/wall-clock";
 import { useBodyScrollLock } from "../../_components/use-body-scroll-lock";
 import {
   completeCalendarItemAction,
+  createCalendarBlockAction,
   deleteCalendarItemAction,
   updateCalendarBlockAction,
 } from "../actions";
+import { CategoryPicker, type PickableCategory } from "./category-picker";
 import type { TimelineBlock } from "../_lib/timeline";
 
 export type TimelineItemPayload = {
@@ -34,6 +37,8 @@ export type TimelineItemPayload = {
   startValue: string;
   endValue: string;
   status: string;
+  /** Assigned TimeCategory id (raw-SQL column), or null. */
+  categoryId: string | null;
 };
 
 export type TimelineBlockPayload =
@@ -48,6 +53,7 @@ export function TimelineBlockButton({
   narrow,
   payload,
   tasks,
+  categories = [],
 }: {
   block: TimelineBlock;
   variant: "planned" | "actual";
@@ -57,6 +63,8 @@ export function TimelineBlockButton({
   narrow: boolean;
   payload: TimelineBlockPayload;
   tasks: LinkableTask[];
+  /** TimeCategory options for the planned-block edit sheet's picker. */
+  categories?: PickableCategory[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -234,8 +242,10 @@ export function TimelineBlockButton({
       ) : null}
 
       {open && payload.type === "item" ? (
-        <PlannedBlockModal
+        <CalendarBlockModal
+          mode="edit"
           item={payload.item}
+          categories={categories}
           onClose={() => setOpen(false)}
         />
       ) : null}
@@ -243,17 +253,36 @@ export function TimelineBlockButton({
   );
 }
 
-function PlannedBlockModal({
+/** Prefill for a new block dragged out on the timeline grid. */
+export type BlockDefaults = { date: string; start: string; end: string };
+
+/**
+ * Shared create/edit sheet for a planned calendar block. Editing surfaces the
+ * Delete / Done controls and submits `updateCalendarBlockAction`; creating (the
+ * drag-to-create flow) prefills the dragged window and submits
+ * `createCalendarBlockAction`. Both expose the same category picker.
+ */
+export function CalendarBlockModal({
+  mode,
   item,
+  defaults,
+  categories = [],
   onClose,
 }: {
-  item: TimelineItemPayload;
+  mode: "create" | "edit";
+  /** Required for edit mode. */
+  item?: TimelineItemPayload;
+  /** Required for create mode — the dragged-out window. */
+  defaults?: BlockDefaults;
+  categories?: PickableCategory[];
   onClose: () => void;
 }) {
   useBodyScrollLock();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [deleteArmed, setDeleteArmed] = useState(false);
+  const [categoryId, setCategoryId] = useState(item?.categoryId ?? "");
+  const titleRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!deleteArmed) return;
@@ -261,7 +290,14 @@ function PlannedBlockModal({
     return () => window.clearTimeout(timer);
   }, [deleteArmed]);
 
+  // Dragging out a window prefills the times — drop the cursor on the title so
+  // the block can be named and saved without reaching for the mouse.
+  useEffect(() => {
+    if (mode === "create") titleRef.current?.focus();
+  }, [mode]);
+
   const run = (action: (formData: FormData) => Promise<unknown>) => {
+    if (!item) return;
     startTransition(async () => {
       const formData = new FormData();
       formData.set("id", item.id);
@@ -271,12 +307,15 @@ function PlannedBlockModal({
     });
   };
 
+  const fieldKey = item?.id ?? "new";
+  const headingId = `timeline-item-title-${fieldKey}`;
+
   return (
     <div className="calendar-modal-backdrop" role="presentation" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby={`timeline-item-title-${item.id}`}
+        aria-labelledby={headingId}
         className="calendar-modal"
         onClick={(event) => event.stopPropagation()}
       >
@@ -286,14 +325,14 @@ function PlannedBlockModal({
               className="text-[0.6875rem] font-semibold uppercase tracking-wider"
               style={{ color: "var(--text-faint)" }}
             >
-              Planned block
+              {mode === "create" ? "New block" : "Planned block"}
             </p>
             <h2
-              id={`timeline-item-title-${item.id}`}
+              id={headingId}
               className="mt-1 text-[1.125rem] font-semibold tracking-tight"
               style={{ color: "var(--text)" }}
             >
-              {item.title}
+              {mode === "create" ? "Plan a block" : item?.title}
             </h2>
           </div>
           <button
@@ -309,7 +348,11 @@ function PlannedBlockModal({
 
         <form
           action={async (formData) => {
-            await updateCalendarBlockAction(formData);
+            if (mode === "create") {
+              await createCalendarBlockAction(formData);
+            } else {
+              await updateCalendarBlockAction(formData);
+            }
             router.refresh();
             onClose();
           }}
@@ -318,7 +361,8 @@ function PlannedBlockModal({
             fillIsoWindowFields(event.currentTarget);
           }}
         >
-          <input type="hidden" name="id" value={item.id} />
+          {item ? <input type="hidden" name="id" value={item.id} /> : null}
+          <input type="hidden" name="categoryId" value={categoryId} />
           <input type="hidden" name="startsAtIso" defaultValue="" />
           <input type="hidden" name="endsAtIso" defaultValue="" />
 
@@ -326,34 +370,42 @@ function PlannedBlockModal({
             <label
               className="block text-[0.75rem] font-medium"
               style={{ color: "var(--text-muted)" }}
-              htmlFor={`timeline-item-name-${item.id}`}
+              htmlFor={`timeline-item-name-${fieldKey}`}
             >
               Title
             </label>
             <input
-              id={`timeline-item-name-${item.id}`}
+              ref={titleRef}
+              id={`timeline-item-name-${fieldKey}`}
               name="title"
               required
-              defaultValue={item.title}
+              placeholder={mode === "create" ? "Deep work, workout, errands..." : undefined}
+              defaultValue={item?.title ?? ""}
               className="field"
             />
           </div>
+
+          <CategoryPicker
+            categories={categories}
+            value={categoryId}
+            onChange={setCategoryId}
+          />
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div className="col-span-2 space-y-1.5 sm:col-span-1">
               <label
                 className="block text-[0.75rem] font-medium"
                 style={{ color: "var(--text-muted)" }}
-                htmlFor={`timeline-item-date-${item.id}`}
+                htmlFor={`timeline-item-date-${fieldKey}`}
               >
                 Date
               </label>
               <input
-                id={`timeline-item-date-${item.id}`}
+                id={`timeline-item-date-${fieldKey}`}
                 name="date"
                 type="date"
                 required
-                defaultValue={item.dateValue}
+                defaultValue={item?.dateValue ?? defaults?.date}
                 className="field"
               />
             </div>
@@ -361,16 +413,16 @@ function PlannedBlockModal({
               <label
                 className="block text-[0.75rem] font-medium"
                 style={{ color: "var(--text-muted)" }}
-                htmlFor={`timeline-item-start-${item.id}`}
+                htmlFor={`timeline-item-start-${fieldKey}`}
               >
                 Start
               </label>
               <input
-                id={`timeline-item-start-${item.id}`}
+                id={`timeline-item-start-${fieldKey}`}
                 name="start"
                 type="time"
                 required
-                defaultValue={item.startValue}
+                defaultValue={item?.startValue ?? defaults?.start}
                 className="field"
               />
             </div>
@@ -378,16 +430,16 @@ function PlannedBlockModal({
               <label
                 className="block text-[0.75rem] font-medium"
                 style={{ color: "var(--text-muted)" }}
-                htmlFor={`timeline-item-end-${item.id}`}
+                htmlFor={`timeline-item-end-${fieldKey}`}
               >
                 End
               </label>
               <input
-                id={`timeline-item-end-${item.id}`}
+                id={`timeline-item-end-${fieldKey}`}
                 name="end"
                 type="time"
                 required
-                defaultValue={item.endValue}
+                defaultValue={item?.endValue ?? defaults?.end}
                 className="field"
               />
             </div>
@@ -401,41 +453,54 @@ function PlannedBlockModal({
             }}
           >
             <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => {
-                  if (!deleteArmed) {
-                    setDeleteArmed(true);
-                    return;
-                  }
-                  run(deleteCalendarItemAction);
-                }}
-                className="btn-ghost"
-                style={
-                  deleteArmed
-                    ? {
-                        color: "var(--accent-strong)",
-                        background: "var(--accent-tint)",
+              {mode === "edit" && item ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => {
+                      if (!deleteArmed) {
+                        setDeleteArmed(true);
+                        return;
                       }
-                    : undefined
-                }
-              >
-                {deleteArmed ? "Sure?" : "Delete"}
-              </button>
-              {item.status !== "done" ? (
+                      run(deleteCalendarItemAction);
+                    }}
+                    className="btn-ghost"
+                    style={
+                      deleteArmed
+                        ? {
+                            color: "var(--accent-strong)",
+                            background: "var(--accent-tint)",
+                          }
+                        : undefined
+                    }
+                  >
+                    {deleteArmed ? "Sure?" : "Delete"}
+                  </button>
+                  {item.status !== "done" ? (
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => run(completeCalendarItemAction)}
+                      className="btn-ghost"
+                    >
+                      Done
+                    </button>
+                  ) : null}
+                </>
+              ) : (
                 <button
                   type="button"
                   disabled={pending}
-                  onClick={() => run(completeCalendarItemAction)}
+                  onClick={onClose}
                   className="btn-ghost"
                 >
-                  Done
+                  Cancel
                 </button>
-              ) : null}
+              )}
             </div>
             <button type="submit" disabled={pending} className="btn-ink">
-              {pending ? "Saving..." : "Save"}
+              {pending ? "Saving..." : mode === "create" ? "Add block" : "Save"}
             </button>
           </div>
         </form>

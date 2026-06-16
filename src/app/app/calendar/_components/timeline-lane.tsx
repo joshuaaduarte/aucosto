@@ -15,9 +15,11 @@ import type {
   TimelineHourMark,
 } from "../_lib/timeline";
 import {
+  CalendarBlockModal,
   TimelineBlockButton,
   type TimelineBlockPayload,
 } from "./timeline-block";
+import type { PickableCategory } from "./category-picker";
 import { HabitGhostBlock } from "./habit-ghost-block";
 import { TimelineNowLine } from "./timeline-now-line";
 
@@ -57,6 +59,7 @@ export function TimelineLane({
   narrow = false,
   payloads,
   tasks,
+  categories = [],
   context = [],
   habits = [],
   enableCreate = false,
@@ -71,11 +74,13 @@ export function TimelineLane({
   narrow?: boolean;
   payloads: Record<string, TimelineBlockPayload>;
   tasks: LinkableTask[];
+  /** TimeCategory options for the planned-lane create/edit sheet. */
+  categories?: PickableCategory[];
   /** Read-only rhythm context drawn behind the tracked blocks. */
   context?: TimelineBlock[];
   /** Habit reminder ghosts drawn behind the planned blocks. */
   habits?: HabitGhost[];
-  /** Tracked lane only: allow dragging out a new entry. */
+  /** Allow dragging out a new block (planned lane) / entry (tracked lane). */
   enableCreate?: boolean;
 }) {
   const laneRef = useRef<HTMLDivElement>(null);
@@ -262,6 +267,7 @@ export function TimelineLane({
               narrow={narrow}
               payload={payload}
               tasks={tasks}
+              categories={categories}
             />
           );
         })}
@@ -279,7 +285,9 @@ export function TimelineLane({
               style={{ color: "var(--text-faint)" }}
             >
               {variant === "planned"
-                ? "Nothing planned"
+                ? enableCreate
+                  ? "Drag to add a block"
+                  : "Nothing planned"
                 : enableCreate
                   ? "Drag to log time"
                   : "Nothing tracked yet"}
@@ -289,13 +297,22 @@ export function TimelineLane({
       </div>
 
       {pending ? (
-        <EntryModal
-          title="Log time"
-          entry={null}
-          defaults={pending}
-          tasks={tasks}
-          onClose={() => setPending(null)}
-        />
+        variant === "planned" ? (
+          <CalendarBlockModal
+            mode="create"
+            defaults={pending}
+            categories={categories}
+            onClose={() => setPending(null)}
+          />
+        ) : (
+          <EntryModal
+            title="Log time"
+            entry={null}
+            defaults={pending}
+            tasks={tasks}
+            onClose={() => setPending(null)}
+          />
+        )
       ) : null}
     </>
   );

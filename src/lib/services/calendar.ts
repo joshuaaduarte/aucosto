@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { requireCan } from "@/lib/auth/can";
 import { recordEvent } from "@/lib/services/events";
+import { ensureTimeCategoryTable } from "@/lib/services/time-categories";
 import type { CalendarItem } from "@/generated/prisma/client";
 import { Prisma } from "@/generated/prisma/client";
 
@@ -17,10 +18,88 @@ export type CreateCalendarItemInput = {
   kind?: string;
   status?: string;
   allDay?: boolean;
+  /** TimeCategory id, or null to clear. `undefined` leaves it untouched. */
+  categoryId?: string | null;
   sourceTool?: string | null;
   sourceRefId?: string | null;
   externalId?: string | null;
 };
+
+// ── Category column (raw SQL, like TimeCategory itself) ────────────────────
+// `CalendarItem.categoryId` is added out-of-band: the generated Prisma client
+// predates it, so the typed `prisma.calendarItem.*` calls neither select nor
+// write it. All categoryId access goes through $queryRaw / $executeRaw here,
+// mirroring the reflect/rhythms/time-categories pattern. Once `prisma generate`
+// has run with the current schema, this can be folded into the typed client.
+
+let categoryColumnReady: Promise<void> | null = null;
+
+/**
+ * Idempotently add `CalendarItem.categoryId` (FK → TimeCategory). Memoized per
+ * process; a failure resets the memo so a cold-start DB blip retries instead of
+ * poisoning the process (same shape as ensureTimeCategoryTable). Ensures the
+ * TimeCategory table exists first so the REFERENCES clause can resolve.
+ */
+export function ensureCalendarCategoryColumn(): Promise<void> {
+  if (!categoryColumnReady) {
+    categoryColumnReady = (async () => {
+      await ensureTimeCategoryTable();
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE "CalendarItem" ADD COLUMN IF NOT EXISTS "categoryId" TEXT REFERENCES "TimeCategory"("id");',
+      );
+    })()
+      .then(() => undefined)
+      .catch((error) => {
+        categoryColumnReady = null;
+        console.error("[calendar] ensureCalendarCategoryColumn failed", error);
+      });
+  }
+  return categoryColumnReady;
+}
+
+/**
+ * Map of calendar item id → categoryId for the given ids. Reads through raw SQL
+ * (the typed client can't see the column). Degrades to an empty map if the
+ * column/table isn't there yet, so the timeline still renders uncategorized.
+ */
+export async function getCalendarItemCategoryIds(
+  userId: string,
+  ids: string[],
+): Promise<Map<string, string | null>> {
+  requireCan(userId, "calendar", "read");
+  const result = new Map<string, string | null>();
+  if (ids.length === 0) return result;
+  try {
+    await ensureCalendarCategoryColumn();
+    const rows = await prisma.$queryRaw<Array<{ id: string; categoryId: string | null }>>(
+      Prisma.sql`
+        SELECT "id", "categoryId"
+        FROM "CalendarItem"
+        WHERE "userId" = ${userId} AND "id" IN (${Prisma.join(ids)})
+      `,
+    );
+    for (const row of rows) result.set(row.id, row.categoryId);
+  } catch (error) {
+    console.error("[calendar] getCalendarItemCategoryIds failed", error);
+  }
+  return result;
+}
+
+/**
+ * Persist a calendar item's categoryId (raw SQL). `null` clears it. Caller is
+ * responsible for ownership scoping — we still filter by userId defensively.
+ */
+async function writeCalendarItemCategory(
+  userId: string,
+  id: string,
+  categoryId: string | null,
+): Promise<void> {
+  await ensureCalendarCategoryColumn();
+  await prisma.$executeRaw(Prisma.sql`
+    UPDATE "CalendarItem" SET "categoryId" = ${categoryId}
+    WHERE "id" = ${id} AND "userId" = ${userId}
+  `);
+}
 
 function sanitizeTitle(title: string) {
   return title.trim();
@@ -124,6 +203,12 @@ export async function createCalendarItem(
     throw error;
   }
 
+  // categoryId lives outside the generated client — set it via raw SQL after
+  // the typed create. Only when explicitly provided (undefined = leave unset).
+  if (input.categoryId !== undefined) {
+    await writeCalendarItemCategory(userId, item.id, input.categoryId || null);
+  }
+
   await recordEvent({
     userId,
     tool: "calendar",
@@ -178,6 +263,11 @@ export async function updateCalendarItem(
       return null;
     }
     throw error;
+  }
+
+  // categoryId is stored out-of-band (raw SQL) — apply it when provided.
+  if (input.categoryId !== undefined) {
+    await writeCalendarItemCategory(userId, item.id, input.categoryId || null);
   }
 
   await recordEvent({

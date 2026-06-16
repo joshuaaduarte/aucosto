@@ -6,7 +6,12 @@ import {
 import { listAccounts } from "@/lib/services/finance";
 import { listDoItems, listSuggestedDoItems } from "@/lib/services/do";
 import { listHabits, listSuggestedHabits } from "@/lib/services/habits";
-import { listCalendarItems } from "@/lib/services/calendar";
+import {
+  ensureCalendarCategoryColumn,
+  getCalendarItemCategoryIds,
+  listCalendarItems,
+} from "@/lib/services/calendar";
+import { listTimeCategories } from "@/lib/services/time-categories";
 import { listRhythmSessionsBetween } from "@/lib/services/rhythms";
 import {
   resolveActiveUserId,
@@ -53,6 +58,10 @@ export default async function CalendarPage({
   const userId = await resolveActiveUserId();
   const context = await requireViewerContext();
   const params = await searchParams;
+
+  // Make sure the out-of-band categoryId column exists before any read/write
+  // touches it (raw-SQL column — see src/lib/services/calendar.ts).
+  await ensureCalendarCategoryColumn();
 
   const weekStart = startOfCalendarWeek();
   const weekEnd = addDays(weekStart, 7);
@@ -109,7 +118,7 @@ export default async function CalendarPage({
   const sevenDaysAgo = new Date(todayStart);
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
 
-  const [weekItems, runningEntry, completedWeek, timelineItems, timelineEntries, timelineRhythms, trailingItems, trailingEntries, accounts, suggestedTasks, suggestedHabits, openTasks, allHabits] = await Promise.all([
+  const [weekItems, runningEntry, completedWeek, timelineItems, timelineEntries, timelineRhythms, trailingItems, trailingEntries, accounts, suggestedTasks, suggestedHabits, openTasks, allHabits, categoryRecords] = await Promise.all([
     listCalendarItems(userId, { from: weekStart, to: weekEnd }),
     getRunningEntry(userId),
     listCompletedSince(userId, startOfWeek()),
@@ -123,7 +132,33 @@ export default async function CalendarPage({
     listSuggestedHabits(userId, { limit: 4 }),
     listDoItems(userId, { includeDone: false }),
     listHabits(userId),
+    listTimeCategories(userId, { includeHidden: true }),
   ]);
+
+  // Category assignments for the timeline blocks (raw-SQL column), plus the
+  // picker options (visible only) and an id→color map over ALL categories so a
+  // block tagged with a since-hidden category still tints correctly.
+  const categoryIdByItem = await getCalendarItemCategoryIds(
+    userId,
+    timelineItems.map((item) => item.id),
+  );
+  const pickableCategories = categoryRecords
+    .filter((category) => !category.isHidden)
+    .map((category) => ({
+      id: category.id,
+      name: category.name,
+      color: category.color,
+      emoji: category.emoji,
+    }));
+  const categoryColorById: Record<string, string> = {};
+  for (const category of categoryRecords) {
+    categoryColorById[category.id] = category.color;
+  }
+  // Attach each block's categoryId so buildDayTimeline can resolve its tint.
+  const timelineItemsForRender = timelineItems.map((item) => ({
+    ...item,
+    categoryId: categoryIdByItem.get(item.id) ?? null,
+  }));
 
   const todayItems = weekItems.filter(
     (item) => item.startsAt < todayEnd && item.endsAt > todayStart,
@@ -157,7 +192,7 @@ export default async function CalendarPage({
   let unionEndHour = 0;
   for (const day of columnDays) {
     const { startHour, endHour } = dayWindowHours({
-      items: timelineItems,
+      items: timelineItemsForRender,
       entries: timelineEntries,
       rhythms: rhythmInputs,
       day,
@@ -175,10 +210,11 @@ export default async function CalendarPage({
     isToday: day.getTime() === todayStart.getTime(),
     isWeekend: day.getDay() === 0 || day.getDay() === 6,
     model: buildDayTimeline({
-      items: timelineItems,
+      items: timelineItemsForRender,
       entries: timelineEntries,
       rhythms: rhythmInputs,
       habits: habitGhostsForDay(allHabits, day),
+      categoryColors: categoryColorById,
       day,
       now,
       bounds: sharedBounds,
@@ -198,7 +234,7 @@ export default async function CalendarPage({
   let mobileEndHour = 0;
   for (const day of mobilePanelDays) {
     const { startHour, endHour } = dayWindowHours({
-      items: timelineItems,
+      items: timelineItemsForRender,
       entries: timelineEntries,
       rhythms: rhythmInputs,
       day,
@@ -215,10 +251,11 @@ export default async function CalendarPage({
     isToday: day.getTime() === todayStart.getTime(),
     isWeekend: day.getDay() === 0 || day.getDay() === 6,
     model: buildDayTimeline({
-      items: timelineItems,
+      items: timelineItemsForRender,
       entries: timelineEntries,
       rhythms: rhythmInputs,
       habits: habitGhostsForDay(allHabits, day),
+      categoryColors: categoryColorById,
       day,
       now,
       bounds: mobileBounds,
@@ -255,6 +292,7 @@ export default async function CalendarPage({
         startValue: formatTimeValue(item.startsAt),
         endValue: formatTimeValue(item.endsAt),
         status: item.status,
+        categoryId: categoryIdByItem.get(item.id) ?? null,
       },
     };
   }
@@ -314,6 +352,7 @@ export default async function CalendarPage({
         mobilePanels={mobilePanels}
         payloads={timelinePayloads}
         tasks={linkableTasks}
+        categories={pickableCategories}
         nav={timelineNav}
       />
 
@@ -360,6 +399,7 @@ export default async function CalendarPage({
 
       <CalendarQuickAddModal
         todayDateValue={todayDateValue}
+        categories={pickableCategories}
         suggestedTasks={suggestedTasks.map((task) => ({
           id: task.id,
           title: task.title,

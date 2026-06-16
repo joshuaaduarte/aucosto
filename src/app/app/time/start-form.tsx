@@ -7,9 +7,12 @@ const initialState: StartState = undefined;
 
 export function StartForm({
   suggestedCategories = [],
+  defaultCategory,
   quickStart,
 }: {
   suggestedCategories?: string[];
+  /** Pre-selected category (e.g. from the calendar block happening now). */
+  defaultCategory?: string;
   quickStart?: React.ReactNode;
 }) {
   const [state, formAction, pending] = useActionState(
@@ -97,6 +100,7 @@ export function StartForm({
               id="category"
               name="category"
               type="text"
+              defaultValue={defaultCategory ?? ""}
               placeholder="deep work, errands..."
               className="field"
             />

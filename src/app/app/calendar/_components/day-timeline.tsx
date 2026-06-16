@@ -18,6 +18,7 @@ import type { LinkableTask } from "../../time/entry-editor";
 import type { DayTimelineModel } from "../_lib/timeline";
 import { TimelineLane } from "./timeline-lane";
 import type { TimelineBlockPayload } from "./timeline-block";
+import type { PickableCategory } from "./category-picker";
 import { ViewSelector, type CalendarView } from "./view-selector";
 import { MobileDateStrip } from "./mobile-date-strip";
 
@@ -73,6 +74,7 @@ export function CalendarTimeline({
   mobilePanels,
   payloads,
   tasks,
+  categories,
   nav,
 }: {
   view: CalendarView;
@@ -86,6 +88,8 @@ export function CalendarTimeline({
   mobilePanels: CalendarColumn[];
   payloads: Record<string, TimelineBlockPayload>;
   tasks: LinkableTask[];
+  /** TimeCategory options for the block create/edit sheets. */
+  categories: PickableCategory[];
   nav: CalendarTimelineNav;
 }) {
   const router = useRouter();
@@ -550,6 +554,7 @@ export function CalendarTimeline({
                     allowCreate={false}
                     payloads={payloads}
                     tasks={tasks}
+                    categories={categories}
                   />
                 </div>
               ))}
@@ -607,6 +612,7 @@ export function CalendarTimeline({
                     allowCreate={!isTouch}
                     payloads={payloads}
                     tasks={tasks}
+                    categories={categories}
                   />
                 </div>
               ))}
@@ -667,6 +673,7 @@ export function CalendarTimeline({
                   allowCreate={!isTouch}
                   payloads={payloads}
                   tasks={tasks}
+                  categories={categories}
                 />
               ))}
             </div>
@@ -687,6 +694,7 @@ function DayColumn({
   allowCreate,
   payloads,
   tasks,
+  categories,
 }: {
   column: CalendarColumn;
   height: number;
@@ -696,10 +704,11 @@ function DayColumn({
   compact: boolean;
   /** Saturday/Sunday in a week-grain view — dim the column slightly. */
   weekend: boolean;
-  /** Drag-to-create on the tracked lane (mouse/desktop only). */
+  /** Drag-to-create on both lanes (mouse/desktop only — touch keeps swipe). */
   allowCreate: boolean;
   payloads: Record<string, TimelineBlockPayload>;
   tasks: LinkableTask[];
+  categories: PickableCategory[];
 }) {
   const { model, isToday } = column;
   const windowStartIso = model.windowStart.toISOString();
@@ -761,7 +770,9 @@ function DayColumn({
           narrow={compact}
           payloads={payloads}
           tasks={tasks}
+          categories={categories}
           habits={model.habits}
+          enableCreate={allowCreate}
         />
         <TimelineLane
           blocks={model.actual}
@@ -773,6 +784,7 @@ function DayColumn({
           narrow={compact}
           payloads={payloads}
           tasks={tasks}
+          categories={categories}
           context={model.context}
           enableCreate={allowCreate}
         />

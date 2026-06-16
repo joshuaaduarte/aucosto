@@ -4,6 +4,7 @@ import { useState } from "react";
 import { formatMinutes } from "@/lib/do";
 import { fillIsoWindowFields } from "@/lib/wall-clock";
 import { createCalendarBlockAction } from "./actions";
+import { CategoryPicker, type PickableCategory } from "./_components/category-picker";
 import { useBodyScrollLock } from "../_components/use-body-scroll-lock";
 
 const QUICK_TEMPLATES = [
@@ -15,11 +16,13 @@ const QUICK_TEMPLATES = [
 
 export function CalendarQuickAddModal({
   todayDateValue,
+  categories = [],
   suggestedTasks = [],
   suggestedHabits = [],
   gapSuggestions = [],
 }: {
   todayDateValue: string;
+  categories?: PickableCategory[];
   suggestedTasks?: Array<{
     id: string;
     title: string;
@@ -44,6 +47,7 @@ export function CalendarQuickAddModal({
   const [title, setTitle] = useState("");
   const [doItemId, setDoItemId] = useState("");
   const [habitId, setHabitId] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [date, setDate] = useState(todayDateValue);
   const [start, setStart] = useState("09:00");
   const [end, setEnd] = useState("10:00");
@@ -113,6 +117,7 @@ export function CalendarQuickAddModal({
     setTitle("");
     setDoItemId("");
     setHabitId("");
+    setCategoryId("");
     setDate(todayDateValue);
     setStart("09:00");
     setEnd("10:00");
@@ -280,6 +285,7 @@ export function CalendarQuickAddModal({
               <div className="space-y-1.5">
                 <input type="hidden" name="doItemId" value={doItemId} />
                 <input type="hidden" name="habitId" value={habitId} />
+                <input type="hidden" name="categoryId" value={categoryId} />
                 <input type="hidden" name="startsAtIso" defaultValue="" />
                 <input type="hidden" name="endsAtIso" defaultValue="" />
                 <label
@@ -299,6 +305,12 @@ export function CalendarQuickAddModal({
                   onChange={(event) => setTitle(event.target.value)}
                 />
               </div>
+
+              <CategoryPicker
+                categories={categories}
+                value={categoryId}
+                onChange={setCategoryId}
+              />
 
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="space-y-1.5">

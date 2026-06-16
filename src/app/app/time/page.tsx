@@ -11,7 +11,10 @@ import {
   listSuggestedDoItems,
 } from "@/lib/services/do";
 import { listHabits } from "@/lib/services/habits";
-import { listCalendarItems } from "@/lib/services/calendar";
+import {
+  getCalendarItemCategoryIds,
+  listCalendarItems,
+} from "@/lib/services/calendar";
 import {
   listEntryProjectTags,
   listProjectPickerOptions,
@@ -341,6 +344,30 @@ export default async function TimePage() {
       live: item.startsAt <= now,
     }));
 
+  // If a calendar block is happening right now and it carries a category, lead
+  // the free-form start form with that category pre-selected. The block's
+  // categoryId lives in a raw-SQL column; resolve it to the category's name so
+  // the timer stores the same value the category chips do.
+  const activeBlock = todayCalendarItems.find(
+    (item) =>
+      item.status !== "done" &&
+      item.status !== "cancelled" &&
+      !item.allDay &&
+      item.startsAt <= now &&
+      item.endsAt > now,
+  );
+  let nowBlockCategory: string | undefined;
+  if (activeBlock) {
+    const categoryIdByItem = await getCalendarItemCategoryIds(userId, [
+      activeBlock.id,
+    ]);
+    const categoryId = categoryIdByItem.get(activeBlock.id);
+    const match = categoryId
+      ? allCategories.find((category) => category.id === categoryId)
+      : null;
+    if (match) nowBlockCategory = match.name;
+  }
+
   // Untracked gap since the last completed entry (only when idle).
   const lastEndedAt = windowEntries.reduce<Date | null>(
     (latest, entry) =>
@@ -622,6 +649,7 @@ export default async function TimePage() {
         ) : (
           <StartForm
             suggestedCategories={suggestedCategories}
+            defaultCategory={nowBlockCategory}
             quickStart={quickStart}
           />
         )}

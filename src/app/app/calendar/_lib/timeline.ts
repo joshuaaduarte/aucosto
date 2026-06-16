@@ -199,7 +199,7 @@ function layoutLane<T>(
 type PlannedInput = Pick<
   CalendarItem,
   "id" | "title" | "startsAt" | "endsAt" | "allDay" | "status" | "kind"
-> & { sourceTool?: string | null };
+> & { sourceTool?: string | null; categoryId?: string | null };
 
 type ActualInput = Pick<
   TimeEntry,
@@ -227,6 +227,8 @@ export type DayTimelineInput = {
   rhythms?: RhythmInput[];
   /** Habit reminder templates due on this day (caller filters by weekday). */
   habits?: HabitGhostInput[];
+  /** TimeCategory id → color, so a categorized planned block tints to match. */
+  categoryColors?: Record<string, string>;
   day: Date;
   now: Date;
 };
@@ -316,16 +318,18 @@ export function buildDayTimeline(
     id: item.id,
     title: item.title,
     detail: `${formatShort(item.startsAt)}–${formatShort(item.endsAt)}`,
-    // One color language with the rest of the app: task-sourced blocks
-    // use the "do" color, habit blocks "habit", native blocks "calendar".
+    // An explicit category wins: tint the block to its TimeCategory color.
+    // Otherwise fall back to the source-tool color language used app-wide:
+    // task-sourced blocks "do", habit blocks "habit", native blocks "calendar".
     color:
-      item.kind === "external"
+      (item.categoryId && input.categoryColors?.[item.categoryId]) ||
+      (item.kind === "external"
         ? categoryColor(null)
         : item.sourceTool === "do"
           ? categoryColor("do")
           : item.sourceTool === "habit"
             ? categoryColor("habit")
-            : categoryColor("calendar"),
+            : categoryColor("calendar")),
     ...placement,
     running: false,
     muted: item.status === "done",
