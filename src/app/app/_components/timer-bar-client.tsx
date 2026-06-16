@@ -25,6 +25,7 @@ import type { PipHabit } from "@/components/pip-timer-widget";
 export function TimerBarClient({
   entryId,
   entryLabel,
+  entryCategory,
   color,
   startedAtIso,
   initialNotes,
@@ -33,6 +34,7 @@ export function TimerBarClient({
 }: {
   entryId: string;
   entryLabel: string;
+  entryCategory: string | null;
   color: string;
   startedAtIso: string;
   initialNotes: string | null;
@@ -199,6 +201,8 @@ export function TimerBarClient({
               id: entryId,
               name: entryLabel,
               startedAtMs: startedAt,
+              category: entryCategory,
+              color,
             }}
             habits={pipHabits}
             totalMsToday={pipTotalMsToday}

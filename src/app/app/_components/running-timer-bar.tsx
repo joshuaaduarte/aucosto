@@ -20,6 +20,7 @@ export async function RunningTimerBar({ userId }: { userId: string }) {
     <TimerBarClient
       entryId={running.id}
       entryLabel={running.label}
+      entryCategory={running.category}
       color={categoryColor(running.category)}
       startedAtIso={running.startedAt.toISOString()}
       initialNotes={running.notes}

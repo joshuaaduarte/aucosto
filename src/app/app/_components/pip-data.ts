@@ -9,6 +9,7 @@ import "server-only";
 import { listHabits, type HabitSummary } from "@/lib/services/habits";
 import { listEntriesBetween } from "@/lib/services/time";
 import { startOfToday } from "@/lib/time";
+import { categoryColor } from "@/lib/time-categories";
 import type { PipHabit } from "@/components/pip-timer-widget";
 
 /** Today's due habits, shaped for the widget (most relevant first, capped). */
@@ -21,6 +22,7 @@ export function toPipHabits(habits: HabitSummary[]): PipHabit[] {
       name: habit.title,
       done: habit.completedToday || habit.keptAliveToday,
       streak: habit.currentStreak,
+      color: categoryColor(habit.bucket ?? "habit"),
     }));
 }
 

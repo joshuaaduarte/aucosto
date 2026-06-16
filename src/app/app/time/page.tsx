@@ -532,6 +532,8 @@ export default async function TimePage() {
         id: running.id,
         name: running.label,
         startedAtMs: running.startedAt.getTime(),
+        category: running.category,
+        color: colorFor(running.category),
         habitId: running.habitId,
       }
     : null;
