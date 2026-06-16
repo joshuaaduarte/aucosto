@@ -158,13 +158,13 @@ export function TimerBarClient({
           />
           <Link
             href="/app/time"
-            className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium"
+            className="min-w-0 truncate text-[0.8125rem] font-medium"
             style={{ color: "var(--text)" }}
           >
             {entryLabel}
           </Link>
           <span
-            className="tabular shrink-0 text-[0.8125rem] font-semibold"
+            className="tabular ml-auto shrink-0 text-[0.8125rem] font-semibold"
             style={{ color: "var(--text)", fontFeatureSettings: '"tnum" 1' }}
           >
             {formatDuration(now - startedAt)}
