@@ -310,6 +310,27 @@ export async function quickLogHabitAction(formData: FormData) {
   revalidateHabits();
 }
 
+// One-tap "done" from the floating Picture-in-Picture widget. Mirrors
+// quickLogHabitAction's logic but takes a plain id (the PiP widget calls it as
+// a function, not through a <form>). Idempotent-ish: a habit already complete
+// just logs its remaining (>=1) again, which the service tolerates.
+export async function logHabitDone(id: string) {
+  const userId = await resolveActiveUserId();
+  if (!id) return;
+  const habits = await listHabits(userId, { includeArchived: false });
+  const habit = habits.find((item) => item.id === id);
+  if (!habit) return;
+
+  const remaining =
+    habit.cadence === "weekly"
+      ? Math.max(1, habit.targetCount - habit.progressThisWeek)
+      : Math.max(1, habit.targetCount - habit.progressToday);
+  const quantity = habit.goalUnit === "count" ? 1 : remaining;
+
+  await logHabitProgress(userId, id, { quantity, notes: null, mode: "full" });
+  revalidateHabits();
+}
+
 // Undo today's log — clears today's entries so the habit can be re-logged
 // cleanly (fix a wrong count, remove an accidental tap, or just take it back).
 export async function undoTodayHabitLogAction(formData: FormData) {

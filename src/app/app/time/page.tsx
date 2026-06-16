@@ -43,6 +43,8 @@ import { ManageCategories } from "./manage-categories";
 import { QuickStartChips } from "./quick-start-chips";
 import { RunningCard } from "./running-card";
 import { StartForm } from "./start-form";
+import { PipLaunchButton } from "./pip-launch-button";
+import { completedMsBetween, toPipHabits } from "../_components/pip-data";
 
 export const dynamic = "force-dynamic";
 
@@ -523,6 +525,19 @@ export default async function TimePage() {
     }
   }
 
+  // Floating Picture-in-Picture pop-out: the running entry, today's due habits,
+  // and today's completed total. Reuses data already fetched above.
+  const pipEntry = running
+    ? {
+        id: running.id,
+        name: running.label,
+        startedAtMs: running.startedAt.getTime(),
+        habitId: running.habitId,
+      }
+    : null;
+  const pipHabits = toPipHabits(habitList);
+  const pipTotalMs = completedMsBetween(windowEntries, todayStart);
+
   return (
     <div className="space-y-10">
       <header className="fade-in flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -540,16 +555,23 @@ export default async function TimePage() {
             Sessions
           </h1>
         </div>
-        <p
-          className="text-[0.8125rem] sm:max-w-[38rem] sm:text-right"
-          style={{ color: "var(--text-muted)" }}
-        >
-          {running
-            ? `1 running now · ${formatHM(weekTotalMs)} logged this week`
-            : hasArchive
-              ? `${closedTodayCount} closed today · ${formatHM(weekTotalMs)} this week`
-              : "No session running yet"}
-        </p>
+        <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end">
+          <PipLaunchButton
+            entry={pipEntry}
+            habits={pipHabits}
+            totalMsToday={pipTotalMs}
+          />
+          <p
+            className="text-[0.8125rem] sm:max-w-[38rem] sm:text-right"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {running
+              ? `1 running now · ${formatHM(weekTotalMs)} logged this week`
+              : hasArchive
+                ? `${closedTodayCount} closed today · ${formatHM(weekTotalMs)} this week`
+                : "No session running yet"}
+          </p>
+        </div>
       </header>
 
       {/* Untracked gap backfill */}

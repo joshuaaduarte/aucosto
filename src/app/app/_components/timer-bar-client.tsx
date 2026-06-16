@@ -19,6 +19,8 @@ import {
   BackdatedStopModal,
   ClockRewindIcon,
 } from "../time/backdated-stop-modal";
+import { PipLaunchButton } from "../time/pip-launch-button";
+import type { PipHabit } from "@/components/pip-timer-widget";
 
 export function TimerBarClient({
   entryId,
@@ -26,12 +28,16 @@ export function TimerBarClient({
   color,
   startedAtIso,
   initialNotes,
+  pipHabits,
+  pipTotalMsToday,
 }: {
   entryId: string;
   entryLabel: string;
   color: string;
   startedAtIso: string;
   initialNotes: string | null;
+  pipHabits: PipHabit[];
+  pipTotalMsToday: number;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -185,6 +191,20 @@ export function TimerBarClient({
           >
             <span aria-hidden>📝</span>
           </button>
+          {/* Pop the timer into a floating always-on-top window. Desktop only
+              (Document PiP is a desktop-Chrome feature) and self-hides where
+              unsupported. */}
+          <PipLaunchButton
+            entry={{
+              id: entryId,
+              name: entryLabel,
+              startedAtMs: startedAt,
+            }}
+            habits={pipHabits}
+            totalMsToday={pipTotalMsToday}
+            iconOnly
+            className="btn-icon hidden h-8 w-8 shrink-0 items-center justify-center rounded-full md:inline-flex"
+          />
           <Link
             href="/app/time"
             className="btn-ghost h-8 shrink-0 rounded-full px-2.5 text-[0.75rem]"
