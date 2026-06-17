@@ -596,6 +596,71 @@ export async function updateWakeTime(
   });
 }
 
+/**
+ * Correct a completed sleep session's wake time — the pencil on the time
+ * tracker's wake-up marker and the hub's sleep card. The wake time IS the
+ * session's `endedAt` (stopping the sleep timer is itself the wake event), so
+ * this MOVES `endedAt` and re-derives the duration in JS — never DB date math
+ * (lessons #2). `wakeAt` is an absolute instant the browser built from the
+ * wall-clock the user picked (lessons #10), so the server's TZ never
+ * reinterprets it. Rejects a wake time at/before the bedtime. Returns null if
+ * no such sleep session exists. Distinct from `updateWakeTime`, which edits a
+ * `wakeup` check-in's `metadata.wakeTime`.
+ */
+export async function updateSleepWakeTime(
+  userId: string,
+  sessionId: string,
+  wakeAt: Date,
+): Promise<SleepSessionRecord | null> {
+  requireCan(userId, "rhythm", "write");
+  if (Number.isNaN(wakeAt.getTime())) {
+    throw new Error("Wake time is invalid.");
+  }
+  let duration: number;
+  let record: SleepSessionRecord;
+  try {
+    const rows = await prisma.$queryRaw<MetaRow[]>(Prisma.sql`
+      SELECT ${SELECT_FIELDS}, "metadata"
+      FROM "RhythmSession"
+      WHERE "userId" = ${userId} AND "id" = ${sessionId} AND "type" = 'sleep'
+      LIMIT 1
+    `);
+    const row = rows[0];
+    if (!row) return null;
+    if (wakeAt.getTime() <= row.startedAt.getTime()) {
+      throw new Error("Wake time must be after you went to sleep.");
+    }
+    duration = rhythmDurationMinutes(row.startedAt, wakeAt);
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "RhythmSession"
+      SET "endedAt" = ${wakeAt}, "durationMinutes" = ${duration}
+      WHERE "userId" = ${userId} AND "id" = ${sessionId}
+    `);
+    record = {
+      id: row.id,
+      startedAt: row.startedAt,
+      endedAt: wakeAt,
+      durationMinutes: duration,
+      wakeTime: readMorningMeta(row.metadata).wakeTime,
+    };
+  } catch (error) {
+    if (isMissingTableError(error)) {
+      throw new Error(
+        "The rhythms table isn't migrated yet — apply scripts/create-rhythm-table.sql first.",
+      );
+    }
+    throw error;
+  }
+  await recordEvent({
+    userId,
+    tool: "rhythm",
+    type: "rhythm.updated",
+    refId: sessionId,
+    meta: { rhythm: "sleep", durationMinutes: duration },
+  });
+  return record;
+}
+
 /** Wrap up today's morning (sets endedAt → the hub card dismisses itself). */
 export async function completeMorning(userId: string): Promise<void> {
   requireCan(userId, "rhythm", "write");

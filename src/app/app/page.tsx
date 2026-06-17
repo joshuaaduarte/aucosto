@@ -306,6 +306,7 @@ export default async function HubPage() {
             state={sleepCardState}
             mode={sleepCardMode}
             startedAtMs={cycleSleep?.startedAt.getTime() ?? null}
+            endedAtMs={cycleSleep?.endedAt?.getTime() ?? null}
             sleepMinutes={cycleSleep?.durationMinutes ?? null}
             sessionId={cycleSleep?.id ?? null}
           />

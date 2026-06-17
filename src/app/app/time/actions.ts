@@ -11,6 +11,7 @@ import {
   updateTimeCategory,
 } from "@/lib/services/time-categories";
 import { tagTimeEntry } from "@/lib/services/projects";
+import { updateSleepWakeTime as updateSleepWakeTimeService } from "@/lib/services/rhythms";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import { windowFromFormData } from "@/lib/wall-clock";
 
@@ -376,6 +377,42 @@ export async function stopEntryAt(endedAtIso: string) {
   revalidatePath("/app/habits");
   revalidatePath("/app/time");
   revalidatePath("/app/calendar");
+}
+
+// Correct the wake time on a completed sleep session from the time tracker's
+// wake-up marker. The wake time is the session's endedAt, so this moves it and
+// re-derives the duration (in the service). `wakeAtIso` is an absolute instant
+// the browser built from the picked wall-clock on the wake day — the server's
+// TZ never reinterprets it (lessons #10).
+export async function updateSleepWakeTimeAction(
+  sessionId: string,
+  wakeAtIso: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  let userId: string;
+  try {
+    userId = await resolveActiveUserId();
+  } catch {
+    return { ok: false, error: "Not signed in." };
+  }
+  const wakeAt = new Date(wakeAtIso);
+  if (Number.isNaN(wakeAt.getTime())) {
+    return { ok: false, error: "Wake time is invalid." };
+  }
+  try {
+    const updated = await updateSleepWakeTimeService(userId, sessionId, wakeAt);
+    if (!updated) {
+      return { ok: false, error: "That sleep session no longer exists." };
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof Error ? error.message : "Couldn't update the wake time.",
+    };
+  }
+  revalidatePath("/app");
+  revalidatePath("/app/time");
+  return { ok: true };
 }
 
 export async function stopEntryAndCompleteDoItem(formData: FormData) {

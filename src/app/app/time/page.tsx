@@ -41,6 +41,7 @@ import { AddEntryButton, EntryEditButton } from "./entry-editor";
 import { GapBackfillCard } from "./gap-backfill-card";
 import { TagProjectButton } from "./tag-project-button";
 import { GapSlotRow } from "./gap-slot";
+import { SleepWakeMarker } from "./sleep-wake-marker";
 import { InsightsSection } from "./insights-section";
 import { ManageCategories } from "./manage-categories";
 import { QuickStartChips } from "./quick-start-chips";
@@ -926,10 +927,13 @@ export default async function TimePage() {
                   {/* Wake-up sits at the bottom: it's the earliest event of
                       this day. */}
                   {group.wake.map((sleep) => (
-                    <SleepMarkerRow
+                    <SleepWakeMarker
                       key={`wake-${sleep.id}`}
-                      variant="wake"
-                      sleep={sleep}
+                      sessionId={sleep.id}
+                      startedAtMs={sleep.startedAt.getTime()}
+                      endedAtMs={sleep.endedAt ? sleep.endedAt.getTime() : null}
+                      durationMinutes={sleep.durationMinutes}
+                      wakeTime={sleep.wakeTime}
                     />
                   ))}
                 </ul>

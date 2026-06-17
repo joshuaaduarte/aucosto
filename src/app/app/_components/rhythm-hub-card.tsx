@@ -332,7 +332,7 @@ function MorningInProgress({
         </div>
       </div>
 
-      {habits.length > 0 ? (
+      {!morning.completed && habits.length > 0 ? (
         <div className="mt-3">
           <p
             className="text-[0.6875rem] font-semibold uppercase tracking-wider"
@@ -365,24 +365,26 @@ function MorningInProgress({
         </div>
       ) : null}
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <Link
-          href="/app/do"
-          className="text-[0.8125rem] underline-offset-2 hover:underline"
-          style={{ color: "var(--text-muted)" }}
-        >
-          What are you starting with? →
-        </Link>
-        <button
-          type="button"
-          onClick={wrapUp}
-          disabled={wrapping}
-          className="btn-ghost text-[0.8125rem]"
-          style={{ color: "var(--text-faint)" }}
-        >
-          {wrapping ? "…" : "Done with morning"}
-        </button>
-      </div>
+      {!morning.completed ? (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <Link
+            href="/app/do"
+            className="text-[0.8125rem] underline-offset-2 hover:underline"
+            style={{ color: "var(--text-muted)" }}
+          >
+            What are you starting with? →
+          </Link>
+          <button
+            type="button"
+            onClick={wrapUp}
+            disabled={wrapping}
+            className="btn-ghost text-[0.8125rem]"
+            style={{ color: "var(--text-faint)" }}
+          >
+            {wrapping ? "…" : "Done with morning"}
+          </button>
+        </div>
+      ) : null}
     </CardShell>
   );
 }
@@ -423,7 +425,9 @@ export function RhythmHubCard({
   const inMorning = hour >= 5 && hour < 10;
   if (!inMorning) return null; // outside the morning window → no morning card
 
-  if (morning?.completed) return null; // wrapped up, gone for the day
+  // A completed morning no longer shows habits / "Done with morning", but the
+  // card stays during the window so the wake-time edit pencil remains tappable
+  // (MorningInProgress hides its in-progress controls when morning.completed).
   if (morning?.started) {
     return <MorningInProgress morning={morning} habits={morningHabits} />;
   }

@@ -18,6 +18,7 @@ import {
   logRhythmSession,
   startMorning,
   startRhythm,
+  updateSleepWakeTime,
   updateWakeTime,
 } from "@/lib/services/rhythms";
 
@@ -72,6 +73,7 @@ export async function POST(request: Request) {
     sessionId?: string;
     startedAt?: string;
     endedAt?: string;
+    wakeAt?: string;
     wakeTime?: string | null;
     notes?: string | null;
   };
@@ -96,6 +98,28 @@ export async function POST(request: Request) {
       }
       await updateWakeTime(userId, payload.sessionId, payload.wakeTime);
       return NextResponse.json({ ok: true });
+    }
+    // Correct a completed sleep session's wake time (the sleep card's edit
+    // pencil). endedAt moves and the duration is re-derived in the service.
+    if (payload.action === "update-sleep-wake") {
+      if (!payload.sessionId) {
+        return NextResponse.json({ error: "sessionId is required." }, { status: 400 });
+      }
+      if (typeof payload.wakeAt !== "string") {
+        return NextResponse.json({ error: "wakeAt is required." }, { status: 400 });
+      }
+      const wakeAt = new Date(payload.wakeAt);
+      if (Number.isNaN(wakeAt.getTime())) {
+        return NextResponse.json(
+          { error: "wakeAt must be a valid timestamp." },
+          { status: 400 },
+        );
+      }
+      const session = await updateSleepWakeTime(userId, payload.sessionId, wakeAt);
+      if (!session) {
+        return NextResponse.json({ error: "No sleep session with that id." }, { status: 404 });
+      }
+      return NextResponse.json({ session });
     }
     // Wrap up the morning so the hub card dismisses for the rest of the day.
     if (payload.action === "complete-morning") {
