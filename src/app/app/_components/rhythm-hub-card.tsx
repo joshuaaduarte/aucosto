@@ -34,6 +34,12 @@ export type MorningCardState = {
   wakeTime: string | null;
   /** Sleep carried over from last night, in minutes. */
   sleepMinutes: number | null;
+  /**
+   * The wakeup session's id — present only when an explicit morning check-in
+   * exists (null when the wake time was auto-derived from a sleep session,
+   * which has no wakeup row to edit). Drives the wake-time edit pencil.
+   */
+  wakeSessionId: string | null;
 };
 
 export type MorningHabit = { id: string; title: string; completedToday: boolean };
@@ -173,6 +179,44 @@ function MorningInProgress({
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
   const [logging, startLogging] = useTransition();
   const [wrapping, setWrapping] = useState(false);
+  const [editingWake, setEditingWake] = useState(false);
+  const [draftWake, setDraftWake] = useState(morning.wakeTime ?? "07:00");
+  const [savingWake, setSavingWake] = useState(false);
+  const [wakeError, setWakeError] = useState<string | null>(null);
+
+  function openWakeEditor() {
+    setDraftWake(morning.wakeTime ?? toTimeValue(new Date()));
+    setWakeError(null);
+    setEditingWake(true);
+  }
+
+  async function saveWake() {
+    if (savingWake || !morning.wakeSessionId) return;
+    setSavingWake(true);
+    setWakeError(null);
+    try {
+      const res = await fetch("/api/rhythms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update-wake",
+          sessionId: morning.wakeSessionId,
+          wakeTime: draftWake,
+        }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(data?.error ?? "Couldn't update your wake time.");
+      }
+      setEditingWake(false);
+      // The hub re-reads the wake time on refresh → the line updates.
+      router.refresh();
+    } catch (err) {
+      setWakeError(err instanceof Error ? err.message : "Couldn't update your wake time.");
+    } finally {
+      setSavingWake(false);
+    }
+  }
 
   function logHabit(id: string) {
     if (doneIds.has(id)) return;
@@ -214,10 +258,77 @@ function MorningInProgress({
           <p className="text-[0.875rem] font-semibold" style={{ color: "var(--text)" }}>
             Your morning
           </p>
-          <p className="mt-0.5 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
-            {morning.wakeTime ? `Up since ${prettyTime(morning.wakeTime)}` : "In progress"}
-            {sleepLine ? ` · ${sleepLine}` : ""}
-          </p>
+          {editingWake ? (
+            <div className="mt-1.5 flex flex-wrap items-end gap-2">
+              <label className="flex flex-col gap-1">
+                <span
+                  className="text-[0.6875rem] font-medium"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Woke up
+                </span>
+                <input
+                  type="time"
+                  value={draftWake}
+                  onChange={(event) => setDraftWake(event.target.value)}
+                  className="field"
+                  style={{ width: "8rem" }}
+                  aria-label="Wake time"
+                  autoFocus
+                />
+              </label>
+              <button
+                type="button"
+                onClick={saveWake}
+                disabled={savingWake}
+                className="btn-ink"
+              >
+                {savingWake ? "Saving…" : "Save"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingWake(false);
+                  setWakeError(null);
+                }}
+                disabled={savingWake}
+                className="btn-ghost"
+                style={{ color: "var(--text-faint)" }}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <p
+              className="mt-0.5 flex items-center gap-1.5 text-[0.8125rem]"
+              style={{ color: "var(--text-muted)" }}
+            >
+              <span>
+                {morning.wakeTime ? `Up since ${prettyTime(morning.wakeTime)}` : "In progress"}
+                {sleepLine ? ` · ${sleepLine}` : ""}
+              </span>
+              {morning.wakeSessionId && morning.wakeTime ? (
+                <button
+                  type="button"
+                  onClick={openWakeEditor}
+                  className="btn-icon"
+                  aria-label="Edit wake time"
+                  title="Edit wake time"
+                  style={{ color: "var(--text-faint)" }}
+                >
+                  ✏️
+                </button>
+              ) : null}
+            </p>
+          )}
+          {wakeError ? (
+            <p
+              className="mt-2 rounded-md px-3 py-2 text-[0.8125rem]"
+              style={{ background: "var(--accent-tint)", color: "var(--accent-strong)" }}
+            >
+              {wakeError}
+            </p>
+          ) : null}
         </div>
       </div>
 

@@ -550,6 +550,52 @@ export async function startMorning(
   return { sleepMinutes };
 }
 
+/**
+ * Correct the wake time on an existing wakeup session — the edit pencil on the
+ * morning card, for when you check in hours after actually waking. Merges into
+ * the JSONB column via `||` so the carried-over `sleepMinutes` survives. Stores
+ * "HH:mm" exactly as typed (the same format `startMorning` writes and the card
+ * reads) — no DB date math, no timezone round-trip.
+ */
+export async function updateWakeTime(
+  userId: string,
+  sessionId: string,
+  wakeTime: string,
+): Promise<void> {
+  requireCan(userId, "rhythm", "write");
+  const cleanWake =
+    typeof wakeTime === "string" && /^\d{1,2}:\d{2}$/.test(wakeTime.trim())
+      ? wakeTime.trim()
+      : null;
+  if (!cleanWake) {
+    throw new Error("Enter a valid wake time.");
+  }
+  try {
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "RhythmSession"
+      SET "metadata" =
+        COALESCE("metadata", '{}'::jsonb) || jsonb_build_object('wakeTime', ${cleanWake}::text)
+      WHERE "userId" = ${userId}
+        AND "id" = ${sessionId}
+        AND "type" = 'wakeup'
+    `);
+  } catch (error) {
+    if (isMissingTableError(error)) {
+      throw new Error(
+        "The rhythms table isn't migrated yet — apply scripts/create-rhythm-table.sql first.",
+      );
+    }
+    throw error;
+  }
+  await recordEvent({
+    userId,
+    tool: "rhythm",
+    type: "rhythm.updated",
+    refId: sessionId,
+    meta: { rhythm: "wakeup", wakeTime: cleanWake },
+  });
+}
+
 /** Wrap up today's morning (sets endedAt → the hub card dismisses itself). */
 export async function completeMorning(userId: string): Promise<void> {
   requireCan(userId, "rhythm", "write");

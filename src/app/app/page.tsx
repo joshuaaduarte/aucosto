@@ -328,6 +328,8 @@ export default async function HubPage() {
                     completed: wakeStatus.morning.completed,
                     wakeTime: wakeStatus.wakeTime,
                     sleepMinutes: wakeStatus.sleepMinutes,
+                    // A real check-in has an editable wakeup session.
+                    wakeSessionId: wakeStatus.morning.id,
                   }
                 : wakeStatus?.captured
                   ? {
@@ -335,6 +337,8 @@ export default async function HubPage() {
                       completed: false,
                       wakeTime: wakeStatus.wakeTime,
                       sleepMinutes: wakeStatus.sleepMinutes,
+                      // Sleep-derived wake — no wakeup row to edit.
+                      wakeSessionId: null,
                     }
                   : null
             }

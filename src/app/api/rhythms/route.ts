@@ -18,6 +18,7 @@ import {
   logRhythmSession,
   startMorning,
   startRhythm,
+  updateWakeTime,
 } from "@/lib/services/rhythms";
 
 export const dynamic = "force-dynamic";
@@ -84,6 +85,17 @@ export async function POST(request: Request) {
         typeof payload.wakeTime === "string" ? payload.wakeTime : null,
       );
       return NextResponse.json(result, { status: 201 });
+    }
+    // Correct an already-recorded wake time (the morning card's edit pencil).
+    if (payload.action === "update-wake") {
+      if (!payload.sessionId) {
+        return NextResponse.json({ error: "sessionId is required." }, { status: 400 });
+      }
+      if (typeof payload.wakeTime !== "string") {
+        return NextResponse.json({ error: "wakeTime is required." }, { status: 400 });
+      }
+      await updateWakeTime(userId, payload.sessionId, payload.wakeTime);
+      return NextResponse.json({ ok: true });
     }
     // Wrap up the morning so the hub card dismisses for the rest of the day.
     if (payload.action === "complete-morning") {

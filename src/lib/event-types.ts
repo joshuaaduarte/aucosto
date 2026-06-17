@@ -71,6 +71,7 @@ const EVENT_LABELS: Record<string, string> = {
   // rhythms
   "rhythm.started": "started a rhythm",
   "rhythm.ended": "completed a rhythm",
+  "rhythm.updated": "corrected a wake time",
 
   // user
   "user.privacy_updated": "updated privacy settings",
