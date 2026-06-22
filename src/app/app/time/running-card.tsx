@@ -80,7 +80,7 @@ export function RunningCard({
           border: "1px solid var(--accent-tint-strong)",
         }}
       >
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span
@@ -89,7 +89,7 @@ export function RunningCard({
                 aria-hidden
               />
               <span
-                className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+                className="whitespace-nowrap text-[0.6875rem] font-semibold uppercase tracking-wider"
                 style={{ color: "var(--accent-strong)" }}
               >
                 Running{category ? ` · ${category}` : ""}
@@ -102,7 +102,7 @@ export function RunningCard({
               {label}
             </h2>
             <p
-              className="mt-1 text-[2.5rem] font-semibold tabular leading-none sm:text-[3.25rem]"
+              className="mt-1 whitespace-nowrap text-[2.5rem] font-semibold tabular leading-none sm:text-[3.25rem]"
               style={{
                 color: "var(--text)",
                 letterSpacing: "-0.03em",
@@ -119,14 +119,6 @@ export function RunningCard({
                 Linked to Do List: {doItem.title}
               </p>
             ) : null}
-            {!doItem && habit ? (
-              <p
-                className="mt-2 text-[0.8125rem]"
-                style={{ color: "var(--text-muted)" }}
-              >
-                Linked to Habit: {habit.title}
-              </p>
-            ) : null}
             {doItem ? (
               <p
                 className="mt-1 text-[0.75rem]"
@@ -140,12 +132,12 @@ export function RunningCard({
             ) : null}
             {!doItem && habit ? (
               <p
-                className="mt-1 text-[0.75rem]"
+                className="mt-2 text-[0.75rem]"
                 style={{ color: "var(--text-faint)" }}
               >
                 {isMinuteHabit
                   ? `Tracked if you stop now: ${formatMinutes(elapsedMinutes)} · target ${habit.targetLabel}`
-                  : `Target: ${habit.targetLabel}`}
+                  : `Habit · ${habit.targetLabel}`}
               </p>
             ) : null}
             {!doItem && !habit ? (
