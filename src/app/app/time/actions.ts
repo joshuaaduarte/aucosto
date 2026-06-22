@@ -91,12 +91,21 @@ export async function quickStartEntry(formData: FormData) {
     throw new Error(parsed.error.issues[0]?.message ?? "Invalid input.");
   }
 
+  // Capture before starting — startEntry auto-stops whatever's running.
+  const previousHabitId = (await timeService.getRunningEntry(userId))?.habitId ?? null;
+
   const entry = await timeService.startEntry(userId, {
     label: parsed.data.label,
     category: parsed.data.category ?? null,
     doItemId: parsed.data.doItemId ?? null,
     habitId: parsed.data.habitId ?? null,
   });
+
+  // Safety net: a check/count habit switched away from without going through
+  // the habit-log modal (e.g. a minute habit, or the modal being bypassed)
+  // still gets credited via the "remaining target" fallback. No-ops if the
+  // habit was already logged explicitly (idempotent).
+  await autoLogHabitOnStop(userId, previousHabitId);
 
   // Tag the entry to its task's project (when started from a task chip) so it
   // surfaces a project chip in the list and feeds the project's time rollups.
@@ -105,6 +114,65 @@ export async function quickStartEntry(formData: FormData) {
       await tagTimeEntry(userId, entry.id, parsed.data.projectId);
     } catch (error) {
       console.error("[time] quickStartEntry project tag failed", error);
+    }
+  }
+
+  revalidatePath("/app");
+  revalidatePath("/app/do");
+  revalidatePath("/app/habits");
+  revalidatePath("/app/time");
+  revalidatePath("/app/calendar");
+}
+
+// Switch flow for a check/count habit: log its quantity, then start the next
+// entry — used by the running card's habit-log modal when "Switch" is tapped
+// instead of a stop action. Logging before starting matters: startEntry
+// auto-stops the running entry as a raw DB update, so the habit context here
+// must come from the form, not a fresh getRunningEntry read.
+export async function switchEntryWithHabitReflection(formData: FormData) {
+  const userId = await resolveActiveUserId();
+  const habitId = String(formData.get("habitId") ?? "").trim();
+  const quantityRaw = String(formData.get("quantity") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim();
+
+  const parsed = startSchema.safeParse({
+    label: formData.get("nextLabel") ?? "",
+    category: (formData.get("nextCategory") as string) || undefined,
+    doItemId: (formData.get("nextDoItemId") as string) || undefined,
+    habitId: (formData.get("nextHabitId") as string) || undefined,
+  });
+  if (!habitId) {
+    throw new Error("Missing habit id.");
+  }
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? "Invalid input.");
+  }
+
+  if (quantityRaw) {
+    const quantity = Number(quantityRaw);
+    if (!Number.isFinite(quantity) || quantity < 1) {
+      throw new Error("Invalid habit quantity.");
+    }
+    await logHabitProgress(userId, habitId, {
+      quantity,
+      notes: notes || "Completed from timed habit session.",
+      mode: "full",
+    });
+  }
+
+  const entry = await timeService.startEntry(userId, {
+    label: parsed.data.label,
+    category: parsed.data.category ?? null,
+    doItemId: parsed.data.doItemId ?? null,
+    habitId: parsed.data.habitId ?? null,
+  });
+
+  const nextProjectId = (formData.get("nextProjectId") as string) || "";
+  if (nextProjectId) {
+    try {
+      await tagTimeEntry(userId, entry.id, nextProjectId);
+    } catch (error) {
+      console.error("[time] switchEntryWithHabitReflection project tag failed", error);
     }
   }
 

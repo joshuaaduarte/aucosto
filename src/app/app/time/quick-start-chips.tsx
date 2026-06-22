@@ -47,7 +47,7 @@ export type QuickStartRecent = {
   color: string;
 };
 
-type StartPayload = {
+export type StartPayload = {
   label: string;
   category?: string;
   doItemId?: string;
@@ -62,6 +62,8 @@ export function QuickStartChips({
   habits = [],
   recents = [],
   categoryManage,
+  runningHabit = null,
+  onSwitchHabitLogRequired,
 }: {
   categories?: QuickStartCategory[];
   calendarItems?: QuickStartCalendarItem[];
@@ -69,6 +71,11 @@ export function QuickStartChips({
   habits?: QuickStartHabit[];
   recents?: QuickStartRecent[];
   categoryManage?: ReactNode;
+  /** The habit linked to the currently-running timer, when used as the
+   * running card's switch panel — check/count habits need an explicit log
+   * before switching away, so taps are routed to the parent instead. */
+  runningHabit?: { id: string; isMinuteHabit: boolean } | null;
+  onSwitchHabitLogRequired?: (payload: StartPayload) => void;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -76,6 +83,10 @@ export function QuickStartChips({
 
   const start = (key: string, payload: StartPayload) => {
     if (pending) return;
+    if (runningHabit && !runningHabit.isMinuteHabit && onSwitchHabitLogRequired) {
+      onSwitchHabitLogRequired(payload);
+      return;
+    }
     setStartingKey(key);
     startTransition(async () => {
       const formData = new FormData();

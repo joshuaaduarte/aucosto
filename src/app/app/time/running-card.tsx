@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { cloneElement, isValidElement, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { formatMinutes } from "@/lib/do";
 import {
@@ -8,6 +8,7 @@ import {
   stopEntryAndCompleteDoItem,
   stopEntryWithHabitReflection,
   stopEntryWithReflection,
+  switchEntryWithHabitReflection,
 } from "./actions";
 import { formatDuration } from "@/lib/time";
 import { DescribeRow } from "./describe-row";
@@ -16,6 +17,7 @@ import {
   BackdatedStopModal,
   ClockRewindIcon,
 } from "./backdated-stop-modal";
+import type { StartPayload } from "./quick-start-chips";
 import { useBodyScrollLock } from "../_components/use-body-scroll-lock";
 
 export function RunningCard({
@@ -56,6 +58,7 @@ export function RunningCard({
   const [pending, startTransition] = useTransition();
   const [reflectOpen, setReflectOpen] = useState(false);
   const [stopAtOpen, setStopAtOpen] = useState(false);
+  const [switchPayload, setSwitchPayload] = useState<StartPayload | null>(null);
   useBodyScrollLock(reflectOpen);
 
   useEffect(() => {
@@ -70,6 +73,30 @@ export function RunningCard({
   const trackedIfStoppedNow = (doItem?.trackedMinutes ?? 0) + elapsedMinutes;
   const [reflectionPending, startReflectionTransition] = useTransition();
   const isMinuteHabit = habit?.goalUnit === "minutes";
+
+  const closeHabitModal = () => {
+    setReflectOpen(false);
+    setSwitchPayload(null);
+  };
+
+  // Check/count habits need an explicit log before switching away — route
+  // switch-panel taps through the same modal used by "Log and stop".
+  const switchPanelNode =
+    switchPanel && habit && isValidElement(switchPanel)
+      ? cloneElement(
+          switchPanel as React.ReactElement<{
+            runningHabit?: { id: string; isMinuteHabit: boolean } | null;
+            onSwitchHabitLogRequired?: (payload: StartPayload) => void;
+          }>,
+          {
+            runningHabit: { id: habit.id, isMinuteHabit },
+            onSwitchHabitLogRequired: (payload: StartPayload) => {
+              setSwitchPayload(payload);
+              setReflectOpen(true);
+            },
+          },
+        )
+      : switchPanel;
 
   return (
     <>
@@ -232,7 +259,7 @@ export function RunningCard({
         {/* Jot notes mid-session — keyed by entry so a switch starts fresh. */}
         <RunningNotes key={entryId} entryId={entryId} initialNotes={notes} />
 
-        {switchPanel ? (
+        {switchPanelNode ? (
           <div
             className="mt-5 border-t pt-4"
             style={{ borderColor: "var(--accent-tint-strong)" }}
@@ -243,7 +270,7 @@ export function RunningCard({
             >
               Switch — one tap stops this and starts the next
             </p>
-            {switchPanel}
+            {switchPanelNode}
           </div>
         ) : null}
       </article>
@@ -407,13 +434,17 @@ export function RunningCard({
         <div
           className="calendar-modal-backdrop"
           role="presentation"
-          onClick={() => setReflectOpen(false)}
+          onClick={closeHabitModal}
         >
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="habit-reflection-title"
             className="calendar-modal"
+            style={{
+              paddingBottom:
+                "calc(1rem + var(--mobile-tabbar-height, 0px) + var(--timer-bar-height, 0px) + var(--safe-area-bottom, 0px))",
+            }}
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-4">
@@ -422,7 +453,7 @@ export function RunningCard({
                   className="text-[0.6875rem] font-semibold uppercase tracking-wider"
                   style={{ color: "var(--text-faint)" }}
                 >
-                  Stop session
+                  {switchPayload ? "Switching" : "Stop session"}
                 </p>
                 <h2
                   id="habit-reflection-title"
@@ -435,7 +466,9 @@ export function RunningCard({
                   className="mt-2 text-[0.8125rem]"
                   style={{ color: "var(--text-muted)" }}
                 >
-                  Timed habit sessions for check/count habits need an explicit log so the habit gets credit.
+                  {switchPayload
+                    ? `Log this before switching to "${switchPayload.label}" — timed check/count habits need an explicit log so the habit gets credit.`
+                    : "Timed habit sessions for check/count habits need an explicit log so the habit gets credit."}
                 </p>
               </div>
 
@@ -443,7 +476,7 @@ export function RunningCard({
                 type="button"
                 className="btn-icon h-8 w-8 rounded-full border"
                 style={{ borderColor: "var(--border-faint)" }}
-                onClick={() => setReflectOpen(false)}
+                onClick={closeHabitModal}
                 aria-label="Close habit reflection modal"
               >
                 ×
@@ -453,9 +486,18 @@ export function RunningCard({
             <form
               action={(formData) => {
                 startReflectionTransition(async () => {
-                  await stopEntryWithHabitReflection(formData);
+                  if (switchPayload) {
+                    formData.set("nextLabel", switchPayload.label);
+                    if (switchPayload.category) formData.set("nextCategory", switchPayload.category);
+                    if (switchPayload.doItemId) formData.set("nextDoItemId", switchPayload.doItemId);
+                    if (switchPayload.habitId) formData.set("nextHabitId", switchPayload.habitId);
+                    if (switchPayload.projectId) formData.set("nextProjectId", switchPayload.projectId);
+                    await switchEntryWithHabitReflection(formData);
+                  } else {
+                    await stopEntryWithHabitReflection(formData);
+                  }
                   router.refresh();
-                  setReflectOpen(false);
+                  closeHabitModal();
                 });
               }}
               className="mt-5 space-y-4"
@@ -508,12 +550,18 @@ export function RunningCard({
                   type="button"
                   className="btn-ghost"
                   disabled={reflectionPending}
-                  onClick={() => setReflectOpen(false)}
+                  onClick={closeHabitModal}
                 >
                   Cancel
                 </button>
                 <button type="submit" disabled={reflectionPending} className="btn-ink">
-                  {reflectionPending ? "Stopping..." : "Log and stop"}
+                  {reflectionPending
+                    ? switchPayload
+                      ? "Switching..."
+                      : "Stopping..."
+                    : switchPayload
+                      ? "Log and switch"
+                      : "Log and stop"}
                 </button>
               </div>
             </form>
