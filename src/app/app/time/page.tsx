@@ -83,6 +83,22 @@ function dayKey(date: Date) {
   return startOfDay(date).toISOString();
 }
 
+/**
+ * Display day for a sleep-onset (bedtime) marker. Going to bed after midnight
+ * but before 6am logically closes out the PREVIOUS calendar day's night, so we
+ * bucket it there — otherwise a 12:15am bedtime jumps to the top of "Today"
+ * instead of sitting with "Yesterday". Display-only; the stored timestamp is
+ * never changed. Wake-up markers are bucketed by their actual wake day (a 5am
+ * wake still belongs to that morning), so this shift applies to onset only.
+ */
+function sleepOnsetDay(startedAt: Date) {
+  const day = startOfDay(startedAt);
+  if (startedAt.getHours() < 6) {
+    day.setDate(day.getDate() - 1);
+  }
+  return day;
+}
+
 /** "06:17" → "6:17 AM" (or null when unparseable). */
 function formatClockString(hhmm: string | null) {
   if (!hhmm) return null;
@@ -518,7 +534,9 @@ export default async function TimePage() {
     ensureGroup(entry.startedAt).entries.push(entry);
   }
   for (const sleep of sleepSessions) {
-    ensureGroup(sleep.startedAt).bed.push(sleep);
+    // Bedtime buckets by its logical night (post-midnight onset → previous
+    // day); the wake-up marker stays on its actual wake day.
+    ensureGroup(sleepOnsetDay(sleep.startedAt)).bed.push(sleep);
     // Only show a wake-up marker once there's a wake time to show.
     if (sleep.endedAt || sleep.wakeTime) {
       ensureGroup(sleep.endedAt ?? now).wake.push(sleep);
