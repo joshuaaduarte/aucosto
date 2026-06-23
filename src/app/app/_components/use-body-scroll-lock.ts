@@ -1,25 +1,29 @@
 "use client";
 
-// Locks body scroll while a modal/bottom sheet is open. Reference-counted at
-// module level so overlapping or nested modals can't unlock the page early:
-// the lock releases only when the LAST active lock unmounts or deactivates.
+// Locks body scroll while a modal/bottom sheet is open. Tracked at module
+// level via a set of per-instance tokens (not a plain counter) so
+// overlapping/nested modals only release the lock when the last one closes —
+// and so a double-fired effect (React dev double-invoke, a modal that
+// re-locks before its sibling unlocks) can never desync the count, since
+// Set add/delete are idempotent per token.
 
-import { useEffect } from "react";
+import { useEffect, useId } from "react";
 
-let lockCount = 0;
+const lockTokens = new Set<string>();
+
+function applyLockState() {
+  document.body.style.overflow = lockTokens.size > 0 ? "hidden" : "";
+}
 
 export function useBodyScrollLock(active: boolean = true) {
+  const id = useId();
   useEffect(() => {
     if (!active) return;
-    lockCount += 1;
-    if (lockCount === 1) {
-      document.body.style.overflow = "hidden";
-    }
+    lockTokens.add(id);
+    applyLockState();
     return () => {
-      lockCount -= 1;
-      if (lockCount === 0) {
-        document.body.style.overflow = "";
-      }
+      lockTokens.delete(id);
+      applyLockState();
     };
-  }, [active]);
+  }, [active, id]);
 }

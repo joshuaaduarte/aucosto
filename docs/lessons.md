@@ -102,12 +102,15 @@ pattern: keep `opacity-0 group-hover:opacity-100` for desktop, add
 can only grow, and desktop is untouched. Also: `.field` inputs bump to 1rem
 under 640px or iOS Safari zooms the viewport on focus.
 
-## 9. `useBodyScrollLock` — reference-counted scroll lock
+## 9. `useBodyScrollLock` — token-set scroll lock
 
 All modals call `useBodyScrollLock(open)` (or unconditionally when the
 component only mounts while open). It sets `overflow: hidden` on `<body>`
-with a **module-level reference count**, so overlapping/nested modals only
-release the lock when the last one closes. Never set body overflow
+backed by a **module-level set of per-instance tokens** (`useId()`-keyed),
+not a plain counter — so overlapping/nested modals only release the lock
+when the last one closes, and a double-fired effect (React dev
+double-invoke, or two modals racing open/close) can never desync the lock,
+since `Set.add`/`delete` are idempotent per token. Never set body overflow
 directly; never forget the hook on a new modal (the More sheet, every
 calendar-modal consumer, and the habit modals all use it).
 

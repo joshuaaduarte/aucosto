@@ -287,8 +287,8 @@ export function HabitEditForm({ habit }: { habit: HabitSummary }) {
         ) : null}
 
         <div className="flex justify-end">
-          <button type="submit" disabled={pending} className="btn-ink">
-            {pending ? "Saving…" : "Save changes"}
+          <button type="submit" disabled={pending} className="btn-ink w-full sm:w-auto">
+            {pending ? "Saving..." : "Save changes"}
           </button>
         </div>
       </form>
