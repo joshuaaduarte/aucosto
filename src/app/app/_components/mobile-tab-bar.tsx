@@ -133,6 +133,17 @@ const MORE_TOOLS: MoreTool[] = [
     ),
   },
   {
+    href: "/app/assistant",
+    label: "Assistant",
+    icon: (
+      <svg {...ip}>
+        <rect x="2.5" y="3.5" width="10" height="8" rx="1.5" />
+        <path d="M5.5 6.25h.01M9.5 6.25h.01M5 9h5" />
+        <path d="M7.5 1.5v2" />
+      </svg>
+    ),
+  },
+  {
     href: "/app/settings",
     label: "Settings",
     icon: (

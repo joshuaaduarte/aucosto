@@ -112,6 +112,15 @@ function ReflectIcon() {
     </svg>
   );
 }
+function AssistantIcon() {
+  return (
+    <svg {...ip}>
+      <rect x="2.5" y="3.5" width="10" height="8" rx="1.5" />
+      <path d="M5.5 6.25h.01M9.5 6.25h.01M5 9h5" />
+      <path d="M7.5 1.5v2" />
+    </svg>
+  );
+}
 function GearIcon() {
   return (
     <svg {...ip}>
@@ -157,6 +166,7 @@ const navItems: NavItem[] = [
   { href: "/app/reflect", label: "Reflect", match: (p) => p.startsWith("/app/reflect"), finance: false, icon: <ReflectIcon /> },
   { href: "/app/insights", label: "Insights", match: (p) => p.startsWith("/app/insights"), finance: false, icon: <TrendIcon /> },
   { href: "/app/finance", label: "Finance", match: (p) => p.startsWith("/app/finance"), finance: true, icon: <WalletIcon /> },
+  { href: "/app/assistant", label: "Assistant", match: (p) => p.startsWith("/app/assistant"), finance: false, icon: <AssistantIcon /> },
 ];
 
 const comingSoon: Array<{ label: string; icon: React.ReactNode }> = [
