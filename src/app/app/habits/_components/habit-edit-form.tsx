@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import {
   HABIT_CADENCE_LABELS,
   HABIT_CADENCES,
@@ -9,10 +9,11 @@ import {
   HABIT_GOAL_UNIT_LABELS,
   HABIT_GOAL_UNITS,
   HABIT_WEEKDAY_OPTIONS,
+  type HabitCadence,
   parseHabitDays,
 } from "@/lib/habits";
 import type { HabitSummary } from "@/lib/services/habits";
-import { updateHabitAction } from "../actions";
+import { type HabitState, updateHabitAction } from "../actions";
 
 /** Clamp minutes-since-midnight to a 24-hour HH:MM string for <input type="time">. */
 function clampClock24(totalMinutes: number): string {
@@ -34,11 +35,29 @@ function parseClock24(value: string | null | undefined): number | null {
 }
 
 export function HabitEditForm({ habit }: { habit: HabitSummary }) {
+  const [state, formAction, pending] = useActionState<HabitState, FormData>(updateHabitAction, undefined);
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+  const submittedRef = useRef(false);
+  const [cadence, setCadence] = useState<HabitCadence>(habit.cadence as HabitCadence);
   const [showWindow, setShowWindow] = useState(
     Boolean(habit.windowStart || habit.windowEnd),
   );
   const [windowStart, setWindowStart] = useState(habit.windowStart ?? "");
   const [windowEnd, setWindowEnd] = useState(habit.windowEnd ?? "");
+
+  useEffect(() => {
+    if (pending) {
+      submittedRef.current = true;
+      return;
+    }
+    if (submittedRef.current && !state?.error) {
+      submittedRef.current = false;
+      const timer = window.setTimeout(() => {
+        if (detailsRef.current) detailsRef.current.open = false;
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+  }, [pending, state]);
 
   // Enabling the window pre-fills ±1h around the reminder (the default range).
   const toggleWindow = () => {
@@ -56,11 +75,17 @@ export function HabitEditForm({ habit }: { habit: HabitSummary }) {
   };
 
   return (
-    <details className="rounded-[0.95rem] border" style={{ borderColor: "var(--border-faint)" }}>
+    <details ref={detailsRef} className="rounded-[0.95rem] border" style={{ borderColor: "var(--border-faint)" }}>
       <summary className="cursor-pointer list-none px-3 py-2 text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
         Edit habit
       </summary>
-      <form action={updateHabitAction} className="space-y-3 px-3 pb-3">
+      <form
+        action={formAction}
+        className="space-y-3 px-3 pb-3"
+        onSubmit={() => {
+          submittedRef.current = true;
+        }}
+      >
         <input type="hidden" name="id" value={habit.id} />
         <div className="space-y-1.5">
           <label htmlFor={`title-${habit.id}`} className="block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
@@ -74,7 +99,13 @@ export function HabitEditForm({ habit }: { habit: HabitSummary }) {
             <label htmlFor={`cadence-${habit.id}`} className="block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
               Cadence
             </label>
-            <select id={`cadence-${habit.id}`} name="cadence" defaultValue={habit.cadence} className="field">
+            <select
+              id={`cadence-${habit.id}`}
+              name="cadence"
+              value={cadence}
+              onChange={(event) => setCadence(event.target.value as HabitCadence)}
+              className="field"
+            >
               {HABIT_CADENCES.map((option) => (
                 <option key={option} value={option}>
                   {HABIT_CADENCE_LABELS[option]}
@@ -98,28 +129,38 @@ export function HabitEditForm({ habit }: { habit: HabitSummary }) {
             <label htmlFor={`target-${habit.id}`} className="block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
               Target
             </label>
-            <input id={`target-${habit.id}`} name="targetCount" type="number" min={1} defaultValue={habit.targetCount} className="field" />
+            <input
+              id={`target-${habit.id}`}
+              name="targetCount"
+              type="number"
+              min={1}
+              defaultValue={habit.targetCount}
+              className="field"
+              required
+            />
           </div>
         </div>
 
-        <div className="space-y-2">
-          <p className="text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
-            Custom days
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {HABIT_WEEKDAY_OPTIONS.map((day) => (
-              <label key={`${habit.id}-${day.value}`} className="pill cursor-pointer gap-2 px-2 py-1">
-                <input
-                  type="checkbox"
-                  name="daysOfWeek"
-                  value={day.value}
-                  defaultChecked={parseHabitDays(habit.daysOfWeek).includes(day.value)}
-                />
-                <span>{day.short}</span>
-              </label>
-            ))}
+        {cadence === "custom" ? (
+          <div className="space-y-2">
+            <p className="text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
+              Custom days
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {HABIT_WEEKDAY_OPTIONS.map((day) => (
+                <label key={`${habit.id}-${day.value}`} className="pill cursor-pointer gap-2 px-2 py-1">
+                  <input
+                    type="checkbox"
+                    name="daysOfWeek"
+                    value={day.value}
+                    defaultChecked={parseHabitDays(habit.daysOfWeek).includes(day.value)}
+                  />
+                  <span>{day.short}</span>
+                </label>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="space-y-1.5">
@@ -236,9 +277,18 @@ export function HabitEditForm({ habit }: { habit: HabitSummary }) {
           </div>
         </div>
 
+        {state?.error ? (
+          <p
+            className="rounded-md px-3 py-2 text-[0.8125rem]"
+            style={{ background: "var(--accent-tint)", color: "var(--accent-strong)", border: "1px solid var(--accent-tint-strong)" }}
+          >
+            {state.error}
+          </p>
+        ) : null}
+
         <div className="flex justify-end">
-          <button type="submit" className="btn-ink">
-            Save changes
+          <button type="submit" disabled={pending} className="btn-ink">
+            {pending ? "Saving…" : "Save changes"}
           </button>
         </div>
       </form>

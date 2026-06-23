@@ -106,7 +106,10 @@ export async function createHabitAction(
   revalidateHabits();
 }
 
-export async function updateHabitAction(formData: FormData) {
+export async function updateHabitAction(
+  _prev: HabitState,
+  formData: FormData,
+): Promise<HabitState> {
   const userId = await resolveActiveUserId();
   const id = String(formData.get("id") ?? "");
   const parsed = habitSchema.safeParse({
@@ -126,13 +129,17 @@ export async function updateHabitAction(formData: FormData) {
     daysOfWeek: formData.getAll("daysOfWeek"),
   });
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? "Invalid habit.");
+    return { error: parsed.error.issues[0]?.message ?? "Invalid habit." };
   }
-  await updateHabit(userId, id, {
+  const updated = await updateHabit(userId, id, {
     ...parsed.data,
     daysOfWeek: serializeHabitDays(parsed.data.daysOfWeek),
   });
+  if (!updated) {
+    return { error: "Habit not found." };
+  }
   revalidateHabits();
+  return undefined;
 }
 
 export async function logHabitAction(
