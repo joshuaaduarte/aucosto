@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { formatHabitQuantity, type HabitGoalUnit } from "@/lib/habits";
 import type { HabitSummary } from "@/lib/services/habits";
 import { type HabitLogState, logHabitAction } from "../actions";
@@ -30,7 +31,11 @@ export function LogProgressModal({ habit, onClose }: { habit: HabitSummary; onCl
     }
   }, [onClose, pending, state]);
 
-  return (
+  // Portal to <body>: ancestor transforms/filters (e.g. animated page
+  // sections) would otherwise become the containing block for this
+  // fixed-position backdrop and drag the modal into the document flow,
+  // letting the bottom-fixed tab/timer bars render over it.
+  return createPortal(
     <div className="calendar-modal-backdrop" role="presentation" onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-labelledby={`habit-log-title-${habit.id}`} className="calendar-modal" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between gap-4">
@@ -103,6 +108,7 @@ export function LogProgressModal({ habit, onClose }: { habit: HabitSummary; onCl
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

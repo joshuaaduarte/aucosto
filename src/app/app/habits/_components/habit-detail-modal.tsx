@@ -5,6 +5,7 @@
 // tapping a habit card — the card itself stays compact.
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { categoryColor } from "@/lib/time-categories";
 import { formatHabitQuantity, type HabitGoalUnit } from "@/lib/habits";
 import type { HabitSummary } from "@/lib/services/habits";
@@ -58,7 +59,11 @@ export function HabitDetailModal({
     habit.fallbackLoggedToday ||
     habit.recoveryLoggedToday;
 
-  return (
+  // Portal to <body>: ancestor transforms/filters (e.g. animated page
+  // sections) would otherwise become the containing block for this
+  // fixed-position backdrop and drag the modal into the document flow,
+  // letting the bottom-fixed tab/timer bars render over it.
+  return createPortal(
     <>
       <div className="calendar-modal-backdrop" role="presentation" onClick={onClose}>
         <div
@@ -279,6 +284,7 @@ export function HabitDetailModal({
 
       {scheduleOpen ? <ScheduleModal habit={habit} onClose={() => setScheduleOpen(false)} /> : null}
       {logOpen ? <LogProgressModal habit={habit} onClose={() => setLogOpen(false)} /> : null}
-    </>
+    </>,
+    document.body,
   );
 }
