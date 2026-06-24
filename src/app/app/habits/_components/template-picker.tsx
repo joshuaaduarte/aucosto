@@ -43,7 +43,12 @@ export function TemplatePicker({
   return (
     <section
       className="rounded-[1rem] border p-4 sm:p-5"
-      style={{ borderColor: "var(--border-soft)", background: "var(--bg-page)" }}
+      style={{
+        borderColor: "var(--border-soft)",
+        background: "var(--bg-page)",
+        paddingBottom:
+          "calc(1rem + var(--mobile-tabbar-height) + var(--timer-bar-height, 0px) + var(--safe-area-bottom, 0px))",
+      }}
     >
       <div className="flex items-start justify-between gap-3">
         <div>
