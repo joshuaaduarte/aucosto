@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   computeSignals,
   computeBriefing,
+  resolveTimezone,
   FOCUS_TEMPLATES,
   WATCHOUT_TEMPLATES,
   JOURNAL_PROMPTS,
   type SignalFacts,
 } from "@/lib/assistant-signals";
+
+// ── base fixtures ──────────────────────────────────────────────────────────
 
 function makeFacts(overrides: Partial<SignalFacts> = {}): SignalFacts {
   return {
@@ -41,6 +44,30 @@ function makeFacts(overrides: Partial<SignalFacts> = {}): SignalFacts {
   };
 }
 
+// makeBriefingFacts builds a minimal facts object that satisfies the extended
+// BriefingFacts type (which requires wokeUpAt, calendar.nextEvent, time.runningTimer).
+function makeBriefingFacts(
+  overrides: {
+    wokeUpAt?: string | null;
+    nextEvent?: { title: string } | null;
+    runningTimer?: { category: string | null } | null;
+    tasks?: { open: { title: string; lane: string }[] };
+    habits?: { items: { name: string; done: boolean; streak: number; scheduledToday: boolean }[] };
+  } = {},
+) {
+  return {
+    today: {
+      wokeUpAt: overrides.wokeUpAt ?? null,
+      calendar: { nextEvent: overrides.nextEvent ?? null },
+      time: { runningTimer: overrides.runningTimer ?? null },
+      tasks: overrides.tasks ?? { open: [] },
+      habits: overrides.habits ?? { items: [] },
+    },
+  };
+}
+
+// ── computeSignals — hasRunningTimer ───────────────────────────────────────
+
 describe("computeSignals — hasRunningTimer", () => {
   it("is false when no timer", () => {
     const s = computeSignals(makeFacts(), 9 * 60);
@@ -54,6 +81,8 @@ describe("computeSignals — hasRunningTimer", () => {
     expect(s.hasRunningTimer).toBe(true);
   });
 });
+
+// ── computeSignals — lateStart ─────────────────────────────────────────────
 
 describe("computeSignals — lateStart", () => {
   it("is false when wokeUpAt is null", () => {
@@ -89,6 +118,8 @@ describe("computeSignals — lateStart", () => {
     expect(s.lateStart).toBe(true);
   });
 });
+
+// ── computeSignals — openDay ───────────────────────────────────────────────
 
 describe("computeSignals — openDay", () => {
   it("is true when calendar is empty", () => {
@@ -133,6 +164,8 @@ describe("computeSignals — openDay", () => {
   });
 });
 
+// ── computeSignals — needsPlan ─────────────────────────────────────────────
+
 describe("computeSignals — needsPlan", () => {
   it("is true when openDay and no tasks at all", () => {
     const s = computeSignals(makeFacts(), 10 * 60);
@@ -166,6 +199,8 @@ describe("computeSignals — needsPlan", () => {
   });
 });
 
+// ── computeSignals — momentum ──────────────────────────────────────────────
+
 describe("computeSignals — momentum", () => {
   it("is low when nothing tracked and past 10am", () => {
     const s = computeSignals(makeFacts(), 10 * 60);
@@ -192,6 +227,8 @@ describe("computeSignals — momentum", () => {
     expect(s.momentum).toBe("low");
   });
 });
+
+// ── computeSignals — habitRecovery ─────────────────────────────────────────
 
 describe("computeSignals — habitRecovery", () => {
   it("is false when yesterday habits were all done", () => {
@@ -241,6 +278,8 @@ describe("computeSignals — habitRecovery", () => {
   });
 });
 
+// ── computeSignals — stalledProjects ───────────────────────────────────────
+
 describe("computeSignals — stalledProjects", () => {
   it("returns empty when no projects", () => {
     const s = computeSignals(makeFacts(), 10 * 60);
@@ -267,6 +306,8 @@ describe("computeSignals — stalledProjects", () => {
   });
 });
 
+// ── computeSignals — financeNeedsAttention ─────────────────────────────────
+
 describe("computeSignals — financeNeedsAttention", () => {
   it("is always false (deferred)", () => {
     const facts = makeFacts({ finance: { visible: false } });
@@ -280,6 +321,8 @@ describe("computeSignals — financeNeedsAttention", () => {
     expect(s.financeNeedsAttention).toBe(false);
   });
 });
+
+// ── computeSignals — driftRisk ─────────────────────────────────────────────
 
 describe("computeSignals — driftRisk", () => {
   it("is low when no risk factors", () => {
@@ -301,26 +344,20 @@ describe("computeSignals — driftRisk", () => {
     const facts = makeFacts({
       yesterday: { habitsCompleted: 0, habitsTotal: 4 },
     });
-    // openDay: no future events > 30min
-    // needsPlan: openDay and no today tasks
-    // no running timer at 11am
     const s = computeSignals(facts, 11 * 60);
     expect(s.driftRisk).toBe("high");
   });
 
   it("is medium with 2-3 risk factors", () => {
-    // openDay (+1), no timer at 10am (+1) => 2 = medium
     const facts = makeFacts();
-    const s = computeSignals(facts, 10 * 60);
-    // openDay=true, needsPlan may be true too, let's check score
-    // openDay(+1), needsPlan(+1 since openDay+no today tasks), momentum=low at 10am (+1), habitRecovery=false, no timer at 10am(+1)
-    // score = 4 = high? No: openDay(1)+needsPlan(1)+momentum_low_at_10am(1)+no_timer_at_10am(1) = 4 → high
-    // Let me use 8am instead (no momentum flag since localHour < 10)
+    // At 8am: openDay(1), needsPlan(1), momentum=low but hour<10 so no(0),
+    // habitRecovery=false(0), no timer at 8am(1) = 3 = medium
     const s2 = computeSignals(facts, 8 * 60);
-    // openDay(1), needsPlan(1), momentum=low but hour<10 so no(0), habitRecovery=false(0), no timer at 8am(1) = 3 = medium
     expect(s2.driftRisk).toBe("medium");
   });
 });
+
+// ── computeBriefing — currentState (compound slug) ─────────────────────────
 
 describe("computeBriefing — currentState", () => {
   function makeSignals(overrides: Partial<ReturnType<typeof computeSignals>> = {}) {
@@ -340,54 +377,78 @@ describe("computeBriefing — currentState", () => {
     };
   }
 
-  const emptyFacts = {
-    today: {
-      tasks: { open: [] },
-      habits: { items: [] },
-    },
-  };
-
-  it("returns timer_running when hasRunningTimer", () => {
-    const b = computeBriefing(emptyFacts, makeSignals({ hasRunningTimer: true }), 10, 1);
-    expect(b.currentState).toBe("timer currently running");
+  it("contains 'timer_active' when hasRunningTimer with no category", () => {
+    const facts = makeBriefingFacts({ runningTimer: { category: null } });
+    const b = computeBriefing(facts, makeSignals({ hasRunningTimer: true }), 10, 1);
+    expect(b.currentState).toContain("timer_active");
   });
 
-  it("returns morning_not_started early with no tasks", () => {
-    const b = computeBriefing(emptyFacts, makeSignals(), 7, 1);
-    expect(b.currentState).toBe("morning not yet started");
+  it("contains 'timer_work' when running timer has category 'work'", () => {
+    const facts = makeBriefingFacts({ runningTimer: { category: "work" } });
+    const b = computeBriefing(facts, makeSignals({ hasRunningTimer: true }), 10, 1);
+    expect(b.currentState).toContain("timer_work");
   });
 
-  it("returns active_morning_open at 9am with open day", () => {
-    const b = computeBriefing(emptyFacts, makeSignals({ openDay: true }), 9, 1);
-    expect(b.currentState).toBe("active morning with open calendar");
+  it("contains timer category slug (lowercase, no spaces)", () => {
+    const facts = makeBriefingFacts({ runningTimer: { category: "Deep Work" } });
+    const b = computeBriefing(facts, makeSignals({ hasRunningTimer: true }), 10, 1);
+    expect(b.currentState).toContain("timer_deepwork");
   });
 
-  it("returns active_morning_planned at 9am without open day", () => {
-    const b = computeBriefing(emptyFacts, makeSignals({ openDay: false }), 9, 1);
-    expect(b.currentState).toBe("active morning with scheduled blocks");
+  it("contains 'morning' before noon", () => {
+    const b = computeBriefing(makeBriefingFacts(), makeSignals(), 9, 1);
+    expect(b.currentState).toContain("morning");
   });
 
-  it("returns evening after 18:00", () => {
-    const b = computeBriefing(emptyFacts, makeSignals(), 19, 1);
-    expect(b.currentState).toBe("evening");
+  it("contains 'midday' for hours 12–16", () => {
+    const b = computeBriefing(makeBriefingFacts(), makeSignals({ openDay: false }), 14, 1);
+    expect(b.currentState).toContain("midday");
   });
 
-  it("returns mid_day_drifting when driftRisk is medium or high", () => {
-    const b = computeBriefing(emptyFacts, makeSignals({ driftRisk: "medium" }), 14, 1);
-    expect(b.currentState).toBe("mid-day with drift risk");
+  it("contains 'evening' at or after 17:00", () => {
+    const b = computeBriefing(makeBriefingFacts(), makeSignals(), 19, 1);
+    expect(b.currentState).toContain("evening");
   });
 
-  it("returns mid_day_on_track otherwise", () => {
-    const b = computeBriefing(emptyFacts, makeSignals({ driftRisk: "low", openDay: false }), 14, 1);
-    expect(b.currentState).toBe("mid-day on track");
+  it("contains 'early' before 6am", () => {
+    const b = computeBriefing(makeBriefingFacts(), makeSignals(), 5, 1);
+    expect(b.currentState).toContain("early");
+  });
+
+  it("contains 'open' when openDay and not crowded", () => {
+    const b = computeBriefing(makeBriefingFacts(), makeSignals({ openDay: true }), 10, 1);
+    expect(b.currentState).toContain("open");
+  });
+
+  it("contains 'crowded' when crowdedDay", () => {
+    const b = computeBriefing(makeBriefingFacts(), makeSignals({ crowdedDay: true, openDay: false }), 14, 1);
+    expect(b.currentState).toContain("crowded");
+  });
+
+  it("contains 'normal' when not open and not crowded", () => {
+    const b = computeBriefing(makeBriefingFacts(), makeSignals({ openDay: false }), 14, 1);
+    expect(b.currentState).toContain("normal");
+  });
+
+  it("contains 'needs_plan' when needsPlan", () => {
+    const b = computeBriefing(makeBriefingFacts(), makeSignals({ needsPlan: true }), 9, 1);
+    expect(b.currentState).toContain("needs_plan");
+  });
+
+  it("stays within 60 chars", () => {
+    const facts = makeBriefingFacts({ runningTimer: { category: "verylongcategorynamethatshouldbetruncated" } });
+    const b = computeBriefing(facts, makeSignals({ hasRunningTimer: true, needsPlan: true }), 10, 1);
+    expect(b.currentState.length).toBeLessThanOrEqual(60);
   });
 });
 
+// ── computeBriefing — topSignals ordering and cap ─────────────────────────
+
 describe("computeBriefing — topSignals ordering and cap", () => {
   it("includes unfinishedPriority first if active", () => {
-    const facts = {
-      today: { tasks: { open: [{ title: "T1", lane: "today" }] }, habits: { items: [] } },
-    };
+    const facts = makeBriefingFacts({
+      tasks: { open: [{ title: "T1", lane: "today" }] },
+    });
     const signals = computeSignals(
       {
         ...makeFacts(),
@@ -413,15 +474,17 @@ describe("computeBriefing — topSignals ordering and cap", () => {
       financeNeedsAttention: false,
       unfinishedPriority: true,
     };
-    const b = computeBriefing({ today: { tasks: { open: [] }, habits: { items: [] } } }, s, 12, 1);
+    const b = computeBriefing(makeBriefingFacts(), s, 12, 1);
     expect(b.topSignals.length).toBeLessThanOrEqual(4);
   });
 });
 
+// ── computeBriefing — suggestedFocus ──────────────────────────────────────
+
 describe("computeBriefing — suggestedFocus", () => {
   it("always has at least 2 items", () => {
     const b = computeBriefing(
-      { today: { tasks: { open: [] }, habits: { items: [] } } },
+      makeBriefingFacts(),
       {
         hasRunningTimer: false,
         lateStart: false,
@@ -455,15 +518,15 @@ describe("computeBriefing — suggestedFocus", () => {
       financeNeedsAttention: false,
       unfinishedPriority: false,
     };
-    const b = computeBriefing({ today: { tasks: { open: [] }, habits: { items: [] } } }, s, 12, 1);
+    const b = computeBriefing(makeBriefingFacts(), s, 12, 1);
     const hasFilled = b.suggestedFocus.some((f) => f.includes("MyProject"));
     expect(hasFilled).toBe(true);
   });
 });
 
-describe("computeBriefing — journalPrompt", () => {
-  const emptyFacts = { today: { tasks: { open: [] }, habits: { items: [] } } };
+// ── computeBriefing — journalPrompt ───────────────────────────────────────
 
+describe("computeBriefing — journalPrompt", () => {
   it("picks avoidance prompt on high drift risk", () => {
     const s = {
       hasRunningTimer: false,
@@ -478,7 +541,7 @@ describe("computeBriefing — journalPrompt", () => {
       financeNeedsAttention: false,
       unfinishedPriority: false,
     };
-    const b = computeBriefing(emptyFacts, s, 12, 3);
+    const b = computeBriefing(makeBriefingFacts(), s, 12, 3);
     expect(b.morningMessageInputs.journalPromptSeed).toBe(JOURNAL_PROMPTS[3]);
   });
 
@@ -496,7 +559,7 @@ describe("computeBriefing — journalPrompt", () => {
       financeNeedsAttention: false,
       unfinishedPriority: false,
     };
-    const b = computeBriefing(emptyFacts, s, 12, 3);
+    const b = computeBriefing(makeBriefingFacts(), s, 12, 3);
     expect(b.morningMessageInputs.journalPromptSeed).toBe(JOURNAL_PROMPTS[0]);
   });
 
@@ -514,9 +577,213 @@ describe("computeBriefing — journalPrompt", () => {
       financeNeedsAttention: false,
       unfinishedPriority: false,
     };
-    const b = computeBriefing(emptyFacts, s, 12, 2);
+    const b = computeBriefing(makeBriefingFacts(), s, 12, 2);
     expect(b.morningMessageInputs.journalPromptSeed).toBe(
       JOURNAL_PROMPTS[2 % JOURNAL_PROMPTS.length],
     );
+  });
+});
+
+// ── computeBriefing — contextNotes ────────────────────────────────────────
+
+describe("computeBriefing — contextNotes", () => {
+  function makeSignals(overrides: Partial<ReturnType<typeof computeSignals>> = {}) {
+    return {
+      hasRunningTimer: false,
+      lateStart: false,
+      openDay: false,
+      crowdedDay: false,
+      needsPlan: false,
+      momentum: "medium" as const,
+      driftRisk: "low" as const,
+      habitRecovery: false,
+      stalledProjects: [],
+      financeNeedsAttention: false,
+      unfinishedPriority: false,
+      ...overrides,
+    };
+  }
+
+  it("is empty when no notable conditions", () => {
+    const b = computeBriefing(makeBriefingFacts(), makeSignals(), 12, 1);
+    expect(b.contextNotes).toEqual([]);
+  });
+
+  it("adds 0-tasks note when needsPlan and openCount === 0", () => {
+    const facts = makeBriefingFacts({ tasks: { open: [] } });
+    const b = computeBriefing(facts, makeSignals({ needsPlan: true }), 12, 1);
+    expect(b.contextNotes).toContain("0 open tasks — day needs an explicit intention");
+  });
+
+  it("adds today-lane note when needsPlan but tasks exist outside today lane", () => {
+    const facts = makeBriefingFacts({
+      tasks: { open: [{ title: "Something", lane: "later" }] },
+    });
+    const b = computeBriefing(facts, makeSignals({ needsPlan: true }), 12, 1);
+    expect(b.contextNotes).toContain(
+      "no tasks in today lane — nothing prioritized yet",
+    );
+  });
+
+  it("adds no-events note when openDay and nextEvent is null", () => {
+    const facts = makeBriefingFacts({ nextEvent: null });
+    const b = computeBriefing(facts, makeSignals({ openDay: true }), 12, 1);
+    expect(b.contextNotes).toContain("no upcoming calendar events");
+  });
+
+  it("does not add no-events note when nextEvent is present", () => {
+    const facts = makeBriefingFacts({ nextEvent: { title: "Meeting" } });
+    const b = computeBriefing(facts, makeSignals({ openDay: true }), 12, 1);
+    expect(b.contextNotes).not.toContain("no upcoming calendar events");
+  });
+
+  it("adds late-start note including wake time", () => {
+    const facts = makeBriefingFacts({ wokeUpAt: "07:30" });
+    const b = computeBriefing(facts, makeSignals({ lateStart: true }), 12, 1);
+    const note = b.contextNotes.find((n) => n.startsWith("late start"));
+    expect(note).toBeDefined();
+    expect(note).toContain("07:30");
+  });
+
+  it("adds low-momentum note at or after 10am", () => {
+    const b = computeBriefing(makeBriefingFacts(), makeSignals({ momentum: "low" }), 10, 1);
+    expect(b.contextNotes).toContain("low tracked time for this time of day");
+  });
+
+  it("does not add low-momentum note before 10am", () => {
+    const b = computeBriefing(makeBriefingFacts(), makeSignals({ momentum: "low" }), 9, 1);
+    expect(b.contextNotes).not.toContain("low tracked time for this time of day");
+  });
+});
+
+// ── computeBriefing — structured prioritySeeds ────────────────────────────
+
+describe("computeBriefing — structured prioritySeeds", () => {
+  it("produces seeds with label, reason, and source fields", () => {
+    const facts = makeBriefingFacts({
+      tasks: { open: [{ title: "Ship feature", lane: "today" }] },
+    });
+    const signals = {
+      hasRunningTimer: false,
+      lateStart: false,
+      openDay: false,
+      crowdedDay: false,
+      needsPlan: false,
+      momentum: "medium" as const,
+      driftRisk: "low" as const,
+      habitRecovery: false,
+      stalledProjects: [],
+      financeNeedsAttention: false,
+      unfinishedPriority: true,
+    };
+    const b = computeBriefing(facts, signals, 10, 1);
+    expect(b.morningMessageInputs.prioritySeeds.length).toBeGreaterThan(0);
+    const seed = b.morningMessageInputs.prioritySeeds[0]!;
+    expect(seed).toHaveProperty("label");
+    expect(seed).toHaveProperty("reason");
+    expect(seed).toHaveProperty("source");
+    expect(seed.label).toBe("Ship feature");
+    expect(seed.reason).toBe("task in today lane");
+    expect(seed.source).toBe("facts.today.tasks");
+  });
+
+  it("assigns 'stalled project' reason for stalled projects", () => {
+    const signals = {
+      hasRunningTimer: false,
+      lateStart: false,
+      openDay: false,
+      crowdedDay: false,
+      needsPlan: false,
+      momentum: "medium" as const,
+      driftRisk: "low" as const,
+      habitRecovery: false,
+      stalledProjects: ["My Project"],
+      financeNeedsAttention: false,
+      unfinishedPriority: false,
+    };
+    const b = computeBriefing(makeBriefingFacts(), signals, 10, 1);
+    const seed = b.morningMessageInputs.prioritySeeds[0];
+    expect(seed?.reason).toBe("stalled project");
+    expect(seed?.source).toBe("signals.stalledProjects");
+  });
+
+  it("prioritySeedLabels matches labels from prioritySeeds", () => {
+    const facts = makeBriefingFacts({
+      tasks: { open: [{ title: "Task A", lane: "today" }] },
+    });
+    const signals = {
+      hasRunningTimer: false,
+      lateStart: false,
+      openDay: false,
+      crowdedDay: false,
+      needsPlan: false,
+      momentum: "medium" as const,
+      driftRisk: "low" as const,
+      habitRecovery: false,
+      stalledProjects: [],
+      financeNeedsAttention: false,
+      unfinishedPriority: true,
+    };
+    const b = computeBriefing(facts, signals, 10, 1);
+    const expected = b.morningMessageInputs.prioritySeeds.map((s) => s.label);
+    expect(b.morningMessageInputs.prioritySeedLabels).toEqual(expected);
+  });
+
+  it("assigns 'habit recovery' reason when streak is 0", () => {
+    const facts = makeBriefingFacts({
+      habits: {
+        items: [{ name: "Meditate", done: false, streak: 0, scheduledToday: true }],
+      },
+    });
+    const signals = {
+      hasRunningTimer: false,
+      lateStart: false,
+      openDay: false,
+      crowdedDay: false,
+      needsPlan: false,
+      momentum: "medium" as const,
+      driftRisk: "low" as const,
+      habitRecovery: false,
+      stalledProjects: [],
+      financeNeedsAttention: false,
+      unfinishedPriority: false,
+    };
+    const b = computeBriefing(facts, signals, 10, 1);
+    const habitSeed = b.morningMessageInputs.prioritySeeds.find(
+      (s) => s.label === "Meditate",
+    );
+    expect(habitSeed?.reason).toBe("habit recovery");
+  });
+});
+
+// ── resolveTimezone ────────────────────────────────────────────────────────
+
+describe("resolveTimezone", () => {
+  it("returns America/Los_Angeles when process.env.TZ is set to it", () => {
+    const orig = process.env.TZ;
+    process.env.TZ = "America/Los_Angeles";
+    expect(resolveTimezone()).toBe("America/Los_Angeles");
+    process.env.TZ = orig;
+  });
+
+  it("falls back to America/Los_Angeles when env vars are absent", () => {
+    const origTZ = process.env.TZ;
+    const origAPP = process.env.APP_TIMEZONE;
+    delete process.env.TZ;
+    delete process.env.APP_TIMEZONE;
+    expect(resolveTimezone()).toBe("America/Los_Angeles");
+    process.env.TZ = origTZ;
+    if (origAPP !== undefined) process.env.APP_TIMEZONE = origAPP;
+  });
+
+  it("prefers APP_TIMEZONE as override when TZ is absent", () => {
+    const origTZ = process.env.TZ;
+    const origAPP = process.env.APP_TIMEZONE;
+    delete process.env.TZ;
+    process.env.APP_TIMEZONE = "America/New_York";
+    expect(resolveTimezone()).toBe("America/New_York");
+    process.env.TZ = origTZ;
+    if (origAPP !== undefined) process.env.APP_TIMEZONE = origAPP;
+    else delete process.env.APP_TIMEZONE;
   });
 });

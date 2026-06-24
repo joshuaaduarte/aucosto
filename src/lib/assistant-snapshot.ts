@@ -24,7 +24,13 @@ import {
   listCompletedSince,
   listEntriesBetween,
 } from "@/lib/services/time";
-import { computeSignals, computeBriefing, type Signals, type Briefing } from "@/lib/assistant-signals";
+import {
+  computeSignals,
+  computeBriefing,
+  resolveTimezone,
+  type Signals,
+  type Briefing,
+} from "@/lib/assistant-signals";
 
 export type AssistantSnapshot = {
   generatedAt: string;
@@ -205,14 +211,17 @@ export async function buildAssistantSnapshot(
     getReflection(userId, yesterdayKey),
     prisma.user.findUnique({
       where: { id: userId },
-      select: { name: true, financeVisible: true, timezone: true },
+      select: { name: true, financeVisible: true },
     }),
     listAccounts(userId),
   ]);
 
   const financeVisible = userRecord?.financeVisible ?? false;
-  const userTimezone =
-    userRecord?.timezone || process.env.TZ || "America/Los_Angeles";
+  // User.timezone is null (unused per CLAUDE.md). Read from env — instrumentation.ts
+  // sets process.env.TZ unconditionally from APP_TIMEZONE or "America/Los_Angeles"
+  // before any request is handled. getHours()/getMinutes() below are correct because
+  // of this pin.
+  const userTimezone = resolveTimezone();
   const displayName = userRecord?.name ?? "Joshua";
 
   // ── today.calendar ──────────────────────────────────────────────────────

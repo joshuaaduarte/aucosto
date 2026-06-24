@@ -9,6 +9,10 @@ export type SignalFacts = {
       totalScheduledMinutes: number;
     };
     time: {
+      // NOTE: computeSignals receives nowMinutes that was derived from
+      // new Date().getHours(). This is correct only because
+      // src/instrumentation.ts pins process.env.TZ to America/Los_Angeles
+      // before any request is handled.
       runningTimer: { title: string } | null;
       totalTrackedMinutes: number;
     };
@@ -43,23 +47,52 @@ export type Signals = {
   unfinishedPriority: boolean;
 };
 
+export type PrioritySeed = {
+  label: string;
+  reason:
+    | "stalled project"
+    | "habit recovery"
+    | "habit not completed"
+    | "task in today lane"
+    | "open task";
+  source:
+    | "signals.stalledProjects"
+    | "facts.today.habits"
+    | "facts.today.tasks";
+};
+
 export type Briefing = {
   currentState: string;
   topSignals: string[];
   suggestedFocus: string[];
   watchouts: string[];
+  contextNotes: string[];
   morningMessageInputs: {
     tone: "direct_accountability" | "gentle_nudge" | "momentum_build" | "recovery_mode";
-    prioritySeeds: string[];
+    prioritySeeds: PrioritySeed[];
+    prioritySeedLabels: string[];
     reminderSeeds: string[];
     journalPromptSeed: string;
   };
 };
 
+// BriefingFacts extends SignalFacts with the timer category and calendar/wake
+// context needed for compound state label and contextNotes.
 type BriefingFacts = {
   today: {
-    tasks: { open: { title: string; lane: string }[] };
-    habits: { items: { name: string; done: boolean; streak: number; scheduledToday: boolean }[] };
+    wokeUpAt: string | null;
+    calendar: {
+      nextEvent: { title: string } | null;
+    };
+    time: {
+      runningTimer: { category: string | null } | null;
+    };
+    tasks: {
+      open: { title: string; lane: string }[];
+    };
+    habits: {
+      items: { name: string; done: boolean; streak: number; scheduledToday: boolean }[];
+    };
   };
 };
 
@@ -149,15 +182,13 @@ export function computeSignals(facts: SignalFacts, nowMinutes: number): Signals 
   };
 }
 
-const STATE_LABELS = {
-  active_morning_planned: "active morning with scheduled blocks",
-  active_morning_open: "active morning with open calendar",
-  mid_day_on_track: "mid-day on track",
-  mid_day_drifting: "mid-day with drift risk",
-  evening_winding_down: "evening",
-  morning_not_started: "morning not yet started",
-  timer_running: "timer currently running",
-} as const;
+// Derives a URL-safe slug from a category string: lowercase, spaces removed,
+// max 12 chars. Falls back to "active" when category is null/empty.
+function categorySlug(category: string | null): string {
+  if (!category) return "active";
+  const slug = category.toLowerCase().replace(/\s+/g, "").slice(0, 12);
+  return slug || "active";
+}
 
 export const FOCUS_TEMPLATES: Record<string, string> = {
   unfinishedPriority: "Complete at least one task from today's priority list",
@@ -186,29 +217,47 @@ export const JOURNAL_PROMPTS: readonly string[] = [
   "What is the most important thing to finish before tonight?",
 ];
 
+// resolveTimezone reads the server timezone that src/instrumentation.ts has
+// already set unconditionally before any request is handled. Returns the
+// resolved value for embedding in snapshots and for testing.
+export function resolveTimezone(): string {
+  return process.env.TZ ?? process.env.APP_TIMEZONE ?? "America/Los_Angeles";
+}
+
 export function computeBriefing(
   facts: BriefingFacts,
   signals: Signals,
   localHour: number,
   dayOfWeek: number,
 ): Briefing {
-  let currentState: string;
-  if (signals.hasRunningTimer) {
-    currentState = STATE_LABELS.timer_running;
-  } else if (localHour < 8 && facts.today.tasks.open.length === 0) {
-    currentState = STATE_LABELS.morning_not_started;
-  } else if (localHour < 12 && signals.openDay) {
-    currentState = STATE_LABELS.active_morning_open;
-  } else if (localHour < 12) {
-    currentState = STATE_LABELS.active_morning_planned;
-  } else if (localHour >= 18) {
-    currentState = STATE_LABELS.evening_winding_down;
-  } else if (signals.driftRisk !== "low") {
-    currentState = STATE_LABELS.mid_day_drifting;
-  } else {
-    currentState = STATE_LABELS.mid_day_on_track;
+  // ── compound currentState ────────────────────────────────────────────────
+  // Build a snake_case slug from up to 4 parts: day-shape · time-of-day ·
+  // timer (optional) · plan-needed (optional). Max 60 chars.
+  const parts: string[] = [];
+
+  // Part 1 — day shape
+  if (signals.crowdedDay) parts.push("crowded");
+  else if (signals.openDay) parts.push("open");
+  else parts.push("normal");
+
+  // Part 2 — time of day
+  if (localHour < 6) parts.push("early");
+  else if (localHour < 12) parts.push("morning");
+  else if (localHour < 17) parts.push("midday");
+  else parts.push("evening");
+
+  // Part 3 — timer (uses facts directly for category access)
+  const runningTimer = facts.today.time.runningTimer;
+  if (runningTimer !== null) {
+    parts.push("timer_" + categorySlug(runningTimer.category));
   }
 
+  // Part 4 — plan needed
+  if (signals.needsPlan) parts.push("needs_plan");
+
+  const currentState = parts.join("_").slice(0, 60);
+
+  // ── topSignals ───────────────────────────────────────────────────────────
   const topSignals: string[] = [];
   if (signals.unfinishedPriority) topSignals.push("unfinishedPriority");
   if (signals.driftRisk === "high") topSignals.push("driftRisk=high");
@@ -219,6 +268,7 @@ export function computeBriefing(
   if (signals.stalledProjects.length > 0) topSignals.push("stalledProjects");
   if (signals.crowdedDay) topSignals.push("crowdedDay");
 
+  // ── suggestedFocus ───────────────────────────────────────────────────────
   const focus: string[] = [];
   if (signals.unfinishedPriority) focus.push(FOCUS_TEMPLATES["unfinishedPriority"]!);
   if (focus.length < 3 && signals.needsPlan) focus.push(FOCUS_TEMPLATES["needsPlan"]!);
@@ -233,6 +283,7 @@ export function computeBriefing(
     focus.push(FOCUS_TEMPLATES["driftRisk_high"]!);
   while (focus.length < 2) focus.push(FOCUS_TEMPLATES["default"]!);
 
+  // ── watchouts ────────────────────────────────────────────────────────────
   const watchouts: string[] = [];
   if (signals.openDay && signals.needsPlan)
     watchouts.push(WATCHOUT_TEMPLATES["openDay_noTasks"]!);
@@ -245,6 +296,24 @@ export function computeBriefing(
   if (watchouts.length < 2 && signals.driftRisk === "high")
     watchouts.push(WATCHOUT_TEMPLATES["driftRisk_high"]!);
 
+  // ── contextNotes ─────────────────────────────────────────────────────────
+  const contextNotes: string[] = [];
+  if (signals.needsPlan && facts.today.tasks.open.length === 0) {
+    contextNotes.push("0 open tasks — day needs an explicit intention");
+  } else if (signals.needsPlan) {
+    contextNotes.push("no tasks in today lane — nothing prioritized yet");
+  }
+  if (signals.openDay && facts.today.calendar.nextEvent === null) {
+    contextNotes.push("no upcoming calendar events");
+  }
+  if (signals.lateStart && facts.today.wokeUpAt !== null) {
+    contextNotes.push(`late start — ${facts.today.wokeUpAt} vs 6:00 AM target`);
+  }
+  if (signals.momentum === "low" && localHour >= 10) {
+    contextNotes.push("low tracked time for this time of day");
+  }
+
+  // ── tone ─────────────────────────────────────────────────────────────────
   let tone: "direct_accountability" | "gentle_nudge" | "momentum_build" | "recovery_mode";
   if (signals.driftRisk === "high" || signals.unfinishedPriority) {
     tone = "direct_accountability";
@@ -256,18 +325,40 @@ export function computeBriefing(
     tone = "gentle_nudge";
   }
 
-  const prioritySeeds: string[] = [];
+  // ── structured prioritySeeds ─────────────────────────────────────────────
+  const prioritySeeds: PrioritySeed[] = [];
+
   for (const task of facts.today.tasks.open) {
-    if (task.lane === "today" && prioritySeeds.length < 3) prioritySeeds.push(task.title);
+    if (task.lane === "today" && prioritySeeds.length < 3) {
+      prioritySeeds.push({
+        label: task.title,
+        reason: "task in today lane",
+        source: "facts.today.tasks",
+      });
+    }
   }
   for (const name of signals.stalledProjects) {
-    if (prioritySeeds.length < 3) prioritySeeds.push(name);
+    if (prioritySeeds.length < 3) {
+      prioritySeeds.push({
+        label: name,
+        reason: "stalled project",
+        source: "signals.stalledProjects",
+      });
+    }
   }
   for (const habit of facts.today.habits.items) {
-    if (!habit.done && habit.scheduledToday && prioritySeeds.length < 3)
-      prioritySeeds.push(habit.name);
+    if (!habit.done && habit.scheduledToday && prioritySeeds.length < 3) {
+      prioritySeeds.push({
+        label: habit.name,
+        reason: habit.streak === 0 ? "habit recovery" : "habit not completed",
+        source: "facts.today.habits",
+      });
+    }
   }
 
+  const prioritySeedLabels = prioritySeeds.map((s) => s.label);
+
+  // ── reminderSeeds ─────────────────────────────────────────────────────────
   const reminderSeeds: string[] = [];
   for (const task of facts.today.tasks.open) {
     if (task.lane === "today" && reminderSeeds.length < 2) reminderSeeds.push(task.title);
@@ -278,6 +369,7 @@ export function computeBriefing(
     }
   }
 
+  // ── journalPromptSeed ─────────────────────────────────────────────────────
   const journalPromptSeed =
     signals.driftRisk === "high"
       ? JOURNAL_PROMPTS[3]!
@@ -290,9 +382,11 @@ export function computeBriefing(
     topSignals: topSignals.slice(0, 4),
     suggestedFocus: focus,
     watchouts,
+    contextNotes,
     morningMessageInputs: {
       tone,
       prioritySeeds,
+      prioritySeedLabels,
       reminderSeeds,
       journalPromptSeed,
     },

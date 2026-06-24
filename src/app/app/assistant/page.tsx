@@ -97,12 +97,25 @@ function SnapshotView({ snapshot }: { snapshot: AssistantSnapshot }) {
             </div>
           )}
 
+          {briefing.contextNotes.length > 0 && (
+            <div>
+              <SubHeader label="Context" value="" />
+              <div className="mt-1 space-y-0.5 pl-2">
+                {briefing.contextNotes.map((note, i) => (
+                  <div key={i} style={{ color: "var(--text-faint)" }}>
+                    · {note}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
             <SubHeader label="Morning inputs" value="" />
             <div className="mt-1 space-y-0.5">
               <Row
                 label="Priority seeds"
-                value={`[${briefing.morningMessageInputs.prioritySeeds.join(", ")}]`}
+                value={`[${briefing.morningMessageInputs.prioritySeedLabels.join(", ")}]`}
                 indent
               />
               <Row
