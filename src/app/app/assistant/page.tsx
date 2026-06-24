@@ -22,112 +22,196 @@ export default async function AssistantPage() {
 }
 
 function SnapshotView({ snapshot }: { snapshot: AssistantSnapshot }) {
-  const { meta, now, today, active, recent, flags } = snapshot;
-  const longDate = new Date(meta.generatedAt).toLocaleDateString([], {
+  const { facts, signals, briefing, user, generatedAt } = snapshot;
+  const longDate = new Date(generatedAt).toLocaleDateString([], {
     weekday: "long",
     month: "short",
     day: "numeric",
     year: "numeric",
-    timeZone: meta.timezone,
+    timeZone: user.timezone,
   });
 
-  const todayOpenPriorityCount = today.openTasks.filter(
-    (task) => task.priority === "today",
+  const todayOpenPriorityCount = facts.today.tasks.open.filter(
+    (task) => task.lane === "today",
   ).length;
 
   return (
     <div className="space-y-7 font-mono text-[0.8125rem]">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1
-          className="text-[1rem] font-bold tracking-wide"
-          style={{ color: "var(--text)" }}
-        >
-          ASSISTANT SNAPSHOT
-        </h1>
+        <div className="flex items-baseline gap-3">
+          <h1
+            className="text-[1rem] font-bold tracking-wide"
+            style={{ color: "var(--text)" }}
+          >
+            ASSISTANT SNAPSHOT
+          </h1>
+          <a
+            href="/api/assistant/snapshot"
+            className="text-[0.75rem] hover:underline"
+            style={{ color: "var(--text-faint)" }}
+          >
+            [JSON]
+          </a>
+        </div>
         <span className="text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
-          generated at {formatClockFromISO(meta.generatedAt, meta.timezone)}
+          generated at {formatClockFromISO(generatedAt, user.timezone)}
         </span>
       </header>
 
+      {/* ━━ BRIEFING ━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <Section title="Briefing">
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Row label="State" value={briefing.currentState} />
+            <Row label="Tone" value={briefing.morningMessageInputs.tone} />
+            <Row label="Drift risk" value={signals.driftRisk} />
+          </div>
+
+          {briefing.topSignals.length > 0 && (
+            <Row label="Top signals" value={briefing.topSignals.join(" · ")} />
+          )}
+
+          {briefing.suggestedFocus.length > 0 && (
+            <div>
+              <SubHeader label="Suggested focus" value="" />
+              <div className="mt-1 space-y-0.5 pl-2">
+                {briefing.suggestedFocus.map((item, i) => (
+                  <div key={i} style={{ color: "var(--text)" }}>
+                    → {item}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {briefing.watchouts.length > 0 && (
+            <div>
+              <SubHeader label="Watchouts" value="" />
+              <div className="mt-1 space-y-0.5 pl-2">
+                {briefing.watchouts.map((item, i) => (
+                  <div key={i} style={{ color: AMBER }}>
+                    ⚠ {item}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <SubHeader label="Morning inputs" value="" />
+            <div className="mt-1 space-y-0.5">
+              <Row
+                label="Priority seeds"
+                value={`[${briefing.morningMessageInputs.prioritySeeds.join(", ")}]`}
+                indent
+              />
+              <Row
+                label="Reminder seeds"
+                value={`[${briefing.morningMessageInputs.reminderSeeds.join(", ")}]`}
+                indent
+              />
+              <Row
+                label="Journal prompt"
+                value={`"${briefing.morningMessageInputs.journalPromptSeed}"`}
+                indent
+              />
+            </div>
+          </div>
+        </div>
+      </Section>
+
       <Section title="Meta">
         <Row label="Date" value={longDate} />
-        <Row label="Time" value={`${formatHHMM(meta.currentTimeLocal)}  (${meta.timezone})`} />
-        {meta.wakeTime ? (
-          <Row label="Woke up" value={formatHHMM(meta.wakeTime)} />
+        <Row label="Time" value={`${formatHHMM(facts.today.localTime)}  (${user.timezone})`} />
+        {facts.today.wokeUpAt ? (
+          <Row label="Woke up" value={formatHHMM(facts.today.wokeUpAt)} />
         ) : (
           <Row label="Woke up" value="not logged" faint />
         )}
       </Section>
 
       <Section title="Now">
-        {now.runningTimer ? (
+        {facts.today.time.runningTimer ? (
           <Row
             label="Timer"
-            value={`${now.runningTimer.title} · ${now.runningTimer.category ?? "uncategorized"} · ${formatMinutes(now.runningTimer.elapsedMinutes)} running`}
+            value={`${facts.today.time.runningTimer.title} · ${facts.today.time.runningTimer.category ?? "uncategorized"} · ${formatMinutes(facts.today.time.runningTimer.elapsedMinutes)} running`}
           />
         ) : (
           <Row label="Timer" value="none running" faint />
         )}
-        {now.nextEvent ? (
+        {facts.today.calendar.nextEvent ? (
           <Row
             label="Next"
-            value={`${formatClockFromISO(now.nextEvent.startsAt, meta.timezone)}  ${now.nextEvent.title}  (in ${now.nextEvent.minutesUntil} min, ${formatMinutes(now.nextEvent.durationMinutes)})`}
+            value={`${formatClockFromISO(facts.today.calendar.nextEvent.startsAt, user.timezone)}  ${facts.today.calendar.nextEvent.title}  (in ${facts.today.calendar.nextEvent.minutesUntil} min, ${formatMinutes(facts.today.calendar.nextEvent.durationMinutes)})`}
           />
         ) : (
           <Row label="Next" value="nothing else scheduled today" faint />
         )}
       </Section>
 
-      <Section title="Flags">
+      <Section title="Signals">
         <FlagRow
           label="hasRunningTimer"
-          active={flags.hasRunningTimer}
-          tone={flags.hasRunningTimer ? GREEN : NEUTRAL}
-          detail={flags.hasRunningTimer ? now.runningTimer?.title ?? "" : ""}
+          active={signals.hasRunningTimer}
+          tone={signals.hasRunningTimer ? GREEN : NEUTRAL}
+          detail={signals.hasRunningTimer ? facts.today.time.runningTimer?.title ?? "" : ""}
         />
         <FlagRow
           label="lateStart"
-          active={flags.lateStart}
-          tone={flags.lateStart ? AMBER : GREEN}
+          active={signals.lateStart}
+          tone={signals.lateStart ? AMBER : GREEN}
         />
         <FlagRow
           label="driftRisk"
-          active={flags.driftRisk}
-          tone={flags.driftRisk ? RED : GREEN}
+          active={signals.driftRisk !== "low"}
+          tone={
+            signals.driftRisk === "high"
+              ? RED
+              : signals.driftRisk === "medium"
+                ? AMBER
+                : GREEN
+          }
+          detail={signals.driftRisk}
         />
         <FlagRow
           label="crowdedDay"
-          active={flags.crowdedDay}
-          tone={flags.crowdedDay ? AMBER : GREEN}
-          detail={`${today.calendarItems.length} events`}
+          active={signals.crowdedDay}
+          tone={signals.crowdedDay ? AMBER : GREEN}
+          detail={`${facts.today.calendar.totalScheduledMinutes}min scheduled`}
         />
         <FlagRow
           label="openDay"
-          active={flags.openDay}
-          tone={flags.openDay ? AMBER : GREEN}
-          detail={`${today.calendarItems.length} events`}
+          active={signals.openDay}
+          tone={signals.openDay ? AMBER : GREEN}
+          detail={`${facts.today.calendar.items.length} events`}
         />
         <FlagRow
-          label="momentumDay"
-          active={flags.momentumDay}
-          tone={flags.momentumDay ? GREEN : NEUTRAL}
-          detail={`${formatMinutes(today.totalTrackedMinutes)} of 4h target`}
+          label="momentum"
+          active={signals.momentum === "good"}
+          tone={
+            signals.momentum === "good"
+              ? GREEN
+              : signals.momentum === "medium"
+                ? AMBER
+                : NEUTRAL
+          }
+          detail={`${formatMinutes(facts.today.time.totalTrackedMinutes)} · ${signals.momentum}`}
         />
         <FlagRow
           label="unfinishedPriority"
-          active={flags.unfinishedPriority}
-          tone={flags.unfinishedPriority ? RED : GREEN}
+          active={signals.unfinishedPriority}
+          tone={signals.unfinishedPriority ? RED : GREEN}
           detail={todayOpenPriorityCount > 0 ? `${todayOpenPriorityCount} in today lane` : ""}
         />
         <FlagRow
           label="habitRecovery"
-          active={flags.habitRecoveryNeeded}
-          tone={flags.habitRecoveryNeeded ? RED : GREEN}
+          active={signals.habitRecovery}
+          tone={signals.habitRecovery ? RED : GREEN}
         />
         <FlagRow
           label="financeNeedsAttention"
-          active={flags.financeNeedsAttention}
-          tone={flags.financeNeedsAttention ? AMBER : NEUTRAL}
+          active={signals.financeNeedsAttention}
+          tone={signals.financeNeedsAttention ? AMBER : NEUTRAL}
           detail="deferred"
         />
       </Section>
@@ -137,13 +221,13 @@ function SnapshotView({ snapshot }: { snapshot: AssistantSnapshot }) {
           <div>
             <SubHeader
               label="Calendar"
-              value={`${today.calendarItems.length} items  /  ${formatMinutes(today.totalScheduledMinutes)} scheduled`}
+              value={`${facts.today.calendar.items.length} items  /  ${formatMinutes(facts.today.calendar.totalScheduledMinutes)} scheduled`}
             />
-            {today.calendarItems.length === 0 ? (
+            {facts.today.calendar.items.length === 0 ? (
               <EmptyLine text="nothing scheduled" />
             ) : (
               <div className="mt-1 space-y-0.5">
-                {today.calendarItems.map((item, index) => (
+                {facts.today.calendar.items.map((item, index) => (
                   <div
                     key={`${item.title}-${index}`}
                     className="grid grid-cols-[4.5rem_1fr_4rem_3.5rem] items-center gap-2"
@@ -172,20 +256,20 @@ function SnapshotView({ snapshot }: { snapshot: AssistantSnapshot }) {
           <div>
             <SubHeader
               label="Tracked"
-              value={`${formatMinutes(today.totalTrackedMinutes)} (today)`}
+              value={`${formatMinutes(facts.today.time.totalTrackedMinutes)} (today)`}
             />
-            {today.timeEntries.length === 0 && !now.runningTimer ? (
+            {facts.today.time.entries.length === 0 && !facts.today.time.runningTimer ? (
               <EmptyLine text="nothing tracked yet" />
             ) : (
               <div className="mt-1 space-y-0.5">
-                {today.timeEntries.map((entry, index) => (
+                {facts.today.time.entries.map((entry, index) => (
                   <div
                     key={`${entry.title}-${index}`}
                     className="grid grid-cols-[9rem_1fr_6rem_4rem] items-center gap-2"
                   >
                     <span style={{ color: "var(--text-faint)" }}>
-                      {formatClockFromISO(entry.startedAt, meta.timezone)}–
-                      {formatClockFromISO(entry.endedAt, meta.timezone)}
+                      {formatClockFromISO(entry.startedAt, user.timezone)}–
+                      {formatClockFromISO(entry.endedAt, user.timezone)}
                     </span>
                     <span style={{ color: "var(--text)" }}>{entry.title}</span>
                     <span style={{ color: "var(--text-faint)" }}>
@@ -196,16 +280,16 @@ function SnapshotView({ snapshot }: { snapshot: AssistantSnapshot }) {
                     </span>
                   </div>
                 ))}
-                {now.runningTimer ? (
+                {facts.today.time.runningTimer ? (
                   <div className="grid grid-cols-[9rem_1fr_6rem_4rem] items-center gap-2">
                     <span style={{ color: "var(--text-faint)" }}>
-                      {formatClockFromISO(now.runningTimer.startedAt, meta.timezone)}→
+                      {formatClockFromISO(facts.today.time.runningTimer.startedAt, user.timezone)}→
                     </span>
                     <span style={{ color: "var(--text)" }}>
-                      {now.runningTimer.title}
+                      {facts.today.time.runningTimer.title}
                     </span>
                     <span style={{ color: "var(--text-faint)" }}>
-                      {now.runningTimer.category ?? ""}
+                      {facts.today.time.runningTimer.category ?? ""}
                     </span>
                     <span style={{ color: GREEN }}>running</span>
                   </div>
@@ -217,19 +301,19 @@ function SnapshotView({ snapshot }: { snapshot: AssistantSnapshot }) {
           <div>
             <SubHeader
               label="Tasks"
-              value={`${today.openTasks.length} open / ${today.completedTasksCount} completed today`}
+              value={`${facts.today.tasks.open.length} open / ${facts.today.tasks.completedCount} completed today`}
             />
-            {today.openTasks.length === 0 ? (
+            {facts.today.tasks.open.length === 0 ? (
               <EmptyLine text="no open tasks" />
             ) : (
               <div className="mt-1 space-y-0.5">
-                {today.openTasks.map((task, index) => (
+                {facts.today.tasks.open.map((task, index) => (
                   <div
                     key={`${task.title}-${index}`}
                     className="grid grid-cols-[5rem_1fr_8rem] items-center gap-2"
                   >
                     <span style={{ color: "var(--text-faint)" }}>
-                      {task.priority ? `[${task.priority}]` : ""}
+                      {task.lane ? `[${task.lane}]` : ""}
                     </span>
                     <span style={{ color: "var(--text)" }}>{task.title}</span>
                     <span
@@ -247,10 +331,10 @@ function SnapshotView({ snapshot }: { snapshot: AssistantSnapshot }) {
           <div>
             <SubHeader
               label="Habits"
-              value={`${today.habitsCompleted} of ${today.habitsTotal} done`}
+              value={`${facts.today.habits.completedCount} of ${facts.today.habits.totalCount} done`}
             />
             <div className="mt-1 space-y-0.5">
-              {today.habits.map((habit, index) => (
+              {facts.today.habits.items.map((habit, index) => (
                 <div
                   key={`${habit.name}-${index}`}
                   className="grid grid-cols-[1.25rem_1fr_5rem_5rem] items-center gap-2"
@@ -273,17 +357,16 @@ function SnapshotView({ snapshot }: { snapshot: AssistantSnapshot }) {
       </Section>
 
       <Section title="Active projects">
-        {active.projects.length === 0 ? (
+        {facts.today.projects.length === 0 ? (
           <EmptyLine text="no active projects" />
         ) : (
           <div className="space-y-0.5">
-            {active.projects.map((project, index) => (
+            {facts.today.projects.map((project, index) => (
               <div
                 key={`${project.name}-${index}`}
-                className="grid grid-cols-[1fr_6rem_6rem_8rem_5rem] items-center gap-2"
+                className="grid grid-cols-[1fr_6rem_8rem_5rem] items-center gap-2"
               >
                 <span style={{ color: "var(--text)" }}>{project.name}</span>
-                <span style={{ color: "var(--text-faint)" }}>{project.status}</span>
                 <span style={{ color: momentumColor(project.momentum) }}>
                   {project.momentum}
                 </span>
@@ -308,17 +391,17 @@ function SnapshotView({ snapshot }: { snapshot: AssistantSnapshot }) {
           <div>
             <SubHeader label="Yesterday" value="" />
             <div className="mt-1 space-y-0.5">
-              <Row label="Tracked" value={formatMinutes(recent.yesterday.trackedMinutes)} indent />
-              <Row label="Tasks" value={`${recent.yesterday.completedTasks} completed`} indent />
+              <Row label="Tracked" value={formatMinutes(facts.yesterday.trackedMinutes)} indent />
+              <Row label="Tasks" value={`${facts.yesterday.completedTasks} completed`} indent />
               <Row
                 label="Habits"
-                value={`${recent.yesterday.habitsCompleted} of ${recent.yesterday.habitsTotal}${
-                  recent.yesterday.reflection?.mood
-                    ? `  mood ${recent.yesterday.reflection.mood}/5`
+                value={`${facts.yesterday.habitsCompleted} of ${facts.yesterday.habitsTotal}${
+                  facts.yesterday.reflection?.mood
+                    ? `  mood ${facts.yesterday.reflection.mood}/5`
                     : ""
                 }${
-                  recent.yesterday.reflection?.note
-                    ? `  "${recent.yesterday.reflection.note}"`
+                  facts.yesterday.reflection?.note
+                    ? `  "${facts.yesterday.reflection.note}"`
                     : ""
                 }`}
                 indent
@@ -331,15 +414,15 @@ function SnapshotView({ snapshot }: { snapshot: AssistantSnapshot }) {
             <div className="mt-1 space-y-0.5">
               <Row
                 label="Tracked"
-                value={`${formatMinutes(recent.last7Days.trackedMinutes)}  avg ${formatMinutes(recent.last7Days.avgDailyMinutes)}/day`}
+                value={`${formatMinutes(facts.week.totalTrackedMinutes)}  avg ${formatMinutes(facts.week.avgDailyMinutes)}/day`}
                 indent
               />
               <Row
                 label="Habits"
                 value={
-                  recent.last7Days.habitsConsistency.length === 0
+                  facts.week.habitConsistency.length === 0
                     ? "—"
-                    : recent.last7Days.habitsConsistency
+                    : facts.week.habitConsistency
                         .map((h) => `${h.name} ${h.doneCount}/${h.scheduledCount}`)
                         .join("  ")
                 }
@@ -350,17 +433,17 @@ function SnapshotView({ snapshot }: { snapshot: AssistantSnapshot }) {
 
           <div>
             <SubHeader label="Recent events" value="" />
-            {recent.recentEvents.length === 0 ? (
+            {facts.today.recentEvents.length === 0 ? (
               <EmptyLine text="none" />
             ) : (
               <div className="mt-1 space-y-0.5">
-                {recent.recentEvents.map((event, index) => (
+                {facts.today.recentEvents.map((event, index) => (
                   <div
                     key={`${event.label}-${index}`}
                     className="grid grid-cols-[6rem_1fr] items-center gap-2"
                   >
                     <span style={{ color: "var(--text-faint)" }}>
-                      {formatClockFromISO(event.at, meta.timezone)}
+                      {formatClockFromISO(event.at, user.timezone)}
                     </span>
                     <span style={{ color: "var(--text)" }}>
                       {event.tool}.{event.label}

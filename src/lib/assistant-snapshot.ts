@@ -6,6 +6,7 @@
 
 import "server-only";
 
+import { prisma } from "@/lib/prisma";
 import { describeEventType } from "@/lib/event-types";
 import { dayKey } from "@/lib/reflect";
 import { startOfToday } from "@/lib/time";
@@ -14,6 +15,7 @@ import { listCalendarItems } from "@/lib/services/calendar";
 import { listDoItems } from "@/lib/services/do";
 import { listRecentEvents } from "@/lib/services/events";
 import { listHabits } from "@/lib/services/habits";
+import { listAccounts } from "@/lib/services/finance";
 import { ensureProjectBoardTables, listBoardProjects } from "@/lib/services/projects";
 import { getReflection } from "@/lib/services/reflect";
 import { getTodayWakeStatus } from "@/lib/services/rhythms";
@@ -22,86 +24,85 @@ import {
   listCompletedSince,
   listEntriesBetween,
 } from "@/lib/services/time";
+import { computeSignals, computeBriefing, type Signals, type Briefing } from "@/lib/assistant-signals";
 
 export type AssistantSnapshot = {
-  meta: {
-    generatedAt: string;
-    currentDate: string;
-    currentTimeLocal: string;
+  generatedAt: string;
+  user: {
     timezone: string;
-    wakeTime: string | null;
+    displayName: string;
   };
 
-  now: {
-    runningTimer: {
-      title: string;
-      category: string | null;
-      startedAt: string;
-      elapsedMinutes: number;
-      linkedHabit: string | null;
-      linkedTask: string | null;
-    } | null;
-    nextEvent: {
-      title: string;
-      startsAt: string;
-      minutesUntil: number;
-      durationMinutes: number;
-      type: "block" | "habit" | "task";
-    } | null;
-  };
+  facts: {
+    today: {
+      date: string;
+      localTime: string; // "HH:MM" 24h
+      wokeUpAt: string | null; // "HH:MM" 24h
 
-  today: {
-    calendarItems: {
-      title: string;
-      startTime: string;
-      endTime: string;
-      durationMinutes: number;
-      done: boolean;
-      type: string;
-    }[];
-    totalScheduledMinutes: number;
+      calendar: {
+        items: {
+          title: string;
+          startTime: string;
+          endTime: string;
+          durationMinutes: number;
+          done: boolean;
+          type: string;
+        }[];
+        totalScheduledMinutes: number;
+        nextEvent: {
+          title: string;
+          startsAt: string;
+          minutesUntil: number;
+          durationMinutes: number;
+        } | null;
+      };
 
-    timeEntries: {
-      title: string;
-      category: string | null;
-      startedAt: string;
-      endedAt: string;
-      durationMinutes: number;
-    }[];
-    totalTrackedMinutes: number;
+      time: {
+        runningTimer: {
+          title: string;
+          category: string | null;
+          startedAt: string;
+          elapsedMinutes: number;
+        } | null;
+        entries: {
+          title: string;
+          category: string | null;
+          durationMinutes: number;
+          startedAt: string;
+          endedAt: string;
+        }[];
+        totalTrackedMinutes: number;
+      };
 
-    openTasks: {
-      title: string;
-      priority: string | null;
-      projectName: string | null;
-      overdue: boolean;
-    }[];
-    completedTasksCount: number;
+      tasks: {
+        open: { title: string; lane: string; projectName: string | null }[];
+        completedCount: number;
+        openCount: number;
+      };
 
-    habits: {
-      name: string;
-      done: boolean;
-      streak: number;
-      target: string;
-      bucket: string;
-      scheduledToday: boolean;
-    }[];
-    habitsCompleted: number;
-    habitsTotal: number;
-  };
+      habits: {
+        items: {
+          name: string;
+          done: boolean;
+          streak: number;
+          target: string;
+          bucket: string;
+          scheduledToday: boolean;
+        }[];
+        completedCount: number;
+        totalCount: number;
+      };
 
-  active: {
-    projects: {
-      name: string;
-      status: string;
-      lastWorkedAt: string | null;
-      lastWorkedDaysAgo: number | null;
-      momentum: "strong" | "slowing" | "stalled" | "none";
-      openTaskCount: number;
-    }[];
-  };
+      projects: {
+        name: string;
+        momentum: "strong" | "slowing" | "stalled" | "none";
+        lastWorkedDaysAgo: number | null;
+        openTaskCount: number;
+      }[];
 
-  recent: {
+      recentEvents: { label: string; tool: string; at: string }[];
+    };
+
     yesterday: {
       trackedMinutes: number;
       completedTasks: number;
@@ -109,43 +110,31 @@ export type AssistantSnapshot = {
       habitsTotal: number;
       reflection: { mood: number | null; note: string | null } | null;
     };
-    last7Days: {
-      trackedMinutes: number;
+
+    week: {
+      totalTrackedMinutes: number;
       avgDailyMinutes: number;
-      habitsConsistency: {
+      habitConsistency: {
         name: string;
         doneCount: number;
         scheduledCount: number;
         pct: number;
       }[];
     };
-    recentEvents: {
-      label: string;
-      tool: string;
-      at: string;
-    }[];
+
+    finance: {
+      visible: boolean;
+      summary: string | null;
+    };
   };
 
-  flags: {
-    hasRunningTimer: boolean;
-    crowdedDay: boolean;
-    openDay: boolean;
-    lateStart: boolean;
-    driftRisk: boolean;
-    momentumDay: boolean;
-    unfinishedPriority: boolean;
-    habitRecoveryNeeded: boolean;
-    financeNeedsAttention: boolean;
-  };
+  signals: Signals;
+  briefing: Briefing;
 };
 
 function toHHMM(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function minutesSinceMidnight(date: Date): number {
-  return date.getHours() * 60 + date.getMinutes();
 }
 
 function minutesBetween(from: Date, to: Date): number {
@@ -164,7 +153,7 @@ function daysAgo(value: Date | null, now: Date): number | null {
   );
 }
 
-function calendarItemType(sourceTool: string | null): "block" | "habit" | "task" {
+function calendarItemType(sourceTool: string | null): string {
   if (sourceTool === "do") return "task";
   if (sourceTool === "habit") return "habit";
   return "block";
@@ -200,6 +189,8 @@ export async function buildAssistantSnapshot(
     recentEvents,
     wakeStatus,
     yesterdayReflection,
+    userRecord,
+    financeAccounts,
   ] = await Promise.all([
     getRunningEntry(userId),
     listCalendarItems(userId, { from: todayStart, to: tomorrowStart }),
@@ -212,37 +203,19 @@ export async function buildAssistantSnapshot(
     listRecentEvents(userId, { limit: 10 }),
     getTodayWakeStatus(userId),
     getReflection(userId, yesterdayKey),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, financeVisible: true, timezone: true },
+    }),
+    listAccounts(userId),
   ]);
 
-  // ── now ──────────────────────────────────────────────────────────────
-  const runningTimer = runningEntry
-    ? {
-        title: runningEntry.label,
-        category: runningEntry.category,
-        startedAt: runningEntry.startedAt.toISOString(),
-        elapsedMinutes: minutesBetween(runningEntry.startedAt, now),
-        linkedHabit: runningEntry.habit?.title ?? null,
-        linkedTask: runningEntry.doItem?.title ?? null,
-      }
-    : null;
+  const financeVisible = userRecord?.financeVisible ?? false;
+  const userTimezone =
+    userRecord?.timezone || process.env.TZ || "America/Los_Angeles";
+  const displayName = userRecord?.name ?? "Joshua";
 
-  const nextCalendarItem = todayCalendarItems
-    .filter((item) => item.startsAt > now && item.status !== "done")
-    .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())[0];
-  const nextEvent = nextCalendarItem
-    ? {
-        title: nextCalendarItem.title,
-        startsAt: nextCalendarItem.startsAt.toISOString(),
-        minutesUntil: minutesBetween(now, nextCalendarItem.startsAt),
-        durationMinutes: minutesBetween(
-          nextCalendarItem.startsAt,
-          nextCalendarItem.endsAt,
-        ),
-        type: calendarItemType(nextCalendarItem.sourceTool),
-      }
-    : null;
-
-  // ── today ────────────────────────────────────────────────────────────
+  // ── today.calendar ──────────────────────────────────────────────────────
   const calendarItems = todayCalendarItems.map((item) => ({
     title: item.title,
     startTime: toHHMM(item.startsAt),
@@ -256,6 +229,31 @@ export async function buildAssistantSnapshot(
     0,
   );
 
+  const nextCalendarItem = todayCalendarItems
+    .filter((item) => item.startsAt > now && item.status !== "done")
+    .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())[0];
+  const nextEvent = nextCalendarItem
+    ? {
+        title: nextCalendarItem.title,
+        startsAt: nextCalendarItem.startsAt.toISOString(),
+        minutesUntil: minutesBetween(now, nextCalendarItem.startsAt),
+        durationMinutes: minutesBetween(
+          nextCalendarItem.startsAt,
+          nextCalendarItem.endsAt,
+        ),
+      }
+    : null;
+
+  // ── today.time ──────────────────────────────────────────────────────────
+  const runningTimer = runningEntry
+    ? {
+        title: runningEntry.label,
+        category: runningEntry.category,
+        startedAt: runningEntry.startedAt.toISOString(),
+        elapsedMinutes: minutesBetween(runningEntry.startedAt, now),
+      }
+    : null;
+
   const timeEntries = todayCompletedEntries.map((entry) => ({
     title: entry.label,
     category: entry.category,
@@ -268,22 +266,20 @@ export async function buildAssistantSnapshot(
       ? minutesBetween(runningEntry.startedAt, now)
       : 0;
   const totalTrackedMinutes =
-    Math.round(sumDurations(todayCompletedEntries) / 60000) +
-    runningTodayMinutes;
+    Math.round(sumDurations(todayCompletedEntries) / 60000) + runningTodayMinutes;
 
+  // ── today.tasks ─────────────────────────────────────────────────────────
   const openDoItems = allDoItems.filter((item) => item.status !== "done");
   const openTasks = openDoItems.map((item) => ({
     title: item.title,
-    priority: item.lane,
+    lane: item.lane,
     projectName: item.projectName,
-    // DoItem has no dueDate field in the schema — there is no real concept
-    // of "overdue" to compute here.
-    overdue: false,
   }));
   const completedTasksCount = allDoItems.filter(
     (item) => item.completedAt && dayKey(item.completedAt) === todayKey,
   ).length;
 
+  // ── today.habits ─────────────────────────────────────────────────────────
   const habitsToday = allHabits.map((habit) => ({
     name: habit.title,
     done: habit.completedToday,
@@ -293,40 +289,39 @@ export async function buildAssistantSnapshot(
     scheduledToday: habit.dueToday,
   }));
   const dueTodayHabits = allHabits.filter((habit) => habit.dueToday);
-  const habitsCompleted = dueTodayHabits.filter(
-    (habit) => habit.completedToday,
-  ).length;
+  const habitsCompleted = dueTodayHabits.filter((h) => h.completedToday).length;
   const habitsTotal = dueTodayHabits.length;
 
-  // ── active projects ─────────────────────────────────────────────────
+  // ── today.projects ───────────────────────────────────────────────────────
   const projects = boardProjects
     .filter((project) => project.status !== "done")
     .map((project) => ({
       name: project.name,
-      status: project.status,
-      lastWorkedAt: project.lastWorkedAt?.toISOString() ?? null,
-      lastWorkedDaysAgo: daysAgo(project.lastWorkedAt, now),
       momentum: (project.momentum
         ? project.momentum.level === "alive"
           ? "strong"
           : project.momentum.level
         : "none") as "strong" | "slowing" | "stalled" | "none",
+      lastWorkedDaysAgo: daysAgo(project.lastWorkedAt, now),
       openTaskCount: project.openTaskCount,
     }));
 
-  // ── recent ───────────────────────────────────────────────────────────
-  const yesterdayTrackedMinutes = Math.round(
-    sumDurations(yesterdayEntries) / 60000,
-  );
+  // ── today.recentEvents ───────────────────────────────────────────────────
+  const recentEventRows = recentEvents.map((event) => ({
+    label: describeEventType(event.type),
+    tool: event.tool,
+    at: event.at.toISOString(),
+  }));
+
+  // ── yesterday ────────────────────────────────────────────────────────────
+  const yesterdayTrackedMinutes = Math.round(sumDurations(yesterdayEntries) / 60000);
   const yesterdayCompletedTasks = allDoItems.filter(
     (item) => item.completedAt && dayKey(item.completedAt) === yesterdayKey,
   ).length;
   const yesterdayHabitDays = allHabits.map((habit) =>
     habit.recentDays.find((day) => day.dateKey === yesterdayKey),
   );
-  const yesterdayHabitsTotal = yesterdayHabitDays.filter(
-    (day) => day?.due,
-  ).length;
+  const yesterdayHabitsTotal = yesterdayHabitDays.filter((day) => day?.due).length;
   const yesterdayHabitsCompleted = yesterdayHabitDays.filter(
     (day) => day?.due && day.completed,
   ).length;
@@ -337,10 +332,11 @@ export async function buildAssistantSnapshot(
       }
     : null;
 
+  // ── week ─────────────────────────────────────────────────────────────────
   const last7TrackedMinutes =
     Math.round(sumDurations(last7DaysEntries) / 60000) + runningTodayMinutes;
   const avgDailyMinutes = Math.round(last7TrackedMinutes / 7);
-  const habitsConsistency = allHabits.map((habit) => {
+  const habitConsistency = allHabits.map((habit) => {
     const last7 = habit.recentDays.slice(-7);
     const scheduledCount = last7.filter((day) => day.due).length;
     const doneCount = last7.filter((day) => day.due && day.completed).length;
@@ -353,109 +349,90 @@ export async function buildAssistantSnapshot(
     };
   });
 
-  const recentEventRows = recentEvents.map((event) => ({
-    label: describeEventType(event.type),
-    tool: event.tool,
-    at: event.at.toISOString(),
-  }));
+  // ── finance ──────────────────────────────────────────────────────────────
+  let financeSummary: string | null = null;
+  if (financeVisible) {
+    const accountCount = financeAccounts.length;
+    if (accountCount > 0) {
+      const lastSync = financeAccounts.reduce(
+        (latest, acc) =>
+          acc.balanceUpdatedAt > latest ? acc.balanceUpdatedAt : latest,
+        financeAccounts[0]!.balanceUpdatedAt,
+      );
+      const syncDaysAgo = daysAgo(lastSync, now) ?? 0;
+      const syncLabel =
+        syncDaysAgo === 0
+          ? "synced today"
+          : syncDaysAgo === 1
+            ? "last sync 1 day ago"
+            : `last sync ${syncDaysAgo} days ago`;
+      financeSummary = `${accountCount} account${accountCount !== 1 ? "s" : ""} · ${syncLabel}`;
+    }
+  }
 
-  // ── flags ────────────────────────────────────────────────────────────
-  const hasRunningTimer = runningEntry !== null;
-  const crowdedDay = calendarItems.length >= 5;
-  const openDay = calendarItems.length <= 1;
-
-  const todayEntryStarts = [
-    ...todayCompletedEntries.map((entry) => entry.startedAt),
-    ...(runningEntry && runningEntry.startedAt >= todayStart
-      ? [runningEntry.startedAt]
-      : []),
-  ];
-  const earliestStart =
-    todayEntryStarts.length > 0
-      ? todayEntryStarts.reduce((a, b) => (a < b ? a : b))
-      : null;
-  const tenAm = 10 * 60;
-  const lateStart = earliestStart
-    ? minutesSinceMidnight(earliestStart) > tenAm
-    : minutesSinceMidnight(now) > tenAm;
-
-  const todayEntryEnds = todayCompletedEntries
-    .map((entry) => entry.endedAt)
-    .filter((value): value is Date => value !== null);
-  const lastEntryEndedAt =
-    todayEntryEnds.length > 0
-      ? todayEntryEnds.reduce((a, b) => (a > b ? a : b))
-      : todayStart;
-  const nowMinutes = minutesSinceMidnight(now);
-  const inWorkWindow = nowMinutes >= 9 * 60 && nowMinutes <= 18 * 60;
-  const driftRisk =
-    inWorkWindow &&
-    !hasRunningTimer &&
-    minutesBetween(lastEntryEndedAt, now) > 90;
-
-  const momentumDay = totalTrackedMinutes > 240;
-
-  // DoItem has no priority/dueDate fields — "today" lane is the closest
-  // existing signal for "needs attention now".
-  const unfinishedPriority = openTasks.some((task) => task.priority === "today");
-
-  const habitRecoveryNeeded = allHabits.some((habit) => {
-    const lastThree = habit.recentDays.slice(-4, -1);
-    const missed = lastThree.filter((day) => day.due && !day.keptAlive).length;
-    return missed >= 2;
-  });
-
-  return {
-    meta: {
-      generatedAt: now.toISOString(),
-      currentDate: todayKey,
-      currentTimeLocal: toHHMM(now),
-      timezone: process.env.TZ ?? "America/Los_Angeles",
-      wakeTime: wakeStatus.wakeTime,
-    },
-    now: {
-      runningTimer,
-      nextEvent,
-    },
+  // ── assemble facts ────────────────────────────────────────────────────────
+  const facts = {
     today: {
-      calendarItems,
-      totalScheduledMinutes,
-      timeEntries,
-      totalTrackedMinutes,
-      openTasks,
-      completedTasksCount,
-      habits: habitsToday,
-      habitsCompleted,
-      habitsTotal,
-    },
-    active: {
+      date: todayKey,
+      localTime: toHHMM(now),
+      wokeUpAt: wakeStatus.wakeTime,
+      calendar: {
+        items: calendarItems,
+        totalScheduledMinutes,
+        nextEvent,
+      },
+      time: {
+        runningTimer,
+        entries: timeEntries,
+        totalTrackedMinutes,
+      },
+      tasks: {
+        open: openTasks,
+        completedCount: completedTasksCount,
+        openCount: openTasks.length,
+      },
+      habits: {
+        items: habitsToday,
+        completedCount: habitsCompleted,
+        totalCount: habitsTotal,
+      },
       projects,
-    },
-    recent: {
-      yesterday: {
-        trackedMinutes: yesterdayTrackedMinutes,
-        completedTasks: yesterdayCompletedTasks,
-        habitsCompleted: yesterdayHabitsCompleted,
-        habitsTotal: yesterdayHabitsTotal,
-        reflection: yesterdayReflectionSummary,
-      },
-      last7Days: {
-        trackedMinutes: last7TrackedMinutes,
-        avgDailyMinutes,
-        habitsConsistency,
-      },
       recentEvents: recentEventRows,
     },
-    flags: {
-      hasRunningTimer,
-      crowdedDay,
-      openDay,
-      lateStart,
-      driftRisk,
-      momentumDay,
-      unfinishedPriority,
-      habitRecoveryNeeded,
-      financeNeedsAttention: false,
+    yesterday: {
+      trackedMinutes: yesterdayTrackedMinutes,
+      completedTasks: yesterdayCompletedTasks,
+      habitsCompleted: yesterdayHabitsCompleted,
+      habitsTotal: yesterdayHabitsTotal,
+      reflection: yesterdayReflectionSummary,
     },
+    week: {
+      totalTrackedMinutes: last7TrackedMinutes,
+      avgDailyMinutes,
+      habitConsistency,
+    },
+    finance: {
+      visible: financeVisible,
+      summary: financeSummary,
+    },
+  } satisfies AssistantSnapshot["facts"];
+
+  // ── signals + briefing ────────────────────────────────────────────────────
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const localHour = now.getHours();
+  const dayOfWeek = now.getDay(); // 0 = Sunday
+
+  const signals = computeSignals(facts, nowMinutes);
+  const briefing = computeBriefing(facts, signals, localHour, dayOfWeek);
+
+  return {
+    generatedAt: now.toISOString(),
+    user: {
+      timezone: userTimezone,
+      displayName,
+    },
+    facts,
+    signals,
+    briefing,
   };
 }
