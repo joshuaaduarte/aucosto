@@ -120,7 +120,7 @@ export function TimelineBlockButton({
           }
           setOpen(true);
         }}
-        className={`absolute overflow-hidden rounded text-left ${
+        className={`absolute overflow-hidden rounded text-left min-h-[15px] [@media(pointer:coarse)]:min-h-[2.75rem] ${
           narrow ? "px-1 py-0.5" : "px-1.5 py-0.5"
         }`}
         style={{
@@ -128,7 +128,6 @@ export function TimelineBlockButton({
           height: `${block.heightPct}%`,
           left: `calc(${block.leftPct}% + 4px)`,
           width: `calc(${block.widthPct}% - 8px)`,
-          minHeight: "15px",
           background:
             narrow || variant === "planned"
               ? "var(--bg-page)"

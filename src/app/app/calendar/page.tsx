@@ -333,7 +333,7 @@ export default async function CalendarPage({
   };
 
   return (
-    <div className="space-y-8 pb-28 sm:space-y-10 sm:pb-8">
+    <div className="space-y-8 sm:space-y-10" style={{ paddingBottom: "calc(var(--bottom-inset) + 2rem)" }}>
       <CalendarHeader
         totalTodayCount={todayItems.length}
         gapSuggestionCount={gapSuggestions.length}

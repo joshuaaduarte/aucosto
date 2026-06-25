@@ -120,7 +120,7 @@ export function TimerBarClient({
         style={{
           zIndex: 41,
           bottom:
-            "calc(var(--mobile-tabbar-height, 0px) + env(safe-area-inset-bottom, 0px) + 0.5rem)",
+            "calc(var(--mobile-tabbar-height, 0px) + var(--safe-area-bottom, 0px) + 0.5rem)",
         }}
       >
       <div ref={wrapperRef} className="pointer-events-auto relative w-full max-w-[26rem]">

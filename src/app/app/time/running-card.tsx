@@ -108,8 +108,9 @@ export function RunningCard({
           border: "1px solid var(--accent-tint-strong)",
         }}
       >
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
+        <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
+          {/* Left: identity + elapsed */}
+          <div className="min-w-0 lg:flex-[3]">
             <div className="flex items-center gap-2">
               <span
                 className="ink-pulse inline-block h-1.5 w-1.5 rounded-full"
@@ -176,36 +177,22 @@ export function RunningCard({
               />
             ) : null}
           </div>
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:mt-0">
-            {/* Secondary stop: end this entry at an earlier time. A quiet icon
-                so the primary stop actions stay front and center. */}
-            <button
-              type="button"
-              onClick={() => setStopAtOpen(true)}
-              disabled={pending}
-              aria-label="Stop at an earlier time"
-              title="Stop at an earlier time"
-              className="btn-icon h-9 w-9 rounded-full border"
-              style={{
-                borderColor: "var(--border-faint)",
-                color: "var(--text-muted)",
-              }}
-            >
-              <ClockRewindIcon />
-            </button>
+
+          {/* Right: stop controls */}
+          <div className="flex shrink-0 flex-col gap-2 lg:flex-[2] lg:items-end lg:justify-start">
             {doItem ? (
               <>
-                <form action={stopEntryAndCompleteDoItem}>
+                <form action={stopEntryAndCompleteDoItem} className="w-full lg:w-auto">
                   <input type="hidden" name="doItemId" value={doItem.id} />
                   <input type="hidden" name="actualMinutes" value={trackedIfStoppedNow} />
-                  <button type="submit" className="btn-ink">
+                  <button type="submit" className="btn-ink w-full lg:w-auto">
                     Done and stop
                   </button>
                 </form>
                 <button
                   type="button"
                   onClick={() => setReflectOpen(true)}
-                  className="btn-ghost"
+                  className="btn-ghost w-full lg:w-auto"
                 >
                   Stop and reflect
                 </button>
@@ -216,7 +203,7 @@ export function RunningCard({
                   <button
                     type="button"
                     onClick={() => setReflectOpen(true)}
-                    className="btn-ink"
+                    className="btn-ink w-full lg:w-auto"
                   >
                     Log and stop
                   </button>
@@ -230,7 +217,7 @@ export function RunningCard({
                     })
                   }
                   disabled={pending}
-                  className="btn-ghost"
+                  className="btn-ghost w-full lg:w-auto"
                 >
                   {pending
                     ? "Stopping..."
@@ -249,11 +236,20 @@ export function RunningCard({
                   })
                 }
                 disabled={pending}
-                className="btn-ghost"
+                className="btn-ink w-full lg:w-auto"
               >
                 {pending ? "Stopping..." : "Stop"}
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setStopAtOpen(true)}
+              disabled={pending}
+              className="btn-ghost w-full lg:w-auto"
+            >
+              <ClockRewindIcon />
+              <span className="ml-1.5">Stop earlier</span>
+            </button>
           </div>
         </div>
 

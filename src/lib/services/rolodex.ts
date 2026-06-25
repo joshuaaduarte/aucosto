@@ -32,6 +32,7 @@ export interface RolodexPersonSummary {
   organization: string | null;
   birthday: string | null;
   createdAt: string;
+  lastInteractionAt: string | null;
 }
 
 export interface RolodexPersonDetail extends RolodexPersonSummary {
@@ -299,7 +300,7 @@ type InteractionRow = {
   createdAt: Date;
 };
 
-function rowToSummary(row: PersonRow): RolodexPersonSummary {
+function rowToSummary(row: PersonRow & { lastInteractionAt?: Date | null }): RolodexPersonSummary {
   return {
     id: row.id,
     displayName: row.displayName,
@@ -310,6 +311,7 @@ function rowToSummary(row: PersonRow): RolodexPersonSummary {
     organization: row.organization,
     birthday: isoString(row.birthday),
     createdAt: isoString(row.createdAt) ?? "",
+    lastInteractionAt: isoString(row.lastInteractionAt ?? null),
   };
 }
 
@@ -354,17 +356,18 @@ export async function listPersons(
 ): Promise<RolodexPersonSummary[]> {
   requireCan(userId, "rolodex", "read");
   try {
-    const rows = await prisma.$queryRawUnsafe<PersonRow[]>(
-      `SELECT id, "userId", "displayName", "firstName", "lastName", aliases,
-              "relationshipType", organization, role, birthday, "createdAt", "updatedAt",
+    const rows = await prisma.$queryRawUnsafe<(PersonRow & { lastInteractionAt: Date | null })[]>(
+      `SELECT p.id, p."userId", p."displayName", p."firstName", p."lastName", p.aliases,
+              p."relationshipType", p.organization, p.role, p.birthday, p."createdAt", p."updatedAt",
               NULL::text AS emails, NULL::text AS phones, NULL::text AS addresses,
               NULL::text AS socials, NULL::text AS "importantDates",
               NULL::text AS notes, NULL::text AS preferences,
               NULL::text AS "giftIdeas", NULL::text AS "communicationNotes",
-              NULL::text AS "collaborationNotes", NULL::text AS sensitivities
-       FROM "RolodexPerson"
-       WHERE "userId" = $1
-       ORDER BY "displayName" ASC`,
+              NULL::text AS "collaborationNotes", NULL::text AS sensitivities,
+              (SELECT MAX(i."occurredAt") FROM "RolodexInteraction" i WHERE i."personId" = p.id) AS "lastInteractionAt"
+       FROM "RolodexPerson" p
+       WHERE p."userId" = $1
+       ORDER BY p."displayName" ASC`,
       userId,
     );
 

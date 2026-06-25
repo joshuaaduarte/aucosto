@@ -32,6 +32,19 @@ function upcomingBirthdayLabel(birthday: string | null): string | null {
   return null;
 }
 
+function lastContactLabel(isoDate: string | null): string | null {
+  if (!isoDate) return null;
+  const then = new Date(isoDate);
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - then.getTime()) / 86_400_000);
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+  if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
+  return `${Math.floor(diffDays / 365)}y ago`;
+}
+
 export default async function RolodexPage({
   searchParams,
 }: {
@@ -113,14 +126,14 @@ export default async function RolodexPage({
           </button>
         </form>
 
-        <div className="flex flex-wrap gap-1.5">
+        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 no-scrollbar sm:flex-wrap sm:overflow-x-visible sm:pb-0">
           {RELATIONSHIP_FILTERS.map((filter) => {
             const active = (type ?? "") === filter.value;
             return (
               <Link
                 key={filter.value}
                 href={`/app/rolodex?${filter.value ? `type=${filter.value}` : ""}${q ? `&q=${q}` : ""}`}
-                className="rounded-full px-2.5 py-0.5 text-[0.8125rem] font-medium transition-colors"
+                className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 text-[0.8125rem] font-medium transition-colors [@media(pointer:coarse)]:min-h-[2.75rem] [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:items-center"
                 style={{
                   background: active ? "var(--text)" : "var(--bg-tint)",
                   color: active ? "var(--bg-page)" : "var(--text-muted)",
@@ -159,6 +172,7 @@ export default async function RolodexPage({
           persons.map((person) => {
             const birthdayLabel = upcomingBirthdayLabel(person.birthday);
             const fuStatus = followUpStatus.get(person.id);
+            const contactAgo = lastContactLabel(person.lastInteractionAt);
             return (
               <Link
                 key={person.id}
@@ -178,29 +192,32 @@ export default async function RolodexPage({
                     <p className="truncate text-[0.9375rem] font-semibold" style={{ color: "var(--text)" }}>
                       {person.displayName}
                     </p>
-                    <p className="truncate text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
+                    <p className="truncate text-[0.75rem] sm:text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
                       {[person.relationshipType, person.organization].filter(Boolean).join(" · ") || " "}
+                      {contactAgo ? (
+                        <span style={{ color: "var(--text-faint)" }}> · {contactAgo}</span>
+                      ) : null}
                     </p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-1.5">
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
                     {fuStatus && (
                       <span
-                        className="rounded-full px-2 py-0.5 text-[0.75rem] font-medium"
+                        className="rounded-full px-2 py-0.5 text-[0.625rem] font-medium sm:text-[0.75rem]"
                         style={{
                           background: "rgba(245, 158, 11, 0.15)",
                           color: fuStatus === "overdue" ? "#b45309" : "#d97706",
                         }}
                       >
                         {fuStatus === "overdue"
-                          ? "Overdue follow-up"
+                          ? "Overdue"
                           : fuStatus === "soon"
                           ? "Follow-up soon"
-                          : "Follow-up due"}
+                          : "Follow-up"}
                       </span>
                     )}
                     {birthdayLabel && (
                       <span
-                        className="rounded px-1.5 py-0.5 text-[0.75rem] font-medium"
+                        className="rounded px-1.5 py-0.5 text-[0.625rem] font-medium sm:text-[0.75rem]"
                         style={{ background: "var(--accent-tint)", color: "var(--accent-strong)" }}
                       >
                         🎂 {birthdayLabel}

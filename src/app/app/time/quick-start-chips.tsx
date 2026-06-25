@@ -125,7 +125,7 @@ export function QuickStartChips({
                     habitId: habit.id,
                   })
                 }
-                className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
                 style={chipStyle(startingKey === key)}
               >
                 <span
@@ -160,7 +160,7 @@ export function QuickStartChips({
                     projectId: task.projectId ?? undefined,
                   })
                 }
-                className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
                 style={chipStyle(startingKey === key)}
               >
                 {startingKey === key ? "Starting..." : task.title}
@@ -191,7 +191,7 @@ export function QuickStartChips({
                 onClick={() =>
                   start(key, { label: item.title, category: "calendar" })
                 }
-                className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
                 style={chipStyle(startingKey === key)}
               >
                 <span
@@ -224,7 +224,7 @@ export function QuickStartChips({
                     category: recent.category ?? undefined,
                   })
                 }
-                className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
                 style={chipStyle(startingKey === key)}
               >
                 <span
@@ -254,7 +254,7 @@ export function QuickStartChips({
                     category: category.id,
                   })
                 }
-                className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
                 style={chipStyle(startingKey === key)}
               >
                 <span
@@ -292,7 +292,7 @@ function ChipGroup({
         </p>
         {action ?? null}
       </div>
-      <div className="flex flex-wrap gap-1.5">{children}</div>
+      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 no-scrollbar sm:flex-wrap sm:overflow-x-visible sm:pb-0">{children}</div>
     </div>
   );
 }

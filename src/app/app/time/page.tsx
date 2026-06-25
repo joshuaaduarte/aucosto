@@ -890,7 +890,7 @@ export default async function TimePage() {
                             ) : null}
                           </div>
                           <p
-                            className="mt-0.5 text-[0.75rem]"
+                            className="mt-0.5 text-[0.625rem] sm:text-[0.75rem]"
                             style={{ color: "var(--text-faint)" }}
                           >
                             {entry.startedAt.toLocaleString([], {
@@ -902,7 +902,7 @@ export default async function TimePage() {
                           </p>
                         </div>
                         <span
-                          className="text-[0.8125rem] tabular font-medium"
+                          className="text-[0.6875rem] tabular font-medium sm:text-[0.8125rem]"
                           style={{ color: "var(--text)" }}
                         >
                           {formatDuration(duration)}
