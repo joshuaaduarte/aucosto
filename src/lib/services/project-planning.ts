@@ -56,9 +56,12 @@ export function ensureProjectPlanningColumns(): Promise<void> {
       const cols: [string, string][] = [
         ["goal", "TEXT"],
         ["why_it_matters", "TEXT"],
+        ["whyItMatters", "TEXT"],
         ["open_questions", "TEXT"],
+        ["openQuestions", "TEXT"],
         ["blockers", "TEXT"],
         ["plan_notes", "TEXT"],
+        ["planNotes", "TEXT"],
       ];
       for (const [col, type] of cols) {
         await prisma

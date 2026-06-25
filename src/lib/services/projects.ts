@@ -8,6 +8,7 @@ import { normalizeDoStatus } from "@/lib/do";
 import { deleteDoItemsByProject } from "@/lib/services/do";
 import { recordEvent } from "@/lib/services/events";
 import { listHabits } from "@/lib/services/habits";
+import { ensureProjectPlanningColumns } from "@/lib/services/project-planning";
 import {
   computeMomentum,
   normalizeBoardStatus,
@@ -284,6 +285,10 @@ function summarize(
 export async function listProjects(userId: string): Promise<ProjectSummary[]> {
   requireCan(userId, "projects", "read");
   const now = new Date();
+  await Promise.all([
+    ensureProjectBoardTables(),
+    ensureProjectPlanningColumns(),
+  ]);
 
   const projects = await prisma.project.findMany({
     where: { userId },
