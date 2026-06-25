@@ -1,0 +1,86 @@
+// Rolodex — people, interactions, contact details, follow-ups, gift ideas.
+// Applied to the live DB via ensureRolodexTables() raw SQL in
+// src/lib/services/rolodex.ts (same pattern as reflect/rhythms/projects-board).
+// All JSON array fields are stored as TEXT columns; the service layer
+// parses/serialises them.
+
+model RolodexPerson {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  displayName String
+  firstName   String?
+  lastName    String?
+  aliases     String? // JSON array of strings
+
+  relationshipType String? // "family"|"friend"|"coworker"|"vendor"|"acquaintance"|"other"
+  organization     String?
+  role             String?
+
+  emails    String? // JSON array of {label,value}
+  phones    String? // JSON array of {label,value}
+  addresses String? // JSON array of {label,value}
+  socials   String? // JSON array of {platform,handle,url}
+
+  birthday       DateTime?
+  importantDates String? // JSON array of {label,date}
+
+  notes              String?
+  preferences        String?
+  giftIdeas          String? // JSON array of strings
+  communicationNotes String?
+  collaborationNotes String?
+  sensitivities      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  interactions RolodexInteraction[]
+  mentions     RolodexMention[]
+
+  @@index([userId])
+  @@index([userId, displayName])
+}
+
+model RolodexInteraction {
+  id       String        @id @default(cuid())
+  userId   String
+  personId String
+  person   RolodexPerson @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  sourceTool     String?
+  sourceRecordId String?
+
+  occurredAt DateTime @default(now())
+  title      String
+  body       String?
+
+  followUpNeeded Boolean   @default(false)
+  followUpDate   DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([personId, occurredAt])
+}
+
+model RolodexMention {
+  id       String         @id @default(cuid())
+  userId   String
+  personId String?
+  person   RolodexPerson? @relation(fields: [personId], references: [id], onDelete: SetNull)
+
+  mentionedName  String
+  resolved       Boolean @default(false)
+
+  sourceTool     String
+  sourceRecordId String
+  sourceField    String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, resolved])
+  @@index([personId])
+}

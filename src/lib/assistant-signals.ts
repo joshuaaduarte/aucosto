@@ -42,7 +42,14 @@ export type SignalFacts = {
     habits: {
       items: { name: string; done: boolean; streak: number; scheduledToday: boolean }[];
     };
-    projects: { name: string; momentum: string; openTaskCount: number }[];
+    projects: {
+      name: string;
+      momentum: string;
+      openTaskCount: number;
+      nextAction?: string | null;
+      blockers?: string[];
+      missingNextAction?: boolean;
+    }[];
   };
   yesterday: {
     habitsCompleted: number;
@@ -63,6 +70,7 @@ export type Signals = {
   driftRisk: "low" | "medium" | "high";
   habitRecovery: boolean;
   stalledProjects: string[];
+  projectsMissingNextAction: string[];
   financeNeedsAttention: boolean;
   unfinishedPriority: boolean;
   longRunningTimer: boolean;
@@ -170,6 +178,10 @@ export function computeSignals(facts: SignalFacts, nowMinutes: number): Signals 
     .filter((p) => p.momentum === "stalled" && p.openTaskCount > 0)
     .map((p) => p.name);
 
+  const projectsMissingNextAction = facts.today.projects
+    .filter((p) => p.missingNextAction === true && p.openTaskCount > 0)
+    .map((p) => p.name);
+
   // TODO: check last import date when finance data is available
   const financeNeedsAttention = false;
 
@@ -206,6 +218,7 @@ export function computeSignals(facts: SignalFacts, nowMinutes: number): Signals 
     driftRisk,
     habitRecovery,
     stalledProjects,
+    projectsMissingNextAction,
     financeNeedsAttention,
     unfinishedPriority,
     longRunningTimer,

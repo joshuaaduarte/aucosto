@@ -17,6 +17,20 @@ import { listRecentEvents } from "@/lib/services/events";
 import { listHabits } from "@/lib/services/habits";
 import { listAccounts } from "@/lib/services/finance";
 import { ensureProjectBoardTables, listBoardProjects } from "@/lib/services/projects";
+import {
+  ensureProjectPlanningColumns,
+  listProjectPlanSummaries,
+} from "@/lib/services/project-planning";
+import {
+  ensureRolodexTables,
+  getUpcomingBirthdays,
+  getDueFollowUps,
+  getRecentlyMentioned,
+  listUnresolvedMentions,
+  type BirthdaySummary,
+  type FollowUpSummary,
+  type RecentMentionSummary,
+} from "@/lib/services/rolodex";
 import { getReflection } from "@/lib/services/reflect";
 import { getTodayWakeStatus } from "@/lib/services/rhythms";
 import {
@@ -104,6 +118,9 @@ export type AssistantSnapshot = {
         momentum: "strong" | "slowing" | "stalled" | "none";
         lastWorkedDaysAgo: number | null;
         openTaskCount: number;
+        nextAction: string | null;
+        blockers: string[];
+        missingNextAction: boolean;
       }[];
 
       recentEvents: { label: string; tool: string; at: string }[];
@@ -131,6 +148,13 @@ export type AssistantSnapshot = {
     finance: {
       visible: boolean;
       summary: string | null;
+    };
+
+    rolodex: {
+      upcomingBirthdays: BirthdaySummary[];
+      dueFollowUps: FollowUpSummary[];
+      recentlyMentioned: RecentMentionSummary[];
+      unresolvedMentionCount: number;
     };
   };
 
@@ -181,7 +205,11 @@ export async function buildAssistantSnapshot(
   const todayKey = dayKey(now);
   const yesterdayKey = dayKey(yesterdayStart);
 
-  await ensureProjectBoardTables();
+  await Promise.all([
+    ensureProjectBoardTables(),
+    ensureProjectPlanningColumns().catch(() => {}),
+    ensureRolodexTables().catch(() => {}),
+  ]);
 
   const [
     runningEntry,
@@ -197,6 +225,11 @@ export async function buildAssistantSnapshot(
     yesterdayReflection,
     userRecord,
     financeAccounts,
+    projectPlanSummaries,
+    upcomingBirthdays,
+    dueFollowUps,
+    recentlyMentioned,
+    unresolvedMentions,
   ] = await Promise.all([
     getRunningEntry(userId),
     listCalendarItems(userId, { from: todayStart, to: tomorrowStart }),
@@ -214,6 +247,11 @@ export async function buildAssistantSnapshot(
       select: { name: true, financeVisible: true },
     }),
     listAccounts(userId),
+    listProjectPlanSummaries(userId).catch(() => []),
+    getUpcomingBirthdays(userId).catch(() => []),
+    getDueFollowUps(userId).catch(() => []),
+    getRecentlyMentioned(userId).catch(() => []),
+    listUnresolvedMentions(userId).catch(() => []),
   ]);
 
   const financeVisible = userRecord?.financeVisible ?? false;
@@ -302,18 +340,27 @@ export async function buildAssistantSnapshot(
   const habitsTotal = dueTodayHabits.length;
 
   // ── today.projects ───────────────────────────────────────────────────────
+  const planByProjectId = new Map(
+    projectPlanSummaries.map((p) => [p.projectId, p]),
+  );
   const projects = boardProjects
     .filter((project) => project.status !== "done")
-    .map((project) => ({
-      name: project.name,
-      momentum: (project.momentum
-        ? project.momentum.level === "alive"
-          ? "strong"
-          : project.momentum.level
-        : "none") as "strong" | "slowing" | "stalled" | "none",
-      lastWorkedDaysAgo: daysAgo(project.lastWorkedAt, now),
-      openTaskCount: project.openTaskCount,
-    }));
+    .map((project) => {
+      const plan = planByProjectId.get(project.id);
+      return {
+        name: project.name,
+        momentum: (project.momentum
+          ? project.momentum.level === "alive"
+            ? "strong"
+            : project.momentum.level
+          : "none") as "strong" | "slowing" | "stalled" | "none",
+        lastWorkedDaysAgo: daysAgo(project.lastWorkedAt, now),
+        openTaskCount: project.openTaskCount,
+        nextAction: plan?.nextAction ?? project.nextAction,
+        blockers: plan?.blockers ?? [],
+        missingNextAction: plan?.missingNextAction ?? false,
+      };
+    });
 
   // ── today.recentEvents ───────────────────────────────────────────────────
   const recentEventRows = recentEvents.map((event) => ({
@@ -423,6 +470,13 @@ export async function buildAssistantSnapshot(
     finance: {
       visible: financeVisible,
       summary: financeSummary,
+    },
+
+    rolodex: {
+      upcomingBirthdays,
+      dueFollowUps,
+      recentlyMentioned,
+      unresolvedMentionCount: unresolvedMentions.length,
     },
   } satisfies AssistantSnapshot["facts"];
 

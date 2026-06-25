@@ -115,12 +115,46 @@ The daily command center, composed from every other tool.
 ## Projects (`/app/projects`)
 
 - **Schema:** `Project`; tasks link via `DoItem.projectId` (SetNull).
+  Planning fields (`goal`, `why_it_matters`, `open_questions`, `blockers`,
+  `plan_notes`) added via raw SQL ensure (`src/lib/services/project-planning.ts`);
+  `nextMilestone`, `nextAction`, `targetDate` already existed in the Prisma schema.
 - **Service:** `src/lib/services/projects.ts` — `ProjectSummary` rolls up
   linked-task counts, tracked/scheduled minutes, health flags.
   `deleteProject` takes `{ deleteTasks }` (the delete dialog offers both).
+  `src/lib/services/project-planning.ts` — `getProjectPlan`, `updateProjectPlan`,
+  array helpers (`addProjectQuestion/Blocker`, `removeProjectQuestion/Blocker`),
+  `listProjectPlanSummaries` (feeds assistant snapshot).
 - **UI:** `page.tsx`, `create-form.tsx`, `edit-form.tsx`,
   `delete-project-button.tsx` (choice dialog), `project-planning-forms.tsx`
-  (task + schedule-block creation).
+  (task + schedule-block creation), `_components/project-plan-section.tsx`
+  (inline-editable planning section on detail page — goal, next action banner,
+  milestone, blockers, open questions, notes).
+- **Actions:** `plan-actions.ts` — update/add/remove planning field actions.
+
+## Rolodex (`/app/rolodex`)
+
+Contact relationship manager. No Prisma-generated client — uses raw SQL
+`ensureRolodexTables()` pattern (three tables: `RolodexPerson`,
+`RolodexInteraction`, `RolodexMention`).
+
+- **Schema:** `prisma/schema/rolodex.prisma` (for future `prisma migrate`);
+  runtime tables created by `ensureRolodexTables()` in service.
+- **Service:** `src/lib/services/rolodex.ts` — full CRUD for persons;
+  interaction log (title, body, follow-up flag/date); @mention tracking;
+  `findPersonByName` (case-insensitive includes across displayName/firstName/
+  lastName/aliases); snapshot helpers: `getUpcomingBirthdays` (30d window),
+  `getDueFollowUps`, `getRecentlyMentioned`, `listUnresolvedMentions`.
+- **UI:** `page.tsx` (list + search + relationship-type filter; birthday
+  countdown chips), `new/page.tsx` (create form via `useActionState`),
+  `[id]/page.tsx` (detail: notes, follow-ups, gift ideas, interaction
+  timeline), `[id]/edit/page.tsx` + `_edit-form.tsx` (edit person + inline
+  log-interaction panel).
+- **Actions:** `actions.ts` — `createPersonAction`, `updatePersonAction`,
+  `addInteractionAction`, `resolveMentionAction`.
+- **Assistant integration:** snapshot includes upcoming birthdays, due
+  follow-ups, recently mentioned persons, unresolved @mention count.
+  Action executor handles `create_rolodex_person`, `update_rolodex_person`,
+  `add_rolodex_interaction`, `add_person_followup`, `add_gift_idea`.
 
 ## Finance (`/app/finance`)
 

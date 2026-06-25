@@ -7,8 +7,13 @@ import {
   getBoardProject,
   listAreas,
 } from "@/lib/services/projects";
+import {
+  ensureProjectPlanningColumns,
+  getProjectPlan,
+} from "@/lib/services/project-planning";
 import { EditProjectSheet, type ProjectEditView } from "../_components/edit-project-sheet";
 import { ProjectDetailBody } from "../_components/health-panel";
+import { ProjectPlanSection } from "../_components/project-plan-section";
 
 export const dynamic = "force-dynamic";
 
@@ -28,14 +33,18 @@ export default async function ProjectDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await ensureProjectBoardTables();
+  await Promise.all([
+    ensureProjectBoardTables(),
+    ensureProjectPlanningColumns().catch(() => {}),
+  ]);
   const { id } = await params;
   const userId = await resolveActiveUserId();
   const now = new Date();
 
-  const [detail, areas] = await Promise.all([
+  const [detail, areas, plan] = await Promise.all([
     getBoardProject(userId, id),
     listAreas(userId),
+    getProjectPlan(userId, id).catch(() => null),
   ]);
   if (!detail) notFound();
 
@@ -128,6 +137,12 @@ export default async function ProjectDetailPage({
           now={now}
         />
       </div>
+
+      {plan && (
+        <div className="fade-in-delay-2">
+          <ProjectPlanSection projectId={project.id} plan={plan} />
+        </div>
+      )}
     </div>
   );
 }

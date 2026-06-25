@@ -102,6 +102,17 @@ const MORE_TOOLS: MoreTool[] = [
     ),
   },
   {
+    href: "/app/rolodex",
+    label: "Rolodex",
+    icon: (
+      <svg {...ip}>
+        <circle cx="6" cy="6" r="3" />
+        <path d="M1.5 13c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4" />
+        <path d="M10.5 4h3M10.5 7.5h3M10.5 11h2" />
+      </svg>
+    ),
+  },
+  {
     href: "/app/finance",
     label: "Finance",
     finance: true,

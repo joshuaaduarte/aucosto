@@ -73,6 +73,14 @@ const EVENT_LABELS: Record<string, string> = {
   "rhythm.ended": "completed a rhythm",
   "rhythm.updated": "corrected a wake time",
 
+  // rolodex
+  "rolodex.person_created": "Created contact",
+  "rolodex.person_updated": "Updated contact",
+  "rolodex.interaction_added": "Logged interaction",
+  "rolodex.mention_resolved": "Resolved @mention",
+  "rolodex.followup_added": "Added follow-up",
+  "rolodex.gift_idea_added": "Added gift idea",
+
   // user
   "user.privacy_updated": "updated privacy settings",
 };

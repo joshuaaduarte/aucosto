@@ -1,0 +1,165 @@
+import Link from "next/link";
+import { resolveActiveUserId } from "@/lib/viewer-context";
+import { ensureRolodexTables, listPersons } from "@/lib/services/rolodex";
+
+export const dynamic = "force-dynamic";
+
+const RELATIONSHIP_FILTERS = [
+  { value: "", label: "All" },
+  { value: "family", label: "Family" },
+  { value: "friend", label: "Friends" },
+  { value: "coworker", label: "Coworkers" },
+  { value: "vendor", label: "Vendors" },
+  { value: "acquaintance", label: "Acquaintances" },
+];
+
+function upcomingBirthdayLabel(birthday: string | null): string | null {
+  if (!birthday) return null;
+  const bday = new Date(birthday);
+  const now = new Date();
+  const thisYear = new Date(now.getFullYear(), bday.getMonth(), bday.getDate());
+  const upcoming = thisYear >= now ? thisYear : new Date(now.getFullYear() + 1, bday.getMonth(), bday.getDate());
+  const diffDays = Math.ceil((upcoming.getTime() - now.getTime()) / 86_400_000);
+  if (diffDays <= 30) {
+    return diffDays === 0 ? "Birthday today!" : `Birthday in ${diffDays}d`;
+  }
+  return null;
+}
+
+export default async function RolodexPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; type?: string }>;
+}) {
+  try {
+    await ensureRolodexTables();
+  } catch {
+    // degrade gracefully — tables may not exist yet
+  }
+
+  const { q, type } = await searchParams;
+  const userId = await resolveActiveUserId();
+
+  const persons = await listPersons(userId, {
+    search: q,
+    relationshipType: type || undefined,
+  }).catch(() => []);
+
+  return (
+    <div className="space-y-6">
+      <header className="fade-in flex items-start justify-between gap-3">
+        <h1
+          className="text-[1.5rem] font-bold tracking-tight sm:text-[1.875rem]"
+          style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
+        >
+          Rolodex
+        </h1>
+        <Link
+          href="/app/rolodex/new"
+          className="btn-ghost shrink-0 px-3 py-1.5 text-[0.875rem] font-medium"
+          style={{ color: "var(--accent)" }}
+        >
+          + Add person
+        </Link>
+      </header>
+
+      {/* Search + filter */}
+      <div className="fade-in-delay-1 space-y-3">
+        <form method="GET" className="flex gap-2">
+          <input
+            name="q"
+            type="search"
+            defaultValue={q}
+            placeholder="Search by name, org…"
+            className="field flex-1 text-[0.875rem]"
+          />
+          <input type="hidden" name="type" value={type ?? ""} />
+          <button type="submit" className="btn-ghost px-3 py-1.5 text-[0.875rem] font-medium" style={{ color: "var(--text-muted)" }}>
+            Search
+          </button>
+        </form>
+
+        <div className="flex flex-wrap gap-1.5">
+          {RELATIONSHIP_FILTERS.map((filter) => {
+            const active = (type ?? "") === filter.value;
+            return (
+              <Link
+                key={filter.value}
+                href={`/app/rolodex?${filter.value ? `type=${filter.value}` : ""}${q ? `&q=${q}` : ""}`}
+                className="rounded-full px-2.5 py-0.5 text-[0.8125rem] font-medium transition-colors"
+                style={{
+                  background: active ? "var(--text)" : "var(--bg-tint)",
+                  color: active ? "var(--bg-page)" : "var(--text-muted)",
+                  border: "1px solid var(--border-faint)",
+                }}
+              >
+                {filter.label}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Person list */}
+      <div className="fade-in-delay-2 space-y-2">
+        {persons.length === 0 ? (
+          <div
+            className="rounded-xl p-8 text-center"
+            style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)" }}
+          >
+            <p className="text-[0.9375rem] font-medium" style={{ color: "var(--text-muted)" }}>
+              {q || type ? "No contacts match your filter." : "Your Rolodex is empty — add someone to get started."}
+            </p>
+            {!q && !type && (
+              <Link
+                href="/app/rolodex/new"
+                className="mt-3 inline-block text-[0.875rem] font-medium"
+                style={{ color: "var(--accent)" }}
+              >
+                Add your first contact →
+              </Link>
+            )}
+          </div>
+        ) : (
+          persons.map((person) => {
+            const birthdayLabel = upcomingBirthdayLabel(person.birthday);
+            return (
+              <Link
+                key={person.id}
+                href={`/app/rolodex/${person.id}`}
+                className="block rounded-lg px-4 py-3 transition-colors hover:bg-bg-hover"
+                style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)" }}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[0.9375rem] font-semibold"
+                    style={{ background: "var(--border)", color: "var(--text-muted)" }}
+                    aria-hidden
+                  >
+                    {person.displayName.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[0.9375rem] font-semibold" style={{ color: "var(--text)" }}>
+                      {person.displayName}
+                    </p>
+                    <p className="truncate text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
+                      {[person.relationshipType, person.organization].filter(Boolean).join(" · ") || " "}
+                    </p>
+                  </div>
+                  {birthdayLabel && (
+                    <span
+                      className="shrink-0 rounded px-1.5 py-0.5 text-[0.75rem] font-medium"
+                      style={{ background: "var(--accent-tint)", color: "var(--accent-strong)" }}
+                    >
+                      🎂 {birthdayLabel}
+                    </span>
+                  )}
+                </div>
+              </Link>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}

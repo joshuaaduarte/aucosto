@@ -88,4 +88,78 @@ export const ACTION_REGISTRY: Record<string, ActionDef> = {
     supported: false,
     description: "Finance write operations (not yet supported)",
   },
+
+  // Project planning actions
+  update_project_plan: {
+    action: "update_project_plan",
+    risk: "medium",
+    confirmationRequired: true,
+    supported: true,
+    description: "Update project planning fields (goal, next action, milestone, notes)",
+  },
+  add_project_milestone: {
+    action: "add_project_milestone",
+    risk: "low",
+    confirmationRequired: false,
+    supported: true,
+    description: "Set or update the project's next milestone",
+  },
+  add_project_question: {
+    action: "add_project_question",
+    risk: "low",
+    confirmationRequired: false,
+    supported: true,
+    description: "Add an open question to a project",
+  },
+  add_project_blocker: {
+    action: "add_project_blocker",
+    risk: "low",
+    confirmationRequired: false,
+    supported: true,
+    description: "Add a blocker to a project",
+  },
+  set_project_next_action: {
+    action: "set_project_next_action",
+    risk: "low",
+    confirmationRequired: false,
+    supported: true,
+    description: "Set the next concrete action for a project",
+  },
+
+  // Rolodex actions
+  create_rolodex_person: {
+    action: "create_rolodex_person",
+    risk: "low",
+    confirmationRequired: false,
+    supported: true,
+    description: "Create a new contact in the Rolodex",
+  },
+  update_rolodex_person: {
+    action: "update_rolodex_person",
+    risk: "medium",
+    confirmationRequired: true,
+    supported: true,
+    description: "Update a contact's details in the Rolodex",
+  },
+  add_rolodex_interaction: {
+    action: "add_rolodex_interaction",
+    risk: "low",
+    confirmationRequired: false,
+    supported: true,
+    description: "Log an interaction with a Rolodex contact",
+  },
+  add_person_followup: {
+    action: "add_person_followup",
+    risk: "low",
+    confirmationRequired: false,
+    supported: true,
+    description: "Add a follow-up reminder for a Rolodex contact",
+  },
+  add_gift_idea: {
+    action: "add_gift_idea",
+    risk: "low",
+    confirmationRequired: false,
+    supported: true,
+    description: "Add a gift idea for a Rolodex contact",
+  },
 };

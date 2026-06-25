@@ -11,6 +11,20 @@ import {
   buildReflectionSnapshot,
 } from "@/lib/services/reflect";
 import { updateProject, listBoardProjects } from "@/lib/services/projects";
+import {
+  updateProjectPlan,
+  addProjectQuestion,
+  addProjectBlocker,
+  getProjectPlan,
+} from "@/lib/services/project-planning";
+import {
+  findPersonByName,
+  createPerson,
+  updatePerson,
+  addInteraction,
+  updateFollowUp,
+  getPerson,
+} from "@/lib/services/rolodex";
 import { dayKey } from "@/lib/reflect";
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -96,6 +110,73 @@ const UpdateProjectInput = z.object({
   projectName: z.string().min(1),
   status: z.enum(["active", "paused", "done"]).optional(),
   notes: z.string().optional(),
+});
+
+const UpdateProjectPlanInput = z.object({
+  projectName: z.string().min(1),
+  goal: z.string().max(1000).optional(),
+  whyItMatters: z.string().max(1000).optional(),
+  nextMilestone: z.string().max(500).optional(),
+  nextAction: z.string().max(500).optional(),
+  planNotes: z.string().max(5000).optional(),
+});
+
+const AddProjectMilestoneInput = z.object({
+  projectName: z.string().min(1),
+  milestone: z.string().min(1).max(500),
+});
+
+const AddProjectQuestionInput = z.object({
+  projectName: z.string().min(1),
+  question: z.string().min(1).max(500),
+});
+
+const AddProjectBlockerInput = z.object({
+  projectName: z.string().min(1),
+  blocker: z.string().min(1).max(500),
+});
+
+const SetProjectNextActionInput = z.object({
+  projectName: z.string().min(1),
+  nextAction: z.string().min(1).max(500),
+});
+
+const CreateRolodexPersonInput = z.object({
+  displayName: z.string().min(1).max(200),
+  firstName: z.string().max(100).optional(),
+  lastName: z.string().max(100).optional(),
+  relationshipType: z.string().optional(),
+  organization: z.string().max(200).optional(),
+  birthday: z.string().optional(),
+  notes: z.string().max(5000).optional(),
+});
+
+const UpdateRolodexPersonInput = z.object({
+  personName: z.string().min(1),
+  notes: z.string().max(5000).optional(),
+  relationshipType: z.string().optional(),
+  organization: z.string().max(200).optional(),
+  giftIdeas: z.array(z.string()).optional(),
+  communicationNotes: z.string().max(2000).optional(),
+});
+
+const AddRolodexInteractionInput = z.object({
+  personName: z.string().min(1),
+  title: z.string().min(1).max(300),
+  body: z.string().max(5000).optional(),
+  followUpNeeded: z.boolean().optional(),
+  followUpDate: z.string().optional(),
+});
+
+const AddPersonFollowupInput = z.object({
+  personName: z.string().min(1),
+  title: z.string().min(1).max(300),
+  followUpDate: z.string().optional(),
+});
+
+const AddGiftIdeaInput = z.object({
+  personName: z.string().min(1),
+  idea: z.string().min(1).max(300),
 });
 
 // ── Name resolvers (read-only) ────────────────────────────────────────────
@@ -750,6 +831,424 @@ async function executeUpdateProject(
   };
 }
 
+// ── Person resolver ───────────────────────────────────────────────────────
+
+async function resolvePersonByName(
+  userId: string,
+  name: string,
+): Promise<ResolveResult<{ id: string; name: string }>> {
+  const persons = await findPersonByName(userId, name);
+  const lower = name.toLowerCase();
+
+  const exact = persons.filter((p) => p.displayName.toLowerCase() === lower);
+  if (exact.length === 1) return { found: true, match: { id: exact[0]!.id, name: exact[0]!.displayName } };
+
+  const partial = persons.filter((p) => p.displayName.toLowerCase().includes(lower));
+  if (partial.length === 1) return { found: true, match: { id: partial[0]!.id, name: partial[0]!.displayName } };
+
+  const pool = exact.length > 1 ? exact : partial;
+  return {
+    found: false,
+    candidates: pool.map((p) => ({ id: p.id, name: p.displayName })),
+  };
+}
+
+// ── Project planning preview/execute handlers ─────────────────────────────
+
+async function previewUpdateProjectPlan(
+  userId: string,
+  raw: unknown,
+): Promise<PreviewResult> {
+  const parsed = UpdateProjectPlanInput.safeParse(raw);
+  if (!parsed.success) return err(parsed.error.issues[0]?.message ?? "Invalid input");
+
+  const resolved = await resolveProjectByName(userId, parsed.data.projectName);
+  if (!resolved.found) {
+    return errAmbiguous(
+      resolved.candidates.length === 0
+        ? `No project found matching "${parsed.data.projectName}"`
+        : `Ambiguous project match for "${parsed.data.projectName}"`,
+      resolved.candidates,
+    );
+  }
+
+  const { goal, whyItMatters, nextMilestone, nextAction, planNotes } = parsed.data;
+  const changes: string[] = [];
+  if (goal !== undefined) changes.push("goal");
+  if (whyItMatters !== undefined) changes.push("why it matters");
+  if (nextMilestone !== undefined) changes.push("next milestone");
+  if (nextAction !== undefined) changes.push(`next action → "${nextAction}"`);
+  if (planNotes !== undefined) changes.push("plan notes");
+  if (changes.length === 0) return err("No changes specified");
+
+  return {
+    ok: true,
+    previewText: `Update planning for "${resolved.match.name}": ${changes.join(", ")}`,
+    normalizedInput: {
+      projectId: resolved.match.id,
+      projectName: resolved.match.name,
+      goal: goal ?? null,
+      whyItMatters: whyItMatters ?? null,
+      nextMilestone: nextMilestone ?? null,
+      nextAction: nextAction ?? null,
+      planNotes: planNotes ?? null,
+    },
+    warnings: [],
+  };
+}
+
+async function executeUpdateProjectPlan(
+  userId: string,
+  n: Record<string, unknown>,
+): Promise<ExecuteResult> {
+  const patch: Parameters<typeof updateProjectPlan>[2] = {};
+  if (n.goal !== null && n.goal !== undefined) patch.goal = String(n.goal);
+  if (n.whyItMatters !== null && n.whyItMatters !== undefined) patch.whyItMatters = String(n.whyItMatters);
+  if (n.nextMilestone !== null && n.nextMilestone !== undefined) patch.nextMilestone = String(n.nextMilestone);
+  if (n.nextAction !== null && n.nextAction !== undefined) patch.nextAction = String(n.nextAction);
+  if (n.planNotes !== null && n.planNotes !== undefined) patch.planNotes = String(n.planNotes);
+
+  await updateProjectPlan(userId, String(n.projectId), patch);
+  return { ok: true, recordId: String(n.projectId), recordType: "Project", summary: `Updated planning for "${n.projectName}"` };
+}
+
+async function previewAddProjectMilestone(
+  userId: string,
+  raw: unknown,
+): Promise<PreviewResult> {
+  const parsed = AddProjectMilestoneInput.safeParse(raw);
+  if (!parsed.success) return err(parsed.error.issues[0]?.message ?? "Invalid input");
+
+  const resolved = await resolveProjectByName(userId, parsed.data.projectName);
+  if (!resolved.found) {
+    return errAmbiguous(
+      resolved.candidates.length === 0
+        ? `No project found matching "${parsed.data.projectName}"`
+        : `Ambiguous project match for "${parsed.data.projectName}"`,
+      resolved.candidates,
+    );
+  }
+
+  return {
+    ok: true,
+    previewText: `Set next milestone for "${resolved.match.name}": "${parsed.data.milestone}"`,
+    normalizedInput: { projectId: resolved.match.id, projectName: resolved.match.name, milestone: parsed.data.milestone },
+    warnings: [],
+  };
+}
+
+async function executeAddProjectMilestone(
+  userId: string,
+  n: Record<string, unknown>,
+): Promise<ExecuteResult> {
+  await updateProjectPlan(userId, String(n.projectId), { nextMilestone: String(n.milestone) });
+  return { ok: true, recordId: String(n.projectId), recordType: "Project", summary: `Set milestone for "${n.projectName}"` };
+}
+
+async function previewAddProjectQuestion(
+  userId: string,
+  raw: unknown,
+): Promise<PreviewResult> {
+  const parsed = AddProjectQuestionInput.safeParse(raw);
+  if (!parsed.success) return err(parsed.error.issues[0]?.message ?? "Invalid input");
+
+  const resolved = await resolveProjectByName(userId, parsed.data.projectName);
+  if (!resolved.found) {
+    return errAmbiguous(
+      resolved.candidates.length === 0
+        ? `No project found matching "${parsed.data.projectName}"`
+        : `Ambiguous project match for "${parsed.data.projectName}"`,
+      resolved.candidates,
+    );
+  }
+
+  return {
+    ok: true,
+    previewText: `Add question to "${resolved.match.name}": "${parsed.data.question}"`,
+    normalizedInput: { projectId: resolved.match.id, projectName: resolved.match.name, question: parsed.data.question },
+    warnings: [],
+  };
+}
+
+async function executeAddProjectQuestion(
+  userId: string,
+  n: Record<string, unknown>,
+): Promise<ExecuteResult> {
+  await addProjectQuestion(userId, String(n.projectId), String(n.question));
+  return { ok: true, recordId: String(n.projectId), recordType: "Project", summary: `Added question to "${n.projectName}"` };
+}
+
+async function previewAddProjectBlocker(
+  userId: string,
+  raw: unknown,
+): Promise<PreviewResult> {
+  const parsed = AddProjectBlockerInput.safeParse(raw);
+  if (!parsed.success) return err(parsed.error.issues[0]?.message ?? "Invalid input");
+
+  const resolved = await resolveProjectByName(userId, parsed.data.projectName);
+  if (!resolved.found) {
+    return errAmbiguous(
+      resolved.candidates.length === 0
+        ? `No project found matching "${parsed.data.projectName}"`
+        : `Ambiguous project match for "${parsed.data.projectName}"`,
+      resolved.candidates,
+    );
+  }
+
+  return {
+    ok: true,
+    previewText: `Add blocker to "${resolved.match.name}": "${parsed.data.blocker}"`,
+    normalizedInput: { projectId: resolved.match.id, projectName: resolved.match.name, blocker: parsed.data.blocker },
+    warnings: [],
+  };
+}
+
+async function executeAddProjectBlocker(
+  userId: string,
+  n: Record<string, unknown>,
+): Promise<ExecuteResult> {
+  await addProjectBlocker(userId, String(n.projectId), String(n.blocker));
+  return { ok: true, recordId: String(n.projectId), recordType: "Project", summary: `Added blocker to "${n.projectName}"` };
+}
+
+async function previewSetProjectNextAction(
+  userId: string,
+  raw: unknown,
+): Promise<PreviewResult> {
+  const parsed = SetProjectNextActionInput.safeParse(raw);
+  if (!parsed.success) return err(parsed.error.issues[0]?.message ?? "Invalid input");
+
+  const resolved = await resolveProjectByName(userId, parsed.data.projectName);
+  if (!resolved.found) {
+    return errAmbiguous(
+      resolved.candidates.length === 0
+        ? `No project found matching "${parsed.data.projectName}"`
+        : `Ambiguous project match for "${parsed.data.projectName}"`,
+      resolved.candidates,
+    );
+  }
+
+  const current = await getProjectPlan(userId, resolved.match.id);
+  const before = current?.nextAction ?? null;
+  return {
+    ok: true,
+    previewText: `Set next action for "${resolved.match.name}": "${parsed.data.nextAction}"${before ? `\n(was: "${before}")` : ""}`,
+    normalizedInput: { projectId: resolved.match.id, projectName: resolved.match.name, nextAction: parsed.data.nextAction },
+    warnings: [],
+  };
+}
+
+async function executeSetProjectNextAction(
+  userId: string,
+  n: Record<string, unknown>,
+): Promise<ExecuteResult> {
+  await updateProjectPlan(userId, String(n.projectId), { nextAction: String(n.nextAction) });
+  return { ok: true, recordId: String(n.projectId), recordType: "Project", summary: `Set next action for "${n.projectName}"` };
+}
+
+// ── Rolodex preview/execute handlers ─────────────────────────────────────
+
+async function previewCreateRolodexPerson(
+  _userId: string,
+  raw: unknown,
+): Promise<PreviewResult> {
+  const parsed = CreateRolodexPersonInput.safeParse(raw);
+  if (!parsed.success) return err(parsed.error.issues[0]?.message ?? "Invalid input");
+
+  const parts: string[] = [`Create contact: ${parsed.data.displayName}`];
+  if (parsed.data.relationshipType) parts.push(parsed.data.relationshipType);
+  if (parsed.data.organization) parts.push(`@ ${parsed.data.organization}`);
+
+  return {
+    ok: true,
+    previewText: parts.join(" · "),
+    normalizedInput: parsed.data,
+    warnings: [],
+  };
+}
+
+async function executeCreateRolodexPerson(
+  userId: string,
+  n: Record<string, unknown>,
+): Promise<ExecuteResult> {
+  const id = await createPerson(userId, {
+    displayName: String(n.displayName),
+    firstName: n.firstName ? String(n.firstName) : undefined,
+    lastName: n.lastName ? String(n.lastName) : undefined,
+    relationshipType: n.relationshipType ? String(n.relationshipType) : undefined,
+    organization: n.organization ? String(n.organization) : undefined,
+    birthday: n.birthday ? String(n.birthday) : undefined,
+    notes: n.notes ? String(n.notes) : undefined,
+  });
+  return { ok: true, recordId: id, recordType: "RolodexPerson", summary: `Created contact "${n.displayName}"` };
+}
+
+async function previewUpdateRolodexPerson(
+  userId: string,
+  raw: unknown,
+): Promise<PreviewResult> {
+  const parsed = UpdateRolodexPersonInput.safeParse(raw);
+  if (!parsed.success) return err(parsed.error.issues[0]?.message ?? "Invalid input");
+
+  const resolved = await resolvePersonByName(userId, parsed.data.personName);
+  if (!resolved.found) {
+    return errAmbiguous(
+      resolved.candidates.length === 0
+        ? `No contact found matching "${parsed.data.personName}"`
+        : `Ambiguous contact match for "${parsed.data.personName}"`,
+      resolved.candidates,
+    );
+  }
+
+  const changes: string[] = [];
+  if (parsed.data.notes !== undefined) changes.push("notes");
+  if (parsed.data.relationshipType !== undefined) changes.push(`relationship → ${parsed.data.relationshipType}`);
+  if (parsed.data.organization !== undefined) changes.push(`org → ${parsed.data.organization}`);
+  if (parsed.data.giftIdeas !== undefined) changes.push("gift ideas");
+  if (parsed.data.communicationNotes !== undefined) changes.push("communication notes");
+  if (changes.length === 0) return err("No changes specified");
+
+  return {
+    ok: true,
+    previewText: `Update contact "${resolved.match.name}": ${changes.join(", ")}`,
+    normalizedInput: { ...parsed.data, personId: resolved.match.id, personName: resolved.match.name },
+    warnings: [],
+  };
+}
+
+async function executeUpdateRolodexPerson(
+  userId: string,
+  n: Record<string, unknown>,
+): Promise<ExecuteResult> {
+  const patch: Parameters<typeof updatePerson>[2] = {};
+  if (n.notes !== undefined) patch.notes = n.notes ? String(n.notes) : null;
+  if (n.relationshipType !== undefined) patch.relationshipType = n.relationshipType ? String(n.relationshipType) : null;
+  if (n.organization !== undefined) patch.organization = n.organization ? String(n.organization) : null;
+  if (n.communicationNotes !== undefined) patch.communicationNotes = n.communicationNotes ? String(n.communicationNotes) : null;
+  if (Array.isArray(n.giftIdeas)) {
+    const existing = await getPerson(userId, String(n.personId));
+    patch.giftIdeas = [...(existing?.giftIdeas ?? []), ...(n.giftIdeas as string[])];
+  }
+
+  await updatePerson(userId, String(n.personId), patch);
+  return { ok: true, recordId: String(n.personId), recordType: "RolodexPerson", summary: `Updated contact "${n.personName}"` };
+}
+
+async function previewAddRolodexInteraction(
+  userId: string,
+  raw: unknown,
+): Promise<PreviewResult> {
+  const parsed = AddRolodexInteractionInput.safeParse(raw);
+  if (!parsed.success) return err(parsed.error.issues[0]?.message ?? "Invalid input");
+
+  const resolved = await resolvePersonByName(userId, parsed.data.personName);
+  if (!resolved.found) {
+    return errAmbiguous(
+      resolved.candidates.length === 0
+        ? `No contact found matching "${parsed.data.personName}"`
+        : `Ambiguous contact match for "${parsed.data.personName}"`,
+      resolved.candidates,
+    );
+  }
+
+  const lines = [`Log interaction with "${resolved.match.name}": "${parsed.data.title}"`];
+  if (parsed.data.followUpNeeded) lines.push(`Follow-up: ${parsed.data.followUpDate ?? "no date set"}`);
+
+  return {
+    ok: true,
+    previewText: lines.join("\n"),
+    normalizedInput: { ...parsed.data, personId: resolved.match.id, personName: resolved.match.name },
+    warnings: [],
+  };
+}
+
+async function executeAddRolodexInteraction(
+  userId: string,
+  n: Record<string, unknown>,
+): Promise<ExecuteResult> {
+  const id = await addInteraction(userId, String(n.personId), {
+    title: String(n.title),
+    body: n.body ? String(n.body) : undefined,
+    followUpNeeded: Boolean(n.followUpNeeded),
+    followUpDate: n.followUpDate ? String(n.followUpDate) : undefined,
+    sourceTool: "assistant",
+  });
+  return { ok: true, recordId: id, recordType: "RolodexInteraction", summary: `Logged interaction with "${n.personName}"` };
+}
+
+async function previewAddPersonFollowup(
+  userId: string,
+  raw: unknown,
+): Promise<PreviewResult> {
+  const parsed = AddPersonFollowupInput.safeParse(raw);
+  if (!parsed.success) return err(parsed.error.issues[0]?.message ?? "Invalid input");
+
+  const resolved = await resolvePersonByName(userId, parsed.data.personName);
+  if (!resolved.found) {
+    return errAmbiguous(
+      resolved.candidates.length === 0
+        ? `No contact found matching "${parsed.data.personName}"`
+        : `Ambiguous contact match for "${parsed.data.personName}"`,
+      resolved.candidates,
+    );
+  }
+
+  return {
+    ok: true,
+    previewText: `Add follow-up with "${resolved.match.name}": "${parsed.data.title}"${parsed.data.followUpDate ? ` by ${parsed.data.followUpDate}` : ""}`,
+    normalizedInput: { ...parsed.data, personId: resolved.match.id, personName: resolved.match.name },
+    warnings: [],
+  };
+}
+
+async function executeAddPersonFollowup(
+  userId: string,
+  n: Record<string, unknown>,
+): Promise<ExecuteResult> {
+  const id = await addInteraction(userId, String(n.personId), {
+    title: String(n.title),
+    followUpNeeded: true,
+    followUpDate: n.followUpDate ? String(n.followUpDate) : undefined,
+    sourceTool: "assistant",
+  });
+  return { ok: true, recordId: id, recordType: "RolodexInteraction", summary: `Added follow-up with "${n.personName}"` };
+}
+
+async function previewAddGiftIdea(
+  userId: string,
+  raw: unknown,
+): Promise<PreviewResult> {
+  const parsed = AddGiftIdeaInput.safeParse(raw);
+  if (!parsed.success) return err(parsed.error.issues[0]?.message ?? "Invalid input");
+
+  const resolved = await resolvePersonByName(userId, parsed.data.personName);
+  if (!resolved.found) {
+    return errAmbiguous(
+      resolved.candidates.length === 0
+        ? `No contact found matching "${parsed.data.personName}"`
+        : `Ambiguous contact match for "${parsed.data.personName}"`,
+      resolved.candidates,
+    );
+  }
+
+  return {
+    ok: true,
+    previewText: `Add gift idea for "${resolved.match.name}": "${parsed.data.idea}"`,
+    normalizedInput: { ...parsed.data, personId: resolved.match.id, personName: resolved.match.name },
+    warnings: [],
+  };
+}
+
+async function executeAddGiftIdea(
+  userId: string,
+  n: Record<string, unknown>,
+): Promise<ExecuteResult> {
+  const existing = await getPerson(userId, String(n.personId));
+  const updated = [...(existing?.giftIdeas ?? []), String(n.idea)];
+  await updatePerson(userId, String(n.personId), { giftIdeas: updated });
+  return { ok: true, recordId: String(n.personId), recordType: "RolodexPerson", summary: `Added gift idea for "${n.personName}"` };
+}
+
 // ── Error helpers ─────────────────────────────────────────────────────────
 
 function err(message: string): PreviewResult {
@@ -812,6 +1311,18 @@ const PREVIEWS: Record<
   log_habit: previewLogHabit,
   add_reflection: previewAddReflection,
   update_project: previewUpdateProject,
+  // project planning
+  update_project_plan: previewUpdateProjectPlan,
+  add_project_milestone: previewAddProjectMilestone,
+  add_project_question: previewAddProjectQuestion,
+  add_project_blocker: previewAddProjectBlocker,
+  set_project_next_action: previewSetProjectNextAction,
+  // rolodex
+  create_rolodex_person: previewCreateRolodexPerson,
+  update_rolodex_person: previewUpdateRolodexPerson,
+  add_rolodex_interaction: previewAddRolodexInteraction,
+  add_person_followup: previewAddPersonFollowup,
+  add_gift_idea: previewAddGiftIdea,
 };
 
 const EXECUTES: Record<
@@ -828,6 +1339,18 @@ const EXECUTES: Record<
   log_habit: executeLogHabit,
   add_reflection: executeAddReflection,
   update_project: executeUpdateProject,
+  // project planning
+  update_project_plan: executeUpdateProjectPlan,
+  add_project_milestone: executeAddProjectMilestone,
+  add_project_question: executeAddProjectQuestion,
+  add_project_blocker: executeAddProjectBlocker,
+  set_project_next_action: executeSetProjectNextAction,
+  // rolodex
+  create_rolodex_person: executeCreateRolodexPerson,
+  update_rolodex_person: executeUpdateRolodexPerson,
+  add_rolodex_interaction: executeAddRolodexInteraction,
+  add_person_followup: executeAddPersonFollowup,
+  add_gift_idea: executeAddGiftIdea,
 };
 
 // ── Public API ────────────────────────────────────────────────────────────
