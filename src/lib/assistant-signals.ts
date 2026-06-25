@@ -1,6 +1,26 @@
 // Pure signal and briefing computation for the assistant snapshot.
 // No DB access, no server-only — fully testable.
 
+// Category-specific stale thresholds (minutes). A timer running past its
+// category threshold is flagged as possiblyStaleTimer.
+export const STALE_THRESHOLDS: Record<string, number> = {
+  commute: 90,
+  shower: 45,
+  routine: 180,
+  routines: 180,
+  morning: 180,
+  default: 240, // 4 hours
+};
+
+// Absolute threshold for longRunningTimer (2 hours).
+const LONG_THRESHOLD = 120;
+
+function getStaleThreshold(category: string | null): number {
+  if (!category) return STALE_THRESHOLDS.default!;
+  const key = category.toLowerCase().trim();
+  return STALE_THRESHOLDS[key] ?? STALE_THRESHOLDS.default!;
+}
+
 export type SignalFacts = {
   today: {
     wokeUpAt: string | null; // "HH:MM" 24h
@@ -13,7 +33,7 @@ export type SignalFacts = {
       // new Date().getHours(). This is correct only because
       // src/instrumentation.ts pins process.env.TZ to America/Los_Angeles
       // before any request is handled.
-      runningTimer: { title: string } | null;
+      runningTimer: { title: string; elapsedMinutes?: number; category?: string | null } | null;
       totalTrackedMinutes: number;
     };
     tasks: {
@@ -45,6 +65,8 @@ export type Signals = {
   stalledProjects: string[];
   financeNeedsAttention: boolean;
   unfinishedPriority: boolean;
+  longRunningTimer: boolean;
+  possiblyStaleTimer: boolean;
 };
 
 export type PrioritySeed = {
@@ -85,7 +107,7 @@ type BriefingFacts = {
       nextEvent: { title: string } | null;
     };
     time: {
-      runningTimer: { category: string | null } | null;
+      runningTimer: { category: string | null; elapsedMinutes?: number } | null;
     };
     tasks: {
       open: { title: string; lane: string }[];
@@ -167,6 +189,13 @@ export function computeSignals(facts: SignalFacts, nowMinutes: number): Signals 
   const driftRisk: "low" | "medium" | "high" =
     driftScore <= 1 ? "low" : driftScore <= 3 ? "medium" : "high";
 
+  const elapsedMinutes = facts.today.time.runningTimer?.elapsedMinutes ?? 0;
+  const runningCategory = facts.today.time.runningTimer?.category ?? null;
+  const possiblyStaleTimer =
+    hasRunningTimer && elapsedMinutes >= getStaleThreshold(runningCategory);
+  const longRunningTimer =
+    possiblyStaleTimer || (hasRunningTimer && elapsedMinutes >= LONG_THRESHOLD);
+
   return {
     hasRunningTimer,
     lateStart,
@@ -179,6 +208,8 @@ export function computeSignals(facts: SignalFacts, nowMinutes: number): Signals 
     stalledProjects,
     financeNeedsAttention,
     unfinishedPriority,
+    longRunningTimer,
+    possiblyStaleTimer,
   };
 }
 
@@ -285,7 +316,15 @@ export function computeBriefing(
 
   // ── watchouts ────────────────────────────────────────────────────────────
   const watchouts: string[] = [];
-  if (signals.openDay && signals.needsPlan)
+  if (signals.possiblyStaleTimer && runningTimer !== null) {
+    const elapsed = runningTimer.elapsedMinutes ?? 0;
+    const hours = Math.floor(elapsed / 60);
+    const mins = elapsed % 60;
+    const cat = runningTimer.category ?? null;
+    const label = cat ? cat.charAt(0).toUpperCase() + cat.slice(1) : "Timer";
+    watchouts.push(`${label} has been running for ${hours}h ${mins}m and may be stale`);
+  }
+  if (watchouts.length < 2 && signals.openDay && signals.needsPlan)
     watchouts.push(WATCHOUT_TEMPLATES["openDay_noTasks"]!);
   if (watchouts.length < 2 && signals.habitRecovery)
     watchouts.push(WATCHOUT_TEMPLATES["habitRecovery"]!);
@@ -311,6 +350,9 @@ export function computeBriefing(
   }
   if (signals.momentum === "low" && localHour >= 10) {
     contextNotes.push("low tracked time for this time of day");
+  }
+  if (signals.possiblyStaleTimer) {
+    contextNotes.push("Tracked time today may be inflated by a long-running timer");
   }
 
   // ── tone ─────────────────────────────────────────────────────────────────

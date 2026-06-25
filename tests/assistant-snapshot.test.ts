@@ -50,7 +50,7 @@ function makeBriefingFacts(
   overrides: {
     wokeUpAt?: string | null;
     nextEvent?: { title: string } | null;
-    runningTimer?: { category: string | null } | null;
+    runningTimer?: { category: string | null; elapsedMinutes?: number } | null;
     tasks?: { open: { title: string; lane: string }[] };
     habits?: { items: { name: string; done: boolean; streak: number; scheduledToday: boolean }[] };
   } = {},
@@ -373,6 +373,8 @@ describe("computeBriefing — currentState", () => {
       stalledProjects: [],
       financeNeedsAttention: false,
       unfinishedPriority: false,
+      longRunningTimer: false,
+      possiblyStaleTimer: false,
       ...overrides,
     };
   }
@@ -473,6 +475,8 @@ describe("computeBriefing — topSignals ordering and cap", () => {
       stalledProjects: ["Alpha"],
       financeNeedsAttention: false,
       unfinishedPriority: true,
+      longRunningTimer: false,
+      possiblyStaleTimer: false,
     };
     const b = computeBriefing(makeBriefingFacts(), s, 12, 1);
     expect(b.topSignals.length).toBeLessThanOrEqual(4);
@@ -497,6 +501,8 @@ describe("computeBriefing — suggestedFocus", () => {
         stalledProjects: [],
         financeNeedsAttention: false,
         unfinishedPriority: false,
+        longRunningTimer: false,
+        possiblyStaleTimer: false,
       },
       12,
       1,
@@ -517,6 +523,8 @@ describe("computeBriefing — suggestedFocus", () => {
       stalledProjects: ["MyProject"],
       financeNeedsAttention: false,
       unfinishedPriority: false,
+      longRunningTimer: false,
+      possiblyStaleTimer: false,
     };
     const b = computeBriefing(makeBriefingFacts(), s, 12, 1);
     const hasFilled = b.suggestedFocus.some((f) => f.includes("MyProject"));
@@ -540,6 +548,8 @@ describe("computeBriefing — journalPrompt", () => {
       stalledProjects: [],
       financeNeedsAttention: false,
       unfinishedPriority: false,
+      longRunningTimer: false,
+      possiblyStaleTimer: false,
     };
     const b = computeBriefing(makeBriefingFacts(), s, 12, 3);
     expect(b.morningMessageInputs.journalPromptSeed).toBe(JOURNAL_PROMPTS[3]);
@@ -558,6 +568,8 @@ describe("computeBriefing — journalPrompt", () => {
       stalledProjects: [],
       financeNeedsAttention: false,
       unfinishedPriority: false,
+      longRunningTimer: false,
+      possiblyStaleTimer: false,
     };
     const b = computeBriefing(makeBriefingFacts(), s, 12, 3);
     expect(b.morningMessageInputs.journalPromptSeed).toBe(JOURNAL_PROMPTS[0]);
@@ -576,6 +588,8 @@ describe("computeBriefing — journalPrompt", () => {
       stalledProjects: [],
       financeNeedsAttention: false,
       unfinishedPriority: false,
+      longRunningTimer: false,
+      possiblyStaleTimer: false,
     };
     const b = computeBriefing(makeBriefingFacts(), s, 12, 2);
     expect(b.morningMessageInputs.journalPromptSeed).toBe(
@@ -600,6 +614,8 @@ describe("computeBriefing — contextNotes", () => {
       stalledProjects: [],
       financeNeedsAttention: false,
       unfinishedPriority: false,
+      longRunningTimer: false,
+      possiblyStaleTimer: false,
       ...overrides,
     };
   }
@@ -675,6 +691,8 @@ describe("computeBriefing — structured prioritySeeds", () => {
       stalledProjects: [],
       financeNeedsAttention: false,
       unfinishedPriority: true,
+      longRunningTimer: false,
+      possiblyStaleTimer: false,
     };
     const b = computeBriefing(facts, signals, 10, 1);
     expect(b.morningMessageInputs.prioritySeeds.length).toBeGreaterThan(0);
@@ -700,6 +718,8 @@ describe("computeBriefing — structured prioritySeeds", () => {
       stalledProjects: ["My Project"],
       financeNeedsAttention: false,
       unfinishedPriority: false,
+      longRunningTimer: false,
+      possiblyStaleTimer: false,
     };
     const b = computeBriefing(makeBriefingFacts(), signals, 10, 1);
     const seed = b.morningMessageInputs.prioritySeeds[0];
@@ -723,6 +743,8 @@ describe("computeBriefing — structured prioritySeeds", () => {
       stalledProjects: [],
       financeNeedsAttention: false,
       unfinishedPriority: true,
+      longRunningTimer: false,
+      possiblyStaleTimer: false,
     };
     const b = computeBriefing(facts, signals, 10, 1);
     const expected = b.morningMessageInputs.prioritySeeds.map((s) => s.label);
@@ -747,6 +769,8 @@ describe("computeBriefing — structured prioritySeeds", () => {
       stalledProjects: [],
       financeNeedsAttention: false,
       unfinishedPriority: false,
+      longRunningTimer: false,
+      possiblyStaleTimer: false,
     };
     const b = computeBriefing(facts, signals, 10, 1);
     const habitSeed = b.morningMessageInputs.prioritySeeds.find(
@@ -785,5 +809,101 @@ describe("resolveTimezone", () => {
     process.env.TZ = origTZ;
     if (origAPP !== undefined) process.env.APP_TIMEZONE = origAPP;
     else delete process.env.APP_TIMEZONE;
+  });
+});
+
+// ── computeSignals — stale/long-running timer ──────────────────────────────
+
+describe("computeSignals — possiblyStaleTimer and longRunningTimer", () => {
+  it("commute 100 min: possiblyStaleTimer=true, longRunningTimer=true", () => {
+    const facts = makeFacts();
+    facts.today.time.runningTimer = {
+      title: "Commute",
+      category: "commute",
+      elapsedMinutes: 100,
+    };
+    const s = computeSignals(facts, 9 * 60);
+    expect(s.possiblyStaleTimer).toBe(true); // 100 >= 90 (commute threshold)
+    expect(s.longRunningTimer).toBe(true);   // possiblyStale => longRunning
+  });
+
+  it("commute 60 min: neither flag", () => {
+    const facts = makeFacts();
+    facts.today.time.runningTimer = {
+      title: "Commute",
+      category: "commute",
+      elapsedMinutes: 60,
+    };
+    const s = computeSignals(facts, 9 * 60);
+    expect(s.possiblyStaleTimer).toBe(false); // 60 < 90
+    expect(s.longRunningTimer).toBe(false);   // 60 < 120
+  });
+
+  it("deep work 150 min: longRunningTimer=true, possiblyStaleTimer=false", () => {
+    const facts = makeFacts();
+    facts.today.time.runningTimer = {
+      title: "Deep work",
+      category: "deep work",
+      elapsedMinutes: 150,
+    };
+    const s = computeSignals(facts, 10 * 60);
+    expect(s.longRunningTimer).toBe(true);    // 150 >= 120
+    expect(s.possiblyStaleTimer).toBe(false); // 150 < 240 (default threshold)
+  });
+
+  it("no running timer: both false", () => {
+    const s = computeSignals(makeFacts(), 10 * 60);
+    expect(s.possiblyStaleTimer).toBe(false);
+    expect(s.longRunningTimer).toBe(false);
+  });
+});
+
+// ── computeBriefing — stale timer watchouts and contextNotes ───────────────
+
+describe("computeBriefing — stale timer", () => {
+  function makeBaseSignals(overrides: Partial<ReturnType<typeof computeSignals>> = {}) {
+    return {
+      hasRunningTimer: true,
+      lateStart: false,
+      openDay: false,
+      crowdedDay: false,
+      needsPlan: false,
+      momentum: "medium" as const,
+      driftRisk: "low" as const,
+      habitRecovery: false,
+      stalledProjects: [],
+      financeNeedsAttention: false,
+      unfinishedPriority: false,
+      longRunningTimer: true,
+      possiblyStaleTimer: true,
+      ...overrides,
+    };
+  }
+
+  it("adds stale timer to watchouts when possiblyStaleTimer", () => {
+    const facts = makeBriefingFacts({
+      runningTimer: { category: "commute", elapsedMinutes: 100 },
+    });
+    const b = computeBriefing(facts, makeBaseSignals(), 9, 1);
+    expect(b.watchouts.some((w) => w.toLowerCase().includes("commute"))).toBe(true);
+    expect(b.watchouts.some((w) => w.includes("stale"))).toBe(true);
+  });
+
+  it("adds inflated note to contextNotes when possiblyStaleTimer", () => {
+    const facts = makeBriefingFacts({
+      runningTimer: { category: "commute", elapsedMinutes: 100 },
+    });
+    const b = computeBriefing(facts, makeBaseSignals(), 9, 1);
+    expect(b.contextNotes.some((n) => n.includes("inflated"))).toBe(true);
+  });
+
+  it("no stale watchout when possiblyStaleTimer is false", () => {
+    const facts = makeBriefingFacts({
+      runningTimer: { category: "deep work", elapsedMinutes: 150 },
+    });
+    const signals = makeBaseSignals({ possiblyStaleTimer: false });
+    const b = computeBriefing(facts, signals, 10, 1);
+    expect(b.watchouts.some((w) => w.includes("stale"))).toBe(false);
+    expect(b.contextNotes.some((n) => n.includes("inflated"))).toBe(false);
   });
 });

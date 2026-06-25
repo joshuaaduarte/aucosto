@@ -5,6 +5,10 @@ export default defineConfig({
   resolve: {
     // Mirror tsconfig's "@/*" -> "src/*" alias so tests can import the same way.
     alias: {
+      // Services import "server-only", which throws outside RSC. Stub it.
+      "server-only": fileURLToPath(
+        new URL("./tests/integration/server-only-stub.ts", import.meta.url),
+      ),
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },

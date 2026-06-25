@@ -7,6 +7,10 @@ import {
   type AssistantSnapshot,
 } from "@/lib/assistant-snapshot";
 import { resolveActiveUserId } from "@/lib/viewer-context";
+import {
+  getRecentAudits,
+  type AssistantActionAudit,
+} from "@/lib/assistant-action-audit";
 
 export const dynamic = "force-dynamic";
 
@@ -18,10 +22,24 @@ const NEUTRAL = "#9ca3af";
 export default async function AssistantPage() {
   const userId = await resolveActiveUserId();
   const snapshot = await buildAssistantSnapshot(userId);
-  return <SnapshotView snapshot={snapshot} />;
+
+  let recentAudits: AssistantActionAudit[] = [];
+  try {
+    recentAudits = await getRecentAudits(userId, 5);
+  } catch {
+    // audit table may not exist yet — degrade gracefully
+  }
+
+  return <SnapshotView snapshot={snapshot} recentAudits={recentAudits} />;
 }
 
-function SnapshotView({ snapshot }: { snapshot: AssistantSnapshot }) {
+function SnapshotView({
+  snapshot,
+  recentAudits,
+}: {
+  snapshot: AssistantSnapshot;
+  recentAudits: AssistantActionAudit[];
+}) {
   const { facts, signals, briefing, user, generatedAt } = snapshot;
   const longDate = new Date(generatedAt).toLocaleDateString([], {
     weekday: "long",
@@ -57,6 +75,18 @@ function SnapshotView({ snapshot }: { snapshot: AssistantSnapshot }) {
           generated at {formatClockFromISO(generatedAt, user.timezone)}
         </span>
       </header>
+
+      {/* ━━ STALE TIMER WARNING ━━━━━━━━━━━━━ */}
+      {signals.possiblyStaleTimer && facts.today.time.runningTimer && (
+        <div
+          className="rounded border px-3 py-2 text-[0.8125rem]"
+          style={{ borderColor: AMBER, color: AMBER }}
+        >
+          ⚠ Timer "{facts.today.time.runningTimer.title}" has been running for{" "}
+          {formatMinutes(facts.today.time.runningTimer.elapsedMinutes ?? 0)} and
+          may be stale. Consider stopping it via the assistant or manually.
+        </div>
+      )}
 
       {/* ━━ BRIEFING ━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <Section title="Briefing">
@@ -226,6 +256,22 @@ function SnapshotView({ snapshot }: { snapshot: AssistantSnapshot }) {
           active={signals.financeNeedsAttention}
           tone={signals.financeNeedsAttention ? AMBER : NEUTRAL}
           detail="deferred"
+        />
+        <FlagRow
+          label="possiblyStaleTimer"
+          active={signals.possiblyStaleTimer}
+          tone={signals.possiblyStaleTimer ? AMBER : NEUTRAL}
+          detail={signals.possiblyStaleTimer ? facts.today.time.runningTimer?.title ?? "" : ""}
+        />
+        <FlagRow
+          label="longRunningTimer"
+          active={signals.longRunningTimer}
+          tone={signals.longRunningTimer ? AMBER : NEUTRAL}
+          detail={
+            signals.longRunningTimer
+              ? formatMinutes(facts.today.time.runningTimer?.elapsedMinutes ?? 0)
+              : ""
+          }
         />
       </Section>
 
@@ -467,6 +513,43 @@ function SnapshotView({ snapshot }: { snapshot: AssistantSnapshot }) {
             )}
           </div>
         </div>
+      </Section>
+      {/* ━━ ASSISTANT ACTIONS ━━━━━━━━━━━━━━━ */}
+      <Section title="Assistant actions">
+        {recentAudits.length === 0 ? (
+          <EmptyLine text="no actions recorded yet" />
+        ) : (
+          <div className="space-y-0.5">
+            {recentAudits.map((audit) => (
+              <div
+                key={audit.id}
+                className="grid grid-cols-[6rem_5rem_1fr_4rem] items-center gap-2"
+              >
+                <span style={{ color: "var(--text-faint)" }}>
+                  {formatClockFromISO(audit.createdAt, user.timezone)}
+                </span>
+                <span
+                  style={{
+                    color:
+                      audit.status === "executed"
+                        ? GREEN
+                        : audit.status === "rejected"
+                          ? RED
+                          : NEUTRAL,
+                  }}
+                >
+                  [{audit.status}]
+                </span>
+                <span className="truncate" style={{ color: "var(--text)" }}>
+                  {audit.previewText || audit.action}
+                </span>
+                <span style={{ color: "var(--text-faint)" }}>
+                  {audit.riskLevel}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </Section>
     </div>
   );
