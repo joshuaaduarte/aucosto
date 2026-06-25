@@ -68,7 +68,10 @@ export async function POST(req: NextRequest) {
   });
 
   if (!preview.ok) {
-    return NextResponse.json({ ok: false, error: preview.error, auditId }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: preview.error, candidates: preview.candidates ?? null, auditId },
+      { status: 400 },
+    );
   }
 
   return NextResponse.json({

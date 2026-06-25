@@ -25,7 +25,7 @@ export default async function AssistantPage() {
 
   let recentAudits: AssistantActionAudit[] = [];
   try {
-    recentAudits = await getRecentAudits(userId, 5);
+    recentAudits = await getRecentAudits(userId, 10);
   } catch {
     // audit table may not exist yet — degrade gracefully
   }
@@ -519,38 +519,95 @@ function SnapshotView({
         {recentAudits.length === 0 ? (
           <EmptyLine text="no actions recorded yet" />
         ) : (
-          <div className="space-y-0.5">
+          <div className="space-y-2">
             {recentAudits.map((audit) => (
-              <div
-                key={audit.id}
-                className="grid grid-cols-[6rem_5rem_1fr_4rem] items-center gap-2"
-              >
-                <span style={{ color: "var(--text-faint)" }}>
-                  {formatClockFromISO(audit.createdAt, user.timezone)}
-                </span>
-                <span
-                  style={{
-                    color:
-                      audit.status === "executed"
-                        ? GREEN
-                        : audit.status === "rejected"
-                          ? RED
-                          : NEUTRAL,
-                  }}
-                >
-                  [{audit.status}]
-                </span>
-                <span className="truncate" style={{ color: "var(--text)" }}>
-                  {audit.previewText || audit.action}
-                </span>
-                <span style={{ color: "var(--text-faint)" }}>
-                  {audit.riskLevel}
-                </span>
-              </div>
+              <AuditRow key={audit.id} audit={audit} timezone={user.timezone} />
             ))}
           </div>
         )}
       </Section>
+    </div>
+  );
+}
+
+function AuditRow({
+  audit,
+  timezone,
+}: {
+  audit: AssistantActionAudit;
+  timezone: string;
+}) {
+  const { status, riskLevel } = audit;
+
+  const statusStyle: React.CSSProperties =
+    status === "executed"
+      ? { background: "rgba(16,185,129,0.08)", borderColor: "rgba(16,185,129,0.3)", color: GREEN }
+      : status === "rejected"
+        ? { background: "rgba(239,68,68,0.08)", borderColor: "rgba(239,68,68,0.3)", color: RED }
+        : status === "failed"
+          ? { background: "rgba(239,68,68,0.08)", borderColor: "rgba(239,68,68,0.25)", color: RED }
+          : { background: "rgba(156,163,175,0.06)", borderColor: "rgba(156,163,175,0.2)", color: NEUTRAL };
+
+  const statusLabel =
+    status === "executed"
+      ? "Executed"
+      : status === "rejected"
+        ? "Rejected"
+        : status === "failed"
+          ? "Failed"
+          : "Preview only — no change made";
+
+  const riskColor =
+    riskLevel === "high" ? RED : riskLevel === "medium" ? AMBER : GREEN;
+
+  const dateStr = new Date(audit.createdAt).toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+    timeZone: timezone,
+  });
+  const timeStr = new Date(audit.createdAt).toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: timezone,
+  });
+
+  return (
+    <div
+      className="rounded border px-3 py-2 space-y-1"
+      style={statusStyle}
+    >
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+        <span className="font-semibold" style={{ color: "var(--text)" }}>
+          {audit.action}
+        </span>
+        <span
+          className="rounded px-1.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide"
+          style={{ background: statusStyle.background, color: statusStyle.color }}
+        >
+          {statusLabel}
+        </span>
+        <span
+          className="rounded px-1.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide"
+          style={{ color: riskColor }}
+        >
+          {riskLevel} risk
+        </span>
+        <span className="ml-auto text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+          {dateStr}, {timeStr}
+        </span>
+      </div>
+      {audit.previewText && (
+        <pre
+          className="mt-0.5 whitespace-pre-wrap text-[0.75rem] leading-5"
+          style={{ color: status === "previewed" ? "var(--text-faint)" : "var(--text)", fontFamily: "inherit" }}
+        >
+          {audit.previewText}
+        </pre>
+      )}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+        <span>actor: {audit.actor}</span>
+        <span>confirmed: {audit.confirmed ? "✓" : "—"}</span>
+      </div>
     </div>
   );
 }

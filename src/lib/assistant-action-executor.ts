@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "zod";
 
 import { createDoItem, updateDoItem, getDoItemSummary } from "@/lib/services/do";
-import { getRunningEntry, startEntry, stopRunning, updateEntry } from "@/lib/services/time";
+import { getRunningEntry, startEntry, stopRunning, updateEntry, listRecentEntries } from "@/lib/services/time";
 import { listHabits, logHabitProgress } from "@/lib/services/habits";
 import { createCalendarItem } from "@/lib/services/calendar";
 import {
@@ -15,9 +15,12 @@ import { dayKey } from "@/lib/reflect";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
+export type AmbiguityCandidate = { id: string; name: string; [key: string]: string };
+
 export interface PreviewResult {
   ok: boolean;
   error?: string;
+  candidates?: AmbiguityCandidate[];
   previewText: string;
   normalizedInput: Record<string, unknown>;
   warnings: string[];
@@ -67,6 +70,8 @@ const StartTimerInput = z.object({
 
 const StopTimerInput = z.object({
   entryId: z.string().optional(),
+  endedAtLocal: z.string().optional(), // "YYYY-MM-DDTHH:MM:SS" local time; omit for now
+  note: z.string().optional(),
 });
 
 const EditTimeEntryInput = z.object({
@@ -95,30 +100,52 @@ const UpdateProjectInput = z.object({
 
 // ── Name resolvers (read-only) ────────────────────────────────────────────
 
+type ResolveResult<T> =
+  | { found: true; match: T }
+  | { found: false; candidates: AmbiguityCandidate[] };
+
 async function resolveProjectByName(
   userId: string,
   name: string,
-): Promise<{ id: string; name: string } | null> {
+): Promise<ResolveResult<{ id: string; name: string }>> {
   const projects = await listBoardProjects(userId);
   const lower = name.toLowerCase();
-  return (
-    projects.find((p) => p.name.toLowerCase() === lower) ??
-    projects.find((p) => p.name.toLowerCase().includes(lower)) ??
-    null
-  );
+
+  const exact = projects.filter((p) => p.name.toLowerCase() === lower);
+  if (exact.length === 1) return { found: true, match: exact[0]! };
+
+  const partial = projects.filter((p) => p.name.toLowerCase().includes(lower));
+  if (partial.length === 1) return { found: true, match: partial[0]! };
+
+  const pool = exact.length > 1 ? exact : partial;
+  return {
+    found: false,
+    candidates: pool.map((p) => ({ id: p.id, name: p.name })),
+  };
 }
 
 async function resolveHabitByName(
   userId: string,
   name: string,
-): Promise<{ id: string; title: string } | null> {
+): Promise<ResolveResult<{ id: string; title: string; bucket: string | null }>> {
   const habits = await listHabits(userId);
   const lower = name.toLowerCase();
-  return (
-    habits.find((h) => h.title.toLowerCase() === lower) ??
-    habits.find((h) => h.title.toLowerCase().includes(lower)) ??
-    null
-  );
+
+  const exact = habits.filter((h) => h.title.toLowerCase() === lower);
+  if (exact.length === 1) return { found: true, match: exact[0]! };
+
+  const partial = habits.filter((h) => h.title.toLowerCase().includes(lower));
+  if (partial.length === 1) return { found: true, match: partial[0]! };
+
+  const pool = exact.length > 1 ? exact : partial;
+  return {
+    found: false,
+    candidates: pool.map((h) => ({
+      id: h.id,
+      name: h.title,
+      bucket: h.bucket ?? "",
+    })),
+  };
 }
 
 // ── Date helpers ──────────────────────────────────────────────────────────
@@ -143,13 +170,15 @@ async function previewCreateTask(
   const { title, projectName, bucket, notes } = parsed.data;
   const warnings: string[] = [];
   let projectId: string | null = null;
+  let resolvedProjectName: string | null = null;
 
   if (projectName) {
-    const project = await resolveProjectByName(userId, projectName);
-    if (!project) {
+    const resolved = await resolveProjectByName(userId, projectName);
+    if (!resolved.found) {
       warnings.push(`Project "${projectName}" not found — task will be created without a project`);
     } else {
-      projectId = project.id;
+      projectId = resolved.match.id;
+      resolvedProjectName = resolved.match.name;
     }
   }
 
@@ -157,9 +186,13 @@ async function previewCreateTask(
   const lane = bucket === "backlog" ? "someday" : bucket;
   const normalizedInput: Record<string, unknown> = { title, lane, projectId, notes: notes ?? null };
 
+  const lines: string[] = [`Create task: ${title}`];
+  if (resolvedProjectName) lines.push(`Project: ${resolvedProjectName}`);
+  lines.push(`Lane: ${lane}`);
+
   return {
     ok: true,
-    previewText: `Create task "${title}" in [${lane}]${projectId ? ` · project resolved` : ""}`,
+    previewText: lines.join("\n"),
     normalizedInput,
     warnings,
   };
@@ -207,11 +240,11 @@ async function previewUpdateTask(
     if (projectName === "") {
       projectId = null;
     } else {
-      const project = await resolveProjectByName(userId, projectName);
-      if (!project) {
+      const resolved = await resolveProjectByName(userId, projectName);
+      if (!resolved.found) {
         warnings.push(`Project "${projectName}" not found — project will not be changed`);
       } else {
-        projectId = project.id;
+        projectId = resolved.match.id;
       }
     }
   }
@@ -283,11 +316,11 @@ async function previewStartTimer(
   let habitId: string | null = null;
 
   if (habitName) {
-    const habit = await resolveHabitByName(userId, habitName);
-    if (!habit) {
+    const resolved = await resolveHabitByName(userId, habitName);
+    if (!resolved.found) {
       warnings.push(`Habit "${habitName}" not found — timer will start without habit link`);
     } else {
-      habitId = habit.id;
+      habitId = resolved.match.id;
     }
   }
 
@@ -314,16 +347,45 @@ async function previewStopTimer(
   if (!parsed.success) {
     return err(parsed.error.issues[0]?.message ?? "Invalid input");
   }
+  const { endedAtLocal, note } = parsed.data;
+
   const running = await getRunningEntry(userId);
   if (!running) return err("No timer is currently running");
 
-  const elapsedMs = Date.now() - running.startedAt.getTime();
+  const now = new Date();
+  // Interpret endedAtLocal in server TZ (pinned by instrumentation.ts to APP_TIMEZONE)
+  const proposedEnd = endedAtLocal ? new Date(endedAtLocal) : now;
+
+  if (Number.isNaN(proposedEnd.getTime())) {
+    return err("Invalid endedAtLocal — must be a datetime string like '2024-06-24T09:15:00'");
+  }
+  if (proposedEnd.getTime() > now.getTime() + 60_000) {
+    return err("Stop time cannot be in the future");
+  }
+
+  const elapsedMs = now.getTime() - running.startedAt.getTime();
   const elapsedMin = Math.round(elapsedMs / 60000);
+  const proposedDurationMs = proposedEnd.getTime() - running.startedAt.getTime();
+  const proposedDurationMin = Math.max(0, Math.round(proposedDurationMs / 60000));
+
+  const startClock = fmtClock(running.startedAt);
+  const proposedEndClock = fmtClock(proposedEnd);
+
+  const lines = [
+    `Stop timer: ${running.label}`,
+    `Started: ${startClock} · Running for ${fmtMinutes(elapsedMin)}`,
+    `Proposed end: ${proposedEndClock}`,
+    `Final duration: ${fmtMinutes(proposedDurationMin)}`,
+  ];
 
   return {
     ok: true,
-    previewText: `Stop timer "${running.label}" (running ${elapsedMin}m)`,
-    normalizedInput: { entryId: running.id },
+    previewText: lines.join("\n"),
+    normalizedInput: {
+      entryId: running.id,
+      endedAtIso: proposedEnd.toISOString(),
+      note: note ?? null,
+    },
     warnings: [],
   };
 }
@@ -346,15 +408,41 @@ async function previewEditTimeEntry(
     return err("Invalid endedAt — must be an ISO datetime string");
   }
 
-  const changes: string[] = [];
-  if (title) changes.push(`title → "${title}"`);
-  if (startedAt) changes.push(`start → ${startedAt}`);
-  if (endedAt) changes.push(`end → ${endedAt}`);
-  if (changes.length === 0) warnings.push("No changes specified");
+  // Look up existing entry for before/after preview
+  const recent = await listRecentEntries(userId, { limit: 200 });
+  const existing = recent.find((e) => e.id === entryId);
+  if (!existing) {
+    return err(`Time entry "${entryId}" not found`);
+  }
+
+  if (title === undefined && startedAt === undefined && endedAt === undefined) {
+    warnings.push("No changes specified");
+  }
+
+  const afterStart = startedAt ? new Date(startedAt) : existing.startedAt;
+  const afterEnd = endedAt ? new Date(endedAt) : existing.endedAt;
+
+  const beforeStart = fmtClock(existing.startedAt);
+  const beforeEnd = existing.endedAt ? fmtClock(existing.endedAt) : "running";
+  const beforeDur = existing.endedAt
+    ? fmtMinutes(Math.round((existing.endedAt.getTime() - existing.startedAt.getTime()) / 60000))
+    : "–";
+
+  const afterEndStr = afterEnd ? fmtClock(afterEnd) : "running";
+  const afterDur = afterEnd
+    ? fmtMinutes(Math.max(0, Math.round((afterEnd.getTime() - afterStart.getTime()) / 60000)))
+    : "–";
+
+  const label = title ?? existing.label;
+  const lines = [
+    `Edit time entry: ${label}`,
+    `Before: ${beforeStart}–${beforeEnd} · ${beforeDur}`,
+    `After: ${fmtClock(afterStart)}–${afterEndStr} · ${afterDur}`,
+  ];
 
   return {
     ok: true,
-    previewText: `Edit time entry ${entryId}: ${changes.join(", ") || "no changes"}`,
+    previewText: lines.join("\n"),
     normalizedInput: {
       entryId,
       title: title ?? null,
@@ -375,9 +463,17 @@ async function previewLogHabit(
   }
   const { habitName, value, note } = parsed.data;
 
-  const habit = await resolveHabitByName(userId, habitName);
-  if (!habit) return err(`Habit "${habitName}" not found`);
+  const resolved = await resolveHabitByName(userId, habitName);
+  if (!resolved.found) {
+    return errAmbiguous(
+      resolved.candidates.length === 0
+        ? `No habit found matching "${habitName}"`
+        : `Ambiguous habit match for "${habitName}"`,
+      resolved.candidates,
+    );
+  }
 
+  const habit = resolved.match;
   return {
     ok: true,
     previewText: `Log habit "${habit.title}"${value !== undefined ? ` (${value}x)` : ""}`,
@@ -426,9 +522,17 @@ async function previewUpdateProject(
   }
   const { projectName, status, notes } = parsed.data;
 
-  const project = await resolveProjectByName(userId, projectName);
-  if (!project) return err(`Project "${projectName}" not found`);
+  const resolved = await resolveProjectByName(userId, projectName);
+  if (!resolved.found) {
+    return errAmbiguous(
+      resolved.candidates.length === 0
+        ? `No project found matching "${projectName}"`
+        : `Ambiguous project match for "${projectName}"`,
+      resolved.candidates,
+    );
+  }
 
+  const project = resolved.match;
   const changes: string[] = [];
   if (status) changes.push(`status → ${status}`);
   if (notes !== undefined) changes.push(`notes updated`);
@@ -539,9 +643,10 @@ async function executeStartTimer(
 
 async function executeStopTimer(
   userId: string,
-  _n: Record<string, unknown>,
+  n: Record<string, unknown>,
 ): Promise<ExecuteResult> {
-  await stopRunning(userId);
+  const endedAt = n.endedAtIso ? new Date(String(n.endedAtIso)) : undefined;
+  await stopRunning(userId, endedAt);
   return {
     ok: true,
     recordId: null,
@@ -657,8 +762,38 @@ function err(message: string): PreviewResult {
   };
 }
 
+function errAmbiguous(message: string, candidates: AmbiguityCandidate[]): PreviewResult {
+  return {
+    ok: false,
+    error: message,
+    candidates,
+    previewText: "",
+    normalizedInput: {},
+    warnings: [],
+  };
+}
+
 function err2(message: string): ExecuteResult {
   return { ok: false, error: message, recordId: null, recordType: null, summary: "" };
+}
+
+// ── Formatting helpers ────────────────────────────────────────────────────
+
+function fmtClock(date: Date): string {
+  return date.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function fmtMinutes(minutes: number): string {
+  const v = Math.max(0, Math.round(minutes));
+  if (v === 0) return "0m";
+  const h = Math.floor(v / 60);
+  const m = v % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
 }
 
 // ── Dispatch tables ───────────────────────────────────────────────────────
