@@ -848,6 +848,31 @@ export async function getLinkedTimeEntries(
   }
 }
 
+export interface PendingFollowUp {
+  personId: string;
+  followUpDate: string | null;
+}
+
+export async function listAllPendingFollowUps(userId: string): Promise<PendingFollowUp[]> {
+  requireCan(userId, "rolodex", "read");
+  try {
+    const rows = await prisma.$queryRawUnsafe<Array<{ personId: string; followUpDate: Date | null }>>(
+      `SELECT "personId", "followUpDate"
+       FROM "RolodexInteraction"
+       WHERE "userId" = $1 AND "followUpNeeded" = true
+       ORDER BY "followUpDate" ASC NULLS LAST`,
+      userId,
+    );
+    return rows.map((r) => ({
+      personId: r.personId,
+      followUpDate: isoString(r.followUpDate),
+    }));
+  } catch (error) {
+    console.error("[rolodex] listAllPendingFollowUps failed", error);
+    return [];
+  }
+}
+
 export async function getRecentlyMentioned(
   userId: string,
   limit = 5,

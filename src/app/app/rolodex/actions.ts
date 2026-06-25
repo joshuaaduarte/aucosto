@@ -8,6 +8,7 @@ import {
   createPerson,
   updatePerson,
   addInteraction,
+  updateFollowUp,
   resolveMention,
   type CreatePersonInput,
 } from "@/lib/services/rolodex";
@@ -119,6 +120,7 @@ const interactionSchema = z.object({
   body: z.string().trim().max(5000).optional(),
   followUpNeeded: z.boolean().optional(),
   followUpDate: z.string().trim().optional(),
+  occurredAt: z.string().trim().optional(),
 });
 
 export type AddInteractionResult = { ok: true } | { ok: false; error: string };
@@ -129,6 +131,7 @@ export async function addInteractionAction(
   body?: string,
   followUpNeeded?: boolean,
   followUpDate?: string,
+  occurredAt?: string,
 ): Promise<AddInteractionResult> {
   let userId: string;
   try {
@@ -136,7 +139,7 @@ export async function addInteractionAction(
   } catch {
     return { ok: false, error: "Not signed in." };
   }
-  const parsed = interactionSchema.safeParse({ personId, title, body, followUpNeeded, followUpDate });
+  const parsed = interactionSchema.safeParse({ personId, title, body, followUpNeeded, followUpDate, occurredAt });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
@@ -144,6 +147,7 @@ export async function addInteractionAction(
     await addInteraction(userId, personId, {
       title: parsed.data.title,
       body: parsed.data.body || null,
+      occurredAt: parsed.data.occurredAt || null,
       followUpNeeded: parsed.data.followUpNeeded ?? false,
       followUpDate: parsed.data.followUpDate || null,
     });
@@ -151,6 +155,28 @@ export async function addInteractionAction(
     return { ok: true };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Could not add interaction." };
+  }
+}
+
+export async function updateFollowUpAction(
+  interactionId: string,
+  followUpNeeded: boolean,
+  personId?: string,
+  followUpDate?: string,
+): Promise<AddInteractionResult> {
+  let userId: string;
+  try {
+    userId = await resolveActiveUserId();
+  } catch {
+    return { ok: false, error: "Not signed in." };
+  }
+  if (!interactionId) return { ok: false, error: "Missing interaction id." };
+  try {
+    await updateFollowUp(userId, interactionId, followUpNeeded, followUpDate);
+    revalidateRolodex(personId);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not update follow-up." };
   }
 }
 

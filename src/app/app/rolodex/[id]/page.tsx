@@ -7,6 +7,7 @@ import {
   getLinkedCalendarItems,
   getLinkedTimeEntries,
 } from "@/lib/services/rolodex";
+import { InteractionTimeline } from "./_interaction-timeline";
 
 export const dynamic = "force-dynamic";
 
@@ -153,56 +154,11 @@ export default async function PersonDetailPage({
         </section>
       )}
 
-      {/* Interactions */}
-      <section className="fade-in-delay-2 space-y-3">
-        <div className="flex items-center justify-between">
-          <h2
-            className="text-[0.6875rem] font-semibold uppercase tracking-wider"
-            style={{ color: "var(--text-faint)" }}
-          >
-            Interactions ({person.interactions.length})
-          </h2>
-          <Link
-            href={`/app/rolodex/${id}/edit`}
-            className="text-[0.8125rem] font-medium"
-            style={{ color: "var(--accent)" }}
-          >
-            + Add interaction
-          </Link>
-        </div>
-
-        {person.interactions.length === 0 ? (
-          <p className="text-[0.875rem]" style={{ color: "var(--text-ghost)" }}>
-            No interactions logged yet.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {person.interactions.map((i) => (
-              <div
-                key={i.id}
-                className="rounded-lg px-3 py-2.5"
-                style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)" }}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-[0.875rem] font-medium" style={{ color: "var(--text)" }}>{i.title}</p>
-                  <time
-                    dateTime={i.occurredAt}
-                    className="shrink-0 text-[0.75rem]"
-                    style={{ color: "var(--text-ghost)" }}
-                  >
-                    {formatDate(i.occurredAt)}
-                  </time>
-                </div>
-                {i.body && (
-                  <p className="mt-1 text-[0.8125rem]" style={{ color: "var(--text-muted)", whiteSpace: "pre-wrap" }}>
-                    {i.body}
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      <InteractionTimeline
+        personId={id}
+        personName={person.displayName}
+        interactions={person.interactions}
+      />
 
       {/* Linked calendar events */}
       {linkedCalendar.length > 0 && (

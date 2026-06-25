@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { resolveActiveUserId } from "@/lib/viewer-context";
-import { ensureRolodexTables, listPersons, listUnresolvedMentions } from "@/lib/services/rolodex";
+import {
+  ensureRolodexTables,
+  listPersons,
+  listUnresolvedMentions,
+  listAllPendingFollowUps,
+} from "@/lib/services/rolodex";
 import { UnresolvedMentionsBanner } from "./unresolved-mentions";
 
 export const dynamic = "force-dynamic";
@@ -41,14 +46,34 @@ export default async function RolodexPage({
   const { q, type } = await searchParams;
   const userId = await resolveActiveUserId();
 
-  const [persons, unresolvedMentions] = await Promise.all([
+  const [persons, unresolvedMentions, pendingFollowUps] = await Promise.all([
     listPersons(userId, { search: q, relationshipType: type || undefined }).catch(() => []),
     listUnresolvedMentions(userId).catch(() => []),
+    listAllPendingFollowUps(userId).catch(() => []),
   ]);
 
   // Fetch full person list for "link to existing" only when there are unresolved mentions
   const allPersons =
     unresolvedMentions.length > 0 ? await listPersons(userId).catch(() => []) : [];
+
+  const now = new Date();
+  const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const followUpStatus = new Map<string, "overdue" | "soon" | "pending">();
+  for (const fu of pendingFollowUps) {
+    let status: "overdue" | "soon" | "pending";
+    if (!fu.followUpDate) {
+      status = "pending";
+    } else {
+      const d = new Date(fu.followUpDate);
+      if (d < now) status = "overdue";
+      else if (d <= sevenDaysLater) status = "soon";
+      else status = "pending";
+    }
+    const existing = followUpStatus.get(fu.personId);
+    if (!existing || status === "overdue" || (status === "soon" && existing === "pending")) {
+      followUpStatus.set(fu.personId, status);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -133,6 +158,7 @@ export default async function RolodexPage({
         ) : (
           persons.map((person) => {
             const birthdayLabel = upcomingBirthdayLabel(person.birthday);
+            const fuStatus = followUpStatus.get(person.id);
             return (
               <Link
                 key={person.id}
@@ -156,14 +182,31 @@ export default async function RolodexPage({
                       {[person.relationshipType, person.organization].filter(Boolean).join(" · ") || " "}
                     </p>
                   </div>
-                  {birthdayLabel && (
-                    <span
-                      className="shrink-0 rounded px-1.5 py-0.5 text-[0.75rem] font-medium"
-                      style={{ background: "var(--accent-tint)", color: "var(--accent-strong)" }}
-                    >
-                      🎂 {birthdayLabel}
-                    </span>
-                  )}
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {fuStatus && (
+                      <span
+                        className="rounded-full px-2 py-0.5 text-[0.75rem] font-medium"
+                        style={{
+                          background: "rgba(245, 158, 11, 0.15)",
+                          color: fuStatus === "overdue" ? "#b45309" : "#d97706",
+                        }}
+                      >
+                        {fuStatus === "overdue"
+                          ? "Overdue follow-up"
+                          : fuStatus === "soon"
+                          ? "Follow-up soon"
+                          : "Follow-up due"}
+                      </span>
+                    )}
+                    {birthdayLabel && (
+                      <span
+                        className="rounded px-1.5 py-0.5 text-[0.75rem] font-medium"
+                        style={{ background: "var(--accent-tint)", color: "var(--accent-strong)" }}
+                      >
+                        🎂 {birthdayLabel}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </Link>
             );
