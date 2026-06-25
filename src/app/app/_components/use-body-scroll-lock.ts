@@ -12,7 +12,11 @@ import { useEffect, useId } from "react";
 const lockTokens = new Set<string>();
 
 function applyLockState() {
-  document.body.style.overflow = lockTokens.size > 0 ? "hidden" : "";
+  const value = lockTokens.size > 0 ? "hidden" : "";
+  document.body.style.overflow = value;
+  // Some browsers (Firefox, iOS Safari) use the html element as the scroll
+  // container rather than body. Lock both so the page stays put in all cases.
+  document.documentElement.style.overflow = value;
 }
 
 export function useBodyScrollLock(active: boolean = true) {

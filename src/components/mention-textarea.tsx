@@ -11,6 +11,7 @@ import {
   type KeyboardEvent,
   type TextareaHTMLAttributes,
 } from "react";
+import { createPortal } from "react-dom";
 
 type PersonSuggestion = {
   id: string;
@@ -69,15 +70,36 @@ function activeMention(value: string, caret: number) {
 export const MentionTextarea = forwardRef<HTMLTextAreaElement, MentionTextareaProps>(
   function MentionTextarea({ helperText, onChange, onKeyDown, className, ...props }, ref) {
     const innerRef = useRef<HTMLTextAreaElement | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
     const [people, setPeople] = useState<PersonSuggestion[]>(cachedPeople ?? []);
     const [mention, setMention] = useState<ReturnType<typeof activeMention>>(null);
     const [activeIndex, setActiveIndex] = useState(0);
+    // Fixed-position coords for the portal dropdown, recalculated when mention opens.
+    const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
     useImperativeHandle(ref, () => innerRef.current as HTMLTextAreaElement);
 
     useEffect(() => {
       void loadPeople().then(setPeople);
     }, []);
+
+    // Recalculate the portal dropdown position each time the mention opens.
+    useEffect(() => {
+      if (mention && containerRef.current) {
+        const r = containerRef.current.getBoundingClientRect();
+        setDropdownPos({ top: r.bottom + 4, left: r.left + 8, width: r.width - 16 });
+      } else {
+        setDropdownPos(null);
+      }
+    }, [mention]);
+
+    // Close the dropdown if the container scrolls (e.g. inside a scrollable modal).
+    useEffect(() => {
+      if (!mention) return;
+      const close = () => setMention(null);
+      window.addEventListener("scroll", close, { capture: true, passive: true });
+      return () => window.removeEventListener("scroll", close, { capture: true });
+    }, [mention]);
 
     const suggestions = useMemo(() => {
       if (!mention) return [];
@@ -158,8 +180,57 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, MentionTextareaPr
       onKeyDown?.(event);
     }
 
+    // The dropdown is portaled to document.body with position:fixed so it
+    // escapes any overflow:hidden/auto ancestor (modals, scrollable cards, etc.)
+    // The position is anchored by measuring the container div via getBoundingClientRect.
+    const dropdown =
+      mention && dropdownPos
+        ? createPortal(
+            <div
+              className="overflow-hidden rounded-md border shadow-lg"
+              style={{
+                position: "fixed",
+                top: dropdownPos.top,
+                left: dropdownPos.left,
+                width: dropdownPos.width,
+                zIndex: 9999,
+                background: "var(--bg-page)",
+                borderColor: "var(--border-soft)",
+              }}
+            >
+              {suggestions.length > 0 ? (
+                suggestions.map((person, index) => (
+                  <button
+                    key={person.id}
+                    type="button"
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[0.8125rem]"
+                    style={{
+                      background: index === activeIndex ? "var(--bg-hover)" : "transparent",
+                      color: "var(--text)",
+                    }}
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      choose(person);
+                    }}
+                  >
+                    <span className="font-medium">@{person.displayName}</span>
+                    <span className="truncate text-[0.75rem]" style={{ color: "var(--text-muted)" }}>
+                      {[person.relationshipType, person.organization].filter(Boolean).join(" · ")}
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <div className="px-3 py-2 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
+                  No match yet. Saving will create an unresolved mention.
+                </div>
+              )}
+            </div>,
+            document.body,
+          )
+        : null;
+
     return (
-      <div className="relative">
+      <div ref={containerRef} className="relative">
         <textarea
           {...props}
           ref={innerRef}
@@ -169,39 +240,7 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, MentionTextareaPr
           onClick={(event) => refreshMention(event.currentTarget)}
           onKeyUp={(event) => refreshMention(event.currentTarget)}
         />
-        {mention ? (
-          <div
-            className="absolute left-2 right-2 top-full z-40 mt-1 overflow-hidden rounded-md border shadow-lg"
-            style={{ background: "var(--bg-page)", borderColor: "var(--border-soft)" }}
-          >
-            {suggestions.length > 0 ? (
-              suggestions.map((person, index) => (
-                <button
-                  key={person.id}
-                  type="button"
-                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[0.8125rem]"
-                  style={{
-                    background: index === activeIndex ? "var(--bg-hover)" : "transparent",
-                    color: "var(--text)",
-                  }}
-                  onMouseDown={(event) => {
-                    event.preventDefault();
-                    choose(person);
-                  }}
-                >
-                  <span className="font-medium">@{person.displayName}</span>
-                  <span className="truncate text-[0.75rem]" style={{ color: "var(--text-muted)" }}>
-                    {[person.relationshipType, person.organization].filter(Boolean).join(" · ")}
-                  </span>
-                </button>
-              ))
-            ) : (
-              <div className="px-3 py-2 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
-                No match yet. Saving will create an unresolved mention.
-              </div>
-            )}
-          </div>
-        ) : null}
+        {dropdown}
         {helperText ? (
           <p className="mt-1 text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
             {helperText}
