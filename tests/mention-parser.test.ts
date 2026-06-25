@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseMentions, mentionNames } from "@/lib/mention-parser";
+import { parseMentions, mentionNames, parseInsights } from "@/lib/mention-parser";
 
 describe("parseMentions", () => {
   it("extracts a single @Name", () => {
@@ -131,6 +131,80 @@ describe("parseMentions", () => {
 
   it("ignores empty brackets @[]", () => {
     const result = parseMentions("@[] is not a mention");
+    expect(result).toHaveLength(0);
+  });
+
+  it("does not include @insight as a person mention", () => {
+    const result = parseMentions("@insight This is important. @Ana agreed.");
+    expect(result).toHaveLength(1);
+    expect(result[0]!.name).toBe("Ana");
+  });
+
+  it("filters @insight from mentionNames too", () => {
+    const names = mentionNames("@insight Remember this. @Bob knows.");
+    expect(names).toEqual(["Bob"]);
+  });
+});
+
+describe("parseInsights", () => {
+  it("extracts insight text until end of sentence", () => {
+    const result = parseInsights("@insight This is a key learning.");
+    expect(result).toHaveLength(1);
+    expect(result[0]!.text).toBe("This is a key learning.");
+    expect(result[0]!.kind).toBe("insight");
+  });
+
+  it("does not create entries for person mentions", () => {
+    const result = parseInsights("@Ana talked about budgets");
+    expect(result).toHaveLength(0);
+  });
+
+  it("extracts multiple @insight markers", () => {
+    const result = parseInsights(
+      "@insight First lesson. Then stuff happened. @insight Second lesson!",
+    );
+    expect(result).toHaveLength(2);
+    expect(result[0]!.text).toBe("First lesson.");
+    expect(result[1]!.text).toBe("Second lesson!");
+  });
+
+  it("captures until end of string when no sentence boundary", () => {
+    const result = parseInsights("@insight No period here");
+    expect(result).toHaveLength(1);
+    expect(result[0]!.text).toBe("No period here");
+  });
+
+  it("captures until newline", () => {
+    const result = parseInsights("@insight First line\nSecond line");
+    expect(result).toHaveLength(1);
+    expect(result[0]!.text).toBe("First line");
+  });
+
+  it("at start of line captures until sentence end", () => {
+    const text = "Some preamble.\n@insight Always end with a next action.";
+    const result = parseInsights(text);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.text).toBe("Always end with a next action.");
+  });
+
+  it("mixed note with people and insights separates correctly", () => {
+    const text = "Talked with @Ana about budget. @insight Money chats need a concrete next step. Then @Bob called.";
+    const mentions = parseMentions(text);
+    const insights = parseInsights(text);
+
+    expect(mentions.map((m) => m.name)).toEqual(["Ana", "Bob"]);
+    expect(insights).toHaveLength(1);
+    expect(insights[0]!.text).toBe("Money chats need a concrete next step.");
+  });
+
+  it("records correct offsets", () => {
+    const result = parseInsights("Hello @insight Test!");
+    expect(result[0]!.startOffset).toBe(6);
+    expect(result[0]!.endOffset).toBe(20);
+  });
+
+  it("skips empty @insight with no body", () => {
+    const result = parseInsights("@insight ");
     expect(result).toHaveLength(0);
   });
 });

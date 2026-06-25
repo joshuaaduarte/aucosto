@@ -49,6 +49,7 @@ import { RunningCard } from "./running-card";
 import { StartForm } from "./start-form";
 import { PipLaunchButton } from "./pip-launch-button";
 import { loadPipState } from "../_components/pip-data";
+import { CapturedTodaySection } from "./captured-today";
 
 export const dynamic = "force-dynamic";
 
@@ -739,6 +740,9 @@ export default async function TimePage() {
           coverage={coverage}
         />
       </section>
+
+      {/* Captured insights */}
+      <CapturedTodaySection userId={userId} todayStart={todayStart} />
 
       {/* Recent entries */}
       <section className="fade-in-delay-4">

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { parseMentions } from "@/lib/mention-parser";
+import { parseMentions, parseInsights } from "@/lib/mention-parser";
 import {
   ensureRolodexTables,
   findPersonByName,
@@ -8,6 +8,12 @@ import {
   resolveMention,
   addInteraction,
 } from "@/lib/services/rolodex";
+import {
+  ensureInsightTables,
+  deleteInsightsForSource,
+  createInsight,
+  linkInsightToPerson,
+} from "@/lib/services/captured-insights";
 import { prisma } from "@/lib/prisma";
 
 export interface MentionProcessResult {
@@ -68,6 +74,47 @@ async function getExistingMention(
   } catch {
     return null;
   }
+}
+
+async function getExistingInteraction(
+  userId: string,
+  personId: string,
+  sourceTool: string,
+  sourceRecordId: string,
+): Promise<{ id: string } | null> {
+  try {
+    const rows = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
+      `SELECT "id" FROM "RolodexInteraction"
+       WHERE "userId" = $1 AND "personId" = $2 AND "sourceTool" = $3 AND "sourceRecordId" = $4
+       LIMIT 1`,
+      userId,
+      personId,
+      sourceTool,
+      sourceRecordId,
+    );
+    return rows[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function updateInteraction(
+  interactionId: string,
+  userId: string,
+  title: string,
+  body: string | null,
+  occurredAt: Date,
+): Promise<void> {
+  await prisma.$executeRawUnsafe(
+    `UPDATE "RolodexInteraction"
+     SET "title" = $1, "body" = $2, "occurredAt" = $3::timestamptz
+     WHERE "id" = $4 AND "userId" = $5`,
+    title,
+    body,
+    occurredAt.toISOString(),
+    interactionId,
+    userId,
+  );
 }
 
 /**
@@ -137,13 +184,20 @@ export async function processMentions(
         }
 
         const body = extractSurroundingSentence(text, mention.start, mention.end);
-        const interactionId = await addInteraction(userId, person.id, {
-          title: interactionTitle,
-          body: body || null,
-          occurredAt: at.toISOString(),
-          sourceTool,
-          sourceRecordId,
-        });
+        const existingInteraction = await getExistingInteraction(userId, person.id, sourceTool, sourceRecordId);
+        let interactionId: string;
+        if (existingInteraction) {
+          await updateInteraction(existingInteraction.id, userId, interactionTitle, body || null, at);
+          interactionId = existingInteraction.id;
+        } else {
+          interactionId = await addInteraction(userId, person.id, {
+            title: interactionTitle,
+            body: body || null,
+            occurredAt: at.toISOString(),
+            sourceTool,
+            sourceRecordId,
+          });
+        }
 
         result.resolved.push({ name: mention.name, personId: person.id, interactionId });
       } else if (candidates.length === 0) {
@@ -179,6 +233,36 @@ export async function processMentions(
     } catch (e) {
       console.error("[mention-processor] failed processing mention", mention.name, e);
     }
+  }
+
+  // ── Insight processing ──────────────────────────────────────────────────
+  try {
+    await ensureInsightTables();
+    const insights = parseInsights(text);
+    // Idempotent: wipe previous insights for this source field before re-inserting
+    await deleteInsightsForSource(userId, sourceTool, sourceRecordId, sourceField);
+
+    const resolvedPersonIds = result.resolved.map((r) => r.personId);
+    for (const insight of insights) {
+      try {
+        const created = await createInsight({
+          userId,
+          sourceTool,
+          sourceRecordId,
+          sourceField,
+          occurredAt: at,
+          text: insight.text,
+          kind: insight.kind,
+        });
+        for (const personId of resolvedPersonIds) {
+          await linkInsightToPerson(created.id, personId, userId);
+        }
+      } catch (e) {
+        console.error("[mention-processor] failed creating insight", e);
+      }
+    }
+  } catch (e) {
+    console.error("[mention-processor] insight processing failed", e);
   }
 
   return result;

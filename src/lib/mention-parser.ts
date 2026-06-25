@@ -4,6 +4,15 @@ export interface ParsedMention {
   end: number;
 }
 
+export interface ParsedInsight {
+  text: string;
+  kind: string;
+  startOffset: number;
+  endOffset: number;
+}
+
+const RESERVED_KEYWORDS = new Set(["insight"]);
+
 /**
  * Extract all @mentions from a string.
  * Rules:
@@ -32,6 +41,7 @@ export function parseMentions(text: string): ParsedMention[] {
       name = match[1].trim();
     } else {
       const first = match[2]!;
+      if (RESERVED_KEYWORDS.has(first.toLowerCase())) continue;
       const second = match[3];
       name = second ? `${first} ${second}` : first;
     }
@@ -52,4 +62,35 @@ export function parseMentions(text: string): ParsedMention[] {
 /** Deduplicated mention names extracted from text — convenience wrapper over parseMentions. */
 export function mentionNames(text: string): string[] {
   return parseMentions(text).map((m) => m.name);
+}
+
+/**
+ * Extract `@insight ...` markers from text.
+ * Each @insight captures text until end of sentence (`.!?\n`) or end of string.
+ */
+export function parseInsights(text: string): ParsedInsight[] {
+  const re = /(?<![a-zA-Z0-9_])@insight\s+/gi;
+  const results: ParsedInsight[] = [];
+
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text)) !== null) {
+    const bodyStart = match.index + match[0].length;
+    let bodyEnd = text.length;
+    for (let i = bodyStart; i < text.length; i++) {
+      if (text[i] === "\n" || /[.!?]/.test(text[i]!)) {
+        bodyEnd = i + 1;
+        break;
+      }
+    }
+    const insightText = text.slice(bodyStart, bodyEnd).trim();
+    if (!insightText) continue;
+    results.push({
+      text: insightText,
+      kind: "insight",
+      startOffset: match.index,
+      endOffset: bodyEnd,
+    });
+  }
+
+  return results;
 }

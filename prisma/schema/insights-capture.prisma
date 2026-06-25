@@ -1,0 +1,37 @@
+// Captured insights — durable observations captured via @insight markers.
+// Applied to the live DB via ensureInsightTables() raw SQL in
+// src/lib/services/captured-insights.ts (same pattern as rolodex/reflect).
+
+model CapturedInsight {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  sourceTool     String
+  sourceRecordId String
+  sourceField    String?
+  occurredAt     DateTime
+  text           String
+  kind           String   @default("insight")
+  status         String   @default("active")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  persons CapturedInsightPerson[]
+
+  @@index([userId])
+  @@index([userId, occurredAt(sort: Desc)])
+  @@index([userId, sourceTool, sourceRecordId])
+}
+
+model CapturedInsightPerson {
+  id        String @id @default(cuid())
+  userId    String
+  insightId String
+  personId  String
+
+  insight CapturedInsight @relation(fields: [insightId], references: [id], onDelete: Cascade)
+
+  @@unique([insightId, personId])
+  @@index([userId, personId])
+}

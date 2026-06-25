@@ -81,6 +81,9 @@ const EVENT_LABELS: Record<string, string> = {
   "rolodex.followup_added": "Added follow-up",
   "rolodex.gift_idea_added": "Added gift idea",
 
+  // insights
+  "insight.captured": "captured an insight",
+
   // user
   "user.privacy_updated": "updated privacy settings",
 };

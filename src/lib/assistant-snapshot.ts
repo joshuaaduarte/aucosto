@@ -31,6 +31,10 @@ import {
   type FollowUpSummary,
   type RecentMentionSummary,
 } from "@/lib/services/rolodex";
+import {
+  ensureInsightTables,
+  listRecentInsights,
+} from "@/lib/services/captured-insights";
 import { getReflection } from "@/lib/services/reflect";
 import { getTodayWakeStatus } from "@/lib/services/rhythms";
 import {
@@ -156,6 +160,8 @@ export type AssistantSnapshot = {
       recentlyMentioned: RecentMentionSummary[];
       unresolvedMentionCount: number;
     };
+
+    recentInsights: Array<{ text: string; sourceTool: string; occurredAt: string }>;
   };
 
   signals: Signals;
@@ -209,6 +215,7 @@ export async function buildAssistantSnapshot(
     ensureProjectBoardTables(),
     ensureProjectPlanningColumns().catch(() => {}),
     ensureRolodexTables().catch(() => {}),
+    ensureInsightTables().catch(() => {}),
   ]);
 
   const [
@@ -230,6 +237,7 @@ export async function buildAssistantSnapshot(
     dueFollowUps,
     recentlyMentioned,
     unresolvedMentions,
+    recentCapturedInsights,
   ] = await Promise.all([
     getRunningEntry(userId),
     listCalendarItems(userId, { from: todayStart, to: tomorrowStart }),
@@ -252,6 +260,7 @@ export async function buildAssistantSnapshot(
     getDueFollowUps(userId).catch(() => []),
     getRecentlyMentioned(userId).catch(() => []),
     listUnresolvedMentions(userId).catch(() => []),
+    listRecentInsights(userId, { limit: 5 }).catch(() => []),
   ]);
 
   const financeVisible = userRecord?.financeVisible ?? false;
@@ -478,6 +487,12 @@ export async function buildAssistantSnapshot(
       recentlyMentioned,
       unresolvedMentionCount: unresolvedMentions.length,
     },
+
+    recentInsights: recentCapturedInsights.map((i) => ({
+      text: i.text,
+      sourceTool: i.sourceTool,
+      occurredAt: i.occurredAt,
+    })),
   } satisfies AssistantSnapshot["facts"];
 
   // ── signals + briefing ────────────────────────────────────────────────────
