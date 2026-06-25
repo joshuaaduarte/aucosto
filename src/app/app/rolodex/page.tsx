@@ -65,9 +65,14 @@ export default async function RolodexPage({
     listAllPendingFollowUps(userId).catch(() => []),
   ]);
 
-  // Fetch full person list for "link to existing" only when there are unresolved mentions
-  const allPersons =
-    unresolvedMentions.length > 0 ? await listPersons(userId).catch(() => []) : [];
+  // Fetch the full (unfiltered) person list for:
+  // 1. The unresolved-mentions "link to existing" picker
+  // 2. The attention panel's follow-up and birthday lookups (which span all people)
+  const needsFullList =
+    unresolvedMentions.length > 0 ||
+    pendingFollowUps.length > 0 ||
+    (q || type); // filtered view — attention panel needs all names
+  const allPersons = needsFullList ? await listPersons(userId).catch(() => []) : persons;
 
   const now = new Date();
   const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -88,10 +93,36 @@ export default async function RolodexPage({
     }
   }
 
+  // Upcoming birthdays within 30 days (for attention panel — uses full list)
+  const upcomingBirthdays = allPersons
+    .filter((p) => upcomingBirthdayLabel(p.birthday) !== null)
+    .map((p) => ({ id: p.id, name: p.displayName, label: upcomingBirthdayLabel(p.birthday)! }))
+    .slice(0, 5);
+
+  // Overdue/soon follow-ups (for attention panel — uses full list to resolve names)
+  // followUpStatus was built from pendingFollowUps which spans all persons.
+  const urgentFollowUpPersonIds = [...followUpStatus.entries()]
+    .filter(([, status]) => status === "overdue" || status === "soon")
+    .map(([personId]) => personId);
+  const urgentFollowUps = urgentFollowUpPersonIds
+    .map((id) => {
+      const person = allPersons.find((p) => p.id === id);
+      return person ? { id: person.id, name: person.displayName, status: followUpStatus.get(id)! } : null;
+    })
+    .filter(Boolean) as Array<{ id: string; name: string; status: "overdue" | "soon" | "pending" }>;
+
+  const hasAttentionItems =
+    unresolvedMentions.length > 0 ||
+    urgentFollowUps.length > 0 ||
+    upcomingBirthdays.length > 0;
+
   return (
     <div className="space-y-6">
+      {/* Mobile-only: unresolved mentions banner above everything */}
       {unresolvedMentions.length > 0 && (
-        <UnresolvedMentionsBanner mentions={unresolvedMentions} persons={allPersons} />
+        <div className="lg:hidden">
+          <UnresolvedMentionsBanner mentions={unresolvedMentions} persons={allPersons} />
+        </div>
       )}
 
       <header className="fade-in flex items-start justify-between gap-3">
@@ -110,126 +141,242 @@ export default async function RolodexPage({
         </Link>
       </header>
 
-      {/* Search + filter */}
-      <div className="fade-in-delay-1 space-y-3">
-        <form method="GET" className="flex gap-2">
-          <input
-            name="q"
-            type="search"
-            defaultValue={q}
-            placeholder="Search by name, org…"
-            className="field flex-1 text-[0.875rem]"
-          />
-          <input type="hidden" name="type" value={type ?? ""} />
-          <button type="submit" className="btn-ghost px-3 py-1.5 text-[0.875rem] font-medium" style={{ color: "var(--text-muted)" }}>
-            Search
-          </button>
-        </form>
+      {/* Desktop two-column layout: contact list left, attention panel right */}
+      <div className="lg:grid lg:grid-cols-[1fr_280px] lg:gap-8">
+        {/* Left column: search + filter + list */}
+        <div className="space-y-4">
+          {/* Search + filter */}
+          <div className="fade-in-delay-1 space-y-3">
+            <form method="GET" className="flex gap-2">
+              <input
+                name="q"
+                type="search"
+                defaultValue={q}
+                placeholder="Search by name, org…"
+                className="field flex-1 text-[0.875rem]"
+              />
+              <input type="hidden" name="type" value={type ?? ""} />
+              <button type="submit" className="btn-ghost px-3 py-1.5 text-[0.875rem] font-medium" style={{ color: "var(--text-muted)" }}>
+                Search
+              </button>
+            </form>
 
-        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 no-scrollbar sm:flex-wrap sm:overflow-x-visible sm:pb-0">
-          {RELATIONSHIP_FILTERS.map((filter) => {
-            const active = (type ?? "") === filter.value;
-            return (
-              <Link
-                key={filter.value}
-                href={`/app/rolodex?${filter.value ? `type=${filter.value}` : ""}${q ? `&q=${q}` : ""}`}
-                className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 text-[0.8125rem] font-medium transition-colors [@media(pointer:coarse)]:min-h-[2.75rem] [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:items-center"
-                style={{
-                  background: active ? "var(--text)" : "var(--bg-tint)",
-                  color: active ? "var(--bg-page)" : "var(--text-muted)",
-                  border: "1px solid var(--border-faint)",
-                }}
-              >
-                {filter.label}
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-
-
-      {/* Person list */}
-      <div className="fade-in-delay-3 space-y-2">
-        {persons.length === 0 ? (
-          <div
-            className="rounded-xl p-8 text-center"
-            style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)" }}
-          >
-            <p className="text-[0.9375rem] font-medium" style={{ color: "var(--text-muted)" }}>
-              {q || type ? "No contacts match your filter." : "Your Rolodex is empty — add someone to get started."}
-            </p>
-            {!q && !type && (
-              <Link
-                href="/app/rolodex/new"
-                className="mt-3 inline-block text-[0.875rem] font-medium"
-                style={{ color: "var(--accent)" }}
-              >
-                Add your first contact →
-              </Link>
-            )}
+            <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 no-scrollbar sm:flex-wrap sm:overflow-x-visible sm:pb-0">
+              {RELATIONSHIP_FILTERS.map((filter) => {
+                const active = (type ?? "") === filter.value;
+                return (
+                  <Link
+                    key={filter.value}
+                    href={`/app/rolodex?${filter.value ? `type=${filter.value}` : ""}${q ? `&q=${q}` : ""}`}
+                    className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 text-[0.8125rem] font-medium transition-colors [@media(pointer:coarse)]:min-h-[2.75rem] [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:items-center"
+                    style={{
+                      background: active ? "var(--text)" : "var(--bg-tint)",
+                      color: active ? "var(--bg-page)" : "var(--text-muted)",
+                      border: "1px solid var(--border-faint)",
+                    }}
+                  >
+                    {filter.label}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
-        ) : (
-          persons.map((person) => {
-            const birthdayLabel = upcomingBirthdayLabel(person.birthday);
-            const fuStatus = followUpStatus.get(person.id);
-            const contactAgo = lastContactLabel(person.lastInteractionAt);
-            return (
-              <Link
-                key={person.id}
-                href={`/app/rolodex/${person.id}`}
-                className="block rounded-lg px-4 py-3 transition-colors hover:bg-bg-hover"
+
+          {/* Person list */}
+          <div className="fade-in-delay-3 space-y-2">
+            {persons.length === 0 ? (
+              <div
+                className="rounded-xl p-8 text-center"
                 style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)" }}
               >
-                <div className="flex items-center gap-3">
-                  <div
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[0.9375rem] font-semibold"
-                    style={{ background: "var(--border)", color: "var(--text-muted)" }}
-                    aria-hidden
+                <p className="text-[0.9375rem] font-medium" style={{ color: "var(--text-muted)" }}>
+                  {q || type ? "No contacts match your filter." : "Your Rolodex is empty — add someone to get started."}
+                </p>
+                {!q && !type && (
+                  <Link
+                    href="/app/rolodex/new"
+                    className="mt-3 inline-block text-[0.875rem] font-medium"
+                    style={{ color: "var(--accent)" }}
                   >
-                    {person.displayName.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[0.9375rem] font-semibold" style={{ color: "var(--text)" }}>
-                      {person.displayName}
-                    </p>
-                    <p className="truncate text-[0.75rem] sm:text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
-                      {[person.relationshipType, person.organization].filter(Boolean).join(" · ") || " "}
-                      {contactAgo ? (
-                        <span style={{ color: "var(--text-faint)" }}> · {contactAgo}</span>
-                      ) : null}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-                    {fuStatus && (
-                      <span
-                        className="rounded-full px-2 py-0.5 text-[0.625rem] font-medium sm:text-[0.75rem]"
-                        style={{
-                          background: "rgba(245, 158, 11, 0.15)",
-                          color: fuStatus === "overdue" ? "#b45309" : "#d97706",
-                        }}
+                    Add your first contact →
+                  </Link>
+                )}
+              </div>
+            ) : (
+              persons.map((person) => {
+                const birthdayLabel = upcomingBirthdayLabel(person.birthday);
+                const fuStatus = followUpStatus.get(person.id);
+                const contactAgo = lastContactLabel(person.lastInteractionAt);
+                return (
+                  <Link
+                    key={person.id}
+                    href={`/app/rolodex/${person.id}`}
+                    className="block rounded-lg px-4 py-3 transition-colors hover:bg-bg-hover"
+                    style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)" }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[0.9375rem] font-semibold"
+                        style={{ background: "var(--border)", color: "var(--text-muted)" }}
+                        aria-hidden
                       >
-                        {fuStatus === "overdue"
-                          ? "Overdue"
-                          : fuStatus === "soon"
-                          ? "Follow-up soon"
-                          : "Follow-up"}
-                      </span>
-                    )}
-                    {birthdayLabel && (
-                      <span
-                        className="rounded px-1.5 py-0.5 text-[0.625rem] font-medium sm:text-[0.75rem]"
-                        style={{ background: "var(--accent-tint)", color: "var(--accent-strong)" }}
-                      >
-                        🎂 {birthdayLabel}
-                      </span>
-                    )}
-                  </div>
+                        {person.displayName.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[0.9375rem] font-semibold" style={{ color: "var(--text)" }}>
+                          {person.displayName}
+                        </p>
+                        <p className="truncate text-[0.75rem] sm:text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
+                          {[person.relationshipType, person.organization].filter(Boolean).join(" · ") || " "}
+                          {contactAgo ? (
+                            <span style={{ color: "var(--text-faint)" }}> · {contactAgo}</span>
+                          ) : null}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                        {fuStatus && (
+                          <span
+                            className="rounded-full px-2 py-0.5 text-[0.625rem] font-medium sm:text-[0.75rem]"
+                            style={{
+                              background: "rgba(245, 158, 11, 0.15)",
+                              color: fuStatus === "overdue" ? "#b45309" : "#d97706",
+                            }}
+                          >
+                            {fuStatus === "overdue"
+                              ? "Overdue"
+                              : fuStatus === "soon"
+                              ? "Follow-up soon"
+                              : "Follow-up"}
+                          </span>
+                        )}
+                        {birthdayLabel && (
+                          <span
+                            className="rounded px-1.5 py-0.5 text-[0.625rem] font-medium sm:text-[0.75rem]"
+                            style={{ background: "var(--accent-tint)", color: "var(--accent-strong)" }}
+                          >
+                            🎂 {birthdayLabel}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Right column: attention panel (desktop only, only if there's something to show) */}
+        {hasAttentionItems && (
+          <aside className="hidden lg:block space-y-5">
+            <p
+              className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+              style={{ color: "var(--text-faint)" }}
+            >
+              Needs attention
+            </p>
+
+            {/* Unresolved mentions */}
+            {unresolvedMentions.length > 0 && (
+              <div
+                className="rounded-xl p-4 space-y-3"
+                style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)" }}
+              >
+                <p className="text-[0.75rem] font-semibold" style={{ color: "var(--text-muted)" }}>
+                  {unresolvedMentions.length} unresolved mention{unresolvedMentions.length !== 1 ? "s" : ""}
+                </p>
+                <div className="space-y-1.5">
+                  {unresolvedMentions.slice(0, 4).map((mention) => (
+                    <div key={mention.id} className="flex items-start gap-2">
+                      <span className="mt-0.5 shrink-0 text-[0.75rem]" style={{ color: "var(--text-faint)" }}>@</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[0.8125rem] font-medium" style={{ color: "var(--text)" }}>
+                          {mention.mentionedName}
+                        </p>
+                        <p className="truncate text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+                          {mention.sourceTool}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  {unresolvedMentions.length > 4 && (
+                    <p className="text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+                      +{unresolvedMentions.length - 4} more
+                    </p>
+                  )}
                 </div>
-              </Link>
-            );
-          })
+              </div>
+            )}
+
+            {/* Urgent follow-ups */}
+            {urgentFollowUps.length > 0 && (
+              <div
+                className="rounded-xl p-4 space-y-3"
+                style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)" }}
+              >
+                <p className="text-[0.75rem] font-semibold" style={{ color: "var(--text-muted)" }}>
+                  Follow-ups due
+                </p>
+                <div className="space-y-1.5">
+                  {urgentFollowUps.slice(0, 5).map((fu) => (
+                    <Link
+                      key={fu.id}
+                      href={`/app/rolodex/${fu.id}`}
+                      className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-bg-hover"
+                    >
+                      <span
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{ background: fu.status === "overdue" ? "#b45309" : "#d97706" }}
+                        aria-hidden
+                      />
+                      <span className="truncate text-[0.8125rem] font-medium" style={{ color: "var(--text)" }}>
+                        {fu.name}
+                      </span>
+                      <span
+                        className="ml-auto shrink-0 text-[0.6875rem] font-medium"
+                        style={{ color: fu.status === "overdue" ? "#b45309" : "#d97706" }}
+                      >
+                        {fu.status === "overdue" ? "Overdue" : "Soon"}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Upcoming birthdays */}
+            {upcomingBirthdays.length > 0 && (
+              <div
+                className="rounded-xl p-4 space-y-3"
+                style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)" }}
+              >
+                <p className="text-[0.75rem] font-semibold" style={{ color: "var(--text-muted)" }}>
+                  Upcoming birthdays
+                </p>
+                <div className="space-y-1.5">
+                  {upcomingBirthdays.map((b) => (
+                    <Link
+                      key={b.id}
+                      href={`/app/rolodex/${b.id}`}
+                      className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-bg-hover"
+                    >
+                      <span className="shrink-0 text-[0.875rem]" aria-hidden>🎂</span>
+                      <span className="truncate text-[0.8125rem] font-medium" style={{ color: "var(--text)" }}>
+                        {b.name}
+                      </span>
+                      <span className="ml-auto shrink-0 text-[0.6875rem]" style={{ color: "var(--text-faint)" }}>
+                        {b.label.replace("Birthday ", "")}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </aside>
         )}
       </div>
+
+      {/* Mobile: unresolved mentions (shown at bottom if present — banner is at top) */}
     </div>
   );
 }

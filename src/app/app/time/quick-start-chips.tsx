@@ -125,7 +125,7 @@ export function QuickStartChips({
                     habitId: habit.id,
                   })
                 }
-                className="inline-flex shrink-0 items-center gap-1.5 rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded px-2.5 py-1.5 text-[0.75rem] font-medium transition-colors [@media(pointer:coarse)]:min-h-[2.75rem]"
                 style={chipStyle(startingKey === key)}
               >
                 <span
@@ -160,12 +160,14 @@ export function QuickStartChips({
                     projectId: task.projectId ?? undefined,
                   })
                 }
-                className="inline-flex shrink-0 items-center gap-1.5 rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded px-2.5 py-1.5 text-[0.75rem] font-medium transition-colors [@media(pointer:coarse)]:min-h-[2.75rem]"
                 style={chipStyle(startingKey === key)}
               >
-                {startingKey === key ? "Starting..." : task.title}
+                <span className="max-w-[16ch] truncate">
+                  {startingKey === key ? "Starting..." : task.title}
+                </span>
                 {task.projectName ? (
-                  <span style={{ color: "var(--text-faint)" }}>
+                  <span className="max-w-[10ch] truncate" style={{ color: "var(--text-faint)" }}>
                     {task.projectName}
                   </span>
                 ) : task.estimatedMinutes ? (
@@ -191,7 +193,7 @@ export function QuickStartChips({
                 onClick={() =>
                   start(key, { label: item.title, category: "calendar" })
                 }
-                className="inline-flex shrink-0 items-center gap-1.5 rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded px-2.5 py-1.5 text-[0.75rem] font-medium transition-colors [@media(pointer:coarse)]:min-h-[2.75rem]"
                 style={chipStyle(startingKey === key)}
               >
                 <span
@@ -199,7 +201,9 @@ export function QuickStartChips({
                   style={{ background: "var(--accent)" }}
                   aria-hidden
                 />
-                {startingKey === key ? "Starting..." : item.title}
+                <span className="max-w-[14ch] truncate">
+                  {startingKey === key ? "Starting..." : item.title}
+                </span>
                 <span style={{ color: "var(--text-faint)" }}>
                   {item.timeLabel}
                 </span>
@@ -224,7 +228,7 @@ export function QuickStartChips({
                     category: recent.category ?? undefined,
                   })
                 }
-                className="inline-flex shrink-0 items-center gap-1.5 rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded px-2.5 py-1.5 text-[0.75rem] font-medium transition-colors [@media(pointer:coarse)]:min-h-[2.75rem]"
                 style={chipStyle(startingKey === key)}
               >
                 <span
@@ -232,7 +236,9 @@ export function QuickStartChips({
                   style={{ background: recent.color }}
                   aria-hidden
                 />
-                {startingKey === key ? "Starting..." : recent.label}
+                <span className="max-w-[16ch] truncate">
+                  {startingKey === key ? "Starting..." : recent.label}
+                </span>
               </button>
             );
           })}
@@ -254,7 +260,7 @@ export function QuickStartChips({
                     category: category.id,
                   })
                 }
-                className="inline-flex shrink-0 items-center gap-1.5 rounded px-2 py-1 text-[0.75rem] font-medium transition-colors"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded px-2.5 py-1.5 text-[0.75rem] font-medium transition-colors [@media(pointer:coarse)]:min-h-[2.75rem]"
                 style={chipStyle(startingKey === key)}
               >
                 <span

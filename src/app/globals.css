@@ -515,10 +515,6 @@ body > * {
 }
 
 @media (min-width: 640px) {
-  .calendar-fab {
-    bottom: 1.5rem;
-  }
-
   /* Desktop: centered dialog, as before. */
   .calendar-modal-backdrop {
     align-items: center;
