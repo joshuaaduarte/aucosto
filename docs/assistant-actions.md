@@ -328,7 +328,60 @@ Applies to: `log_habit` (habitName), `update_project` (projectName).
 
 ---
 
-## 8. What's Explicitly NOT Supported
+## 8. Rolodex & @mention Actions
+
+### Rolodex assistant actions (via `/api/assistant/actions`)
+
+| Action | Risk | Description |
+|--------|------|-------------|
+| `create_person` | low | Create a new Rolodex contact |
+| `add_interaction` | low | Add an interaction note to an existing contact |
+| `resolve_person_mention` | low | Link an unresolved @mention to a contact |
+
+### Unresolved mentions in the snapshot
+
+The snapshot (`GET /api/assistant/snapshot`) includes a `rolodex` key when the user has the Rolodex feature:
+
+```json
+{
+  "rolodex": {
+    "unresolvedMentionCount": 3,
+    "unresolvedMentions": [
+      { "id": "m1", "mentionedName": "Ana", "sourceTool": "reflection", "createdAt": "..." }
+    ]
+  }
+}
+```
+
+### `resolve_person_mention` action
+
+Resolves an unresolved `@mention` by linking it to an existing Rolodex person.
+
+**Input:**
+```json
+{
+  "action": "resolve_person_mention",
+  "input": {
+    "mentionId": "m1",
+    "personId": "p_abc"
+  }
+}
+```
+
+**Ambiguity handling**: if the agent encounters an `@mention` in a note and wants to resolve it without a `mentionId`, it should search for the person by name via `find_person` (if available) or ask Josh for disambiguation before proceeding.
+
+### Handling unresolved mentions
+
+When the snapshot shows `unresolvedMentionCount > 0`, the agent may:
+1. Show Josh the unresolved mentions list
+2. For each mention, propose matching existing contacts or suggest creating new ones
+3. Call `resolve_person_mention` with confirmed `mentionId` + `personId`
+
+If a mention matches 0 or 2+ existing contacts, treat it as ambiguous — do not auto-resolve.
+
+---
+
+## 9. What's Explicitly NOT Supported
 
 - **Finance writes** — `finance_write` is in the registry as `supported: false`, `risk: "high"`. Any attempt returns a 400.
 - **Deletes** — no `delete_task`, `delete_time_entry`, etc.

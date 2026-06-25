@@ -7,8 +7,8 @@ import {
   buildReflectionSnapshot,
   upsertReflection,
 } from "@/lib/services/reflect";
-import { syncRolodexMentionsForText } from "@/lib/services/rolodex-mentions";
 import { resolveActiveUserId } from "@/lib/viewer-context";
+import { processMentions } from "@/lib/mention-processor";
 
 const rating = z.coerce.number().int().min(1).max(5);
 
@@ -82,26 +82,26 @@ export async function saveReflectionAction(
       freeNotes: parsed.data.freeNotes ?? null,
       contextSnapshot,
     });
-    await Promise.all([
-      syncRolodexMentionsForText(userId, {
-        sourceTool: "reflect",
-        sourceRecordId: targetKey,
-        sourceField: "wentWell",
-        text: parsed.data.wentWell ?? null,
-      }),
-      syncRolodexMentionsForText(userId, {
-        sourceTool: "reflect",
-        sourceRecordId: targetKey,
-        sourceField: "carryForward",
-        text: parsed.data.carryForward ?? null,
-      }),
-      syncRolodexMentionsForText(userId, {
-        sourceTool: "reflect",
-        sourceRecordId: targetKey,
-        sourceField: "freeNotes",
-        text: parsed.data.freeNotes ?? null,
-      }),
-    ]);
+
+    // Process @mentions in all free-text fields (side-effect, never blocks save)
+    const combinedText = [parsed.data.wentWell, parsed.data.carryForward, parsed.data.freeNotes]
+      .filter(Boolean)
+      .join("\n\n");
+    if (combinedText) {
+      try {
+        await processMentions(
+          userId,
+          combinedText,
+          "reflection",
+          targetKey,
+          "note",
+          "Mentioned in daily reflection",
+          snapshotAt,
+        );
+      } catch (e) {
+        console.error("[reflect] mention processing failed", e);
+      }
+    }
   } catch (error) {
     return {
       error:

@@ -775,6 +775,78 @@ export async function getDueFollowUps(userId: string): Promise<FollowUpSummary[]
   }
 }
 
+// ── Cross-tool linked records ─────────────────────────────────────────────
+
+export interface LinkedCalendarItem {
+  id: string;
+  title: string;
+  startAt: string;
+}
+
+export interface LinkedTimeEntry {
+  id: string;
+  title: string;
+  startedAt: string;
+}
+
+export async function getLinkedCalendarItems(
+  userId: string,
+  personId: string,
+): Promise<LinkedCalendarItem[]> {
+  requireCan(userId, "rolodex", "read");
+  try {
+    const rows = await prisma.$queryRawUnsafe<
+      Array<{ id: string; title: string; startedAt: Date }>
+    >(
+      `SELECT c."id", c."title", c."startsAt" AS "startedAt"
+       FROM "RolodexMention" m
+       JOIN "CalendarItem" c ON c."id" = m."sourceRecordId"
+       WHERE m."userId" = $1 AND m."personId" = $2 AND m."sourceTool" = 'calendar'
+       ORDER BY c."startsAt" DESC
+       LIMIT 5`,
+      userId,
+      personId,
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      startAt: isoString(r.startedAt) ?? "",
+    }));
+  } catch (error) {
+    console.error("[rolodex] getLinkedCalendarItems failed", error);
+    return [];
+  }
+}
+
+export async function getLinkedTimeEntries(
+  userId: string,
+  personId: string,
+): Promise<LinkedTimeEntry[]> {
+  requireCan(userId, "rolodex", "read");
+  try {
+    const rows = await prisma.$queryRawUnsafe<
+      Array<{ id: string; label: string; startedAt: Date }>
+    >(
+      `SELECT t."id", t."label", t."startedAt"
+       FROM "RolodexMention" m
+       JOIN "TimeEntry" t ON t."id" = m."sourceRecordId"
+       WHERE m."userId" = $1 AND m."personId" = $2 AND m."sourceTool" = 'time'
+       ORDER BY t."startedAt" DESC
+       LIMIT 5`,
+      userId,
+      personId,
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.label,
+      startedAt: isoString(r.startedAt) ?? "",
+    }));
+  } catch (error) {
+    console.error("[rolodex] getLinkedTimeEntries failed", error);
+    return [];
+  }
+}
+
 export async function getRecentlyMentioned(
   userId: string,
   limit = 5,

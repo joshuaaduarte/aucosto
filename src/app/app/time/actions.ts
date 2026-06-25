@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import * as timeService from "@/lib/services/time";
+import { processMentions } from "@/lib/mention-processor";
 import { reflectOnDoItemSession } from "@/lib/services/do";
 import { logHabitProgress, markHabitDoneFromTimer } from "@/lib/services/habits";
 import {
@@ -11,7 +12,6 @@ import {
   updateTimeCategory,
 } from "@/lib/services/time-categories";
 import { tagTimeEntry } from "@/lib/services/projects";
-import { syncRolodexMentionsForText } from "@/lib/services/rolodex-mentions";
 import { updateSleepWakeTime as updateSleepWakeTimeService } from "@/lib/services/rhythms";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import { windowFromFormData } from "@/lib/wall-clock";
@@ -217,13 +217,20 @@ export async function updateEntryNotes(
     const updated = await timeService.updateEntry(userId, id, {
       notes: trimmed ? notes.slice(0, 2000) : null,
     });
-    if (updated) {
-      await syncRolodexMentionsForText(userId, {
-        sourceTool: "time",
-        sourceRecordId: id,
-        sourceField: "notes",
-        text: trimmed ? notes.slice(0, 2000) : null,
-      });
+    if (updated && trimmed) {
+      try {
+        await processMentions(
+          userId,
+          trimmed,
+          "time",
+          id,
+          "notes",
+          `Mentioned in time entry: ${updated.label}`,
+          updated.startedAt,
+        );
+      } catch (e) {
+        console.error("[time] mention processing failed", e);
+      }
     }
     return { ok: Boolean(updated) };
   } catch {
@@ -276,6 +283,7 @@ export async function saveEntryAction(
   const startedAt = window.startsAt;
   const endedAt = window.endsAt;
 
+  let savedEntry: Awaited<ReturnType<typeof timeService.updateEntry>> | Awaited<ReturnType<typeof timeService.createPastEntry>> | null = null;
   try {
     if (parsed.data.id) {
       const updated = await timeService.updateEntry(userId, parsed.data.id, {
@@ -289,14 +297,9 @@ export async function saveEntryAction(
       if (!updated) {
         return { error: "Entry not found." };
       }
-      await syncRolodexMentionsForText(userId, {
-        sourceTool: "time",
-        sourceRecordId: updated.id,
-        sourceField: "notes",
-        text: parsed.data.notes ?? null,
-      });
+      savedEntry = updated;
     } else {
-      const entry = await timeService.createPastEntry(userId, {
+      savedEntry = await timeService.createPastEntry(userId, {
         label: parsed.data.label,
         category: parsed.data.category ?? null,
         doItemId: parsed.data.doItemId ?? null,
@@ -304,17 +307,27 @@ export async function saveEntryAction(
         startedAt,
         endedAt,
       });
-      await syncRolodexMentionsForText(userId, {
-        sourceTool: "time",
-        sourceRecordId: entry.id,
-        sourceField: "notes",
-        text: parsed.data.notes ?? null,
-      });
     }
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Could not save entry.",
     };
+  }
+
+  if (savedEntry && parsed.data.notes) {
+    try {
+      await processMentions(
+        userId,
+        parsed.data.notes,
+        "time",
+        savedEntry.id,
+        "notes",
+        `Mentioned in time entry: ${savedEntry.label}`,
+        savedEntry.startedAt,
+      );
+    } catch (e) {
+      console.error("[time] mention processing failed", e);
+    }
   }
 
   revalidatePath("/app");
@@ -549,12 +562,6 @@ export async function stopEntryWithReflection(formData: FormData) {
       actualMinutes: outcome === "done" && actualRaw ? Number(actualRaw) : undefined,
       remainingMinutes: remainingRaw ? Number(remainingRaw) : undefined,
       notes: notes || null,
-    });
-    await syncRolodexMentionsForText(userId, {
-      sourceTool: "do",
-      sourceRecordId: doItemId,
-      sourceField: "session_notes",
-      text: notes || null,
     });
   }
 

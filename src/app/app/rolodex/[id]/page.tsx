@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveActiveUserId } from "@/lib/viewer-context";
-import { ensureRolodexTables, getPerson } from "@/lib/services/rolodex";
+import {
+  ensureRolodexTables,
+  getPerson,
+  getLinkedCalendarItems,
+  getLinkedTimeEntries,
+} from "@/lib/services/rolodex";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +44,11 @@ export default async function PersonDetailPage({
 
   const person = await getPerson(userId, id).catch(() => null);
   if (!person) notFound();
+
+  const [linkedCalendar, linkedTime] = await Promise.all([
+    getLinkedCalendarItems(userId, id).catch(() => []),
+    getLinkedTimeEntries(userId, id).catch(() => []),
+  ]);
 
   const dueFollowUps = person.interactions.filter((i) => i.followUpNeeded);
 
@@ -193,6 +203,60 @@ export default async function PersonDetailPage({
           </div>
         )}
       </section>
+
+      {/* Linked calendar events */}
+      {linkedCalendar.length > 0 && (
+        <section className="fade-in-delay-2 space-y-2">
+          <h2
+            className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+            style={{ color: "var(--text-faint)" }}
+          >
+            Calendar events
+          </h2>
+          <div className="space-y-1">
+            {linkedCalendar.map((item) => (
+              <Link
+                key={item.id}
+                href="/app/calendar"
+                className="flex items-center justify-between rounded-md px-3 py-2 text-[0.875rem] hover:bg-bg-hover"
+                style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)" }}
+              >
+                <span style={{ color: "var(--text)" }}>{item.title}</span>
+                <span className="shrink-0 text-[0.8125rem]" style={{ color: "var(--text-ghost)" }}>
+                  {formatDate(item.startAt)}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Linked time entries */}
+      {linkedTime.length > 0 && (
+        <section className="fade-in-delay-2 space-y-2">
+          <h2
+            className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+            style={{ color: "var(--text-faint)" }}
+          >
+            Time entries
+          </h2>
+          <div className="space-y-1">
+            {linkedTime.map((entry) => (
+              <Link
+                key={entry.id}
+                href="/app/time"
+                className="flex items-center justify-between rounded-md px-3 py-2 text-[0.875rem] hover:bg-bg-hover"
+                style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)" }}
+              >
+                <span style={{ color: "var(--text)" }}>{entry.title}</span>
+                <span className="shrink-0 text-[0.8125rem]" style={{ color: "var(--text-ghost)" }}>
+                  {formatDate(entry.startedAt)}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Contact info */}
       {(person.emails.length > 0 || person.phones.length > 0) && (

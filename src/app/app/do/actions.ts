@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { DO_LANES, DO_STATUSES } from "@/lib/do";
+import { processMentions } from "@/lib/mention-processor";
 import {
   createDoItem,
   deleteDoItem,
@@ -13,7 +14,6 @@ import {
 } from "@/lib/services/do";
 import { createCalendarItem } from "@/lib/services/calendar";
 import { getRunningEntry, stopRunning } from "@/lib/services/time";
-import { syncRolodexMentionsForText } from "@/lib/services/rolodex-mentions";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import { windowFromFormData } from "@/lib/wall-clock";
 
@@ -73,12 +73,20 @@ export async function createDoItemAction(
   }
 
   const item = await createDoItem(userId, parsed.data);
-  await syncRolodexMentionsForText(userId, {
-    sourceTool: "do",
-    sourceRecordId: item.id,
-    sourceField: "notes",
-    text: parsed.data.notes,
-  });
+  if (parsed.data.notes) {
+    try {
+      await processMentions(
+        userId,
+        parsed.data.notes,
+        "do",
+        item.id,
+        "notes",
+        `Mentioned in task: ${item.title}`,
+      );
+    } catch (e) {
+      console.error("[do] mention processing failed", e);
+    }
+  }
   revalidateDo();
 }
 
@@ -99,13 +107,21 @@ export async function updateDoItemAction(formData: FormData) {
     throw new Error(parsed.error.issues[0]?.message ?? "Invalid task.");
   }
 
-  await updateDoItem(userId, id, parsed.data);
-  await syncRolodexMentionsForText(userId, {
-    sourceTool: "do",
-    sourceRecordId: id,
-    sourceField: "notes",
-    text: parsed.data.notes,
-  });
+  const updated = await updateDoItem(userId, id, parsed.data);
+  if (updated && parsed.data.notes) {
+    try {
+      await processMentions(
+        userId,
+        parsed.data.notes,
+        "do",
+        updated.id,
+        "notes",
+        `Mentioned in task: ${updated.title}`,
+      );
+    } catch (e) {
+      console.error("[do] mention processing failed", e);
+    }
+  }
   revalidateDo();
 }
 
@@ -169,12 +185,6 @@ export async function reflectDoItemSessionAction(formData: FormData) {
     actualMinutes: nullableNumber(formData, "actualMinutes"),
     remainingMinutes: nullableNumber(formData, "remainingMinutes"),
     notes: nullableString(formData, "notes"),
-  });
-  await syncRolodexMentionsForText(userId, {
-    sourceTool: "do",
-    sourceRecordId: id,
-    sourceField: "session_notes",
-    text: nullableString(formData, "notes"),
   });
   revalidateDo();
 }

@@ -173,21 +173,48 @@ export async function resolveMentionAction(
   }
 }
 
-export async function resolveMentionFormAction(formData: FormData): Promise<void> {
-  const userId = await resolveActiveUserId();
-  const mentionId = String(formData.get("mentionId") ?? "").trim();
-  const personId = String(formData.get("personId") ?? "").trim();
-  if (!mentionId || !personId) return;
-  await resolveMention(userId, mentionId, personId);
-  revalidateRolodex(personId);
+export type MentionActionResult = { ok: boolean; personId?: string; error?: string };
+
+/** Create a new RolodexPerson from an unresolved mention and mark the mention resolved. */
+export async function createPersonFromMentionAction(
+  mentionId: string,
+  displayName: string,
+): Promise<MentionActionResult> {
+  let userId: string;
+  try {
+    userId = await resolveActiveUserId();
+  } catch {
+    return { ok: false, error: "Not signed in." };
+  }
+  const name = displayName.trim();
+  if (!name) return { ok: false, error: "Display name is required." };
+  try {
+    const personId = await createPerson(userId, { displayName: name });
+    await resolveMention(userId, mentionId, personId);
+    revalidateRolodex(personId);
+    return { ok: true, personId };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not create contact." };
+  }
 }
 
-export async function createPersonFromMentionAction(formData: FormData): Promise<void> {
-  const userId = await resolveActiveUserId();
-  const mentionId = String(formData.get("mentionId") ?? "").trim();
-  const displayName = String(formData.get("displayName") ?? "").trim();
-  if (!mentionId || !displayName) return;
-  const personId = await createPerson(userId, { displayName });
-  await resolveMention(userId, mentionId, personId);
-  revalidateRolodex(personId);
+/** Link an existing unresolved mention to an existing person and mark it resolved. */
+export async function linkMentionToPersonAction(
+  mentionId: string,
+  personId: string,
+): Promise<MentionActionResult> {
+  let userId: string;
+  try {
+    userId = await resolveActiveUserId();
+  } catch {
+    return { ok: false, error: "Not signed in." };
+  }
+  if (!mentionId || !personId) return { ok: false, error: "Missing ids." };
+  try {
+    await resolveMention(userId, mentionId, personId);
+    revalidateRolodex(personId);
+    return { ok: true, personId };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not link mention." };
+  }
 }

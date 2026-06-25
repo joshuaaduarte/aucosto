@@ -8,10 +8,10 @@ import {
   deleteCalendarItem,
   updateCalendarItem,
 } from "@/lib/services/calendar";
+import { processMentions } from "@/lib/mention-processor";
 import { updateDoItem } from "@/lib/services/do";
 import { windowFromFormData } from "@/lib/wall-clock";
 import { listHabits, logHabitProgress, startTimerForHabit } from "@/lib/services/habits";
-import { syncRolodexMentionsForText } from "@/lib/services/rolodex-mentions";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 
 function revalidateCalendar() {
@@ -50,14 +50,23 @@ export async function createCalendarBlockAction(formData: FormData) {
     sourceTool: doItemId ? "do" : habitId ? "habit" : null,
     sourceRefId: doItemId ?? habitId,
   });
-  await syncRolodexMentionsForText(userId, {
-    sourceTool: "calendar",
-    sourceRecordId: item.id,
-    sourceField: "notes",
-    text: notes,
-  });
   if (doItemId) {
     await updateDoItem(userId, doItemId, { status: "scheduled" });
+  }
+  if (notes) {
+    try {
+      await processMentions(
+        userId,
+        notes,
+        "calendar",
+        item.id,
+        "notes",
+        `Mentioned in calendar event: ${item.title}`,
+        item.startsAt,
+      );
+    } catch (e) {
+      console.error("[calendar] mention processing failed", e);
+    }
   }
 
   revalidateCalendar();
@@ -109,7 +118,7 @@ export async function updateCalendarBlockAction(formData: FormData) {
     throw new Error("Date and time are required.");
   }
 
-  await updateCalendarItem(userId, id, {
+  const updatedItem = await updateCalendarItem(userId, id, {
     title,
     startsAt: window.startsAt,
     endsAt: window.endsAt,
@@ -118,12 +127,21 @@ export async function updateCalendarBlockAction(formData: FormData) {
     categoryId,
     status: "confirmed",
   });
-  await syncRolodexMentionsForText(userId, {
-    sourceTool: "calendar",
-    sourceRecordId: id,
-    sourceField: "notes",
-    text: notes,
-  });
+  if (updatedItem && notes) {
+    try {
+      await processMentions(
+        userId,
+        notes,
+        "calendar",
+        updatedItem.id,
+        "notes",
+        `Mentioned in calendar event: ${updatedItem.title}`,
+        updatedItem.startsAt,
+      );
+    } catch (e) {
+      console.error("[calendar] mention processing failed", e);
+    }
+  }
   revalidateCalendar();
 }
 
