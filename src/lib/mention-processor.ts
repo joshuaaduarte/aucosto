@@ -136,133 +136,137 @@ export async function processMentions(
   if (!text.trim()) return result;
 
   const mentions = parseMentions(text);
-  if (mentions.length === 0) return result;
-
-  try {
-    await ensureRolodexTables();
-  } catch (e) {
-    console.error("[mention-processor] ensureRolodexTables failed", e);
-    return result;
-  }
+  const insights = parseInsights(text);
+  if (mentions.length === 0 && insights.length === 0) return result;
 
   const at = occurredAt ?? new Date();
+  const resolvedPersonIds = new Set<string>();
 
-  for (const mention of mentions) {
+  // ── Mention processing ────────────────────────────────────────────────
+  if (mentions.length > 0) {
     try {
-      const existing = await getExistingMention(
-        userId,
-        sourceTool,
-        sourceRecordId,
-        sourceField,
-        mention.name,
-      );
+      await ensureRolodexTables();
+    } catch (e) {
+      console.error("[mention-processor] ensureRolodexTables failed", e);
+      return result;
+    }
 
-      // Already fully resolved — nothing more to do for this mention.
-      if (existing?.resolved) continue;
+    for (const mention of mentions) {
+      try {
+        const existing = await getExistingMention(
+          userId,
+          sourceTool,
+          sourceRecordId,
+          sourceField,
+          mention.name,
+        );
 
-      // If unresolved mention exists, re-try the person lookup so that a person
-      // added to the Rolodex after the note was first saved gets linked.
-      const candidates = await findPersonByName(userId, mention.name);
-
-      if (candidates.length === 1) {
-        const person = candidates[0]!;
-
-        let mentionId: string;
-        if (existing) {
-          // Reuse the unresolved mention row — just resolve it in-place.
-          mentionId = existing.id;
-          await resolveMention(userId, mentionId, person.id);
-        } else {
-          mentionId = await createMention(userId, {
-            mentionedName: mention.name,
-            sourceTool,
-            sourceRecordId,
-            sourceField,
-            personId: person.id,
-          });
-          await resolveMention(userId, mentionId, person.id);
+        if (existing?.resolved && existing.personId) {
+          resolvedPersonIds.add(existing.personId);
+          continue;
         }
 
-        const body = extractSurroundingSentence(text, mention.start, mention.end);
-        const existingInteraction = await getExistingInteraction(userId, person.id, sourceTool, sourceRecordId);
-        let interactionId: string;
-        if (existingInteraction) {
-          await updateInteraction(existingInteraction.id, userId, interactionTitle, body || null, at);
-          interactionId = existingInteraction.id;
-        } else {
-          interactionId = await addInteraction(userId, person.id, {
-            title: interactionTitle,
-            body: body || null,
-            occurredAt: at.toISOString(),
-            sourceTool,
-            sourceRecordId,
-          });
-        }
+        const candidates = await findPersonByName(userId, mention.name);
 
-        result.resolved.push({ name: mention.name, personId: person.id, interactionId });
-      } else if (candidates.length === 0) {
-        if (!existing) {
-          const mentionId = await createMention(userId, {
-            mentionedName: mention.name,
-            sourceTool,
-            sourceRecordId,
-            sourceField,
-            personId: null,
-          });
-          result.unresolved.push({ name: mention.name, mentionId });
-        } else {
-          result.unresolved.push({ name: mention.name, mentionId: existing.id });
-        }
-      } else {
-        // Ambiguous — more than one person matches.
-        const mentionId = existing
-          ? existing.id
-          : await createMention(userId, {
+        if (candidates.length === 1) {
+          const person = candidates[0]!;
+
+          let mentionId: string;
+          if (existing) {
+            mentionId = existing.id;
+            await resolveMention(userId, mentionId, person.id);
+          } else {
+            mentionId = await createMention(userId, {
+              mentionedName: mention.name,
+              sourceTool,
+              sourceRecordId,
+              sourceField,
+              personId: person.id,
+            });
+            await resolveMention(userId, mentionId, person.id);
+          }
+
+          const body = extractSurroundingSentence(text, mention.start, mention.end);
+          const existingInteraction = await getExistingInteraction(userId, person.id, sourceTool, sourceRecordId);
+          let interactionId: string;
+          if (existingInteraction) {
+            await updateInteraction(existingInteraction.id, userId, interactionTitle, body || null, at);
+            interactionId = existingInteraction.id;
+          } else {
+            interactionId = await addInteraction(userId, person.id, {
+              title: interactionTitle,
+              body: body || null,
+              occurredAt: at.toISOString(),
+              sourceTool,
+              sourceRecordId,
+            });
+          }
+
+          resolvedPersonIds.add(person.id);
+          result.resolved.push({ name: mention.name, personId: person.id, interactionId });
+        } else if (candidates.length === 0) {
+          if (!existing) {
+            const mentionId = await createMention(userId, {
               mentionedName: mention.name,
               sourceTool,
               sourceRecordId,
               sourceField,
               personId: null,
             });
-        result.ambiguous.push({
-          name: mention.name,
-          candidates: candidates.map((c) => ({ id: c.id, displayName: c.displayName })),
-        });
-        result.unresolved.push({ name: mention.name, mentionId });
+            result.unresolved.push({ name: mention.name, mentionId });
+          } else {
+            result.unresolved.push({ name: mention.name, mentionId: existing.id });
+          }
+        } else {
+          const mentionId = existing
+            ? existing.id
+            : await createMention(userId, {
+                mentionedName: mention.name,
+                sourceTool,
+                sourceRecordId,
+                sourceField,
+                personId: null,
+              });
+          result.ambiguous.push({
+            name: mention.name,
+            candidates: candidates.map((c) => ({ id: c.id, displayName: c.displayName })),
+          });
+          result.unresolved.push({ name: mention.name, mentionId });
+        }
+      } catch (e) {
+        console.error("[mention-processor] failed processing mention", mention.name, e);
       }
-    } catch (e) {
-      console.error("[mention-processor] failed processing mention", mention.name, e);
     }
   }
 
   // ── Insight processing ──────────────────────────────────────────────────
-  try {
-    await ensureInsightTables();
-    const insights = parseInsights(text);
-    // Idempotent: wipe previous insights for this source field before re-inserting
-    await deleteInsightsForSource(userId, sourceTool, sourceRecordId, sourceField);
+  if (insights.length > 0) {
+    try {
+      await ensureInsightTables();
+      await deleteInsightsForSource(userId, sourceTool, sourceRecordId, sourceField);
 
-    const resolvedPersonIds = result.resolved.map((r) => r.personId);
-    for (const insight of insights) {
-      try {
-        const created = await createInsight({
-          userId,
-          sourceTool,
-          sourceRecordId,
-          sourceField,
-          occurredAt: at,
-          text: insight.text,
-          kind: insight.kind,
-        });
-        for (const personId of resolvedPersonIds) {
-          await linkInsightToPerson(created.id, personId, userId);
+      const personIds = [...resolvedPersonIds];
+      for (const insight of insights) {
+        try {
+          const created = await createInsight({
+            userId,
+            sourceTool,
+            sourceRecordId,
+            sourceField,
+            occurredAt: at,
+            text: insight.text,
+            kind: insight.kind,
+          });
+          for (const personId of personIds) {
+            await linkInsightToPerson(created.id, personId, userId);
+          }
+        } catch (e) {
+          console.error("[mention-processor] failed creating insight", e);
         }
-      } catch (e) {
-        console.error("[mention-processor] failed creating insight", e);
       }
+    } catch (e) {
+      console.error("[mention-processor] insight processing failed", e);
     }
-  } catch (e) {
-    console.error("[mention-processor] insight processing failed", e);
   }
 
   return result;

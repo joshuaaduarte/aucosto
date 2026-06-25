@@ -436,7 +436,7 @@ export function EntryModal({
               defaultValue={entry?.notes ?? ""}
               placeholder="A quick thought about this session..."
               className="field min-h-[64px] resize-y"
-              helperText="Type @ to link a Rolodex person."
+              helperText="Type @ to link a person · @insight to capture a takeaway"
             />
           </div>
 

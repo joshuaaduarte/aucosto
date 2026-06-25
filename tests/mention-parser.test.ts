@@ -140,6 +140,11 @@ describe("parseMentions", () => {
     expect(result[0]!.name).toBe("Ana");
   });
 
+  it("returns empty for standalone @insight note with no people", () => {
+    const result = parseMentions("@insight Something useful.");
+    expect(result).toHaveLength(0);
+  });
+
   it("filters @insight from mentionNames too", () => {
     const names = mentionNames("@insight Remember this. @Bob knows.");
     expect(names).toEqual(["Bob"]);
@@ -206,5 +211,10 @@ describe("parseInsights", () => {
   it("skips empty @insight with no body", () => {
     const result = parseInsights("@insight ");
     expect(result).toHaveLength(0);
+  });
+
+  it("returns empty when no @insight markers present", () => {
+    expect(parseInsights("No markers here.")).toHaveLength(0);
+    expect(parseInsights("Just @Ana mentioned")).toHaveLength(0);
   });
 });
