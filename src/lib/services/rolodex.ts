@@ -159,101 +159,102 @@ let rolodexTablesReady: Promise<void> | null = null;
 
 export function ensureRolodexTables(): Promise<void> {
   if (!rolodexTablesReady) {
-    rolodexTablesReady = (async () => {
-      await prisma.$executeRawUnsafe(`
-        CREATE TABLE IF NOT EXISTS "RolodexPerson" (
-          "id"                TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-          "userId"            TEXT NOT NULL,
-          "displayName"       TEXT NOT NULL,
-          "firstName"         TEXT,
-          "lastName"          TEXT,
-          "aliases"           TEXT,
-          "relationshipType"  TEXT,
-          "organization"      TEXT,
-          "role"              TEXT,
-          "emails"            TEXT,
-          "phones"            TEXT,
-          "addresses"         TEXT,
-          "socials"           TEXT,
-          "birthday"          TIMESTAMPTZ,
-          "importantDates"    TEXT,
-          "notes"             TEXT,
-          "preferences"       TEXT,
-          "giftIdeas"         TEXT,
-          "communicationNotes" TEXT,
-          "collaborationNotes" TEXT,
-          "sensitivities"     TEXT,
-          "createdAt"         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          "updatedAt"         TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-      `);
-      await prisma.$executeRawUnsafe(`
-        CREATE INDEX IF NOT EXISTS "RolodexPerson_userId_idx"
-          ON "RolodexPerson" ("userId")
-      `);
-      await prisma.$executeRawUnsafe(`
-        CREATE INDEX IF NOT EXISTS "RolodexPerson_userId_displayName_idx"
-          ON "RolodexPerson" ("userId", "displayName")
-      `);
-
-      await prisma.$executeRawUnsafe(`
-        CREATE TABLE IF NOT EXISTS "RolodexInteraction" (
-          "id"             TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-          "userId"         TEXT NOT NULL,
-          "personId"       TEXT NOT NULL
-                             REFERENCES "RolodexPerson"("id") ON DELETE CASCADE,
-          "sourceTool"     TEXT,
-          "sourceRecordId" TEXT,
-          "occurredAt"     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          "title"          TEXT NOT NULL,
-          "body"           TEXT,
-          "followUpNeeded" BOOLEAN NOT NULL DEFAULT false,
-          "followUpDate"   TIMESTAMPTZ,
-          "createdAt"      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-      `);
-      await prisma.$executeRawUnsafe(`
-        CREATE INDEX IF NOT EXISTS "RolodexInteraction_userId_idx"
-          ON "RolodexInteraction" ("userId")
-      `);
-      await prisma.$executeRawUnsafe(`
-        CREATE INDEX IF NOT EXISTS "RolodexInteraction_personId_occurredAt_idx"
-          ON "RolodexInteraction" ("personId", "occurredAt" DESC)
-      `);
-
-      await prisma.$executeRawUnsafe(`
-        CREATE TABLE IF NOT EXISTS "RolodexMention" (
-          "id"             TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-          "userId"         TEXT NOT NULL,
-          "personId"       TEXT REFERENCES "RolodexPerson"("id") ON DELETE SET NULL,
-          "mentionedName"  TEXT NOT NULL,
-          "resolved"       BOOLEAN NOT NULL DEFAULT false,
-          "sourceTool"     TEXT NOT NULL,
-          "sourceRecordId" TEXT NOT NULL,
-          "sourceField"    TEXT,
-          "createdAt"      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-      `);
-      await prisma.$executeRawUnsafe(`
-        CREATE INDEX IF NOT EXISTS "RolodexMention_userId_idx"
-          ON "RolodexMention" ("userId")
-      `);
-      await prisma.$executeRawUnsafe(`
-        CREATE INDEX IF NOT EXISTS "RolodexMention_userId_resolved_idx"
-          ON "RolodexMention" ("userId", "resolved")
-      `);
-      await prisma.$executeRawUnsafe(`
-        CREATE INDEX IF NOT EXISTS "RolodexMention_personId_idx"
-          ON "RolodexMention" ("personId")
-      `);
-    })()
-      .then(() => undefined)
-      .catch((error) => {
-        rolodexTablesReady = null;
-        console.error("[rolodex] ensureRolodexTables failed", error);
-      });
+    rolodexTablesReady = _createRolodexTables();
   }
-  return rolodexTablesReady!;
+  return rolodexTablesReady;
+}
+
+async function _createRolodexTables(): Promise<void> {
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "RolodexPerson" (
+        "id"                TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "userId"            TEXT NOT NULL,
+        "displayName"       TEXT NOT NULL,
+        "firstName"         TEXT,
+        "lastName"          TEXT,
+        "aliases"           TEXT,
+        "relationshipType"  TEXT,
+        "organization"      TEXT,
+        "role"              TEXT,
+        "emails"            TEXT,
+        "phones"            TEXT,
+        "addresses"         TEXT,
+        "socials"           TEXT,
+        "birthday"          TIMESTAMPTZ,
+        "importantDates"    TEXT,
+        "notes"             TEXT,
+        "preferences"       TEXT,
+        "giftIdeas"         TEXT,
+        "communicationNotes" TEXT,
+        "collaborationNotes" TEXT,
+        "sensitivities"     TEXT,
+        "createdAt"         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        "updatedAt"         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "RolodexPerson_userId_idx"
+        ON "RolodexPerson" ("userId")
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "RolodexPerson_userId_displayName_idx"
+        ON "RolodexPerson" ("userId", "displayName")
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "RolodexInteraction" (
+        "id"             TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "userId"         TEXT NOT NULL,
+        "personId"       TEXT NOT NULL
+                           REFERENCES "RolodexPerson"("id") ON DELETE CASCADE,
+        "sourceTool"     TEXT,
+        "sourceRecordId" TEXT,
+        "occurredAt"     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        "title"          TEXT NOT NULL,
+        "body"           TEXT,
+        "followUpNeeded" BOOLEAN NOT NULL DEFAULT false,
+        "followUpDate"   TIMESTAMPTZ,
+        "createdAt"      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "RolodexInteraction_userId_idx"
+        ON "RolodexInteraction" ("userId")
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "RolodexInteraction_personId_occurredAt_idx"
+        ON "RolodexInteraction" ("personId", "occurredAt" DESC)
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "RolodexMention" (
+        "id"             TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "userId"         TEXT NOT NULL,
+        "personId"       TEXT REFERENCES "RolodexPerson"("id") ON DELETE SET NULL,
+        "mentionedName"  TEXT NOT NULL,
+        "resolved"       BOOLEAN NOT NULL DEFAULT false,
+        "sourceTool"     TEXT NOT NULL,
+        "sourceRecordId" TEXT NOT NULL,
+        "sourceField"    TEXT,
+        "createdAt"      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "RolodexMention_userId_idx"
+        ON "RolodexMention" ("userId")
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "RolodexMention_userId_resolved_idx"
+        ON "RolodexMention" ("userId", "resolved")
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "RolodexMention_personId_idx"
+        ON "RolodexMention" ("personId")
+    `);
+  } catch (error) {
+    rolodexTablesReady = null;
+    console.error("[rolodex] ensureRolodexTables failed", error);
+    throw error;
+  }
 }
 
 // ── Row → type mappers ────────────────────────────────────────────────────

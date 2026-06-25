@@ -37,17 +37,24 @@ function extractSurroundingSentence(text: string, start: number, end: number): s
   return text.slice(sentenceStart, sentenceEnd).trim();
 }
 
-/** Check if a mention with these exact coordinates already exists (dedup guard). */
-async function mentionAlreadyExists(
+/**
+ * Look up an existing mention for this exact (userId, sourceTool, sourceRecordId,
+ * sourceField, mentionedName) key.  Returns the row if found so callers can check
+ * whether it is already resolved — unresolved mentions should be retried when the
+ * person is eventually added to the Rolodex.
+ */
+async function getExistingMention(
   userId: string,
   sourceTool: string,
   sourceRecordId: string,
   sourceField: string,
   mentionedName: string,
-): Promise<boolean> {
+): Promise<{ id: string; resolved: boolean; personId: string | null } | null> {
   try {
-    const rows = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
-      `SELECT "id" FROM "RolodexMention"
+    const rows = await prisma.$queryRawUnsafe<
+      Array<{ id: string; resolved: boolean; personId: string | null }>
+    >(
+      `SELECT "id", "resolved", "personId" FROM "RolodexMention"
        WHERE "userId" = $1 AND "sourceTool" = $2 AND "sourceRecordId" = $3
          AND "sourceField" = $4 AND "mentionedName" = $5
        LIMIT 1`,
@@ -57,9 +64,9 @@ async function mentionAlreadyExists(
       sourceField,
       mentionedName,
     );
-    return rows.length > 0;
+    return rows[0] ?? null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -95,28 +102,39 @@ export async function processMentions(
 
   for (const mention of mentions) {
     try {
-      // Dedup: skip if we already recorded this mention for this record
-      const exists = await mentionAlreadyExists(
+      const existing = await getExistingMention(
         userId,
         sourceTool,
         sourceRecordId,
         sourceField,
         mention.name,
       );
-      if (exists) continue;
 
+      // Already fully resolved — nothing more to do for this mention.
+      if (existing?.resolved) continue;
+
+      // If unresolved mention exists, re-try the person lookup so that a person
+      // added to the Rolodex after the note was first saved gets linked.
       const candidates = await findPersonByName(userId, mention.name);
 
       if (candidates.length === 1) {
         const person = candidates[0]!;
-        const mentionId = await createMention(userId, {
-          mentionedName: mention.name,
-          sourceTool,
-          sourceRecordId,
-          sourceField,
-          personId: person.id,
-        });
-        await resolveMention(userId, mentionId, person.id);
+
+        let mentionId: string;
+        if (existing) {
+          // Reuse the unresolved mention row — just resolve it in-place.
+          mentionId = existing.id;
+          await resolveMention(userId, mentionId, person.id);
+        } else {
+          mentionId = await createMention(userId, {
+            mentionedName: mention.name,
+            sourceTool,
+            sourceRecordId,
+            sourceField,
+            personId: person.id,
+          });
+          await resolveMention(userId, mentionId, person.id);
+        }
 
         const body = extractSurroundingSentence(text, mention.start, mention.end);
         const interactionId = await addInteraction(userId, person.id, {
@@ -129,22 +147,29 @@ export async function processMentions(
 
         result.resolved.push({ name: mention.name, personId: person.id, interactionId });
       } else if (candidates.length === 0) {
-        const mentionId = await createMention(userId, {
-          mentionedName: mention.name,
-          sourceTool,
-          sourceRecordId,
-          sourceField,
-          personId: null,
-        });
-        result.unresolved.push({ name: mention.name, mentionId });
+        if (!existing) {
+          const mentionId = await createMention(userId, {
+            mentionedName: mention.name,
+            sourceTool,
+            sourceRecordId,
+            sourceField,
+            personId: null,
+          });
+          result.unresolved.push({ name: mention.name, mentionId });
+        } else {
+          result.unresolved.push({ name: mention.name, mentionId: existing.id });
+        }
       } else {
-        const mentionId = await createMention(userId, {
-          mentionedName: mention.name,
-          sourceTool,
-          sourceRecordId,
-          sourceField,
-          personId: null,
-        });
+        // Ambiguous — more than one person matches.
+        const mentionId = existing
+          ? existing.id
+          : await createMention(userId, {
+              mentionedName: mention.name,
+              sourceTool,
+              sourceRecordId,
+              sourceField,
+              personId: null,
+            });
         result.ambiguous.push({
           name: mention.name,
           candidates: candidates.map((c) => ({ id: c.id, displayName: c.displayName })),
