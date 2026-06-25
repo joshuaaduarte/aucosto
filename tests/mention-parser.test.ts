@@ -89,4 +89,48 @@ describe("parseMentions", () => {
     expect(names).toContain("Bob");
     expect(names).toHaveLength(2);
   });
+
+  // Bracket form @[Full Name] — inserted by the mention picker for names with spaces
+  it("extracts bracket-form @[Full Name]", () => {
+    const result = parseMentions("Worked with @[Ana Duarte] today");
+    expect(result).toHaveLength(1);
+    expect(result[0]!.name).toBe("Ana Duarte");
+  });
+
+  it("bracket-form records correct start and end positions", () => {
+    const result = parseMentions("Met @[Ana Duarte] yesterday");
+    expect(result[0]!.start).toBe(4);
+    expect(result[0]!.end).toBe(17); // "@[Ana Duarte]" = 13 chars, starts at 4
+  });
+
+  it("bracket-form deduplicates same name", () => {
+    const result = parseMentions("@[Ana Duarte] and @[Ana Duarte] again");
+    expect(result).toHaveLength(1);
+    expect(result[0]!.name).toBe("Ana Duarte");
+  });
+
+  it("mixes bracket-form and bare-form mentions", () => {
+    const names = mentionNames("With @[Ana Duarte] and @Bob");
+    expect(names).toContain("Ana Duarte");
+    expect(names).toContain("Bob");
+    expect(names).toHaveLength(2);
+  });
+
+  it("bracket-form at start of string", () => {
+    const result = parseMentions("@[Ana Duarte] reviewed this");
+    expect(result).toHaveLength(1);
+    expect(result[0]!.name).toBe("Ana Duarte");
+    expect(result[0]!.start).toBe(0);
+  });
+
+  it("bracket-form with three-word name", () => {
+    const result = parseMentions("Thanks @[Mary Jane Watson]");
+    expect(result).toHaveLength(1);
+    expect(result[0]!.name).toBe("Mary Jane Watson");
+  });
+
+  it("ignores empty brackets @[]", () => {
+    const result = parseMentions("@[] is not a mention");
+    expect(result).toHaveLength(0);
+  });
 });
