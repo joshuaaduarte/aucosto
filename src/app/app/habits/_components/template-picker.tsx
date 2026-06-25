@@ -47,7 +47,7 @@ export function TemplatePicker({
         borderColor: "var(--border-soft)",
         background: "var(--bg-page)",
         paddingBottom:
-          "calc(1rem + var(--mobile-tabbar-height) + var(--timer-bar-height, 0px) + var(--safe-area-bottom, 0px))",
+          "calc(var(--safe-area-bottom, 0px) + var(--mobile-tabbar-height, 0px) + var(--timer-bar-height, 0px) + 3.5rem + 1rem)",
       }}
     >
       <div className="flex items-start justify-between gap-3">
