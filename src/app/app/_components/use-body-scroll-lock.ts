@@ -6,28 +6,48 @@
 // and so a double-fired effect (React dev double-invoke, a modal that
 // re-locks before its sibling unlocks) can never desync the count, since
 // Set add/delete are idempotent per token.
+//
+// iOS Safari ignores `overflow: hidden` on body for scroll-event propagation.
+// `position: fixed` on body is the only reliable way to prevent the page from
+// scrolling through a modal when the modal's inner scroller hits its boundary.
+// We save/restore scrollY so the page position is unchanged after the modal
+// closes.
 
 import { useEffect, useId } from "react";
 
 const lockTokens = new Set<string>();
+let savedScrollY = 0;
 
-function applyLockState() {
-  const value = lockTokens.size > 0 ? "hidden" : "";
-  document.body.style.overflow = value;
-  // Some browsers (Firefox, iOS Safari) use the html element as the scroll
-  // container rather than body. Lock both so the page stays put in all cases.
-  document.documentElement.style.overflow = value;
+function applyLock() {
+  savedScrollY = window.scrollY;
+  document.body.style.position = "fixed";
+  document.body.style.top = `-${savedScrollY}px`;
+  document.body.style.left = "0";
+  document.body.style.right = "0";
+  document.body.style.overflow = "hidden";
+  document.documentElement.style.overflow = "hidden";
+}
+
+function releaseLock() {
+  document.body.style.position = "";
+  document.body.style.top = "";
+  document.body.style.left = "";
+  document.body.style.right = "";
+  document.body.style.overflow = "";
+  document.documentElement.style.overflow = "";
+  window.scrollTo(0, savedScrollY);
 }
 
 export function useBodyScrollLock(active: boolean = true) {
   const id = useId();
   useEffect(() => {
     if (!active) return;
+    const isFirst = lockTokens.size === 0;
     lockTokens.add(id);
-    applyLockState();
+    if (isFirst) applyLock();
     return () => {
       lockTokens.delete(id);
-      applyLockState();
+      if (lockTokens.size === 0) releaseLock();
     };
   }, [active, id]);
 }

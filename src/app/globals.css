@@ -478,6 +478,9 @@ body > * {
   padding: 0;
   background: rgba(15, 15, 15, 0.36);
   backdrop-filter: blur(6px);
+  /* Prevent touch events on the backdrop itself from being interpreted as
+     scroll gestures that could bleed through to the page. */
+  touch-action: none;
 }
 
 .calendar-modal {
@@ -487,6 +490,9 @@ body > * {
   /* dvh tracks the *visible* viewport on mobile (URL bar collapse etc.). */
   max-height: min(88dvh, 50rem);
   overflow-y: auto;
+  /* When the inner scroll hits its boundary, do not propagate the gesture to
+     the page behind the modal (iOS Safari scroll-bleed prevention). */
+  overscroll-behavior: contain;
   border: 1px solid var(--border-soft);
   border-bottom: none;
   border-radius: 1rem 1rem 0 0;
