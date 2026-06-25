@@ -8,6 +8,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { PRESET_TIME_CATEGORIES } from "@/lib/time-categories";
 import { fillIsoWindowFields } from "@/lib/wall-clock";
+import { MentionTextarea } from "@/components/mention-textarea";
 import { saveEntryAction, type EntryFormState } from "./actions";
 import { useBodyScrollLock } from "../_components/use-body-scroll-lock";
 
@@ -429,12 +430,13 @@ export function EntryModal({
               Note{" "}
               <span style={{ color: "var(--text-faint)" }}>(optional)</span>
             </label>
-            <textarea
+            <MentionTextarea
               id="entry-editor-notes"
               name="notes"
               defaultValue={entry?.notes ?? ""}
               placeholder="A quick thought about this session..."
               className="field min-h-[64px] resize-y"
+              helperText="Type @ to link a Rolodex person."
             />
           </div>
 

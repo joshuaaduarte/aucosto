@@ -1,4 +1,5 @@
 import type { CalendarItem } from "@/generated/prisma/client";
+import { MentionTextarea } from "@/components/mention-textarea";
 import {
   addDays,
   formatCalendarTimeRange,
@@ -245,11 +246,13 @@ export function CalendarItemCard({
                 >
                   Notes
                 </label>
-                <input
+                <MentionTextarea
                   id={`notes-${item.id}`}
                   name="notes"
                   defaultValue={item.notes ?? ""}
-                  className="field"
+                  rows={2}
+                  className="field min-h-[64px] resize-y"
+                  helperText="Type @ to link a Rolodex person."
                 />
               </div>
             </div>

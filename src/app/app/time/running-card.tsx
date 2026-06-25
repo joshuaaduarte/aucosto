@@ -3,6 +3,7 @@
 import { cloneElement, isValidElement, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { formatMinutes } from "@/lib/do";
+import { MentionTextarea } from "@/components/mention-textarea";
 import {
   stopEntry,
   stopEntryAndCompleteDoItem,
@@ -398,11 +399,13 @@ export function RunningCard({
                 >
                   Notes
                 </label>
-                <input
+                <MentionTextarea
                   id="reflection-notes"
                   name="notes"
-                  className="field"
+                  rows={2}
+                  className="field min-h-[64px] resize-y"
                   placeholder="Anything to remember for next time?"
+                  helperText="Type @ to link a Rolodex person."
                 />
               </div>
 
@@ -531,11 +534,13 @@ export function RunningCard({
                 >
                   Notes
                 </label>
-                <input
+                <MentionTextarea
                   id="habit-reflection-notes"
                   name="notes"
-                  className="field"
+                  rows={2}
+                  className="field min-h-[64px] resize-y"
                   placeholder="What did you finish or learn?"
+                  helperText="Type @ to link a Rolodex person."
                 />
               </div>
 

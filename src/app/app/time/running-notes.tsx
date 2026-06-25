@@ -8,6 +8,7 @@
 // truth; the save is fire-and-forget (see updateEntryNotes).
 
 import { useEffect, useRef, useState } from "react";
+import { MentionTextarea } from "@/components/mention-textarea";
 import { updateEntryNotes } from "./actions";
 
 export function RunningNotes({
@@ -91,7 +92,7 @@ export function RunningNotes({
 
   return (
     <div className="mt-3">
-      <textarea
+      <MentionTextarea
         ref={textareaRef}
         rows={1}
         value={notes}
@@ -101,6 +102,7 @@ export function RunningNotes({
         aria-label="Notes for this session"
         className="field w-full resize-none overflow-hidden"
         style={{ minHeight: "2.5rem" }}
+        helperText="Type @ to link a Rolodex person."
       />
     </div>
   );

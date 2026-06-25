@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { DO_BUCKET_SUGGESTIONS, DO_LANE_LABELS, DO_LANES } from "@/lib/do";
+import { MentionTextarea } from "@/components/mention-textarea";
 import { createDoItemAction, type DoState } from "./actions";
 import { useBodyScrollLock } from "../_components/use-body-scroll-lock";
 
@@ -284,12 +285,14 @@ export function DoCreateForm({
                 >
                   Notes <span style={{ color: "var(--text-faint)" }}>(optional)</span>
                 </label>
-                <input
+                <MentionTextarea
                   id="do-notes"
                   name="notes"
-                  className="field"
+                  rows={2}
+                  className="field min-h-[64px] resize-y"
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
+                  helperText="Type @ to link a Rolodex person."
                 />
               </div>
 

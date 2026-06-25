@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import type { ProjectPlan } from "@/lib/services/project-planning";
+import { MentionTextarea } from "@/components/mention-textarea";
 import {
   updateProjectPlanAction,
   addProjectQuestionAction,
@@ -57,13 +58,14 @@ function InlineEdit({
   return (
     <div className="space-y-1.5">
       {multiline ? (
-        <textarea
+        <MentionTextarea
           autoFocus
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           rows={3}
           className="field w-full resize-none text-[0.875rem]"
           placeholder={placeholder}
+          helperText="Type @ to link a Rolodex person."
         />
       ) : (
         <input
@@ -161,15 +163,15 @@ function ArrayField({
         </div>
       ))}
       <div className="flex gap-1.5">
-        <input
-          type="text"
+        <MentionTextarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") { e.preventDefault(); handleAdd(); }
           }}
           placeholder={placeholder}
-          className="field flex-1 text-[0.8125rem]"
+          rows={1}
+          className="field min-h-[2.25rem] flex-1 resize-none text-[0.8125rem]"
         />
         <button
           type="button"

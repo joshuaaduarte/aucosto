@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { formatMinutes } from "@/lib/do";
 import { fillIsoWindowFields } from "@/lib/wall-clock";
+import { MentionTextarea } from "@/components/mention-textarea";
 import { createCalendarBlockAction } from "./actions";
 import { CategoryPicker, type PickableCategory } from "./_components/category-picker";
 import { useBodyScrollLock } from "../_components/use-body-scroll-lock";
@@ -423,12 +424,14 @@ export function CalendarQuickAddModal({
                   >
                     Notes
                   </label>
-                  <input
+                  <MentionTextarea
                     id="quick-notes"
                     name="notes"
-                    className="field"
+                    rows={2}
+                    className="field min-h-[64px] resize-y"
                     value={notes}
                     onChange={(event) => setNotes(event.target.value)}
+                    helperText="Type @ to link a Rolodex person."
                   />
                 </div>
               </div>

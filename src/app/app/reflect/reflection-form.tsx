@@ -10,6 +10,7 @@ import {
   RATING_FIELDS,
   type ReflectionRatingField,
 } from "@/lib/reflect";
+import { MentionTextarea } from "@/components/mention-textarea";
 import { saveReflectionAction, type ReflectionFormState } from "./actions";
 
 const initialState: ReflectionFormState = undefined;
@@ -185,12 +186,13 @@ function TextField({
         {label}{" "}
         <span style={{ color: "var(--text-faint)" }}>(optional)</span>
       </label>
-      <textarea
+      <MentionTextarea
         id={id}
         name={name}
         defaultValue={defaultValue}
         placeholder={placeholder}
         className="field min-h-[88px] resize-y"
+        helperText="Type @ to link a Rolodex person."
       />
     </div>
   );
