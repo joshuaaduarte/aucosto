@@ -28,6 +28,7 @@ export interface RolodexPersonSummary {
   firstName: string | null;
   lastName: string | null;
   aliases: string[];
+  contactKind: string;
   relationshipType: string | null;
   organization: string | null;
   birthday: string | null;
@@ -85,6 +86,7 @@ export interface CreatePersonInput {
   phones?: ContactField[];
   addresses?: ContactField[];
   socials?: SocialLink[];
+  contactKind?: string;
   birthday?: string | null;
   importantDates?: LabeledDate[];
   notes?: string | null;
@@ -203,6 +205,10 @@ async function _createRolodexTables(): Promise<void> {
         ON "RolodexPerson" ("userId", "displayName")
     `);
     await prisma.$executeRawUnsafe(`
+      ALTER TABLE "RolodexPerson"
+        ADD COLUMN IF NOT EXISTS "contactKind" TEXT NOT NULL DEFAULT 'person'
+    `);
+    await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "RolodexInteraction" (
         "id"             TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         "userId"         TEXT NOT NULL,
@@ -270,6 +276,7 @@ type PersonRow = {
   relationshipType: string | null;
   organization: string | null;
   role: string | null;
+  contactKind: string;
   emails: string | null;
   phones: string | null;
   addresses: string | null;
@@ -307,6 +314,7 @@ function rowToSummary(row: PersonRow & { lastInteractionAt?: Date | null }): Rol
     firstName: row.firstName,
     lastName: row.lastName,
     aliases: parseJsonArray<string>(row.aliases),
+    contactKind: row.contactKind ?? "person",
     relationshipType: row.relationshipType,
     organization: row.organization,
     birthday: isoString(row.birthday),
@@ -352,13 +360,14 @@ function rowToInteraction(row: InteractionRow): RolodexInteraction {
 
 export async function listPersons(
   userId: string,
-  opts: { search?: string; relationshipType?: string } = {},
+  opts: { search?: string; relationshipType?: string; contactKind?: string } = {},
 ): Promise<RolodexPersonSummary[]> {
   requireCan(userId, "rolodex", "read");
   try {
     const rows = await prisma.$queryRawUnsafe<(PersonRow & { lastInteractionAt: Date | null })[]>(
       `SELECT p.id, p."userId", p."displayName", p."firstName", p."lastName", p.aliases,
               p."relationshipType", p.organization, p.role, p.birthday, p."createdAt", p."updatedAt",
+              COALESCE(p."contactKind", 'person') AS "contactKind",
               NULL::text AS emails, NULL::text AS phones, NULL::text AS addresses,
               NULL::text AS socials, NULL::text AS "importantDates",
               NULL::text AS notes, NULL::text AS preferences,
@@ -383,6 +392,10 @@ export async function listPersons(
           (p.organization?.toLowerCase().includes(lower) ?? false) ||
           p.aliases.some((a) => a.toLowerCase().includes(lower)),
       );
+    }
+
+    if (opts.contactKind) {
+      result = result.filter((p) => p.contactKind === opts.contactKind);
     }
 
     if (opts.relationshipType) {
@@ -427,13 +440,13 @@ export async function createPerson(
   await prisma.$executeRawUnsafe(
     `INSERT INTO "RolodexPerson" (
        "id", "userId", "displayName", "firstName", "lastName", "aliases",
-       "relationshipType", "organization", "role", "emails", "phones",
+       "relationshipType", "organization", "role", "contactKind", "emails", "phones",
        "addresses", "socials", "birthday", "importantDates", "notes",
        "preferences", "giftIdeas", "communicationNotes", "collaborationNotes",
        "sensitivities", "createdAt", "updatedAt"
      ) VALUES (
-       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-       $14::timestamptz, $15, $16, $17, $18, $19, $20, $21, NOW(), NOW()
+       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+       $15::timestamptz, $16, $17, $18, $19, $20, $21, $22, NOW(), NOW()
      )`,
     id,
     userId,
@@ -444,6 +457,7 @@ export async function createPerson(
     data.relationshipType ?? null,
     data.organization?.trim() ?? null,
     data.role?.trim() ?? null,
+    data.contactKind ?? "person",
     data.emails?.length ? JSON.stringify(data.emails) : null,
     data.phones?.length ? JSON.stringify(data.phones) : null,
     data.addresses?.length ? JSON.stringify(data.addresses) : null,
@@ -493,7 +507,11 @@ export async function updatePerson(
   if (patch.phones !== undefined) add("phones", patch.phones?.length ? JSON.stringify(patch.phones) : null);
   if (patch.addresses !== undefined) add("addresses", patch.addresses?.length ? JSON.stringify(patch.addresses) : null);
   if (patch.socials !== undefined) add("socials", patch.socials?.length ? JSON.stringify(patch.socials) : null);
-  if (patch.birthday !== undefined) add("birthday", patch.birthday ?? null);
+  if (patch.contactKind !== undefined) add("contactKind", patch.contactKind);
+  if (patch.birthday !== undefined) {
+    sets.push(`"birthday" = $${idx++}::timestamptz`);
+    values.push(patch.birthday ?? null);
+  }
   if (patch.importantDates !== undefined) add("importantDates", patch.importantDates?.length ? JSON.stringify(patch.importantDates) : null);
   if (patch.notes !== undefined) add("notes", patch.notes?.trim() ?? null);
   if (patch.preferences !== undefined) add("preferences", patch.preferences?.trim() ?? null);

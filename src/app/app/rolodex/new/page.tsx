@@ -1,8 +1,14 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import { createPersonAction, type RolodexFormState } from "../actions";
+
+const CONTACT_KINDS = [
+  { value: "person", label: "Person" },
+  { value: "pet", label: "Pet" },
+  { value: "organization", label: "Organization" },
+];
 
 const RELATIONSHIP_TYPES = [
   { value: "", label: "Select type…" },
@@ -11,6 +17,8 @@ const RELATIONSHIP_TYPES = [
   { value: "coworker", label: "Coworker" },
   { value: "vendor", label: "Vendor" },
   { value: "acquaintance", label: "Acquaintance" },
+  { value: "pet", label: "Pet" },
+  { value: "organization", label: "Organization" },
   { value: "other", label: "Other" },
 ];
 
@@ -19,6 +27,7 @@ export default function NewPersonPage() {
     createPersonAction,
     undefined,
   );
+  const [contactKind, setContactKind] = useState("person");
 
   return (
     <div className="space-y-6">
@@ -39,6 +48,8 @@ export default function NewPersonPage() {
       </header>
 
       <form action={action} className="fade-in-delay-1 space-y-4">
+        <input type="hidden" name="contactKind" value={contactKind} />
+
         {state?.error && (
           <p
             className="rounded-lg px-3 py-2 text-[0.875rem]"
@@ -49,6 +60,29 @@ export default function NewPersonPage() {
         )}
 
         <div className="space-y-3 rounded-xl p-4" style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)" }}>
+          <div>
+            <label className="mb-1 block text-[0.8125rem] font-medium" style={{ color: "var(--text-muted)" }}>
+              Kind
+            </label>
+            <div className="flex gap-1.5">
+              {CONTACT_KINDS.map((k) => (
+                <button
+                  key={k.value}
+                  type="button"
+                  onClick={() => setContactKind(k.value)}
+                  className="rounded-full px-3 py-1.5 text-[0.8125rem] font-medium transition-colors"
+                  style={{
+                    background: contactKind === k.value ? "var(--text)" : "var(--bg-page)",
+                    color: contactKind === k.value ? "var(--bg-page)" : "var(--text-muted)",
+                    border: "1px solid var(--border-faint)",
+                  }}
+                >
+                  {k.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div>
             <label className="mb-1 block text-[0.8125rem] font-medium" style={{ color: "var(--text-muted)" }}>
               Display name *

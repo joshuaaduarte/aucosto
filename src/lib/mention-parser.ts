@@ -11,7 +11,7 @@ export interface ParsedInsight {
   endOffset: number;
 }
 
-const RESERVED_KEYWORDS = new Set(["insight"]);
+const RESERVED_KEYWORDS = new Set(["insight", "remember", "lesson", "decision"]);
 
 /**
  * Extract all @mentions from a string.

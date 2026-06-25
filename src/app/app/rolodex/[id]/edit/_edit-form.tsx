@@ -5,6 +5,12 @@ import { useActionState, useState, useTransition } from "react";
 import { updatePersonAction, addInteractionAction, type RolodexFormState } from "../../actions";
 import type { RolodexPersonDetail } from "@/lib/services/rolodex";
 
+const CONTACT_KINDS = [
+  { value: "person", label: "Person" },
+  { value: "pet", label: "Pet" },
+  { value: "organization", label: "Organization" },
+];
+
 const RELATIONSHIP_TYPES = [
   { value: "", label: "Select type…" },
   { value: "family", label: "Family" },
@@ -12,6 +18,8 @@ const RELATIONSHIP_TYPES = [
   { value: "coworker", label: "Coworker" },
   { value: "vendor", label: "Vendor" },
   { value: "acquaintance", label: "Acquaintance" },
+  { value: "pet", label: "Pet" },
+  { value: "organization", label: "Organization" },
   { value: "other", label: "Other" },
 ];
 
@@ -26,6 +34,8 @@ export function EditPersonForm({
     updatePersonAction,
     undefined,
   );
+
+  const [contactKind, setContactKind] = useState(person.contactKind ?? "person");
 
   const [intTitle, setIntTitle] = useState("");
   const [intBody, setIntBody] = useState("");
@@ -62,6 +72,7 @@ export function EditPersonForm({
       {/* Edit person form */}
       <form action={updateAction} className="fade-in-delay-1 space-y-4">
         <input type="hidden" name="id" value={id} />
+        <input type="hidden" name="contactKind" value={contactKind} />
 
         {updateState?.error && (
           <p
@@ -82,6 +93,29 @@ export function EditPersonForm({
           >
             Basic info
           </p>
+
+          <div>
+            <label className="mb-1 block text-[0.8125rem] font-medium" style={{ color: "var(--text-muted)" }}>
+              Kind
+            </label>
+            <div className="flex gap-1.5">
+              {CONTACT_KINDS.map((k) => (
+                <button
+                  key={k.value}
+                  type="button"
+                  onClick={() => setContactKind(k.value)}
+                  className="rounded-full px-3 py-1.5 text-[0.8125rem] font-medium transition-colors"
+                  style={{
+                    background: contactKind === k.value ? "var(--text)" : "var(--bg-page)",
+                    color: contactKind === k.value ? "var(--bg-page)" : "var(--text-muted)",
+                    border: "1px solid var(--border-faint)",
+                  }}
+                >
+                  {k.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div>
             <label className="mb-1 block text-[0.8125rem] font-medium" style={{ color: "var(--text-muted)" }}>

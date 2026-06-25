@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import {
+  ensureRolodexTables,
   createPerson,
   updatePerson,
   addInteraction,
@@ -25,11 +26,15 @@ const personSchema = z.object({
   displayName: z.string().trim().min(1, "Display name is required").max(200),
   firstName: z.string().trim().max(100).optional(),
   lastName: z.string().trim().max(100).optional(),
+  contactKind: z.string().trim().max(50).optional(),
   relationshipType: z.string().trim().max(50).optional(),
   organization: z.string().trim().max(200).optional(),
   role: z.string().trim().max(200).optional(),
   birthday: z.string().trim().optional(),
   notes: z.string().trim().max(5000).optional(),
+  communicationNotes: z.string().trim().max(2000).optional(),
+  preferences: z.string().trim().max(2000).optional(),
+  sensitivities: z.string().trim().max(2000).optional(),
 });
 
 function readPersonForm(formData: FormData): ReturnType<typeof personSchema.safeParse> {
@@ -37,11 +42,15 @@ function readPersonForm(formData: FormData): ReturnType<typeof personSchema.safe
     displayName: formData.get("displayName") ?? "",
     firstName: (formData.get("firstName") as string) || undefined,
     lastName: (formData.get("lastName") as string) || undefined,
+    contactKind: (formData.get("contactKind") as string) || undefined,
     relationshipType: (formData.get("relationshipType") as string) || undefined,
     organization: (formData.get("organization") as string) || undefined,
     role: (formData.get("role") as string) || undefined,
     birthday: (formData.get("birthday") as string) || undefined,
     notes: (formData.get("notes") as string) || undefined,
+    communicationNotes: (formData.get("communicationNotes") as string) || undefined,
+    preferences: (formData.get("preferences") as string) || undefined,
+    sensitivities: (formData.get("sensitivities") as string) || undefined,
   });
 }
 
@@ -50,11 +59,15 @@ function personInputFromParsed(data: z.infer<typeof personSchema>): CreatePerson
     displayName: data.displayName,
     firstName: data.firstName || null,
     lastName: data.lastName || null,
+    contactKind: data.contactKind || "person",
     relationshipType: data.relationshipType || null,
     organization: data.organization || null,
     role: data.role || null,
     birthday: data.birthday || null,
     notes: data.notes || null,
+    communicationNotes: data.communicationNotes || null,
+    preferences: data.preferences || null,
+    sensitivities: data.sensitivities || null,
   };
 }
 
@@ -215,6 +228,7 @@ export async function createPersonFromMentionAction(
   const name = displayName.trim();
   if (!name) return { ok: false, error: "Display name is required." };
   try {
+    await ensureRolodexTables();
     const personId = await createPerson(userId, { displayName: name });
     await resolveMention(userId, mentionId, personId);
     revalidateRolodex(personId);
@@ -237,6 +251,7 @@ export async function linkMentionToPersonAction(
   }
   if (!mentionId || !personId) return { ok: false, error: "Missing ids." };
   try {
+    await ensureRolodexTables();
     await resolveMention(userId, mentionId, personId);
     revalidateRolodex(personId);
     return { ok: true, personId };

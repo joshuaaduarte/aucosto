@@ -22,6 +22,18 @@ export interface MentionProcessResult {
   ambiguous: Array<{ name: string; candidates: Array<{ id: string; displayName: string }> }>;
 }
 
+const RESERVED_MENTION_KEYWORDS = new Set(["insight", "remember", "lesson", "decision"]);
+
+/** Strip @insight spans and bare @Name syntax from text so interaction bodies read cleanly. */
+function cleanBodyText(text: string): string {
+  let cleaned = text.replace(/(?<![a-zA-Z0-9_])@insight\s+[^.!?\n]*[.!?\n]?/gi, "");
+  cleaned = cleaned.replace(
+    /(?<![a-zA-Z0-9_])@(?:\[([^\]\n]+)\]|([a-zA-Z]\w*)(?:\s+([A-Z]\w*))?)/g,
+    (_, bracket, first, second) => bracket ?? (second ? `${first} ${second}` : first ?? ""),
+  );
+  return cleaned.replace(/\s{2,}/g, " ").trim();
+}
+
 /** Return the sentence(s) containing the @mention for use as interaction body. */
 function extractSurroundingSentence(text: string, start: number, end: number): string {
   // Find the nearest newline or sentence boundary before `start`
@@ -152,6 +164,7 @@ export async function processMentions(
     }
 
     for (const mention of mentions) {
+      if (RESERVED_MENTION_KEYWORDS.has(mention.name.toLowerCase())) continue;
       try {
         const existing = await getExistingMention(
           userId,
@@ -186,7 +199,8 @@ export async function processMentions(
             await resolveMention(userId, mentionId, person.id);
           }
 
-          const body = extractSurroundingSentence(text, mention.start, mention.end);
+          const rawBody = extractSurroundingSentence(text, mention.start, mention.end);
+          const body = cleanBodyText(rawBody);
           const existingInteraction = await getExistingInteraction(userId, person.id, sourceTool, sourceRecordId);
           let interactionId: string;
           if (existingInteraction) {

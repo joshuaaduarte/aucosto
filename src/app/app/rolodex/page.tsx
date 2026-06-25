@@ -10,13 +10,21 @@ import { UnresolvedMentionsBanner } from "./unresolved-mentions";
 
 export const dynamic = "force-dynamic";
 
-const RELATIONSHIP_FILTERS = [
+const KIND_FILTERS = [
   { value: "", label: "All" },
+  { value: "person", label: "People" },
+  { value: "pet", label: "Pets" },
+  { value: "organization", label: "Orgs" },
+];
+
+const RELATIONSHIP_FILTERS = [
   { value: "family", label: "Family" },
   { value: "friend", label: "Friends" },
   { value: "coworker", label: "Coworkers" },
   { value: "vendor", label: "Vendors" },
   { value: "acquaintance", label: "Acquaintances" },
+  { value: "pet", label: "Pet" },
+  { value: "organization", label: "Organization" },
 ];
 
 function upcomingBirthdayLabel(birthday: string | null): string | null {
@@ -48,7 +56,7 @@ function lastContactLabel(isoDate: string | null): string | null {
 export default async function RolodexPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; type?: string }>;
+  searchParams: Promise<{ q?: string; type?: string; kind?: string }>;
 }) {
   try {
     await ensureRolodexTables();
@@ -56,11 +64,11 @@ export default async function RolodexPage({
     // degrade gracefully — tables may not exist yet
   }
 
-  const { q, type } = await searchParams;
+  const { q, type, kind } = await searchParams;
   const userId = await resolveActiveUserId();
 
   const [persons, unresolvedMentions, pendingFollowUps] = await Promise.all([
-    listPersons(userId, { search: q, relationshipType: type || undefined }).catch(() => []),
+    listPersons(userId, { search: q, relationshipType: type || undefined, contactKind: kind || undefined }).catch(() => []),
     listUnresolvedMentions(userId).catch(() => []),
     listAllPendingFollowUps(userId).catch(() => []),
   ]);
@@ -71,7 +79,7 @@ export default async function RolodexPage({
   const needsFullList =
     unresolvedMentions.length > 0 ||
     pendingFollowUps.length > 0 ||
-    (q || type); // filtered view — attention panel needs all names
+    (q || type || kind); // filtered view — attention panel needs all names
   const allPersons = needsFullList ? await listPersons(userId).catch(() => []) : persons;
 
   const now = new Date();
@@ -107,7 +115,8 @@ export default async function RolodexPage({
   const urgentFollowUps = urgentFollowUpPersonIds
     .map((id) => {
       const person = allPersons.find((p) => p.id === id);
-      return person ? { id: person.id, name: person.displayName, status: followUpStatus.get(id)! } : null;
+      if (!person || person.contactKind === "pet" || person.contactKind === "organization") return null;
+      return { id: person.id, name: person.displayName, status: followUpStatus.get(id)! };
     })
     .filter(Boolean) as Array<{ id: string; name: string; status: "overdue" | "soon" | "pending" }>;
 
@@ -156,18 +165,37 @@ export default async function RolodexPage({
                 className="field flex-1 text-[0.875rem]"
               />
               <input type="hidden" name="type" value={type ?? ""} />
+              <input type="hidden" name="kind" value={kind ?? ""} />
               <button type="submit" className="btn-ghost px-3 py-1.5 text-[0.875rem] font-medium" style={{ color: "var(--text-muted)" }}>
                 Search
               </button>
             </form>
 
             <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 no-scrollbar sm:flex-wrap sm:overflow-x-visible sm:pb-0">
+              {KIND_FILTERS.map((filter) => {
+                const active = (kind ?? "") === filter.value && !type;
+                return (
+                  <Link
+                    key={`kind-${filter.value}`}
+                    href={`/app/rolodex?${filter.value ? `kind=${filter.value}` : ""}${q ? `&q=${q}` : ""}`}
+                    className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 text-[0.8125rem] font-medium transition-colors [@media(pointer:coarse)]:min-h-[2.75rem] [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:items-center"
+                    style={{
+                      background: active ? "var(--text)" : "var(--bg-tint)",
+                      color: active ? "var(--bg-page)" : "var(--text-muted)",
+                      border: "1px solid var(--border-faint)",
+                    }}
+                  >
+                    {filter.label}
+                  </Link>
+                );
+              })}
+              <span className="hidden sm:inline-block self-center text-[0.75rem]" style={{ color: "var(--border)" }}>|</span>
               {RELATIONSHIP_FILTERS.map((filter) => {
                 const active = (type ?? "") === filter.value;
                 return (
                   <Link
-                    key={filter.value}
-                    href={`/app/rolodex?${filter.value ? `type=${filter.value}` : ""}${q ? `&q=${q}` : ""}`}
+                    key={`type-${filter.value}`}
+                    href={`/app/rolodex?type=${filter.value}${q ? `&q=${q}` : ""}`}
                     className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 text-[0.8125rem] font-medium transition-colors [@media(pointer:coarse)]:min-h-[2.75rem] [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:items-center"
                     style={{
                       background: active ? "var(--text)" : "var(--bg-tint)",
@@ -223,8 +251,18 @@ export default async function RolodexPage({
                         {person.displayName.charAt(0).toUpperCase()}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-[0.9375rem] font-semibold" style={{ color: "var(--text)" }}>
-                          {person.displayName}
+                        <p className="flex items-center gap-1.5 truncate text-[0.9375rem] font-semibold" style={{ color: "var(--text)" }}>
+                          <span className="truncate">{person.displayName}</span>
+                          {person.contactKind === "pet" && (
+                            <span className="shrink-0 rounded px-1.5 py-0.5 text-[0.625rem] font-medium" style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)", color: "var(--text-muted)" }}>
+                              🐾 Pet
+                            </span>
+                          )}
+                          {person.contactKind === "organization" && (
+                            <span className="shrink-0 rounded px-1.5 py-0.5 text-[0.625rem] font-medium" style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)", color: "var(--text-muted)" }}>
+                              🏢 Org
+                            </span>
+                          )}
                         </p>
                         <p className="truncate text-[0.75rem] sm:text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
                           {[person.relationshipType, person.organization].filter(Boolean).join(" · ") || " "}

@@ -88,8 +88,10 @@ export default async function PersonDetailPage({
               >
                 {person.displayName}
               </h1>
-              <p className="text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
-                {[person.relationshipType, person.organization, person.birthday ? `🎂 ${formatBirthday(person.birthday)}` : null].filter(Boolean).join(" · ")}
+              <p className="flex items-center gap-1.5 text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
+                {person.contactKind === "pet" && <span className="shrink-0 rounded px-1.5 py-0.5 text-[0.625rem] font-medium" style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)" }}>🐾 Pet</span>}
+                {person.contactKind === "organization" && <span className="shrink-0 rounded px-1.5 py-0.5 text-[0.625rem] font-medium" style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)" }}>🏢 Org</span>}
+                <span>{[person.relationshipType, person.organization, person.birthday ? `🎂 ${formatBirthday(person.birthday)}` : null].filter(Boolean).join(" · ")}</span>
               </p>
             </div>
           </div>
