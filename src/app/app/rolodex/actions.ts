@@ -172,3 +172,22 @@ export async function resolveMentionAction(
     return { ok: false, error: error instanceof Error ? error.message : "Could not resolve mention." };
   }
 }
+
+export async function resolveMentionFormAction(formData: FormData): Promise<void> {
+  const userId = await resolveActiveUserId();
+  const mentionId = String(formData.get("mentionId") ?? "").trim();
+  const personId = String(formData.get("personId") ?? "").trim();
+  if (!mentionId || !personId) return;
+  await resolveMention(userId, mentionId, personId);
+  revalidateRolodex(personId);
+}
+
+export async function createPersonFromMentionAction(formData: FormData): Promise<void> {
+  const userId = await resolveActiveUserId();
+  const mentionId = String(formData.get("mentionId") ?? "").trim();
+  const displayName = String(formData.get("displayName") ?? "").trim();
+  if (!mentionId || !displayName) return;
+  const personId = await createPerson(userId, { displayName });
+  await resolveMention(userId, mentionId, personId);
+  revalidateRolodex(personId);
+}

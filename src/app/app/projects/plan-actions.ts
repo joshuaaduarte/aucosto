@@ -10,6 +10,7 @@ import {
   removeProjectQuestion,
   removeProjectBlocker,
 } from "@/lib/services/project-planning";
+import { syncRolodexMentionsForText } from "@/lib/services/rolodex-mentions";
 
 function revalidate(projectId: string) {
   revalidatePath("/app");
@@ -52,6 +53,48 @@ export async function updateProjectPlanAction(
       planNotes: fields.planNotes !== undefined ? fields.planNotes || null : undefined,
       targetDate: fields.targetDate !== undefined ? fields.targetDate : undefined,
     });
+    const mentionSyncs: Promise<void>[] = [];
+    if (fields.goal !== undefined) {
+      mentionSyncs.push(syncRolodexMentionsForText(userId, {
+        sourceTool: "projects",
+        sourceRecordId: projectId,
+        sourceField: "goal",
+        text: fields.goal || null,
+      }));
+    }
+    if (fields.whyItMatters !== undefined) {
+      mentionSyncs.push(syncRolodexMentionsForText(userId, {
+        sourceTool: "projects",
+        sourceRecordId: projectId,
+        sourceField: "whyItMatters",
+        text: fields.whyItMatters || null,
+      }));
+    }
+    if (fields.nextMilestone !== undefined) {
+      mentionSyncs.push(syncRolodexMentionsForText(userId, {
+        sourceTool: "projects",
+        sourceRecordId: projectId,
+        sourceField: "nextMilestone",
+        text: fields.nextMilestone || null,
+      }));
+    }
+    if (fields.nextAction !== undefined) {
+      mentionSyncs.push(syncRolodexMentionsForText(userId, {
+        sourceTool: "projects",
+        sourceRecordId: projectId,
+        sourceField: "nextAction",
+        text: fields.nextAction || null,
+      }));
+    }
+    if (fields.planNotes !== undefined) {
+      mentionSyncs.push(syncRolodexMentionsForText(userId, {
+        sourceTool: "projects",
+        sourceRecordId: projectId,
+        sourceField: "planNotes",
+        text: fields.planNotes || null,
+      }));
+    }
+    await Promise.all(mentionSyncs);
     revalidate(projectId);
     return { ok: true };
   } catch (error) {
@@ -73,6 +116,12 @@ export async function addProjectQuestionAction(
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid." };
   try {
     await addProjectQuestion(userId, parsed.data.projectId, parsed.data.question);
+    await syncRolodexMentionsForText(userId, {
+      sourceTool: "projects",
+      sourceRecordId: parsed.data.projectId,
+      sourceField: `question:${parsed.data.question}`,
+      text: parsed.data.question,
+    });
     revalidate(parsed.data.projectId);
     return { ok: true };
   } catch (error) {
@@ -94,6 +143,12 @@ export async function addProjectBlockerAction(
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid." };
   try {
     await addProjectBlocker(userId, parsed.data.projectId, parsed.data.blocker);
+    await syncRolodexMentionsForText(userId, {
+      sourceTool: "projects",
+      sourceRecordId: parsed.data.projectId,
+      sourceField: `blocker:${parsed.data.blocker}`,
+      text: parsed.data.blocker,
+    });
     revalidate(parsed.data.projectId);
     return { ok: true };
   } catch (error) {
@@ -158,6 +213,12 @@ export async function setNextActionAction(
   try {
     await updateProjectPlan(userId, parsed.data.projectId, {
       nextAction: parsed.data.nextAction || null,
+    });
+    await syncRolodexMentionsForText(userId, {
+      sourceTool: "projects",
+      sourceRecordId: parsed.data.projectId,
+      sourceField: "nextAction",
+      text: parsed.data.nextAction || null,
     });
     revalidate(parsed.data.projectId);
     return { ok: true };

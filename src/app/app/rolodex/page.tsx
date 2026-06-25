@@ -1,6 +1,14 @@
 import Link from "next/link";
 import { resolveActiveUserId } from "@/lib/viewer-context";
-import { ensureRolodexTables, listPersons } from "@/lib/services/rolodex";
+import {
+  ensureRolodexTables,
+  listPersons,
+  listUnresolvedMentions,
+} from "@/lib/services/rolodex";
+import {
+  createPersonFromMentionAction,
+  resolveMentionFormAction,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +52,7 @@ export default async function RolodexPage({
     search: q,
     relationshipType: type || undefined,
   }).catch(() => []);
+  const unresolvedMentions = await listUnresolvedMentions(userId).catch(() => []);
 
   return (
     <div className="space-y-6">
@@ -100,8 +109,76 @@ export default async function RolodexPage({
         </div>
       </div>
 
+      {unresolvedMentions.length > 0 ? (
+        <section
+          className="fade-in-delay-2 rounded-xl p-4"
+          style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)" }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-[0.9375rem] font-semibold" style={{ color: "var(--text)" }}>
+                Unresolved @mentions
+              </h2>
+              <p className="mt-1 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
+                Link these notes to existing people or create new Rolodex entries.
+              </p>
+            </div>
+            <span
+              className="rounded-full px-2 py-0.5 text-[0.75rem] font-medium"
+              style={{ background: "var(--bg-page)", color: "var(--text-muted)" }}
+            >
+              {unresolvedMentions.length}
+            </span>
+          </div>
+          <div className="mt-4 space-y-3">
+            {unresolvedMentions.slice(0, 8).map((mention) => (
+              <div
+                key={mention.id}
+                className="rounded-lg p-3"
+                style={{ background: "var(--bg-page)", border: "1px solid var(--border-faint)" }}
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-[0.9375rem] font-semibold" style={{ color: "var(--text)" }}>
+                      @{mention.mentionedName}
+                    </p>
+                    <p className="text-[0.75rem]" style={{ color: "var(--text-muted)" }}>
+                      From {mention.sourceTool}
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:min-w-[320px] sm:flex-row">
+                    {persons.length > 0 ? (
+                      <form action={resolveMentionFormAction} className="flex flex-1 gap-2">
+                        <input type="hidden" name="mentionId" value={mention.id} />
+                        <select name="personId" className="field min-w-0 flex-1 text-[0.8125rem]">
+                          {persons.map((person) => (
+                            <option key={person.id} value={person.id}>
+                              {person.displayName}
+                            </option>
+                          ))}
+                        </select>
+                        <button type="submit" className="btn-ghost px-2.5 py-1 text-[0.8125rem]">
+                          Link
+                        </button>
+                      </form>
+                    ) : null}
+                    <form action={createPersonFromMentionAction}>
+                      <input type="hidden" name="mentionId" value={mention.id} />
+                      <input type="hidden" name="displayName" value={mention.mentionedName} />
+                      <button type="submit" className="btn-ink whitespace-nowrap px-2.5 py-1 text-[0.8125rem]">
+                        Create person
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {/* Person list */}
-      <div className="fade-in-delay-2 space-y-2">
+      <div className="fade-in-delay-3 space-y-2">
         {persons.length === 0 ? (
           <div
             className="rounded-xl p-8 text-center"

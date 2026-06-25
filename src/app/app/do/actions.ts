@@ -13,6 +13,7 @@ import {
 } from "@/lib/services/do";
 import { createCalendarItem } from "@/lib/services/calendar";
 import { getRunningEntry, stopRunning } from "@/lib/services/time";
+import { syncRolodexMentionsForText } from "@/lib/services/rolodex-mentions";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import { windowFromFormData } from "@/lib/wall-clock";
 
@@ -71,7 +72,13 @@ export async function createDoItemAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid task." };
   }
 
-  await createDoItem(userId, parsed.data);
+  const item = await createDoItem(userId, parsed.data);
+  await syncRolodexMentionsForText(userId, {
+    sourceTool: "do",
+    sourceRecordId: item.id,
+    sourceField: "notes",
+    text: parsed.data.notes,
+  });
   revalidateDo();
 }
 
@@ -93,6 +100,12 @@ export async function updateDoItemAction(formData: FormData) {
   }
 
   await updateDoItem(userId, id, parsed.data);
+  await syncRolodexMentionsForText(userId, {
+    sourceTool: "do",
+    sourceRecordId: id,
+    sourceField: "notes",
+    text: parsed.data.notes,
+  });
   revalidateDo();
 }
 
@@ -156,6 +169,12 @@ export async function reflectDoItemSessionAction(formData: FormData) {
     actualMinutes: nullableNumber(formData, "actualMinutes"),
     remainingMinutes: nullableNumber(formData, "remainingMinutes"),
     notes: nullableString(formData, "notes"),
+  });
+  await syncRolodexMentionsForText(userId, {
+    sourceTool: "do",
+    sourceRecordId: id,
+    sourceField: "session_notes",
+    text: nullableString(formData, "notes"),
   });
   revalidateDo();
 }

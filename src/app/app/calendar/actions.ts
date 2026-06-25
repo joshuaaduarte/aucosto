@@ -11,6 +11,7 @@ import {
 import { updateDoItem } from "@/lib/services/do";
 import { windowFromFormData } from "@/lib/wall-clock";
 import { listHabits, logHabitProgress, startTimerForHabit } from "@/lib/services/habits";
+import { syncRolodexMentionsForText } from "@/lib/services/rolodex-mentions";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 
 function revalidateCalendar() {
@@ -37,7 +38,7 @@ export async function createCalendarBlockAction(formData: FormData) {
     throw new Error("Date and time are required.");
   }
 
-  await createCalendarItem(userId, {
+  const item = await createCalendarItem(userId, {
     title,
     startsAt: window.startsAt,
     endsAt: window.endsAt,
@@ -48,6 +49,12 @@ export async function createCalendarBlockAction(formData: FormData) {
     status: "confirmed",
     sourceTool: doItemId ? "do" : habitId ? "habit" : null,
     sourceRefId: doItemId ?? habitId,
+  });
+  await syncRolodexMentionsForText(userId, {
+    sourceTool: "calendar",
+    sourceRecordId: item.id,
+    sourceField: "notes",
+    text: notes,
   });
   if (doItemId) {
     await updateDoItem(userId, doItemId, { status: "scheduled" });
@@ -110,6 +117,12 @@ export async function updateCalendarBlockAction(formData: FormData) {
     location,
     categoryId,
     status: "confirmed",
+  });
+  await syncRolodexMentionsForText(userId, {
+    sourceTool: "calendar",
+    sourceRecordId: id,
+    sourceField: "notes",
+    text: notes,
   });
   revalidateCalendar();
 }

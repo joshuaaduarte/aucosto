@@ -11,6 +11,7 @@ import {
   updateTimeCategory,
 } from "@/lib/services/time-categories";
 import { tagTimeEntry } from "@/lib/services/projects";
+import { syncRolodexMentionsForText } from "@/lib/services/rolodex-mentions";
 import { updateSleepWakeTime as updateSleepWakeTimeService } from "@/lib/services/rhythms";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import { windowFromFormData } from "@/lib/wall-clock";
@@ -216,6 +217,14 @@ export async function updateEntryNotes(
     const updated = await timeService.updateEntry(userId, id, {
       notes: trimmed ? notes.slice(0, 2000) : null,
     });
+    if (updated) {
+      await syncRolodexMentionsForText(userId, {
+        sourceTool: "time",
+        sourceRecordId: id,
+        sourceField: "notes",
+        text: trimmed ? notes.slice(0, 2000) : null,
+      });
+    }
     return { ok: Boolean(updated) };
   } catch {
     return { ok: false };
@@ -280,14 +289,26 @@ export async function saveEntryAction(
       if (!updated) {
         return { error: "Entry not found." };
       }
+      await syncRolodexMentionsForText(userId, {
+        sourceTool: "time",
+        sourceRecordId: updated.id,
+        sourceField: "notes",
+        text: parsed.data.notes ?? null,
+      });
     } else {
-      await timeService.createPastEntry(userId, {
+      const entry = await timeService.createPastEntry(userId, {
         label: parsed.data.label,
         category: parsed.data.category ?? null,
         doItemId: parsed.data.doItemId ?? null,
         notes: parsed.data.notes ?? null,
         startedAt,
         endedAt,
+      });
+      await syncRolodexMentionsForText(userId, {
+        sourceTool: "time",
+        sourceRecordId: entry.id,
+        sourceField: "notes",
+        text: parsed.data.notes ?? null,
       });
     }
   } catch (error) {
@@ -528,6 +549,12 @@ export async function stopEntryWithReflection(formData: FormData) {
       actualMinutes: outcome === "done" && actualRaw ? Number(actualRaw) : undefined,
       remainingMinutes: remainingRaw ? Number(remainingRaw) : undefined,
       notes: notes || null,
+    });
+    await syncRolodexMentionsForText(userId, {
+      sourceTool: "do",
+      sourceRecordId: doItemId,
+      sourceField: "session_notes",
+      text: notes || null,
     });
   }
 

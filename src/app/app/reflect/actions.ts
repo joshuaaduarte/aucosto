@@ -7,6 +7,7 @@ import {
   buildReflectionSnapshot,
   upsertReflection,
 } from "@/lib/services/reflect";
+import { syncRolodexMentionsForText } from "@/lib/services/rolodex-mentions";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 
 const rating = z.coerce.number().int().min(1).max(5);
@@ -81,6 +82,26 @@ export async function saveReflectionAction(
       freeNotes: parsed.data.freeNotes ?? null,
       contextSnapshot,
     });
+    await Promise.all([
+      syncRolodexMentionsForText(userId, {
+        sourceTool: "reflect",
+        sourceRecordId: targetKey,
+        sourceField: "wentWell",
+        text: parsed.data.wentWell ?? null,
+      }),
+      syncRolodexMentionsForText(userId, {
+        sourceTool: "reflect",
+        sourceRecordId: targetKey,
+        sourceField: "carryForward",
+        text: parsed.data.carryForward ?? null,
+      }),
+      syncRolodexMentionsForText(userId, {
+        sourceTool: "reflect",
+        sourceRecordId: targetKey,
+        sourceField: "freeNotes",
+        text: parsed.data.freeNotes ?? null,
+      }),
+    ]);
   } catch (error) {
     return {
       error:
