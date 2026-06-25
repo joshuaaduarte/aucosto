@@ -166,12 +166,20 @@ export function ProjectRow({
           willChange: "transform",
         }}
       >
-        <h3
-          className="min-w-0 flex-1 truncate text-[0.9375rem] font-semibold"
-          style={{ color: "var(--text)" }}
-        >
-          {view.name}
-        </h3>
+        <div className="min-w-0 flex-1">
+          <h3
+            className="truncate text-[0.9375rem] font-semibold"
+            style={{ color: "var(--text)" }}
+          >
+            {view.name}
+          </h3>
+          {view.nextAction ? (
+            <p className="truncate text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+              <span style={{ color: "var(--text-ghost)" }}>▸ </span>
+              {view.nextAction}
+            </p>
+          ) : null}
+        </div>
         {!muted ? (
           <span
             className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"

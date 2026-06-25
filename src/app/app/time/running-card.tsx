@@ -108,7 +108,7 @@ export function RunningCard({
           border: "1px solid var(--accent-tint-strong)",
         }}
       >
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span
@@ -176,7 +176,7 @@ export function RunningCard({
               />
             ) : null}
           </div>
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:mt-0">
             {/* Secondary stop: end this entry at an earlier time. A quiet icon
                 so the primary stop actions stay front and center. */}
             <button

@@ -125,7 +125,13 @@ export default async function ProjectDetailPage({
         </header>
       </div>
 
-      <div className="fade-in-delay-1">
+      {plan && (
+        <div className="fade-in-delay-1">
+          <ProjectPlanSection projectId={project.id} plan={plan} />
+        </div>
+      )}
+
+      <div className={plan ? "fade-in-delay-2" : "fade-in-delay-1"}>
         <ProjectDetailBody
           projectId={project.id}
           projectName={project.name}
@@ -137,12 +143,6 @@ export default async function ProjectDetailPage({
           now={now}
         />
       </div>
-
-      {plan && (
-        <div className="fade-in-delay-2">
-          <ProjectPlanSection projectId={project.id} plan={plan} />
-        </div>
-      )}
     </div>
   );
 }

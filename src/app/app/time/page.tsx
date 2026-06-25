@@ -789,7 +789,7 @@ export default async function TimePage() {
                     return (
                       <Fragment key={entry.id}>
                       <li
-                        className="group grid grid-cols-[1fr_auto_auto_auto] items-baseline gap-2 rounded-md px-2 py-2 transition-colors hover:bg-bg-hover sm:gap-3"
+                        className="group grid grid-cols-[1fr_auto_auto_auto] items-baseline gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-bg-hover sm:gap-3 sm:py-2"
                         style={{
                           borderTop: "1px solid var(--border-faint)",
                         }}
@@ -974,7 +974,7 @@ function Stat({
   hint: string;
 }) {
   return (
-    <div className="px-4 py-4" style={{ background: "var(--bg-page)" }}>
+    <div className="px-3 py-3 sm:px-4 sm:py-4" style={{ background: "var(--bg-page)" }}>
       <p
         className="text-[0.6875rem] font-semibold uppercase tracking-wider"
         style={{ color: "var(--text-faint)" }}
@@ -982,7 +982,7 @@ function Stat({
         {label}
       </p>
       <p
-        className="mt-1 text-[1.5rem] font-semibold tracking-tight tabular"
+        className="mt-1 text-[1.25rem] font-semibold tracking-tight tabular sm:text-[1.5rem]"
         style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
       >
         {value}

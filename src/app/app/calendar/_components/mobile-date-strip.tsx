@@ -69,19 +69,21 @@ export function MobileDateStrip({
               className="flex h-7 w-7 items-center justify-center rounded-full text-[0.8125rem] font-semibold tabular"
               style={{
                 background: isSelected ? "var(--accent)" : "transparent",
-                color: isSelected ? "var(--text-on-accent)" : "var(--text)",
+                color: isSelected
+                  ? "var(--text-on-accent)"
+                  : isToday
+                    ? "var(--accent-strong)"
+                    : "var(--text)",
+                boxShadow:
+                  isToday && !isSelected
+                    ? "inset 0 0 0 1.5px var(--accent)"
+                    : undefined,
               }}
             >
               {dayNum}
             </span>
-            <span
-              className="h-1 w-1 rounded-full"
-              style={{
-                background:
-                  isToday && !isSelected ? "var(--accent-strong)" : "transparent",
-              }}
-              aria-hidden
-            />
+            {/* Layout spacer — keeps chip height consistent */}
+            <span className="h-1 w-1 rounded-full" aria-hidden />
           </Link>
         );
       })}
