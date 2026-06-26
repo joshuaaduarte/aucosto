@@ -8,6 +8,7 @@ const CONTACT_KINDS = [
   { value: "person", label: "Person" },
   { value: "pet", label: "Pet" },
   { value: "organization", label: "Organization" },
+  { value: "group", label: "Group" },
 ];
 
 const RELATIONSHIP_TYPES = [

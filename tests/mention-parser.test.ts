@@ -149,6 +149,35 @@ describe("parseMentions", () => {
     const names = mentionNames("@insight Remember this. @Bob knows.");
     expect(names).toEqual(["Bob"]);
   });
+
+  it("filters @insight regardless of casing", () => {
+    expect(parseMentions("@Insight Something")).toHaveLength(0);
+    expect(parseMentions("@INSIGHT Something")).toHaveLength(0);
+    expect(parseMentions("@InSiGhT Something")).toHaveLength(0);
+  });
+
+  it("filters bracket-form @[insight ...] as reserved marker", () => {
+    const result = parseMentions("@[insight Something useful]");
+    expect(result).toHaveLength(0);
+  });
+
+  it("filters bracket-form @[insight] with only people remaining", () => {
+    const result = parseMentions("@[insight MCP] @Aditya agreed");
+    expect(result).toHaveLength(1);
+    expect(result[0]!.name).toBe("Aditya");
+  });
+
+  it("extracts @Aditya alongside @insight in same text", () => {
+    const result = parseMentions("@Aditya @insight Something useful");
+    expect(result).toHaveLength(1);
+    expect(result[0]!.name).toBe("Aditya");
+  });
+
+  it("extracts person from text with insight mid-sentence", () => {
+    const result = parseMentions("Meeting with @Aditya. @insight Something useful");
+    expect(result).toHaveLength(1);
+    expect(result[0]!.name).toBe("Aditya");
+  });
 });
 
 describe("parseInsights", () => {

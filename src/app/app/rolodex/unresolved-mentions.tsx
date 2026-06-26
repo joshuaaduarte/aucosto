@@ -5,6 +5,7 @@ import type { RolodexPersonSummary, RolodexMention } from "@/lib/services/rolode
 import {
   createPersonFromMentionAction,
   linkMentionToPersonAction,
+  dismissMentionAction,
 } from "@/app/app/rolodex/actions";
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -14,6 +15,22 @@ const SOURCE_LABELS: Record<string, string> = {
   project: "project notes",
   do: "task",
 };
+
+const CONTACT_KINDS = [
+  { value: "person", label: "Person" },
+  { value: "pet", label: "Pet" },
+  { value: "organization", label: "Organization" },
+  { value: "group", label: "Group" },
+];
+
+const RELATIONSHIP_TYPES = [
+  { value: "", label: "None" },
+  { value: "family", label: "Family" },
+  { value: "friend", label: "Friend" },
+  { value: "coworker", label: "Coworker" },
+  { value: "acquaintance", label: "Acquaintance" },
+  { value: "other", label: "Other" },
+];
 
 function formatDate(iso: string): string {
   try {
@@ -32,10 +49,15 @@ function MentionRow({
   persons: RolodexPersonSummary[];
   onResolved: (id: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [mode, setMode] = useState<"idle" | "create" | "link">("idle");
   const [search, setSearch] = useState("");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  // Create form state
+  const [createName, setCreateName] = useState(mention.mentionedName);
+  const [createKind, setCreateKind] = useState("person");
+  const [createRelType, setCreateRelType] = useState("");
 
   const filtered = search
     ? persons.filter((p) => p.displayName.toLowerCase().includes(search.toLowerCase()))
@@ -44,7 +66,12 @@ function MentionRow({
   function handleCreate() {
     setError(null);
     startTransition(async () => {
-      const res = await createPersonFromMentionAction(mention.id, mention.mentionedName);
+      const res = await createPersonFromMentionAction(
+        mention.id,
+        createName,
+        createKind,
+        createRelType || undefined,
+      );
       if (res.ok) {
         onResolved(mention.id);
       } else {
@@ -57,6 +84,18 @@ function MentionRow({
     setError(null);
     startTransition(async () => {
       const res = await linkMentionToPersonAction(mention.id, personId);
+      if (res.ok) {
+        onResolved(mention.id);
+      } else {
+        setError(res.error ?? "Failed");
+      }
+    });
+  }
+
+  function handleDismiss() {
+    setError(null);
+    startTransition(async () => {
+      const res = await dismissMentionAction(mention.id);
       if (res.ok) {
         onResolved(mention.id);
       } else {
@@ -81,19 +120,28 @@ function MentionRow({
         </div>
         <div className="flex shrink-0 gap-2">
           <button
-            onClick={handleCreate}
+            onClick={() => setMode(mode === "create" ? "idle" : "create")}
             disabled={isPending}
             className="btn-ghost px-2.5 py-1 text-[0.8125rem] font-medium"
             style={{ color: "var(--accent)" }}
           >
-            + New person
+            {mode === "create" ? "Cancel" : "+ New"}
           </button>
           <button
-            onClick={() => setExpanded((v) => !v)}
+            onClick={() => setMode(mode === "link" ? "idle" : "link")}
             className="btn-ghost px-2.5 py-1 text-[0.8125rem] font-medium"
             style={{ color: "var(--text-muted)" }}
           >
-            {expanded ? "Cancel" : "Link existing"}
+            {mode === "link" ? "Cancel" : "Link existing"}
+          </button>
+          <button
+            onClick={handleDismiss}
+            disabled={isPending}
+            className="btn-ghost px-2.5 py-1 text-[0.8125rem] font-medium"
+            style={{ color: "var(--text-faint)" }}
+            title="Dismiss — remove from queue without creating a contact"
+          >
+            Dismiss
           </button>
         </div>
       </div>
@@ -102,7 +150,70 @@ function MentionRow({
         <p className="text-[0.8125rem]" style={{ color: "var(--destructive)" }}>{error}</p>
       )}
 
-      {expanded && (
+      {mode === "create" && (
+        <div className="space-y-2 pt-1">
+          <div>
+            <label className="mb-1 block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
+              Name
+            </label>
+            <input
+              type="text"
+              value={createName}
+              onChange={(e) => setCreateName(e.target.value)}
+              className="field w-full text-[0.8125rem]"
+              placeholder="Display name"
+            />
+          </div>
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className="mb-1 block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
+                Kind
+              </label>
+              <div className="flex gap-1">
+                {CONTACT_KINDS.map((k) => (
+                  <button
+                    key={k.value}
+                    type="button"
+                    onClick={() => setCreateKind(k.value)}
+                    className="rounded-full px-2 py-1 text-[0.75rem] font-medium transition-colors"
+                    style={{
+                      background: createKind === k.value ? "var(--text)" : "var(--bg-page)",
+                      color: createKind === k.value ? "var(--bg-page)" : "var(--text-muted)",
+                      border: "1px solid var(--border-faint)",
+                    }}
+                  >
+                    {k.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="w-36">
+              <label className="mb-1 block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
+                Relationship
+              </label>
+              <select
+                value={createRelType}
+                onChange={(e) => setCreateRelType(e.target.value)}
+                className="field w-full text-[0.8125rem]"
+              >
+                {RELATIONSHIP_TYPES.map((r) => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <button
+            onClick={handleCreate}
+            disabled={isPending || !createName.trim()}
+            className="btn-ghost px-3 py-1.5 text-[0.8125rem] font-medium"
+            style={{ color: "var(--accent)" }}
+          >
+            {isPending ? "Saving…" : "Save contact"}
+          </button>
+        </div>
+      )}
+
+      {mode === "link" && (
         <div className="space-y-2 pt-1">
           <input
             type="search"

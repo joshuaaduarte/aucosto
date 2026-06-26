@@ -6,12 +6,16 @@ import {
   getPerson,
   getLinkedCalendarItems,
   getLinkedTimeEntries,
+  listRelationsForEntity,
+  listPersons,
 } from "@/lib/services/rolodex";
 import {
   ensureInsightTables,
   listInsightsForPerson,
 } from "@/lib/services/captured-insights";
 import { InteractionTimeline } from "./_interaction-timeline";
+import { RelationshipsSection } from "./_relationships-section";
+import { InsightsSection } from "./_insights-section";
 
 export const dynamic = "force-dynamic";
 
@@ -52,10 +56,12 @@ export default async function PersonDetailPage({
 
   await ensureInsightTables().catch(() => {});
 
-  const [linkedCalendar, linkedTime, personInsights] = await Promise.all([
+  const [linkedCalendar, linkedTime, personInsights, relations, allPersons] = await Promise.all([
     getLinkedCalendarItems(userId, id).catch(() => []),
     getLinkedTimeEntries(userId, id).catch(() => []),
     listInsightsForPerson(userId, id, { limit: 10 }).catch(() => []),
+    listRelationsForEntity(userId, id).catch(() => []),
+    listPersons(userId).catch(() => []),
   ]);
 
   const dueFollowUps = person.interactions.filter((i) => i.followUpNeeded);
@@ -91,6 +97,7 @@ export default async function PersonDetailPage({
               <p className="flex items-center gap-1.5 text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
                 {person.contactKind === "pet" && <span className="shrink-0 rounded px-1.5 py-0.5 text-[0.625rem] font-medium" style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)" }}>🐾 Pet</span>}
                 {person.contactKind === "organization" && <span className="shrink-0 rounded px-1.5 py-0.5 text-[0.625rem] font-medium" style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)" }}>🏢 Org</span>}
+                {person.contactKind === "group" && <span className="shrink-0 rounded px-1.5 py-0.5 text-[0.625rem] font-medium" style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)" }}>👥 Group</span>}
                 <span>{[person.relationshipType, person.organization, person.birthday ? `🎂 ${formatBirthday(person.birthday)}` : null].filter(Boolean).join(" · ")}</span>
               </p>
             </div>
@@ -115,48 +122,7 @@ export default async function PersonDetailPage({
       )}
 
       {/* Insights involving this person */}
-      {personInsights.length > 0 && (
-        <section className="fade-in-delay-1 space-y-2">
-          <h2
-            className="text-[0.6875rem] font-semibold uppercase tracking-wider"
-            style={{ color: "var(--text-faint)" }}
-          >
-            Insights
-          </h2>
-          <div
-            className="rounded-lg"
-            style={{
-              background: "var(--bg-tint)",
-              border: "1px solid var(--border-faint)",
-            }}
-          >
-            {personInsights.map((insight) => (
-              <div key={insight.id} className="flex items-start gap-3 px-4 py-3">
-                <span
-                  className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{ background: "#f59e0b" }}
-                  aria-hidden
-                />
-                <div className="min-w-0 flex-1">
-                  <p
-                    className="text-[0.8125rem] leading-snug"
-                    style={{ color: "var(--text)" }}
-                  >
-                    {insight.text}
-                  </p>
-                  <p
-                    className="mt-0.5 text-[0.6875rem]"
-                    style={{ color: "var(--text-ghost)" }}
-                  >
-                    {insight.sourceTool}
-                    {insight.occurredAt ? ` · ${formatDate(insight.occurredAt)}` : ""}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      <InsightsSection personId={id} insights={personInsights} />
 
       {/* Follow-ups due */}
       {dueFollowUps.length > 0 && (
@@ -206,6 +172,12 @@ export default async function PersonDetailPage({
           </div>
         </section>
       )}
+
+      <RelationshipsSection
+        entityId={id}
+        relations={relations}
+        allPersons={allPersons}
+      />
 
       <InteractionTimeline
         personId={id}

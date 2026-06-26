@@ -5,12 +5,20 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import {
+  ensureInsightTables,
+  unlinkInsightFromPerson,
+} from "@/lib/services/captured-insights";
+import {
   ensureRolodexTables,
   createPerson,
   updatePerson,
   addInteraction,
   updateFollowUp,
   resolveMention,
+  dismissMention,
+  createRelation,
+  deleteRelation,
+  RELATION_TYPES,
   type CreatePersonInput,
 } from "@/lib/services/rolodex";
 
@@ -218,6 +226,8 @@ export type MentionActionResult = { ok: boolean; personId?: string; error?: stri
 export async function createPersonFromMentionAction(
   mentionId: string,
   displayName: string,
+  contactKind?: string,
+  relationshipType?: string,
 ): Promise<MentionActionResult> {
   let userId: string;
   try {
@@ -229,12 +239,36 @@ export async function createPersonFromMentionAction(
   if (!name) return { ok: false, error: "Display name is required." };
   try {
     await ensureRolodexTables();
-    const personId = await createPerson(userId, { displayName: name });
+    const personId = await createPerson(userId, {
+      displayName: name,
+      contactKind: contactKind || "person",
+      relationshipType: relationshipType || null,
+    });
     await resolveMention(userId, mentionId, personId);
     revalidateRolodex(personId);
     return { ok: true, personId };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Could not create contact." };
+  }
+}
+
+export async function dismissMentionAction(
+  mentionId: string,
+): Promise<MentionActionResult> {
+  let userId: string;
+  try {
+    userId = await resolveActiveUserId();
+  } catch {
+    return { ok: false, error: "Not signed in." };
+  }
+  if (!mentionId) return { ok: false, error: "Missing mention id." };
+  try {
+    await ensureRolodexTables();
+    await dismissMention(userId, mentionId);
+    revalidateRolodex();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not dismiss mention." };
   }
 }
 
@@ -257,5 +291,94 @@ export async function linkMentionToPersonAction(
     return { ok: true, personId };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Could not link mention." };
+  }
+}
+
+// ── Relation actions ────────────────────────────────────────────────
+
+const relationSchema = z.object({
+  fromEntityId: z.string().min(1),
+  toEntityId: z.string().min(1),
+  type: z.string().min(1),
+  label: z.string().trim().max(200).optional(),
+  notes: z.string().trim().max(2000).optional(),
+});
+
+export async function createRelationAction(
+  formData: FormData,
+): Promise<AddInteractionResult> {
+  let userId: string;
+  try {
+    userId = await resolveActiveUserId();
+  } catch {
+    return { ok: false, error: "Not signed in." };
+  }
+  const parsed = relationSchema.safeParse({
+    fromEntityId: formData.get("fromEntityId") ?? "",
+    toEntityId: formData.get("toEntityId") ?? "",
+    type: formData.get("type") ?? "knows",
+    label: (formData.get("label") as string) || undefined,
+    notes: (formData.get("notes") as string) || undefined,
+  });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+  if (!RELATION_TYPES.includes(parsed.data.type as typeof RELATION_TYPES[number])) {
+    return { ok: false, error: "Invalid relationship type." };
+  }
+  if (parsed.data.fromEntityId === parsed.data.toEntityId) {
+    return { ok: false, error: "Cannot relate an entity to itself." };
+  }
+  try {
+    await ensureRolodexTables();
+    await createRelation(userId, parsed.data);
+    revalidateRolodex(parsed.data.fromEntityId);
+    revalidateRolodex(parsed.data.toEntityId);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not create relationship." };
+  }
+}
+
+export async function deleteRelationAction(
+  relationId: string,
+): Promise<AddInteractionResult> {
+  let userId: string;
+  try {
+    userId = await resolveActiveUserId();
+  } catch {
+    return { ok: false, error: "Not signed in." };
+  }
+  if (!relationId) return { ok: false, error: "Missing relation id." };
+  try {
+    await ensureRolodexTables();
+    await deleteRelation(userId, relationId);
+    revalidateRolodex();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not delete relationship." };
+  }
+}
+
+// ── Insight unlink ──────────────────────────────────────────────────
+
+export async function unlinkInsightFromPersonAction(
+  insightId: string,
+  personId: string,
+): Promise<AddInteractionResult> {
+  let userId: string;
+  try {
+    userId = await resolveActiveUserId();
+  } catch {
+    return { ok: false, error: "Not signed in." };
+  }
+  if (!insightId || !personId) return { ok: false, error: "Missing ids." };
+  try {
+    await ensureInsightTables();
+    await unlinkInsightFromPerson(userId, insightId, personId);
+    revalidateRolodex(personId);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not unlink insight." };
   }
 }

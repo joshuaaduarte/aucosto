@@ -257,10 +257,90 @@ async function _createRolodexTables(): Promise<void> {
       CREATE INDEX IF NOT EXISTS "RolodexMention_personId_idx"
         ON "RolodexMention" ("personId")
     `);
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "RolodexMention"
+        ADD COLUMN IF NOT EXISTS "dismissed" BOOLEAN NOT NULL DEFAULT FALSE
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "RolodexRelation" (
+        "id"           TEXT NOT NULL DEFAULT gen_random_uuid()::text PRIMARY KEY,
+        "userId"       TEXT NOT NULL,
+        "fromEntityId" TEXT NOT NULL,
+        "toEntityId"   TEXT NOT NULL,
+        "type"         TEXT NOT NULL DEFAULT 'knows',
+        "label"        TEXT,
+        "notes"        TEXT,
+        "createdAt"    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        "updatedAt"    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "RolodexRelation_userId_from_idx"
+        ON "RolodexRelation"("userId", "fromEntityId")
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "RolodexRelation_userId_to_idx"
+        ON "RolodexRelation"("userId", "toEntityId")
+    `);
+
+    // Clean up any reserved-marker mentions that leaked through before the fix
+    await _cleanupReservedMarkerMentions();
   } catch (error) {
     rolodexTablesReady = null;
     console.error("[rolodex] ensureRolodexTables failed", error);
     throw error;
+  }
+}
+
+// ── Reserved-marker cleanup (runs once on table init) ────────────────────
+
+async function _cleanupReservedMarkerMentions(): Promise<void> {
+  try {
+    const deleted = await prisma.$executeRawUnsafe(
+      `DELETE FROM "RolodexMention"
+       WHERE "resolvedPersonId" IS NULL
+         AND (
+           LOWER("mentionedName") = 'insight'
+           OR LOWER("mentionedName") LIKE 'insight %'
+         )`,
+    );
+    if (deleted > 0) {
+      console.log(`[rolodex] cleaned up ${deleted} reserved-marker mention rows`);
+    }
+  } catch {
+    // Column might not exist yet or table structure differs — safe to ignore
+    try {
+      const deleted2 = await prisma.$executeRawUnsafe(
+        `DELETE FROM "RolodexMention"
+         WHERE "personId" IS NULL
+           AND "resolved" = false
+           AND (
+             LOWER("mentionedName") = 'insight'
+             OR LOWER("mentionedName") LIKE 'insight %'
+           )`,
+      );
+      if (deleted2 > 0) {
+        console.log(`[rolodex] cleaned up ${deleted2} reserved-marker mention rows`);
+      }
+    } catch (e2) {
+      console.error("[rolodex] reserved-marker cleanup failed", e2);
+    }
+  }
+}
+
+export async function listBogusReservedPersons(
+  userId: string,
+): Promise<Array<{ id: string; displayName: string }>> {
+  requireCan(userId, "rolodex", "read");
+  try {
+    return await prisma.$queryRawUnsafe<Array<{ id: string; displayName: string }>>(
+      `SELECT "id", "displayName" FROM "RolodexPerson"
+       WHERE "userId" = $1
+         AND (LOWER("displayName") = 'insight' OR LOWER("displayName") LIKE 'insight %')`,
+      userId,
+    );
+  } catch {
+    return [];
   }
 }
 
@@ -659,6 +739,20 @@ export async function resolveMention(
   });
 }
 
+export async function dismissMention(
+  userId: string,
+  mentionId: string,
+): Promise<void> {
+  requireCan(userId, "rolodex", "write");
+  await prisma.$executeRawUnsafe(
+    `UPDATE "RolodexMention"
+     SET "dismissed" = true
+     WHERE "id" = $1 AND "userId" = $2`,
+    mentionId,
+    userId,
+  );
+}
+
 export async function listUnresolvedMentions(userId: string): Promise<RolodexMention[]> {
   requireCan(userId, "rolodex", "read");
   try {
@@ -675,7 +769,7 @@ export async function listUnresolvedMentions(userId: string): Promise<RolodexMen
     >(
       `SELECT "id","mentionedName","personId","resolved","sourceTool","sourceRecordId","createdAt"
        FROM "RolodexMention"
-       WHERE "userId" = $1 AND "resolved" = false
+       WHERE "userId" = $1 AND "resolved" = false AND "dismissed" = false
        ORDER BY "createdAt" DESC`,
       userId,
     );
@@ -795,6 +889,133 @@ export async function getDueFollowUps(userId: string): Promise<FollowUpSummary[]
     console.error("[rolodex] getDueFollowUps failed", error);
     return [];
   }
+}
+
+// ── Entity relationships ─────────────────────────────────────────────────
+
+export const RELATION_TYPES = [
+  "spouse", "partner", "pet_of", "parent", "child", "sibling",
+  "friend", "coworker", "manager", "reports_to", "works_at", "knows", "other",
+] as const;
+export type RelationType = (typeof RELATION_TYPES)[number];
+
+export interface RolodexRelation {
+  id: string;
+  userId: string;
+  fromEntityId: string;
+  toEntityId: string;
+  type: string;
+  label: string | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  toEntityName?: string;
+  fromEntityName?: string;
+}
+
+type RelationRow = {
+  id: string;
+  userId: string;
+  fromEntityId: string;
+  toEntityId: string;
+  type: string;
+  label: string | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  toEntityName: string | null;
+  fromEntityName: string | null;
+};
+
+export async function createRelation(
+  userId: string,
+  input: {
+    fromEntityId: string;
+    toEntityId: string;
+    type: string;
+    label?: string;
+    notes?: string;
+  },
+): Promise<RolodexRelation> {
+  requireCan(userId, "rolodex", "write");
+  const id = randomUUID();
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO "RolodexRelation" ("id","userId","fromEntityId","toEntityId","type","label","notes")
+     VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+    id,
+    userId,
+    input.fromEntityId,
+    input.toEntityId,
+    input.type,
+    input.label?.trim() ?? null,
+    input.notes?.trim() ?? null,
+  );
+  await recordEvent({
+    userId,
+    tool: "rolodex",
+    type: "rolodex.relation_created",
+    refId: id,
+    meta: { type: input.type },
+  });
+  return {
+    id,
+    userId,
+    fromEntityId: input.fromEntityId,
+    toEntityId: input.toEntityId,
+    type: input.type,
+    label: input.label?.trim() ?? null,
+    notes: input.notes?.trim() ?? null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+}
+
+export async function listRelationsForEntity(
+  userId: string,
+  entityId: string,
+): Promise<RolodexRelation[]> {
+  requireCan(userId, "rolodex", "read");
+  try {
+    const rows = await prisma.$queryRawUnsafe<RelationRow[]>(
+      `SELECT r.*,
+              pTo."displayName" AS "toEntityName",
+              pFrom."displayName" AS "fromEntityName"
+       FROM "RolodexRelation" r
+       LEFT JOIN "RolodexPerson" pTo ON pTo."id" = r."toEntityId"
+       LEFT JOIN "RolodexPerson" pFrom ON pFrom."id" = r."fromEntityId"
+       WHERE r."userId" = $1
+         AND (r."fromEntityId" = $2 OR r."toEntityId" = $2)
+       ORDER BY r."createdAt" DESC`,
+      userId,
+      entityId,
+    );
+    return rows.map((r) => ({
+      ...r,
+      toEntityName: r.toEntityName ?? undefined,
+      fromEntityName: r.fromEntityName ?? undefined,
+    }));
+  } catch (error) {
+    console.error("[rolodex] listRelationsForEntity failed", error);
+    return [];
+  }
+}
+
+export async function deleteRelation(
+  userId: string,
+  relationId: string,
+): Promise<void> {
+  requireCan(userId, "rolodex", "write");
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM "RolodexRelation" WHERE "id" = $1 AND "userId" = $2`,
+    relationId,
+    userId,
+  );
+  await recordEvent({
+    userId,
+    tool: "rolodex",
+    type: "rolodex.relation_deleted",
+    refId: relationId,
+  });
 }
 
 // ── Cross-tool linked records ─────────────────────────────────────────────

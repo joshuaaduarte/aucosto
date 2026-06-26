@@ -191,6 +191,21 @@ export async function linkInsightToPerson(
   );
 }
 
+export async function unlinkInsightFromPerson(
+  userId: string,
+  insightId: string,
+  personId: string,
+): Promise<void> {
+  requireCan(userId, "time", "write");
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM "CapturedInsightPerson"
+     WHERE "userId" = $1 AND "insightId" = $2 AND "personId" = $3`,
+    userId,
+    insightId,
+    personId,
+  );
+}
+
 export async function listInsightsForSource(
   userId: string,
   sourceTool: string,

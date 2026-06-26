@@ -1,6 +1,6 @@
 import "server-only";
 
-import { parseMentions, parseInsights } from "@/lib/mention-parser";
+import { parseMentions, parseInsights, RESERVED_MARKERS } from "@/lib/mention-parser";
 import {
   ensureRolodexTables,
   findPersonByName,
@@ -22,7 +22,7 @@ export interface MentionProcessResult {
   ambiguous: Array<{ name: string; candidates: Array<{ id: string; displayName: string }> }>;
 }
 
-const RESERVED_MENTION_KEYWORDS = new Set(["insight", "remember", "lesson", "decision"]);
+// Belt-and-suspenders: use the same reserved set from the parser
 
 /** Strip @insight spans and bare @Name syntax from text so interaction bodies read cleanly. */
 function cleanBodyText(text: string): string {
@@ -164,7 +164,11 @@ export async function processMentions(
     }
 
     for (const mention of mentions) {
-      if (RESERVED_MENTION_KEYWORDS.has(mention.name.toLowerCase())) continue;
+      const firstWord = mention.name.split(/\s/)[0] ?? "";
+      if (RESERVED_MARKERS.has(firstWord.toLowerCase())) {
+        console.warn("[mention-processor] skipping reserved marker that slipped through parser:", mention.name);
+        continue;
+      }
       try {
         const existing = await getExistingMention(
           userId,
@@ -284,4 +288,74 @@ export async function processMentions(
   }
 
   return result;
+}
+
+/**
+ * Process mentions across multiple fields of a single record.
+ * Deduplicates interactions: one time entry = one interaction per person,
+ * regardless of whether the mention came from title or notes.
+ * Prefers the notes excerpt as the interaction body; falls back to the title.
+ */
+export async function processMentionsMultiField(
+  userId: string,
+  fields: { label?: string | null; notes?: string | null },
+  sourceTool: string,
+  sourceRecordId: string,
+  interactionTitle: string,
+  occurredAt?: Date,
+): Promise<MentionProcessResult> {
+  const combined: MentionProcessResult = { resolved: [], unresolved: [], ambiguous: [] };
+
+  // Process notes first (preferred source for interaction body)
+  if (fields.notes?.trim()) {
+    const notesResult = await processMentions(
+      userId,
+      fields.notes,
+      sourceTool,
+      sourceRecordId,
+      "notes",
+      interactionTitle,
+      occurredAt,
+    );
+    combined.resolved.push(...notesResult.resolved);
+    combined.unresolved.push(...notesResult.unresolved);
+    combined.ambiguous.push(...notesResult.ambiguous);
+  }
+
+  // Process label — dedup against what notes already resolved
+  if (fields.label?.trim()) {
+    const resolvedNames = new Set(combined.resolved.map((r) => r.name.toLowerCase()));
+    const unresolvedNames = new Set(combined.unresolved.map((u) => u.name.toLowerCase()));
+
+    const labelMentions = parseMentions(fields.label);
+    const newLabelMentions = labelMentions.filter(
+      (m) => !resolvedNames.has(m.name.toLowerCase()) && !unresolvedNames.has(m.name.toLowerCase()),
+    );
+
+    if (newLabelMentions.length > 0) {
+      const labelResult = await processMentions(
+        userId,
+        fields.label,
+        sourceTool,
+        sourceRecordId,
+        "label",
+        interactionTitle,
+        occurredAt,
+      );
+      // Only add mentions not already covered by notes
+      for (const r of labelResult.resolved) {
+        if (!resolvedNames.has(r.name.toLowerCase())) {
+          combined.resolved.push(r);
+        }
+      }
+      for (const u of labelResult.unresolved) {
+        if (!unresolvedNames.has(u.name.toLowerCase())) {
+          combined.unresolved.push(u);
+        }
+      }
+      combined.ambiguous.push(...labelResult.ambiguous);
+    }
+  }
+
+  return combined;
 }

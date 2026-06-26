@@ -15,6 +15,7 @@ const KIND_FILTERS = [
   { value: "person", label: "People" },
   { value: "pet", label: "Pets" },
   { value: "organization", label: "Orgs" },
+  { value: "group", label: "Groups" },
 ];
 
 const RELATIONSHIP_FILTERS = [
@@ -115,7 +116,7 @@ export default async function RolodexPage({
   const urgentFollowUps = urgentFollowUpPersonIds
     .map((id) => {
       const person = allPersons.find((p) => p.id === id);
-      if (!person || person.contactKind === "pet" || person.contactKind === "organization") return null;
+      if (!person || person.contactKind === "pet" || person.contactKind === "organization" || person.contactKind === "group") return null;
       return { id: person.id, name: person.displayName, status: followUpStatus.get(id)! };
     })
     .filter(Boolean) as Array<{ id: string; name: string; status: "overdue" | "soon" | "pending" }>;
@@ -146,7 +147,7 @@ export default async function RolodexPage({
           className="btn-ghost shrink-0 px-3 py-1.5 text-[0.875rem] font-medium"
           style={{ color: "var(--accent)" }}
         >
-          + Add person
+          + Add
         </Link>
       </header>
 
@@ -261,6 +262,11 @@ export default async function RolodexPage({
                           {person.contactKind === "organization" && (
                             <span className="shrink-0 rounded px-1.5 py-0.5 text-[0.625rem] font-medium" style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)", color: "var(--text-muted)" }}>
                               🏢 Org
+                            </span>
+                          )}
+                          {person.contactKind === "group" && (
+                            <span className="shrink-0 rounded px-1.5 py-0.5 text-[0.625rem] font-medium" style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)", color: "var(--text-muted)" }}>
+                              👥 Group
                             </span>
                           )}
                         </p>

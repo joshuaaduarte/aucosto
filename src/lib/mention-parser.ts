@@ -11,7 +11,10 @@ export interface ParsedInsight {
   endOffset: number;
 }
 
-const RESERVED_KEYWORDS = new Set(["insight", "remember", "lesson", "decision"]);
+// Markers like @insight are processed by parseInsights(), not parseMentions().
+// These two code paths are mutually exclusive — a reserved marker is never a person.
+const RESERVED_MARKERS = new Set(["insight", "remember", "lesson", "decision"]);
+export { RESERVED_MARKERS };
 
 /**
  * Extract all @mentions from a string.
@@ -41,10 +44,13 @@ export function parseMentions(text: string): ParsedMention[] {
       name = match[1].trim();
     } else {
       const first = match[2]!;
-      if (RESERVED_KEYWORDS.has(first.toLowerCase())) continue;
       const second = match[3];
       name = second ? `${first} ${second}` : first;
     }
+
+    // Filter out reserved markers regardless of form (bare or bracket)
+    const firstWord = name.split(/\s/)[0] ?? "";
+    if (RESERVED_MARKERS.has(firstWord.toLowerCase())) continue;
 
     if (!name || seen.has(name)) continue;
     seen.add(name);

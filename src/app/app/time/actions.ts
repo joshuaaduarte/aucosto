@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import * as timeService from "@/lib/services/time";
-import { processMentions } from "@/lib/mention-processor";
+import { processMentions, processMentionsMultiField } from "@/lib/mention-processor";
 import { reflectOnDoItemSession } from "@/lib/services/do";
 import { logHabitProgress, markHabitDoneFromTimer } from "@/lib/services/habits";
 import {
@@ -219,12 +219,11 @@ export async function updateEntryNotes(
     });
     if (updated && trimmed) {
       try {
-        await processMentions(
+        await processMentionsMultiField(
           userId,
-          trimmed,
+          { label: updated.label, notes: trimmed },
           "time",
           id,
-          "notes",
           `Mentioned in time entry: ${updated.label}`,
           updated.startedAt,
         );
@@ -314,14 +313,13 @@ export async function saveEntryAction(
     };
   }
 
-  if (savedEntry && parsed.data.notes) {
+  if (savedEntry && (parsed.data.label || parsed.data.notes)) {
     try {
-      await processMentions(
+      await processMentionsMultiField(
         userId,
-        parsed.data.notes,
+        { label: parsed.data.label, notes: parsed.data.notes },
         "time",
         savedEntry.id,
-        "notes",
         `Mentioned in time entry: ${savedEntry.label}`,
         savedEntry.startedAt,
       );
