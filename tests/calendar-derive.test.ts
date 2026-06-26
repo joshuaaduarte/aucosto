@@ -18,6 +18,7 @@ function calendarItem(overrides: Partial<CalendarItem> = {}): CalendarItem {
     startsAt: now,
     endsAt: new Date("2026-05-21T10:00:00.000Z"),
     allDay: false,
+    categoryId: null,
     sourceTool: null,
     sourceRefId: null,
     notes: null,

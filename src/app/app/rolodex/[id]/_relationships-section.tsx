@@ -2,9 +2,9 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import type { RolodexRelation } from "@/lib/services/rolodex";
+import type { RolodexRelation } from "@/lib/rolodex";
+import { RELATION_TYPES } from "@/lib/rolodex";
 import type { RolodexPersonSummary } from "@/lib/services/rolodex";
-import { RELATION_TYPES } from "@/lib/services/rolodex";
 import { createRelationAction, deleteRelationAction } from "../actions";
 
 const TYPE_LABELS: Record<string, string> = {
