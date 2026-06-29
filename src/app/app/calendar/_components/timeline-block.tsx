@@ -309,7 +309,7 @@ export function CalendarBlockModal({
   const fieldKey = item?.id ?? "new";
   const headingId = `timeline-item-title-${fieldKey}`;
 
-  return (
+  return createPortal(
     <div className="calendar-modal-backdrop" role="presentation" onClick={onClose}>
       <div
         role="dialog"
@@ -504,6 +504,7 @@ export function CalendarBlockModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
