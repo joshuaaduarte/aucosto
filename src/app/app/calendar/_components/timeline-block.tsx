@@ -310,7 +310,7 @@ export function CalendarBlockModal({
   const headingId = `timeline-item-title-${fieldKey}`;
 
   return createPortal(
-    <div className="calendar-modal-backdrop" role="presentation" onClick={onClose}>
+    <div className="calendar-modal-backdrop" role="presentation" onPointerDown={(e) => e.stopPropagation()} onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"

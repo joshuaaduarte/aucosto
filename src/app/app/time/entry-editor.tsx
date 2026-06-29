@@ -161,6 +161,7 @@ export function EntryModal({
     <div
       className="calendar-modal-backdrop"
       role="presentation"
+      onPointerDown={(e) => e.stopPropagation()}
       onClick={onClose}
     >
       <div
