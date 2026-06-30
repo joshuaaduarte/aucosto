@@ -7,6 +7,7 @@
 // via getViewerContext() and 401 when there's no session.
 
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getViewerContext } from "@/lib/viewer-context";
 import { isRhythmType } from "@/lib/rhythms";
 import {
@@ -21,6 +22,7 @@ import {
   updateSleepWakeTime,
   updateWakeTime,
 } from "@/lib/services/rhythms";
+import { stopRunning } from "@/lib/services/time";
 
 export const dynamic = "force-dynamic";
 
@@ -80,12 +82,16 @@ export async function POST(request: Request) {
 
   try {
     // Morning check-in: log/refresh today's wake time, carry over last
-    // night's sleep duration. Returns { sleepMinutes }.
+    // night's sleep duration. Returns { sleepMinutes }. Also closes any
+    // open sleep session (resolveLastNightSleepMinutes inside startMorning),
+    // so the time tracker must refresh to show the wake-up marker.
     if (payload.action === "morning") {
       const result = await startMorning(
         userId,
         typeof payload.wakeTime === "string" ? payload.wakeTime : null,
       );
+      revalidatePath("/app");
+      revalidatePath("/app/time");
       return NextResponse.json(result, { status: 201 });
     }
     // Correct an already-recorded wake time (the morning card's edit pencil).
@@ -97,6 +103,8 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "wakeTime is required." }, { status: 400 });
       }
       await updateWakeTime(userId, payload.sessionId, payload.wakeTime);
+      revalidatePath("/app");
+      revalidatePath("/app/time");
       return NextResponse.json({ ok: true });
     }
     // Correct a completed sleep session's wake time (the sleep card's edit
@@ -119,11 +127,15 @@ export async function POST(request: Request) {
       if (!session) {
         return NextResponse.json({ error: "No sleep session with that id." }, { status: 404 });
       }
+      revalidatePath("/app");
+      revalidatePath("/app/time");
       return NextResponse.json({ session });
     }
     // Wrap up the morning so the hub card dismisses for the rest of the day.
     if (payload.action === "complete-morning") {
       await completeMorning(userId);
+      revalidatePath("/app");
+      revalidatePath("/app/time");
       return NextResponse.json({ ok: true });
     }
     if (payload.action === "start") {
@@ -149,9 +161,17 @@ export async function POST(request: Request) {
           end,
           payload.notes ?? null,
         );
+        revalidatePath("/app");
+        revalidatePath("/app/time");
         return NextResponse.json({ session }, { status: 201 });
       }
+      // Going to bed: stop any running time entry so it doesn't tick all night.
+      if (payload.type === "sleep") {
+        await stopRunning(userId);
+      }
       const session = await startRhythm(userId, payload.type, payload.notes ?? null);
+      revalidatePath("/app");
+      revalidatePath("/app/time");
       return NextResponse.json({ session }, { status: 201 });
     }
     if (payload.action === "end") {
@@ -162,6 +182,8 @@ export async function POST(request: Request) {
       if (!session) {
         return NextResponse.json({ error: "No active session with that id." }, { status: 404 });
       }
+      revalidatePath("/app");
+      revalidatePath("/app/time");
       return NextResponse.json({ session });
     }
     return NextResponse.json(
