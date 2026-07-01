@@ -24,7 +24,7 @@ export async function ActivityWidget() {
             className="text-[0.9375rem] font-semibold tracking-tight"
             style={{ color: "var(--text)" }}
           >
-            A quiet morning.
+            All quiet so far.
           </p>
           <p
             className="text-[0.8125rem] leading-relaxed"

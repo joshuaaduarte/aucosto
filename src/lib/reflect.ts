@@ -72,6 +72,30 @@ export function reflectionDayLabel(dateKey: string, todayKey: string): string {
   return "that day";
 }
 
+/** Consecutive-day reflection streak ending today (or yesterday — today not
+ *  being reflected yet shouldn't zero the streak mid-day). Takes the day keys
+ *  of saved reflections plus `todayKey` so callers stay pure. Duplicate keys
+ *  are fine; order doesn't matter. */
+export function reflectionStreak(
+  reflectedKeys: Iterable<string>,
+  todayKey: string,
+): number {
+  const keys = new Set(reflectedKeys);
+  const [year, month, day] = todayKey.split("-").map(Number);
+  if (year === undefined || month === undefined || day === undefined) return 0;
+  const cursor = new Date(year, month - 1, day);
+  // Grace day: if today isn't reflected yet, start counting from yesterday.
+  if (!keys.has(dayKey(cursor))) {
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  let streak = 0;
+  while (keys.has(dayKey(cursor))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
 export function isValidRating(value: number): value is 1 | 2 | 3 | 4 | 5 {
   return Number.isInteger(value) && value >= 1 && value <= 5;
 }

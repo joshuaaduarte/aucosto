@@ -31,10 +31,13 @@ const RELATIONSHIP_FILTERS = [
 function upcomingBirthdayLabel(birthday: string | null): string | null {
   if (!birthday) return null;
   const bday = new Date(birthday);
-  const now = new Date();
-  const thisYear = new Date(now.getFullYear(), bday.getMonth(), bday.getDate());
-  const upcoming = thisYear >= now ? thisYear : new Date(now.getFullYear() + 1, bday.getMonth(), bday.getDate());
-  const diffDays = Math.ceil((upcoming.getTime() - now.getTime()) / 86_400_000);
+  // Compare date-only: a birthday that IS today must not roll to next year
+  // just because midnight has passed.
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const thisYear = new Date(today.getFullYear(), bday.getMonth(), bday.getDate());
+  const upcoming = thisYear >= today ? thisYear : new Date(today.getFullYear() + 1, bday.getMonth(), bday.getDate());
+  const diffDays = Math.round((upcoming.getTime() - today.getTime()) / 86_400_000);
   if (diffDays <= 30) {
     return diffDays === 0 ? "Birthday today!" : `Birthday in ${diffDays}d`;
   }
@@ -151,6 +154,58 @@ export default async function RolodexPage({
         </Link>
       </header>
 
+      {/* Mobile-only compact attention strip: follow-ups due + birthdays.
+          The full panel below is desktop-only, and Josh lives on the phone —
+          without this, due follow-ups and birthdays were invisible unless the
+          person happened to be in the visible list. */}
+      {(urgentFollowUps.length > 0 || upcomingBirthdays.length > 0) && (
+        <div
+          className="lg:hidden rounded-xl p-3 space-y-1.5"
+          style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)" }}
+        >
+          <p className="text-[0.6875rem] font-semibold uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>
+            Needs attention
+          </p>
+          {urgentFollowUps.slice(0, 3).map((fu) => (
+            <Link
+              key={`fu-${fu.id}`}
+              href={`/app/rolodex/${fu.id}`}
+              className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-bg-hover"
+            >
+              <span
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ background: fu.status === "overdue" ? "#b45309" : "#d97706" }}
+                aria-hidden
+              />
+              <span className="truncate text-[0.8125rem] font-medium" style={{ color: "var(--text)" }}>
+                {fu.name}
+              </span>
+              <span
+                className="ml-auto shrink-0 text-[0.6875rem] font-medium"
+                style={{ color: fu.status === "overdue" ? "#b45309" : "#d97706" }}
+              >
+                {fu.status === "overdue" ? "Follow-up overdue" : "Follow-up soon"}
+              </span>
+            </Link>
+          ))}
+          {upcomingBirthdays.slice(0, 3).map((b) => (
+            <Link
+              key={`bd-${b.id}`}
+              href={`/app/rolodex/${b.id}`}
+              className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-bg-hover"
+            >
+              <span className="shrink-0 text-[0.875rem]" aria-hidden>🎂</span>
+              <span className="truncate text-[0.8125rem] font-medium" style={{ color: "var(--text)" }}>
+                {b.name}
+              </span>
+              <span className="ml-auto shrink-0 text-[0.6875rem]" style={{ color: "var(--text-faint)" }}>
+                {b.label.replace("Birthday ", "")}
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
+
       {/* Desktop two-column layout: contact list left, attention panel right */}
       <div className="lg:grid lg:grid-cols-[1fr_280px] lg:gap-8">
         {/* Left column: search + filter + list */}
@@ -219,9 +274,9 @@ export default async function RolodexPage({
                 style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)" }}
               >
                 <p className="text-[0.9375rem] font-medium" style={{ color: "var(--text-muted)" }}>
-                  {q || type ? "No contacts match your filter." : "Your Rolodex is empty — add someone to get started."}
+                  {q || type || kind ? "No contacts match your filter." : "Your Rolodex is empty — add someone to get started."}
                 </p>
-                {!q && !type && (
+                {!q && !type && !kind && (
                   <Link
                     href="/app/rolodex/new"
                     className="mt-3 inline-block text-[0.875rem] font-medium"

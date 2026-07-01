@@ -3,11 +3,22 @@ import { resolveActiveUserId } from "@/lib/viewer-context";
 import { WidgetCard } from "./widget-card";
 
 function formatWhen(date: Date) {
-  return date.toLocaleString([], {
-    weekday: "short",
+  // "Wed 3:00 PM" is ambiguous at a glance — today and next Wednesday read
+  // the same. Say "Today" / "Tomorrow" when that's what it is.
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+  const diffDays = Math.round(
+    (target.getTime() - today.getTime()) / 86_400_000,
+  );
+  const time = date.toLocaleTimeString([], {
     hour: "numeric",
     minute: "2-digit",
   });
+  if (diffDays === 0) return `Today ${time}`;
+  if (diffDays === 1) return `Tomorrow ${time}`;
+  return `${date.toLocaleDateString([], { weekday: "short" })} ${time}`;
 }
 
 export async function CalendarWidget() {

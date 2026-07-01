@@ -10,7 +10,7 @@ import {
   formatMinutesLabel,
   humanizeDoStatus,
 } from "./hub-format";
-import { ArrowRight, CalendarIcon, ClockIcon, ConnectionIcon, WalletIcon } from "./icons";
+import { ArrowRight, CalendarIcon, ClockIcon, ListIcon, RepeatIcon, WalletIcon } from "./icons";
 
 export function QuickActionsSection({
   runningEntry,
@@ -116,7 +116,7 @@ export function QuickActionsSection({
         )}
         <QuickCard
           href="/app/do"
-          icon={<ConnectionIcon />}
+          icon={<ListIcon />}
           label="Do List"
           value={suggestedTasks[0] ? suggestedTasks[0].title : "Quiet"}
           meta={
@@ -129,7 +129,7 @@ export function QuickActionsSection({
         />
         <QuickCard
           href="/app/habits"
-          icon={<ConnectionIcon />}
+          icon={<RepeatIcon />}
           label="Habits"
           value={
             suggestedHabits[0]

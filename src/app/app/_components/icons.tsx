@@ -39,6 +39,28 @@ export function CalendarIcon() {
   );
 }
 
+export function ListIcon() {
+  return (
+    <svg {...ip}>
+      <path d="M5 4h8M5 7.5h8M5 11h5" />
+      <circle cx="2.5" cy="4" r="0.6" fill="currentColor" />
+      <circle cx="2.5" cy="7.5" r="0.6" fill="currentColor" />
+      <circle cx="2.5" cy="11" r="0.6" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function RepeatIcon() {
+  return (
+    <svg {...ip}>
+      <path d="M3 4.5h6.5a2.5 2.5 0 0 1 0 5H8.5" />
+      <path d="M9.5 2.75 11.25 4.5 9.5 6.25" />
+      <path d="M6.5 10.5H4a2.5 2.5 0 0 1 0-5h1" />
+      <path d="M3.5 8.75 1.75 10.5 3.5 12.25" />
+    </svg>
+  );
+}
+
 export function ConnectionIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden>

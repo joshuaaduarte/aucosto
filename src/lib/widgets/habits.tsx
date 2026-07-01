@@ -36,7 +36,10 @@ export async function HabitsWidget() {
               {next.title}
             </p>
             <p className="mt-0.5 text-[0.75rem]" style={{ color: "var(--text-muted)" }}>
-              {next.targetLabel} · {next.keptAliveStreak} kept alive
+              {next.targetLabel}
+              {Math.max(next.currentStreak, next.keptAliveStreak) > 0
+                ? ` · 🔥 ${Math.max(next.currentStreak, next.keptAliveStreak)} day streak`
+                : ""}
             </p>
           </div>
 
@@ -47,8 +50,12 @@ export async function HabitsWidget() {
                   <span className="truncate text-[0.8125rem]" style={{ color: "var(--text)" }}>
                     {habit.title}
                   </span>
-                  <span className="shrink-0 text-[0.6875rem]" style={{ color: "var(--text-faint)" }}>
-                    {habit.keptAliveStreak} kept alive
+                  <span className="shrink-0 text-[0.6875rem] tabular" style={{ color: "var(--text-faint)" }}>
+                    {Math.max(habit.currentStreak, habit.keptAliveStreak) > 0
+                      ? `${Math.max(habit.currentStreak, habit.keptAliveStreak)}d streak`
+                      : habit.completedToday
+                        ? "done today"
+                        : "no streak yet"}
                   </span>
                 </li>
               ))}

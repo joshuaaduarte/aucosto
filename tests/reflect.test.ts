@@ -7,6 +7,7 @@ import {
   moodColor,
   moodEmoji,
   reflectionDayLabel,
+  reflectionStreak,
   summarizeSnapshot,
 } from "@/lib/reflect";
 
@@ -64,6 +65,35 @@ describe("reflectionDayLabel", () => {
   it("collapses older days to 'that day'", () => {
     expect(reflectionDayLabel("2026-06-12", "2026-06-14")).toBe("that day");
     expect(reflectionDayLabel("2026-01-01", "2026-06-14")).toBe("that day");
+  });
+});
+
+describe("reflectionStreak", () => {
+  it("counts consecutive days ending today", () => {
+    expect(
+      reflectionStreak(["2026-06-14", "2026-06-13", "2026-06-12"], "2026-06-14"),
+    ).toBe(3);
+  });
+
+  it("grants a grace day when today is not reflected yet", () => {
+    expect(
+      reflectionStreak(["2026-06-13", "2026-06-12"], "2026-06-14"),
+    ).toBe(2);
+  });
+
+  it("breaks on a gap and spans month boundaries", () => {
+    expect(
+      reflectionStreak(["2026-06-14", "2026-06-12"], "2026-06-14"),
+    ).toBe(1);
+    expect(
+      reflectionStreak(["2026-06-01", "2026-05-31", "2026-05-30"], "2026-06-01"),
+    ).toBe(3);
+  });
+
+  it("returns 0 with no recent reflections or bad input", () => {
+    expect(reflectionStreak([], "2026-06-14")).toBe(0);
+    expect(reflectionStreak(["2026-06-10"], "2026-06-14")).toBe(0);
+    expect(reflectionStreak(["2026-06-14"], "garbage")).toBe(0);
   });
 });
 

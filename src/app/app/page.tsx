@@ -16,7 +16,7 @@ import {
   deriveInsightOfTheDay,
 } from "@/lib/insights";
 import { getRunningEntry, listCompletedSince, listEntriesBetween } from "@/lib/services/time";
-import { dayKey } from "@/lib/reflect";
+import { dayKey, reflectionStreak } from "@/lib/reflect";
 import { startOfToday, startOfWeek } from "@/lib/time";
 import { sumDurations } from "@/lib/time-summary";
 import { getViewerContext } from "@/lib/viewer-context";
@@ -247,6 +247,12 @@ export default async function HubPage() {
   );
   const reflectedToday = dayKey(now) in moodsByDay;
   const isEvening = now.getHours() >= 18;
+  // Consecutive-day reflection streak from the 60-day window already fetched
+  // for insights — pure derive, no extra query.
+  const reflectStreak = reflectionStreak(
+    recentReflections.map((reflection) => reflection.dateKey),
+    dayKey(now),
+  );
 
   // Yesterday's reflection nags persistently until it's done — a passed day
   // left unreflected is a gap to close, and the morning (before noon) is the
@@ -366,6 +372,7 @@ export default async function HubPage() {
         moodsByDay={moodsByDay}
         reflectedToday={reflectedToday}
         isEvening={isEvening}
+        streak={reflectStreak}
       />
 
       <CrossToolCallout

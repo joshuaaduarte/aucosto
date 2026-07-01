@@ -10,12 +10,15 @@ export function ReflectSection({
   moodsByDay,
   reflectedToday,
   isEvening,
+  streak = 0,
 }: {
   /** Last 7 local day keys, oldest first (today last). */
   days: string[];
   moodsByDay: Record<string, number>;
   reflectedToday: boolean;
   isEvening: boolean;
+  /** Consecutive-day reflection streak (today or yesterday anchored). */
+  streak?: number;
 }) {
   const showNudge = isEvening && !reflectedToday;
 
@@ -59,6 +62,15 @@ export function ReflectSection({
             );
           })}
         </span>
+        {streak >= 2 ? (
+          <span
+            className="shrink-0 rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold tabular"
+            style={{ background: "var(--bg-tint)", color: "var(--text-muted)" }}
+            title={`${streak} days reflected in a row`}
+          >
+            🔥 {streak}
+          </span>
+        ) : null}
       </Link>
 
       {reflectedToday ? (

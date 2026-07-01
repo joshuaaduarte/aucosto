@@ -73,8 +73,18 @@ export function deriveHubPrompts(input: HubPromptInput): HubPrompt[] {
     if (dueSoon) {
       const days = daysUntil(dueSoon.dueDate);
       if (days <= 7) {
+        // A due date with a time component can slip just past midnight and
+        // still pass the 24h grace filter — never render "in -1 days".
+        const whenLabel =
+          days < 0
+            ? "yesterday"
+            : days === 0
+              ? "today"
+              : days === 1
+                ? "tomorrow"
+                : `in ${days} days`;
         prompts.push({
-          text: `Card due ${days === 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`}: ${formatUSDFromCents(dueSoon.balanceCents)} on ${dueSoon.name}.`,
+          text: `Card due ${whenLabel}: ${formatUSDFromCents(dueSoon.balanceCents)} on ${dueSoon.name}.`,
           tone: days <= 3 ? "amber" : "zinc",
           ctaLabel: "Review finance",
           href: "/app/finance",
