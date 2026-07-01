@@ -17,11 +17,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireCan } from "@/lib/auth/can";
 import { recordEvent } from "@/lib/services/events";
-import {
-  PRESET_TIME_CATEGORIES,
-  categoryColor,
-  normalizeCategory,
-} from "@/lib/time-categories";
+import { PRESET_TIME_CATEGORIES, categoryColor } from "@/lib/time-categories";
 
 export type TimeCategoryRecord = {
   id: string;

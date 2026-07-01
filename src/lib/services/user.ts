@@ -20,6 +20,16 @@ export type UpdatePrivacySettingsResult = {
 
 export class PrivacyValidationError extends Error {}
 
+/** Display name + finance visibility, for read surfaces like the assistant snapshot. */
+export async function getUserProfile(
+  userId: string,
+): Promise<{ name: string | null; financeVisible: boolean } | null> {
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true, financeVisible: true },
+  });
+}
+
 export async function updatePrivacySettings(
   userId: string,
   input: UpdatePrivacySettingsInput,

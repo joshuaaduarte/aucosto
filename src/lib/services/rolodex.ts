@@ -693,7 +693,89 @@ export async function updateFollowUp(
   );
 }
 
+/**
+ * Find the interaction previously synced from a given source record, if any —
+ * the mention processor updates it in place on re-save instead of stacking
+ * duplicates.
+ */
+export async function getInteractionForSource(
+  userId: string,
+  personId: string,
+  sourceTool: string,
+  sourceRecordId: string,
+): Promise<{ id: string } | null> {
+  requireCan(userId, "rolodex", "read");
+  try {
+    const rows = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
+      `SELECT "id" FROM "RolodexInteraction"
+       WHERE "userId" = $1 AND "personId" = $2 AND "sourceTool" = $3 AND "sourceRecordId" = $4
+       LIMIT 1`,
+      userId,
+      personId,
+      sourceTool,
+      sourceRecordId,
+    );
+    return rows[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function updateInteractionContent(
+  userId: string,
+  interactionId: string,
+  data: { title: string; body: string | null; occurredAt: Date },
+): Promise<void> {
+  requireCan(userId, "rolodex", "write");
+  await prisma.$executeRawUnsafe(
+    `UPDATE "RolodexInteraction"
+     SET "title" = $1, "body" = $2, "occurredAt" = $3::timestamptz
+     WHERE "id" = $4 AND "userId" = $5`,
+    data.title,
+    data.body,
+    data.occurredAt.toISOString(),
+    interactionId,
+    userId,
+  );
+}
+
 // ── Mention resolution ────────────────────────────────────────────────────
+
+/**
+ * Look up an existing mention for this exact (sourceTool, sourceRecordId,
+ * sourceField, mentionedName) key. Returns the row if found so callers can
+ * check whether it is already resolved — unresolved mentions should be
+ * retried when the person is eventually added to the Rolodex.
+ */
+export async function getMentionForSource(
+  userId: string,
+  data: {
+    sourceTool: string;
+    sourceRecordId: string;
+    sourceField: string;
+    mentionedName: string;
+  },
+): Promise<{ id: string; resolved: boolean; personId: string | null } | null> {
+  requireCan(userId, "rolodex", "read");
+  try {
+    const rows = await prisma.$queryRawUnsafe<
+      Array<{ id: string; resolved: boolean; personId: string | null }>
+    >(
+      `SELECT "id", "resolved", "personId" FROM "RolodexMention"
+       WHERE "userId" = $1 AND "sourceTool" = $2 AND "sourceRecordId" = $3
+         AND "sourceField" = $4 AND "mentionedName" = $5
+       LIMIT 1`,
+      userId,
+      data.sourceTool,
+      data.sourceRecordId,
+      data.sourceField,
+      data.mentionedName,
+    );
+    return rows[0] ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export async function createMention(
   userId: string,

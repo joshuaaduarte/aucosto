@@ -18,7 +18,8 @@ export type Tool =
   | "projects"
   | "reflect"
   | "rhythm"
-  | "rolodex";
+  | "rolodex"
+  | "insight";
 export type Action = "read" | "write";
 
 export function can(

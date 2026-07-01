@@ -6,15 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-aucosto is a personal day-to-day dashboard / hub of tools. Single-user (Josh); partner may get scoped finance access later. Designed so external agents can eventually read/write through token-authenticated API endpoints — but the agent surface is **deferred**. Don't pre-build it.
+aucosto is a personal day-to-day dashboard / hub of tools. Single-user (Josh); partner may get scoped finance access later. External agents read/write through the **assistant surface** (`/api/assistant/*` — snapshot read + preview/execute action API, session-cookie authed, audited; see `docs/assistant-actions.md`). Keep that surface narrow — new write actions need a risk level and an audit trail, and finance writes/deletes/bulk ops stay excluded.
 
 **Current branch state: `main` IS the live Next.js app.** (The old CRA scaffold is history; `origin/nextjs-rewrite` is a stale remnant of the rewrite.)
 
-**Deeper docs:** `docs/architecture.md` (per-tool file map and gotchas) and `docs/lessons.md` (hard-won debugging lessons — read before touching raw SQL, migrations, mobile layout, or modals). Deployed on **Vercel** (auto-deploy from `main`); `/api/health` reports the live commit sha + DB reachability.
+**Deeper docs:** `docs/architecture.md` (per-tool file map and gotchas), `docs/lessons.md` (hard-won debugging lessons — read before touching raw SQL, migrations, mobile layout, or modals), and `docs/assistant-actions.md` (agent-facing snapshot + action API). Deployed on **Vercel** (auto-deploy from `main`); `/api/health` reports the live commit sha + DB reachability.
 
 ## Tool map — go here first
 
-Ten tools, one row each. Every tool follows the same shape: schema → service → page/actions → widget.
+One row per tool. Every tool follows the same shape: schema → service → page/actions → widget.
 
 | Tool | Schema (`prisma/schema/`) | Service (`src/lib/services/`) | UI (`src/app/app/`) | Widget (`src/lib/widgets/`) | Pure helpers (`src/lib/`) |
 |---|---|---|---|---|---|
@@ -27,6 +27,9 @@ Ten tools, one row each. Every tool follows the same shape: schema → service �
 | reflect | `reflect.prisma` (DailyReflection) | `reflect.ts` (⚠️ raw SQL — see "Known technical debt") | `reflect/` (+ `reflect/history/`) | — (hub `ReflectSection`) | `reflect.ts` (mood scale, dayKey, snapshot types) |
 | rhythms | `rhythms.prisma` (RhythmSession) | `rhythms.ts` (⚠️ raw SQL — same reflect pattern; fallback `scripts/create-rhythm-table.sql`) | **no page** — hub-only contextual cards (`_components/rhythm-hub-card.tsx` + `sleep-backfill-card.tsx`); `rhythms/page.tsx` just redirects to `/app` | — (hub morning/bedtime check-in) | `rhythms.ts` (5 rhythm defs + checklists, hour→rhythm suggestion, duration fmt); `insights/rhythms.ts` (weekly consistency) |
 | insights | — (reads everything) | — (queries via other services) | `insights/` | — (hub `InsightOfTheDayCard`) | `insights/` (shared buckets, trends, patterns, daily — all pure + tested) |
+| rolodex (contacts) | `rolodex.prisma` (RolodexPerson, RolodexInteraction, RolodexMention, RolodexRelation) | `rolodex.ts` (⚠️ raw SQL + runtime `ensureRolodexTables()`) + `rolodex-mentions.ts` | `rolodex/` (list, `new/`, `[id]/`, `[id]/edit/`) | — (no widget) | `rolodex.ts` (shared types), `mention-parser.ts` (@Name / @[Full Name] / @insight parsing) |
+| captured insights (@insight notes) | `insights-capture.prisma` (CapturedInsight, CapturedInsightPerson) | `captured-insights.ts` (⚠️ raw SQL + runtime `ensureInsightTables()`) | — (surfaces on `time/captured-today.tsx`, rolodex person pages) | — | `mention-processor.ts` (cross-tool orchestrator: text → mentions + insights via the rolodex/captured-insights services) |
+| assistant (agent surface) | — (audit table via runtime DDL) | `assistant-audit.ts` | `assistant/` (snapshot control panel) + `src/app/api/assistant/*` routes | — | `assistant-snapshot.ts` (aggregates every service, no DB), `assistant-signals.ts`, `assistant-actions.ts` (action registry), `assistant-action-executor.ts` (zod-validated, service-delegating) |
 | events (activity log) | `events.prisma` (Event) | `events.ts` (`recordEvent`) | — | `activity.tsx` | `event-types.ts` (label map) |
 
 Cross-cutting pure helpers: `wall-clock.ts` (browser-side date/time → ISO conversion for forms — **mandatory** for any date+start+end form, see lessons #10).
@@ -47,6 +50,9 @@ Other key entry points:
 - Teller bank linking: `src/lib/teller.ts` (API client), `src/lib/services/finance/teller-sync.ts`, webhook at `src/app/api/teller/webhook/route.ts` (verified via `src/lib/teller-webhooks.ts`).
 - Statement import: `src/lib/statement-import/` (CSV + PDF parsers; `pdf-text.ts` extracts text).
 - Privacy/lock UI: `src/app/app/privacy-panel.tsx`, `privacy-actions.ts`, `unlock-screen.tsx`, `lock-now-button.tsx`, `finance/widget-lock-screen.tsx`.
+- Assistant surface: `src/app/app/assistant/page.tsx` (human-readable snapshot) + `/api/assistant/{snapshot,capabilities,actions/preview,actions/execute,actions/history}` route handlers — every route re-checks `auth()` itself (the proxy matcher excludes `/api`); audit trail lives in `src/lib/services/assistant-audit.ts`.
+- @mention / @insight capture: `src/lib/mention-parser.ts` (pure) → `src/lib/mention-processor.ts` (orchestrator), called from time/calendar/reflect/do/projects actions; suggestions API at `src/app/api/rolodex/mention-suggestions/route.ts`.
+- PiP mini timer: `src/components/pip-timer-widget.tsx` (Document Picture-in-Picture, desktop Chrome only), launched from the timer bar.
 
 ## Stack (all bleeding-edge — verify, don't assume)
 
@@ -126,7 +132,7 @@ The Prisma schema is **split per tool** under `prisma/schema/`: `core.prisma` ho
 
 ### Service layer (the chokepoint)
 
-**Tool data access goes through `src/lib/services/<tool>.ts`, never directly through `prisma.<model>.*`** outside the service. (Exceptions: `viewer-context.ts` reads the User row, and `auth.ts` does the credentials lookup — both are infra, not tool data.) This is the single most important architectural rule for keeping tools decoupled.
+**Tool data access goes through `src/lib/services/<tool>.ts`, never directly through `prisma.<model>.*`** outside the service. (Exceptions: `viewer-context.ts` reads the User row, `auth.ts` does the credentials lookup, `demo-workspace.ts` manages the shadow demo user, and the health probe pings the DB — all infra, not tool data.) This is the single most important architectural rule for keeping tools decoupled. Cross-tool orchestrators (`mention-processor.ts`, `assistant-snapshot.ts`, `assistant-action-executor.ts`) live in `src/lib/` but compose **only service functions** — no direct prisma there either.
 
 What lives in a service:
 - Typed functions that take `userId` as first arg and call `requireCan(userId, "<tool>", "read"|"write")` at the top.
@@ -141,7 +147,7 @@ Why: when Tool B needs Tool A's data, it imports from `@/lib/services/<a>` — n
 
 `can(userId, tool, action)` is the single permission check. V1 returns true for any authenticated user. Services call `requireCan(...)` which asserts the userId is a string or throws `AuthorizationError`.
 
-The `Tool` union is `"time" | "finance" | "calendar" | "events" | "do" | "habit" | "projects"`. New tools must be added to the union before their service can call `requireCan`.
+The `Tool` union currently covers `time`, `finance`, `calendar`, `events`, `do`, `habit`, `projects`, `reflect`, `rhythm`, `rolodex`, and `insight` — see `src/lib/auth/can.ts` for the authoritative list. New tools must be added to the union before their service can call `requireCan`; never borrow another tool's name (that's how partner-scoped permissions would leak later).
 
 Adding partner-with-finance-read-only later is **one edit to `can.ts`** — service callsites don't change.
 
@@ -223,7 +229,7 @@ The pattern, learned the hard way (two production outages — `docs/lessons.md` 
 
 ### Per-request DB client
 
-`src/lib/prisma.ts` is a global singleton (dev-mode protected against HMR re-instantiation). **Services** `import { prisma } from "@/lib/prisma"`; app code does not. Do not `new PrismaClient()` anywhere except in scripts where a one-shot is desired.
+`src/lib/prisma.ts` is a **lazy** global singleton (dev-mode protected against HMR re-instantiation): the client is constructed on first property access, so importing the module — and therefore `next build`'s page-data collection — never requires `DATABASE_URL`. **Services** `import { prisma } from "@/lib/prisma"`; app code does not. Do not `new PrismaClient()` anywhere except in scripts where a one-shot is desired.
 
 The Prisma client is imported from `@/generated/prisma/client` (output dir, gitignored), not from `@prisma/client`.
 

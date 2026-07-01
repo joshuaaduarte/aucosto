@@ -122,6 +122,7 @@ export async function deleteInsightsForSource(
   sourceRecordId: string,
   sourceField: string | null,
 ): Promise<void> {
+  requireCan(userId, "insight", "write");
   if (sourceField) {
     await prisma.$executeRawUnsafe(
       `DELETE FROM "CapturedInsight"
@@ -151,6 +152,7 @@ export async function createInsight(data: {
   text: string;
   kind?: string;
 }): Promise<CapturedInsight> {
+  requireCan(data.userId, "insight", "write");
   const rows = await prisma.$queryRawUnsafe<InsightRow[]>(
     `INSERT INTO "CapturedInsight" (
        "userId", "sourceTool", "sourceRecordId", "sourceField",
@@ -168,7 +170,7 @@ export async function createInsight(data: {
   const row = rows[0]!;
   await recordEvent({
     userId: data.userId,
-    tool: "time",
+    tool: "insight",
     type: "insight.captured",
     refId: row.id,
     meta: { text: data.text.slice(0, 100) },
@@ -177,10 +179,11 @@ export async function createInsight(data: {
 }
 
 export async function linkInsightToPerson(
+  userId: string,
   insightId: string,
   personId: string,
-  userId: string,
 ): Promise<void> {
+  requireCan(userId, "insight", "write");
   await prisma.$executeRawUnsafe(
     `INSERT INTO "CapturedInsightPerson" ("userId", "insightId", "personId")
      VALUES ($1, $2, $3)
@@ -196,7 +199,7 @@ export async function unlinkInsightFromPerson(
   insightId: string,
   personId: string,
 ): Promise<void> {
-  requireCan(userId, "time", "write");
+  requireCan(userId, "insight", "write");
   await prisma.$executeRawUnsafe(
     `DELETE FROM "CapturedInsightPerson"
      WHERE "userId" = $1 AND "insightId" = $2 AND "personId" = $3`,
@@ -211,7 +214,7 @@ export async function listInsightsForSource(
   sourceTool: string,
   sourceRecordId: string,
 ): Promise<CapturedInsight[]> {
-  requireCan(userId, "time", "read");
+  requireCan(userId, "insight", "read");
   try {
     const rows = await prisma.$queryRawUnsafe<InsightRow[]>(
       `SELECT * FROM "CapturedInsight"
@@ -247,7 +250,7 @@ export async function listInsightsForPerson(
   personId: string,
   opts?: { limit?: number },
 ): Promise<CapturedInsight[]> {
-  requireCan(userId, "time", "read");
+  requireCan(userId, "insight", "read");
   const limit = opts?.limit ?? 20;
   try {
     const rows = await prisma.$queryRawUnsafe<InsightRow[]>(
@@ -271,7 +274,7 @@ export async function listRecentInsights(
   userId: string,
   opts?: { limit?: number; since?: Date },
 ): Promise<CapturedInsight[]> {
-  requireCan(userId, "time", "read");
+  requireCan(userId, "insight", "read");
   const limit = opts?.limit ?? 10;
   try {
     let rows: InsightRow[];

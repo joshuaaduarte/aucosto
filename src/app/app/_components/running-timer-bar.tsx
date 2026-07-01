@@ -16,8 +16,11 @@ export async function RunningTimerBar({ userId }: { userId: string }) {
   // (this component returns null otherwise), so idle pages pay nothing.
   const pipState = await loadPipState(userId);
 
+  // Keyed by entry id so switching timers remounts the bar — note state and
+  // the popover are seeded from props once per entry and can't leak across.
   return (
     <TimerBarClient
+      key={running.id}
       entryId={running.id}
       entryLabel={running.label}
       color={categoryColor(running.category)}

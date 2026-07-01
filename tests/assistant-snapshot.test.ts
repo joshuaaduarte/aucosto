@@ -3,8 +3,6 @@ import {
   computeSignals,
   computeBriefing,
   resolveTimezone,
-  FOCUS_TEMPLATES,
-  WATCHOUT_TEMPLATES,
   JOURNAL_PROMPTS,
   type SignalFacts,
 } from "@/lib/assistant-signals";

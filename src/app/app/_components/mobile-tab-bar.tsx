@@ -9,7 +9,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SignOutButton } from "../sign-out-button";
 import { useBodyScrollLock } from "./use-body-scroll-lock";
@@ -166,6 +166,10 @@ const MORE_TOOLS: MoreTool[] = [
   },
 ];
 
+// No store to subscribe to — the hour is only re-read on re-render, which is
+// all the reflect dot needs.
+const emptySubscribe = () => () => {};
+
 export function MobileTabBar({
   showFinance,
   needsReflect = false,
@@ -181,12 +185,13 @@ export function MobileTabBar({
   // The reflection nudge only makes sense in the evening — before 6pm there's
   // nothing to act on yet, so a dot all day reads as false urgency. The hour
   // check must run client-side: the server is TZ-pinned to LA, but we want the
-  // viewer's actual local hour. Defaults to false until mounted so SSR (and
+  // viewer's actual local hour. The server snapshot is false so SSR (and
   // the morning) never paints the dot.
-  const [isEvening, setIsEvening] = useState(false);
-  useEffect(() => {
-    setIsEvening(new Date().getHours() >= 18);
-  }, []);
+  const isEvening = useSyncExternalStore(
+    emptySubscribe,
+    () => new Date().getHours() >= 18,
+    () => false,
+  );
   const showReflectDot = needsReflect && isEvening;
 
   const moreTools = MORE_TOOLS.filter((tool) => showFinance || !tool.finance);

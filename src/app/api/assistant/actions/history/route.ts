@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { getRecentAudits } from "@/lib/assistant-action-audit";
+import { getRecentAudits } from "@/lib/services/assistant-audit";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";

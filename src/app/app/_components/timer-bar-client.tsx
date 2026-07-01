@@ -59,17 +59,9 @@ export function TimerBarClient({
     return () => clearInterval(id);
   }, []);
 
-  // The bar isn't remounted when you switch timers — it just re-renders with
-  // new props. Re-seed the note state (and close the popover) so notes never
-  // leak from one entry to the next.
-  useEffect(() => {
-    setNotes(initialNotes ?? "");
-    notesRef.current = initialNotes ?? "";
-    lastSaved.current = initialNotes ?? "";
-    setNoteOpen(false);
-    // entryId is the identity that changes on a switch; initialNotes rides along.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entryId]);
+  // Note state is seeded once per entry: the parent keys this component by
+  // entryId, so switching timers remounts the bar and nothing leaks between
+  // entries.
 
   const save = (value: string) => {
     if (value === lastSaved.current) return;
