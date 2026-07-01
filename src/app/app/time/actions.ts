@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import * as timeService from "@/lib/services/time";
-import { processMentions, processMentionsMultiField } from "@/lib/mention-processor";
+import { processMentionsMultiField } from "@/lib/mention-processor";
 import { reflectOnDoItemSession } from "@/lib/services/do";
 import { logHabitProgress, markHabitDoneFromTimer } from "@/lib/services/habits";
 import {

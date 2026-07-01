@@ -35,3 +35,13 @@ jobs:
         env:
           DATABASE_URL: postgres://noop:noop@127.0.0.1:5432/noop
           DIRECT_URL: postgres://noop:noop@127.0.0.1:5432/noop
+
+      # Full production build — catches what tsc/lint can't (page-data
+      # collection, route-module import errors). The prisma client is lazy,
+      # so no real DATABASE_URL is needed at build time; the placeholders
+      # keep prisma.config.ts happy during the `prisma generate` step of
+      # `npm run build`.
+      - run: npm run build
+        env:
+          DATABASE_URL: postgres://noop:noop@127.0.0.1:5432/noop
+          DIRECT_URL: postgres://noop:noop@127.0.0.1:5432/noop

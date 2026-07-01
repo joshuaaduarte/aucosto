@@ -6,7 +6,6 @@
 
 import "server-only";
 
-import { prisma } from "@/lib/prisma";
 import { describeEventType } from "@/lib/event-types";
 import { dayKey } from "@/lib/reflect";
 import { startOfToday } from "@/lib/time";
@@ -36,6 +35,7 @@ import {
   listRecentInsights,
 } from "@/lib/services/captured-insights";
 import { getReflection } from "@/lib/services/reflect";
+import { getUserProfile } from "@/lib/services/user";
 import { getTodayWakeStatus } from "@/lib/services/rhythms";
 import {
   getRunningEntry,
@@ -250,10 +250,7 @@ export async function buildAssistantSnapshot(
     listRecentEvents(userId, { limit: 10 }),
     getTodayWakeStatus(userId),
     getReflection(userId, yesterdayKey),
-    prisma.user.findUnique({
-      where: { id: userId },
-      select: { name: true, financeVisible: true },
-    }),
+    getUserProfile(userId),
     listAccounts(userId),
     listProjectPlanSummaries(userId).catch(() => []),
     getUpcomingBirthdays(userId).catch(() => []),

@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { ACTION_REGISTRY } from "@/lib/assistant-actions";
 import { previewAction } from "@/lib/assistant-action-executor";
-import { recordAudit } from "@/lib/assistant-action-audit";
+import { recordAudit } from "@/lib/services/assistant-audit";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";

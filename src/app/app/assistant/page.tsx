@@ -10,7 +10,7 @@ import { resolveActiveUserId } from "@/lib/viewer-context";
 import {
   getRecentAudits,
   type AssistantActionAudit,
-} from "@/lib/assistant-action-audit";
+} from "@/lib/services/assistant-audit";
 
 export const dynamic = "force-dynamic";
 
@@ -82,7 +82,7 @@ function SnapshotView({
           className="rounded border px-3 py-2 text-[0.8125rem]"
           style={{ borderColor: AMBER, color: AMBER }}
         >
-          ⚠ Timer "{facts.today.time.runningTimer.title}" has been running for{" "}
+          ⚠ Timer &ldquo;{facts.today.time.runningTimer.title}&rdquo; has been running for{" "}
           {formatMinutes(facts.today.time.runningTimer.elapsedMinutes ?? 0)} and
           may be stale. Consider stopping it via the assistant or manually.
         </div>

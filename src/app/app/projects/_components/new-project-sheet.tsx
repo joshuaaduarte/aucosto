@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState, useTransition } from "react";
+import { useActionState, useState, useTransition } from "react";
 import {
   AREA_COLOR_PALETTE,
   BOARD_STATUSES,
@@ -29,9 +29,13 @@ export function NewProjectSheet({ areas: initialAreas }: { areas: AreaView[] }) 
   const [areaPending, startArea] = useTransition();
   const [areaError, setAreaError] = useState<string | null>(null);
 
-  useEffect(() => {
+  // Re-seed from the server list when revalidation delivers a fresh one
+  // (render-phase adjustment — avoids the extra effect pass).
+  const [prevInitialAreas, setPrevInitialAreas] = useState(initialAreas);
+  if (prevInitialAreas !== initialAreas) {
+    setPrevInitialAreas(initialAreas);
     setAreas(initialAreas);
-  }, [initialAreas]);
+  }
 
   function submitNewArea() {
     const name = newAreaName.trim();

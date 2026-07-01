@@ -7,6 +7,9 @@ import {
   createMention,
   resolveMention,
   addInteraction,
+  getMentionForSource,
+  getInteractionForSource,
+  updateInteractionContent,
 } from "@/lib/services/rolodex";
 import {
   ensureInsightTables,
@@ -14,7 +17,6 @@ import {
   createInsight,
   linkInsightToPerson,
 } from "@/lib/services/captured-insights";
-import { prisma } from "@/lib/prisma";
 
 export interface MentionProcessResult {
   resolved: Array<{ name: string; personId: string; interactionId?: string }>;
@@ -55,79 +57,9 @@ function extractSurroundingSentence(text: string, start: number, end: number): s
   return text.slice(sentenceStart, sentenceEnd).trim();
 }
 
-/**
- * Look up an existing mention for this exact (userId, sourceTool, sourceRecordId,
- * sourceField, mentionedName) key.  Returns the row if found so callers can check
- * whether it is already resolved — unresolved mentions should be retried when the
- * person is eventually added to the Rolodex.
- */
-async function getExistingMention(
-  userId: string,
-  sourceTool: string,
-  sourceRecordId: string,
-  sourceField: string,
-  mentionedName: string,
-): Promise<{ id: string; resolved: boolean; personId: string | null } | null> {
-  try {
-    const rows = await prisma.$queryRawUnsafe<
-      Array<{ id: string; resolved: boolean; personId: string | null }>
-    >(
-      `SELECT "id", "resolved", "personId" FROM "RolodexMention"
-       WHERE "userId" = $1 AND "sourceTool" = $2 AND "sourceRecordId" = $3
-         AND "sourceField" = $4 AND "mentionedName" = $5
-       LIMIT 1`,
-      userId,
-      sourceTool,
-      sourceRecordId,
-      sourceField,
-      mentionedName,
-    );
-    return rows[0] ?? null;
-  } catch {
-    return null;
-  }
-}
-
-async function getExistingInteraction(
-  userId: string,
-  personId: string,
-  sourceTool: string,
-  sourceRecordId: string,
-): Promise<{ id: string } | null> {
-  try {
-    const rows = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
-      `SELECT "id" FROM "RolodexInteraction"
-       WHERE "userId" = $1 AND "personId" = $2 AND "sourceTool" = $3 AND "sourceRecordId" = $4
-       LIMIT 1`,
-      userId,
-      personId,
-      sourceTool,
-      sourceRecordId,
-    );
-    return rows[0] ?? null;
-  } catch {
-    return null;
-  }
-}
-
-async function updateInteraction(
-  interactionId: string,
-  userId: string,
-  title: string,
-  body: string | null,
-  occurredAt: Date,
-): Promise<void> {
-  await prisma.$executeRawUnsafe(
-    `UPDATE "RolodexInteraction"
-     SET "title" = $1, "body" = $2, "occurredAt" = $3::timestamptz
-     WHERE "id" = $4 AND "userId" = $5`,
-    title,
-    body,
-    occurredAt.toISOString(),
-    interactionId,
-    userId,
-  );
-}
+// Mention/interaction lookups and updates live in the rolodex service
+// (getMentionForSource, getInteractionForSource, updateInteractionContent) —
+// this module orchestrates across tools but doesn't touch tables directly.
 
 /**
  * Process @mentions found in a note/text.
@@ -170,13 +102,12 @@ export async function processMentions(
         continue;
       }
       try {
-        const existing = await getExistingMention(
-          userId,
+        const existing = await getMentionForSource(userId, {
           sourceTool,
           sourceRecordId,
           sourceField,
-          mention.name,
-        );
+          mentionedName: mention.name,
+        });
 
         if (existing?.resolved && existing.personId) {
           resolvedPersonIds.add(existing.personId);
@@ -205,10 +136,14 @@ export async function processMentions(
 
           const rawBody = extractSurroundingSentence(text, mention.start, mention.end);
           const body = cleanBodyText(rawBody);
-          const existingInteraction = await getExistingInteraction(userId, person.id, sourceTool, sourceRecordId);
+          const existingInteraction = await getInteractionForSource(userId, person.id, sourceTool, sourceRecordId);
           let interactionId: string;
           if (existingInteraction) {
-            await updateInteraction(existingInteraction.id, userId, interactionTitle, body || null, at);
+            await updateInteractionContent(userId, existingInteraction.id, {
+              title: interactionTitle,
+              body: body || null,
+              occurredAt: at,
+            });
             interactionId = existingInteraction.id;
           } else {
             interactionId = await addInteraction(userId, person.id, {
@@ -276,7 +211,7 @@ export async function processMentions(
             kind: insight.kind,
           });
           for (const personId of personIds) {
-            await linkInsightToPerson(created.id, personId, userId);
+            await linkInsightToPerson(userId, created.id, personId);
           }
         } catch (e) {
           console.error("[mention-processor] failed creating insight", e);

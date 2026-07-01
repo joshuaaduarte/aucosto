@@ -22,7 +22,6 @@ import {
   createPerson,
   updatePerson,
   addInteraction,
-  updateFollowUp,
   getPerson,
 } from "@/lib/services/rolodex";
 import { dayKey } from "@/lib/reflect";

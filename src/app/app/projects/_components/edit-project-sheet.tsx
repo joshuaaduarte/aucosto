@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   AREA_COLOR_PALETTE,
@@ -48,10 +48,13 @@ export function EditProjectSheet({
   const router = useRouter();
   const [openState, setOpenState] = useState(false);
   const open = openProp ?? openState;
-  const setOpen = (value: boolean) => {
-    if (onOpenChange) onOpenChange(value);
-    else setOpenState(value);
-  };
+  const setOpen = useCallback(
+    (value: boolean) => {
+      if (onOpenChange) onOpenChange(value);
+      else setOpenState(value);
+    },
+    [onOpenChange],
+  );
   useBodyScrollLock(open);
 
   const [state, formAction, pending] = useActionState(updateProjectAction, initialState);
@@ -66,7 +69,13 @@ export function EditProjectSheet({
   const [areaPending, startArea] = useTransition();
   const [archivePending, startArchive] = useTransition();
 
-  useEffect(() => setAreas(initialAreas), [initialAreas]);
+  // Re-seed from the server list when revalidation delivers a fresh one
+  // (render-phase adjustment — avoids the extra effect pass).
+  const [prevInitialAreas, setPrevInitialAreas] = useState(initialAreas);
+  if (prevInitialAreas !== initialAreas) {
+    setPrevInitialAreas(initialAreas);
+    setAreas(initialAreas);
+  }
 
   // Close on a successful save (the action returns undefined and revalidates).
   useEffect(() => {
@@ -74,7 +83,7 @@ export function EditProjectSheet({
       submittingRef.current = false;
       setOpen(false);
     }
-  }, [pending, state]);
+  }, [pending, state, setOpen]);
 
   function submitNewArea() {
     const name = newAreaName.trim();
