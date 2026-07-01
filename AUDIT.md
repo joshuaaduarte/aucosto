@@ -4,6 +4,41 @@ A running record of structural audits. Each entry records the snapshot at the
 time of the audit and the follow-ups that came out of it — useful for catching
 drift, not for prescribing what to do next.
 
+## 2026-07-01 — post-rolodex/assistant structural pass
+
+First audit since the rolodex, @mention/@insight capture, and assistant
+surfaces landed. The service-layer discipline mostly held through that
+growth; the drift was at the seams of the new code and in CI health.
+
+- **CI was red**: 6 eslint errors (react-hooks/set-state-in-effect in the
+  timer bar, mobile tab bar, and both project sheets; unescaped entities in
+  the assistant page) failed the lint step on every push. Fixed with the
+  idiomatic patterns (useSyncExternalStore for client-hour reads, key-based
+  remount for the timer bar, render-phase state adjustment for prop
+  re-seeding) — not suppressions. All unused-import warnings cleared.
+- **`src/lib/prisma.ts` made lazy**: importing it no longer throws without
+  `DATABASE_URL`, so `next build` works in secretless environments. The
+  full production build was added to CI, which previously stopped at tests.
+- **captured-insights service hardened**: `createInsight`,
+  `deleteInsightsForSource`, and `linkInsightToPerson` were missing
+  `requireCan`; the service borrowed the `"time"` tool key (same smell the
+  2026-06-10 pass fixed for projects) — a proper `"insight"` entry was
+  added to the `Tool` union; `linkInsightToPerson` arg order normalized to
+  userId-first.
+- **Service-layer rule re-established at the new seams**:
+  `mention-processor.ts` ran raw SQL against Rolodex tables — moved into
+  the rolodex service (`getMentionForSource`, `getInteractionForSource`,
+  `updateInteractionContent`); `assistant-action-audit.ts` moved to
+  `src/lib/services/assistant-audit.ts`; `assistant-snapshot.ts`'s direct
+  User read routed through `services/user.getUserProfile`. Direct prisma
+  imports outside services are back down to the infra allowlist
+  (auth, viewer-context, demo-workspace, health probe).
+- **Docs drift**: CLAUDE.md tool map grew rows for rolodex, captured
+  insights, and the assistant; the stale "agent surface is deferred" note
+  replaced with guardrails for the surface that now exists; Tool union and
+  lazy-prisma sections updated; architecture.md gained captured-insights
+  and assistant sections.
+
 ## 2026-06-10 — navigation + cleanup pass
 
 Convention sweep found zero violations (service-layer rule, requireCan,

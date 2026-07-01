@@ -156,6 +156,44 @@ Contact relationship manager. No Prisma-generated client — uses raw SQL
   Action executor handles `create_rolodex_person`, `update_rolodex_person`,
   `add_rolodex_interaction`, `add_person_followup`, `add_gift_idea`.
 
+## Captured insights (@insight notes)
+
+Cross-tool note capture: typing `@insight <text>` (and `@Name` mentions) in
+time entry notes, calendar descriptions, reflections, task notes, or project
+plans files the span into a queryable store linked to Rolodex people.
+
+- **Schema:** `prisma/schema/insights-capture.prisma` (`CapturedInsight`,
+  `CapturedInsightPerson`); runtime tables via `ensureInsightTables()`.
+- **Service:** `src/lib/services/captured-insights.ts` (raw SQL; tool key
+  `"insight"` in `can.ts`). Re-saving a source record replaces its insights
+  (`deleteInsightsForSource` → `createInsight`) so edits don't duplicate.
+- **Pipeline:** `src/lib/mention-parser.ts` (pure regex extraction, tested)
+  → `src/lib/mention-processor.ts` (orchestrator: resolves @Names against
+  the Rolodex, creates/updates interactions, files insights, links them to
+  the people mentioned alongside). Called fire-and-forget from the source
+  tools' actions — a parse failure must never break a save.
+- **Surfaces:** `time/captured-today.tsx`, Rolodex person detail
+  (`[id]/_insights-section.tsx`), assistant snapshot (recent insights).
+
+## Assistant (agent surface)
+
+Read + audited-write HTTP surface for an external agent, plus a
+human-readable control panel at `/app/assistant`. Full API reference:
+`docs/assistant-actions.md`.
+
+- **Snapshot:** `src/lib/assistant-snapshot.ts` aggregates every service
+  (no direct DB) into facts; `assistant-signals.ts` derives binary flags,
+  drift risk, and briefing seeds (pure, tested).
+- **Actions:** `src/lib/assistant-actions.ts` (registry with risk levels)
+  + `assistant-action-executor.ts` (zod-validated handlers that delegate
+  to services). Preview → execute two-step; medium risk requires
+  `confirmed: true`; high risk rejected; no finance writes or deletes.
+- **Audit:** `src/lib/services/assistant-audit.ts` — every preview/execute
+  writes `assistant_action_audits` (runtime-ensured table).
+- **Routes:** `/api/assistant/{snapshot,capabilities,actions/preview,
+  actions/execute,actions/history}` — each one re-checks `auth()` (the
+  proxy matcher excludes `/api`, so routes are their own gate).
+
 ## Finance (`/app/finance`)
 
 Visibility-gated by `User.financeVisible` (check `context.financeVisible`
