@@ -133,6 +133,7 @@ export function HabitEditForm({ habit }: { habit: HabitSummary }) {
               id={`target-${habit.id}`}
               name="targetCount"
               type="number"
+              inputMode="numeric"
               min={1}
               defaultValue={habit.targetCount}
               className="field"
@@ -189,6 +190,7 @@ export function HabitEditForm({ habit }: { habit: HabitSummary }) {
               id={`duration-${habit.id}`}
               name="defaultDurationMinutes"
               type="number"
+              inputMode="numeric"
               min={5}
               step={5}
               defaultValue={habit.defaultDurationMinutes ?? ""}

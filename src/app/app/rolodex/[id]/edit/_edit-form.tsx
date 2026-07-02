@@ -127,6 +127,8 @@ export function EditPersonForm({
               type="text"
               required
               maxLength={200}
+              autoComplete="name"
+              autoCapitalize="words"
               defaultValue={person.displayName}
               className="field w-full"
             />
@@ -137,13 +139,13 @@ export function EditPersonForm({
               <label className="mb-1 block text-[0.8125rem] font-medium" style={{ color: "var(--text-muted)" }}>
                 First name
               </label>
-              <input name="firstName" type="text" maxLength={100} defaultValue={person.firstName ?? ""} className="field w-full" />
+              <input name="firstName" type="text" maxLength={100} autoComplete="given-name" autoCapitalize="words" defaultValue={person.firstName ?? ""} className="field w-full" />
             </div>
             <div>
               <label className="mb-1 block text-[0.8125rem] font-medium" style={{ color: "var(--text-muted)" }}>
                 Last name
               </label>
-              <input name="lastName" type="text" maxLength={100} defaultValue={person.lastName ?? ""} className="field w-full" />
+              <input name="lastName" type="text" maxLength={100} autoComplete="family-name" autoCapitalize="words" defaultValue={person.lastName ?? ""} className="field w-full" />
             </div>
           </div>
 
@@ -168,6 +170,8 @@ export function EditPersonForm({
                 name="organization"
                 type="text"
                 maxLength={200}
+                autoComplete="organization"
+                autoCapitalize="words"
                 defaultValue={person.organization ?? ""}
                 className="field w-full"
               />

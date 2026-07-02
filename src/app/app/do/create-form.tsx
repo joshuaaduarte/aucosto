@@ -217,6 +217,7 @@ export function DoCreateForm({
                     id="do-estimatedMinutes"
                     name="estimatedMinutes"
                     type="number"
+                    inputMode="numeric"
                     min={5}
                     step={5}
                     placeholder="45"

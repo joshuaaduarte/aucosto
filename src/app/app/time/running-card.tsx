@@ -358,6 +358,7 @@ export function RunningCard({
                     id="reflection-actual"
                     name="actualMinutes"
                     type="number"
+                    inputMode="numeric"
                     min={5}
                     step={5}
                     defaultValue={trackedIfStoppedNow}
@@ -379,6 +380,7 @@ export function RunningCard({
                     id="reflection-remaining"
                     name="remainingMinutes"
                     type="number"
+                    inputMode="numeric"
                     min={5}
                     step={5}
                     placeholder="Optional"
@@ -515,6 +517,7 @@ export function RunningCard({
                   id="habit-reflection-quantity"
                   name="quantity"
                   type="number"
+                  inputMode="numeric"
                   min={1}
                   step={1}
                   defaultValue={habit.suggestedQuantity}

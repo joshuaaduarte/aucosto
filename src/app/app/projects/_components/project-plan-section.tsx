@@ -71,6 +71,7 @@ function InlineEdit({
         <input
           autoFocus
           type="text"
+          enterKeyHint="done"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {

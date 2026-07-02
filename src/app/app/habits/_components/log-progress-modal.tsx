@@ -81,6 +81,7 @@ export function LogProgressModal({ habit, onClose }: { habit: HabitSummary; onCl
               id={`quantity-${habit.id}`}
               name="quantity"
               type="number"
+              inputMode="numeric"
               min={1}
               step={habit.goalUnit === "minutes" ? 5 : 1}
               defaultValue={defaultQuantity}

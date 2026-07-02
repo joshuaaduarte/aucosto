@@ -88,7 +88,7 @@ export default function NewPersonPage() {
             <label className="mb-1 block text-[0.8125rem] font-medium" style={{ color: "var(--text-muted)" }}>
               Display name *
             </label>
-            <input name="displayName" type="text" required maxLength={200} className="field w-full" placeholder="How you refer to them" />
+            <input name="displayName" type="text" required maxLength={200} autoComplete="name" autoCapitalize="words" className="field w-full" placeholder="How you refer to them" />
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -96,13 +96,13 @@ export default function NewPersonPage() {
               <label className="mb-1 block text-[0.8125rem] font-medium" style={{ color: "var(--text-muted)" }}>
                 First name
               </label>
-              <input name="firstName" type="text" maxLength={100} className="field w-full" />
+              <input name="firstName" type="text" maxLength={100} autoComplete="given-name" autoCapitalize="words" className="field w-full" />
             </div>
             <div>
               <label className="mb-1 block text-[0.8125rem] font-medium" style={{ color: "var(--text-muted)" }}>
                 Last name
               </label>
-              <input name="lastName" type="text" maxLength={100} className="field w-full" />
+              <input name="lastName" type="text" maxLength={100} autoComplete="family-name" autoCapitalize="words" className="field w-full" />
             </div>
           </div>
 
@@ -123,7 +123,7 @@ export default function NewPersonPage() {
               <label className="mb-1 block text-[0.8125rem] font-medium" style={{ color: "var(--text-muted)" }}>
                 Organization
               </label>
-              <input name="organization" type="text" maxLength={200} className="field w-full" />
+              <input name="organization" type="text" maxLength={200} autoComplete="organization" autoCapitalize="words" className="field w-full" />
             </div>
           </div>
 
