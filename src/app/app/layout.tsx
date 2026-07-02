@@ -6,6 +6,7 @@ import { getViewerContext } from "@/lib/viewer-context";
 import { AppSidebar, MobileNav } from "./sidebar";
 import { MobileTabBar } from "./_components/mobile-tab-bar";
 import { RunningTimerBar } from "./_components/running-timer-bar";
+import { KeyboardInsetProbe } from "./_components/keyboard-inset-probe";
 
 export default async function AppLayout({
   children,
@@ -41,6 +42,7 @@ export default async function AppLayout({
 
   return (
     <div className="flex min-h-screen flex-1" style={{ background: "var(--bg-app)" }}>
+      <KeyboardInsetProbe />
       <AppSidebar {...navProps} />
 
       <div

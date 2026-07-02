@@ -73,6 +73,10 @@
      tag) only while the bar is visible, so FABs and content shift up to
      make room and collapse back when the timer stops. */
   --timer-bar-height: 0px;
+  /* Height of the on-screen keyboard, published by KeyboardInsetProbe from
+     the visualViewport API (iOS never shrinks dvh/svh for the keyboard).
+     0 when no keyboard; lets bottom-sheet modals lift above it. */
+  --keyboard-inset: 0px;
   /* Composite: total height of all fixed bottom elements. Pages use this
      for scroll-container padding and FAB positioning instead of
      re-deriving the sum in every file. */
@@ -486,15 +490,25 @@ body > * {
   /* Prevent touch events on the backdrop itself from being interpreted as
      scroll gestures that could bleed through to the page. */
   touch-action: none;
+  /* Lift the bottom sheet above the on-screen keyboard. iOS keeps this
+     fixed backdrop pinned to the full layout viewport (bottom edge behind
+     the keyboard), so without this padding the sheet's fields hide behind
+     the keyboard and its accessory bar. */
+  padding-bottom: var(--keyboard-inset, 0px);
+  transition: padding-bottom 0.2s ease;
 }
 
 .calendar-modal {
   position: relative;
   z-index: 1;
   width: 100%;
-  /* dvh tracks the *visible* viewport on mobile (URL bar collapse etc.). */
-  max-height: min(88dvh, 50rem);
+  /* dvh tracks the *visible* viewport on mobile (URL bar collapse etc.), but
+     never shrinks for the keyboard — so also cap against the space left above
+     it. When --keyboard-inset is 0 the last term exceeds 88dvh and drops out,
+     leaving the original behaviour untouched. */
+  max-height: min(88dvh, 50rem, calc(100dvh - var(--keyboard-inset, 0px) - 2.5rem));
   overflow-y: auto;
+  transition: max-height 0.2s ease;
   /* When the inner scroll hits its boundary, do not propagate the gesture to
      the page behind the modal (iOS Safari scroll-bleed prevention). */
   overscroll-behavior: contain;
