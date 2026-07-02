@@ -474,6 +474,7 @@ function SimpleFillModal({
             onChange={(event) => setLabel(event.target.value)}
             placeholder="e.g. Lunch, deep work, errands..."
             className="field"
+            enterKeyHint="done"
             autoFocus
             onKeyDown={(event) => {
               if (event.key === "Enter") {
@@ -692,6 +693,7 @@ function MultiFillModal({
                 onChange={(event) => setLabel(event.target.value)}
                 placeholder="e.g. Breakfast, shower, commute..."
                 className="field"
+                enterKeyHint="next"
                 autoFocus
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {

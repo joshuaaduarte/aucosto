@@ -394,6 +394,7 @@ export function DoItemCard({
                     id={`estimate-${item.id}`}
                     name="estimatedMinutes"
                     type="number"
+                    inputMode="numeric"
                     min={5}
                     step={5}
                     defaultValue={item.estimatedMinutes ?? ""}
@@ -433,6 +434,7 @@ export function DoItemCard({
                     id={`learned-${item.id}`}
                     name="actualMinutes"
                     type="number"
+                    inputMode="numeric"
                     min={5}
                     step={5}
                     defaultValue={item.actualMinutes ?? ""}

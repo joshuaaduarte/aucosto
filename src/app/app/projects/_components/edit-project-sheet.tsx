@@ -273,7 +273,7 @@ export function EditProjectSheet({
                   <label className="block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }} htmlFor="ep-budget">
                     Time budget (hours)
                   </label>
-                  <input id="ep-budget" name="timeBudgetHours" type="number" min="0" step="0.5" defaultValue={project.timeBudgetHours} className="field" />
+                  <input id="ep-budget" name="timeBudgetHours" type="number" inputMode="decimal" min="0" step="0.5" defaultValue={project.timeBudgetHours} className="field" />
                 </div>
                 <div className="space-y-1.5">
                   <label className="block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }} htmlFor="ep-target">

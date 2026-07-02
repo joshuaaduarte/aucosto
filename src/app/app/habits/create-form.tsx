@@ -224,6 +224,7 @@ export function HabitCreateForm() {
                       <input
                         aria-label="Daily target"
                         type="number"
+                        inputMode="numeric"
                         min={1}
                         step={goalUnit === "minutes" ? 5 : 1}
                         value={target}
@@ -295,6 +296,7 @@ export function HabitCreateForm() {
                         id="habit-default-duration"
                         name="defaultDurationMinutes"
                         type="number"
+                        inputMode="numeric"
                         min={5}
                         step={5}
                         className="field"
