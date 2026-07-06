@@ -4,6 +4,7 @@ import { dayKey } from "@/lib/reflect";
 import { getReflection } from "@/lib/services/reflect";
 import { getViewerContext } from "@/lib/viewer-context";
 import { AppSidebar, MobileNav } from "./sidebar";
+import { CommandPalette } from "./_components/command-palette";
 import { MobileTabBar } from "./_components/mobile-tab-bar";
 import { RunningTimerBar } from "./_components/running-timer-bar";
 import { KeyboardInsetProbe } from "./_components/keyboard-inset-probe";
@@ -71,6 +72,8 @@ export default async function AppLayout({
           <RunningTimerBar userId={context.effectiveUserId} />
         </>
       ) : null}
+
+      <CommandPalette />
     </div>
   );
 }

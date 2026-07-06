@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { openCommandPalette } from "./_components/command-palette";
 import { SignOutButton } from "./sign-out-button";
 
 /* ──────────────────────────────────────────────────────────────────
@@ -298,13 +299,12 @@ function SidebarContents({
         )}
       </div>
 
-      {/* Search affordance — visual only for now, wires up to a real palette later */}
+      {/* Search affordance — opens the global command palette */}
       <button
         type="button"
+        onClick={() => openCommandPalette()}
         className="mb-4 flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[0.8125rem] transition-colors hover:bg-bg-hover"
         style={{ color: "var(--text-faint)" }}
-        disabled
-        aria-disabled
       >
         <svg width="14" height="14" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" aria-hidden>
           <circle cx="6.5" cy="6.5" r="4" />
