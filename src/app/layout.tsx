@@ -19,12 +19,26 @@ const jetbrains = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Aucosto | Personal workspace",
   description: "A personal workspace for time, money, calendar, and daily life.",
+  applicationName: "Aucosto",
+  // Installed-app (Add to Home Screen) behavior on iOS: run standalone
+  // without Safari chrome, extend under the status bar (black-translucent —
+  // the mobile header pads itself with --safe-area-top to compensate).
+  appleWebApp: {
+    capable: true,
+    title: "Aucosto",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 // viewport-fit=cover lets env(safe-area-inset-*) resolve on notched phones
 // (used by the bottom-sheet modals to clear the home indicator).
+// themeColor tints the browser/status-bar chrome to match the app surface.
 export const viewport: Viewport = {
   viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#FAFAF8" },
+    { media: "(prefers-color-scheme: dark)", color: "#191919" },
+  ],
 };
 
 export default function RootLayout({
@@ -36,6 +50,9 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${interTight.variable} ${jetbrains.variable} h-full antialiased`}
+      // The beforeInteractive theme script sets data-theme from localStorage
+      // before hydration — an intentional, attribute-level mismatch.
+      suppressHydrationWarning
     >
       <head>
         <Script id="aucosto-theme-init" strategy="beforeInteractive">

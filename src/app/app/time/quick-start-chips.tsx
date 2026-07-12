@@ -296,7 +296,7 @@ function ChipGroup({
         >
           {label}
         </p>
-        {action ?? null}
+        {action ? <span className="shrink-0">{action}</span> : null}
       </div>
       <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 no-scrollbar sm:flex-wrap sm:overflow-x-visible sm:pb-0">{children}</div>
     </div>

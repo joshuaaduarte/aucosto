@@ -417,6 +417,10 @@ export function MobileNav({ showFinance, isDemoMode }: NavProps) {
         style={{
           background: "var(--bg-app)",
           borderBottom: "1px solid var(--border-faint)",
+          // Installed-app mode extends under the iOS status bar
+          // (black-translucent) — pad the header down past it. 0 in Safari.
+          paddingTop: "var(--safe-area-top)",
+          height: "calc(3rem + var(--safe-area-top))",
         }}
       >
         <button
@@ -475,11 +479,15 @@ export function MobileNav({ showFinance, isDemoMode }: NavProps) {
               background: "var(--bg-app)",
               borderRight: "1px solid var(--border-soft)",
               padding: "0.875rem 0.625rem",
+              paddingTop: "calc(0.875rem + var(--safe-area-top))",
+              paddingBottom: "calc(0.875rem + var(--safe-area-bottom))",
+              overflowY: "auto",
             }}
           >
             <button
               onClick={() => setOpen(false)}
-              className="btn-icon absolute right-2 top-2"
+              className="btn-icon absolute right-2"
+              style={{ top: "calc(0.5rem + var(--safe-area-top))" }}
               aria-label="Close navigation"
             >
               <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden>

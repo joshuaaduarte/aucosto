@@ -7,7 +7,10 @@ export default function LoginPage() {
       className="flex min-h-screen flex-col"
       style={{ backgroundColor: "var(--bg-app)", color: "var(--text)" }}
     >
-      <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-5 sm:px-10 sm:py-6">
+      <header
+        className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-5 sm:px-10 sm:py-6"
+        style={{ paddingTop: "calc(1.25rem + var(--safe-area-top))" }}
+      >
         <Link
           href="/"
           className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[0.8125rem] font-medium transition-colors hover:bg-bg-hover"
