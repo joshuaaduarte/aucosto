@@ -67,7 +67,7 @@ function activeMention(value: string, caret: number) {
 }
 
 export const MentionTextarea = forwardRef<HTMLTextAreaElement, MentionTextareaProps>(
-  function MentionTextarea({ helperText, onChange, onKeyDown, className, ...props }, ref) {
+  function MentionTextarea({ helperText, onChange, onKeyDown, onBlur, className, ...props }, ref) {
     const innerRef = useRef<HTMLTextAreaElement | null>(null);
     const [people, setPeople] = useState<PersonSuggestion[]>(cachedPeople ?? []);
     const [mention, setMention] = useState<ReturnType<typeof activeMention>>(null);
@@ -163,8 +163,9 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, MentionTextareaPr
     // handler on each button calls e.preventDefault() which prevents the blur
     // from happening at all for pointer events; this timeout is a safety net for
     // touch sequences where blur may fire anyway.
-    function handleBlur() {
+    function handleBlur(event: React.FocusEvent<HTMLTextAreaElement>) {
       setTimeout(() => setMention(null), 100);
+      onBlur?.(event);
     }
 
     // Render the dropdown ABOVE the textarea using position:absolute + bottom:100%.
