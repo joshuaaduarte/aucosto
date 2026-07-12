@@ -84,6 +84,18 @@ const EVENT_LABELS: Record<string, string> = {
   // insights
   "insight.captured": "captured an insight",
 
+  // push notifications
+  "push.subscribed": "enabled notifications on a device",
+  "push.unsubscribed": "disabled notifications on a device",
+
+  // whoop
+  "whoop.connected": "connected Whoop",
+  "whoop.disconnected": "disconnected Whoop",
+
+  // location signals
+  "location.arrived": "arrived at a place",
+  "location.left": "left a place",
+
   // user
   "user.privacy_updated": "updated privacy settings",
 };

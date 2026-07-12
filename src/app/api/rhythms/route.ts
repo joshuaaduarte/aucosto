@@ -77,6 +77,7 @@ export async function POST(request: Request) {
     endedAt?: string;
     wakeAt?: string;
     wakeTime?: string | null;
+    sleepMinutes?: number | null;
     notes?: string | null;
   };
 
@@ -89,6 +90,15 @@ export async function POST(request: Request) {
       const result = await startMorning(
         userId,
         typeof payload.wakeTime === "string" ? payload.wakeTime : null,
+        {
+          // Whoop-sourced sleep duration, when the morning card had one.
+          sleepMinutes:
+            typeof payload.sleepMinutes === "number" &&
+            Number.isFinite(payload.sleepMinutes) &&
+            payload.sleepMinutes > 0
+              ? Math.round(payload.sleepMinutes)
+              : undefined,
+        },
       );
       revalidatePath("/app");
       revalidatePath("/app/time");

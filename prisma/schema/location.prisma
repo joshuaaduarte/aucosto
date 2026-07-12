@@ -1,0 +1,19 @@
+// Location signals — arrive/leave events at named places, posted by iOS
+// Shortcuts geofence automations (see docs/location-signals.md) through
+// /api/location/ingest. Deliberately NOT a location trail: the useful
+// primitive is "arrived at gym", not a coordinate history. Coordinates are
+// optional context, never surfaced to the assistant snapshot.
+
+model LocationEvent {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  place      String
+  kind       String // "arrive" | "leave"
+  latitude   Float?
+  longitude  Float?
+  occurredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([userId, occurredAt])
+}

@@ -31,6 +31,9 @@ One row per tool. Every tool follows the same shape: schema → service → page
 | captured insights (@insight notes) | `insights-capture.prisma` (CapturedInsight, CapturedInsightPerson) | `captured-insights.ts` (⚠️ raw SQL + runtime `ensureInsightTables()`) | — (surfaces on `time/captured-today.tsx`, rolodex person pages) | — | `mention-processor.ts` (cross-tool orchestrator: text → mentions + insights via the rolodex/captured-insights services) |
 | assistant (agent surface) | — (audit table via runtime DDL) | `assistant-audit.ts` | `assistant/` (snapshot control panel) + `src/app/api/assistant/*` routes | — | `assistant-snapshot.ts` (aggregates every service, no DB), `assistant-signals.ts`, `assistant-actions.ts` (action registry), `assistant-action-executor.ts` (zod-validated, service-delegating) |
 | events (activity log) | `events.prisma` (Event) | `events.ts` (`recordEvent`) | — | `activity.tsx` | `event-types.ts` (label map) |
+| push (notifications) | `push.prisma` (PushSubscription) | `push.ts` (subscriptions + `web-push` sends) | `settings/notifications-panel.tsx` + `/api/push` + `/api/cron/nudges` (vercel.json crons, CRON_SECRET) + `public/sw.js` (push-only SW, **no caching**) | — | — |
+| whoop (integration) | `whoop.prisma` (WhoopConnection, tokens encrypted via `secrets.ts`) | `whoop.ts` (connect/status/`getWhoopMorningPrefill`) | `settings/whoop-panel.tsx` + `/api/whoop/{connect,callback,disconnect}` | — (feeds the hub morning card) | `whoop.ts` (OAuth + v2 API client), `whoop-morning.ts` (pure sleep→prefill mapping, tested) |
+| location (signals) | `location.prisma` (LocationEvent) | `location.ts` (record + `getCurrentPlace`) | `/api/location/ingest` (bearer `LOCATION_WEBHOOK_SECRET`, iOS Shortcuts — `docs/location-signals.md`) + hub header 📍 line | — | `location.ts` (pure current-place derivation, tested) |
 
 Cross-cutting pure helpers: `wall-clock.ts` (browser-side date/time → ISO conversion for forms — **mandatory** for any date+start+end form, see lessons #10).
 
@@ -99,7 +102,8 @@ To reset the dev DB: `prisma migrate reset` (truncates the Supabase DB and repla
 ### Migration workflow (and recovery)
 
 1. Add/edit `prisma/schema/<tool>.prisma` → `npm run db:migrate` (uses `DIRECT_URL`; also regenerates the client). **Verify it ran:** `src/generated/prisma` timestamps must change — if they didn't, the run failed before applying (see `docs/lessons.md` #1).
-2. If a checked-in migration is stuck (table missing but migration recorded as pending), apply its SQL manually (psql with `DIRECT_URL`, or the Supabase SQL editor), then `npx prisma migrate resolve --applied <migration_name>` so Prisma records it, then `npm run db:generate`.
+2. If a checked-in migration is stuck (table missing but migration recorded as pending), apply its SQL manually (psql with `DIRECT_URL`, the Supabase SQL editor, or `npx tsx --env-file=.env scripts/apply-sql.ts <file.sql>`), then `npx prisma migrate resolve --applied <migration_name>` so Prisma records it, then `npm run db:generate`.
+   ⚠️ **`prisma migrate dev` currently demands a full reset** — the DB's recorded migrations diverge from `prisma/migrations/` (a migration applied remotely was never checked in). NEVER accept the reset (it truncates live data). New tables go in via idempotent SQL + `apply-sql.ts` (template: `scripts/create-push-whoop-location.sql`, named to match what `prisma migrate` would generate) followed by `npm run db:generate`.
 3. Verify with the matching health-check script (`scripts/check-reflect.ts` is the template).
 
 `DATABASE_URL` = transaction pooler (runtime; can't run prepared DDL); `DIRECT_URL` = session pooler (migrations only).
@@ -255,17 +259,27 @@ Service: `startMorning` / `completeMorning` / `getTodayMorning` /
 time also seeds the time tool's "since you woke up" gap baseline, and sleep /
 morning sessions render as read-only context blocks on the calendar timeline.
 
-## Future Integrations
+## Integrations
 
-### Whoop
+### Whoop (implemented, activates with credentials)
 
-The Rhythms morning check-in currently captures wake time manually. When Whoop integration is added, it will auto-populate wakeTime, sleepDuration, HRV, and sleep stages from the Whoop API. The RhythmSession.metadata JSONB field is intentionally flexible to accommodate this. The morning check-in component should check for whoop data first and fall back to manual input if unavailable.
+OAuth connect lives at Settings → Whoop; hidden guidance shows until `WHOOP_CLIENT_ID`/`WHOOP_CLIENT_SECRET` are set (create the app at developer.whoop.com with redirect URL `<host>/api/whoop/callback`). While today's wake is uncaptured, the hub calls `getWhoopMorningPrefill()` (v2 sleep + recovery, tokens auto-refresh) and the morning card one-tap confirms Whoop's wake time, carrying its scored sleep minutes into `RhythmSession.metadata`. Editing the prefilled time drops the Whoop sleep duration on purpose. Raw Whoop records are never stored.
+
+### Web Push (implemented)
+
+`public/sw.js` is push-only — **never add a fetch/caching handler**. Nudges are sent by `/api/cron/nudges` (two vercel.json crons, UTC times chosen for LA mornings/evenings), each skipped when the thing it nudges for already happened. iOS only delivers pushes to the installed home-screen app.
+
+### Location signals (implemented)
+
+Arrive/leave events at named places via `/api/location/ingest` — see `docs/location-signals.md` for the iOS Shortcuts setup. Deliberately not a tracker; keep raw coordinates out of the assistant snapshot.
 
 ## Environment
 
 `.env` (gitignored) holds `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, the `SEED_USER_*` triplet, and (optional) Teller credentials: `TELLER_ENV`, `TELLER_APPLICATION_ID`, `TELLER_WEBHOOK_SIGNING_SECRETS`, `TELLER_CERT_PEM`, `TELLER_PRIVATE_KEY_PEM`. Linked-account access tokens are encrypted at rest using `AUTH_SECRET` (`src/lib/secrets.ts`). Changing the seed password requires re-running `npm run db:seed`.
 
 Optional: `LOG_LEVEL` overrides the Pino level (defaults to `debug` in dev, `info` in prod). `APP_TIMEZONE` overrides the server timezone pin (defaults to `America/Los_Angeles`; set **unconditionally** in `src/instrumentation.ts` because Vercel presets `TZ=UTC`).
+
+Integration env (all optional — each feature degrades cleanly when unset, but **production needs them in Vercel too**): `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` (Web Push), `CRON_SECRET` (authenticates `/api/cron/nudges`; Vercel sends it as the Bearer token automatically), `LOCATION_WEBHOOK_SECRET` (location ingest bearer token), `WHOOP_CLIENT_ID` / `WHOOP_CLIENT_SECRET` (Whoop OAuth).
 
 ## Tests
 

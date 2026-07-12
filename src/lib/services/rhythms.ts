@@ -503,6 +503,13 @@ async function resolveLastNightSleepMinutes(
 export async function startMorning(
   userId: string,
   wakeTime: string | null,
+  options: {
+    /**
+     * Externally-known sleep duration (e.g. Whoop's scored sleep) — takes
+     * precedence over the duration derived from a tracked sleep session.
+     */
+    sleepMinutes?: number | null;
+  } = {},
 ): Promise<{ sleepMinutes: number | null }> {
   requireCan(userId, "rhythm", "write");
   const cleanWake =
@@ -512,7 +519,9 @@ export async function startMorning(
 
   const existing = await getTodayMorning(userId);
   const sleepMinutes =
-    existing?.sleepMinutes ?? (await resolveLastNightSleepMinutes(userId));
+    options.sleepMinutes ??
+    existing?.sleepMinutes ??
+    (await resolveLastNightSleepMinutes(userId));
   const metaJson = JSON.stringify({ wakeTime: cleanWake, sleepMinutes });
 
   try {

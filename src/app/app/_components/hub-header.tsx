@@ -7,12 +7,15 @@ export function HubHeader({
   firstName,
   subline,
   actions,
+  placeLine = null,
 }: {
   todayLong: string;
   greeting: string;
   firstName: string | undefined;
   subline: string;
   actions: TopAction[];
+  /** "At Gym since 6:12pm" — from location signals, when known. */
+  placeLine?: string | null;
 }) {
   return (
     <header className="fade-in space-y-4 sm:space-y-5">
@@ -22,6 +25,9 @@ export function HubHeader({
           style={{ color: "var(--text-faint)" }}
         >
           {todayLong}
+          {placeLine ? (
+            <span className="normal-case tracking-normal"> · 📍 {placeLine}</span>
+          ) : null}
         </p>
         <h1
           className="mt-1 text-[2rem] font-bold tracking-tight sm:text-[2.5rem]"

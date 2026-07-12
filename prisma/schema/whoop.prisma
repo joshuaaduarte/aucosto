@@ -1,0 +1,19 @@
+// Whoop OAuth connection — one per user. Access/refresh tokens are encrypted
+// at rest with AUTH_SECRET (src/lib/secrets.ts), same as Teller enrollment
+// tokens. Sleep/recovery data is fetched live from the Whoop API when the
+// morning check-in needs it — raw Whoop records are not stored.
+
+model WhoopConnection {
+  id           String    @id @default(cuid())
+  userId       String    @unique
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  whoopUserId  String?
+  accessToken  String
+  refreshToken String
+  expiresAt    DateTime
+  scopes       String?
+  status       String    @default("connected")
+  lastSyncedAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}

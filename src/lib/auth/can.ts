@@ -19,7 +19,10 @@ export type Tool =
   | "reflect"
   | "rhythm"
   | "rolodex"
-  | "insight";
+  | "insight"
+  | "push"
+  | "whoop"
+  | "location";
 export type Action = "read" | "write";
 
 export function can(

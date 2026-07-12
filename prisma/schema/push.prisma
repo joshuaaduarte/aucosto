@@ -1,0 +1,18 @@
+// Web Push subscriptions — one row per browser/device that enabled
+// notifications (Settings → Notifications). Payloads are sent with the
+// `web-push` library using the VAPID keys in .env; a dead endpoint (410/404
+// from the push service) deletes its row on the next send.
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, endpoint])
+  @@index([userId])
+}

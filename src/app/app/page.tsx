@@ -11,6 +11,8 @@ import {
   listRecentRhythms,
 } from "@/lib/services/rhythms";
 import { listReflections, listRecentMoods } from "@/lib/services/reflect";
+import { getWhoopMorningPrefill } from "@/lib/services/whoop";
+import { getCurrentPlace } from "@/lib/services/location";
 import {
   buildDayFacts,
   deriveInsightOfTheDay,
@@ -120,13 +122,22 @@ export default async function HubPage() {
   // keep the big tuple above intact. The morning card still gates its window in
   // the BROWSER (see RhythmHubCard); the always-on sleep card derives its state
   // here from the LA-pinned server clock — single-user, owner in LA.
-  const [wakeStatus, activeSleep, recentRhythms] = userId
+  const [wakeStatus, activeSleep, recentRhythms, currentPlace] = userId
     ? await Promise.all([
         getTodayWakeStatus(userId),
         getActiveRhythm(userId, "sleep"),
         listRecentRhythms(userId, { limit: 40 }),
+        getCurrentPlace(userId),
       ])
-    : [null, null, []];
+    : [null, null, [], null];
+
+  // Whoop's auto-detected wake data — fetched (external API) only while
+  // today's wake is still uncaptured, i.e. exactly while the morning prompt
+  // is showing. Degrades to null when not connected / not configured.
+  const whoopPrefill =
+    userId && wakeStatus && !wakeStatus.captured
+      ? await getWhoopMorningPrefill(userId)
+      : null;
 
   const now = new Date();
   const todayStart = startOfToday();
@@ -301,6 +312,14 @@ export default async function HubPage() {
         firstName={firstName}
         subline={subline}
         actions={topActions}
+        placeLine={
+          currentPlace
+            ? `At ${currentPlace.place} since ${currentPlace.since.toLocaleTimeString(
+                "en-US",
+                { hour: "numeric", minute: "2-digit", timeZone: timezone },
+              )}`
+            : null
+        }
       />
 
       {/* Hero first: the one recommendation. Stat tiles support it below. */}
@@ -357,6 +376,7 @@ export default async function HubPage() {
                 completedToday: habit.completedToday,
               }))}
             sleepBackfillShowing={sleepBackfillShowing}
+            whoop={whoopPrefill}
           />
         </>
       ) : null}

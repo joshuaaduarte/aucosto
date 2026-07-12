@@ -1,10 +1,25 @@
 import { getViewerContext } from "@/lib/viewer-context";
+import { getWhoopConfig } from "@/lib/whoop";
+import { getWhoopStatus } from "@/lib/services/whoop";
 import { PrivacyPanel } from "../privacy-panel";
+import { NotificationsPanel } from "./notifications-panel";
+import { WhoopPanel } from "./whoop-panel";
 
 export const dynamic = "force-dynamic";
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ whoop?: string }>;
+}) {
   const context = await getViewerContext();
+  const { whoop: whoopFlag } = await searchParams;
+
+  const whoopConfigured = getWhoopConfig().enabled;
+  const whoopStatus =
+    context && whoopConfigured
+      ? await getWhoopStatus(context.effectiveUserId)
+      : { connected: false, lastSyncedAt: null, since: null };
 
   return (
     <div className="space-y-10">
@@ -56,6 +71,61 @@ export default async function SettingsPage() {
             financeVisible={context?.financeVisible ?? false}
             appLockEnabled={context?.appLockEnabled ?? false}
             isDemoMode={context?.isDemoMode ?? false}
+          />
+        </div>
+      </section>
+
+      <section
+        id="notifications"
+        className="rounded-md border p-5"
+        style={{
+          borderColor: "var(--border-soft)",
+          background: "var(--bg-page)",
+        }}
+      >
+        <p
+          className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+          style={{ color: "var(--text-faint)" }}
+        >
+          Notifications
+        </p>
+        <h2
+          className="mt-1 text-[1rem] font-semibold tracking-tight"
+          style={{ color: "var(--text)" }}
+        >
+          Morning and evening nudges on this device.
+        </h2>
+        <div className="mt-4">
+          <NotificationsPanel />
+        </div>
+      </section>
+
+      <section
+        id="whoop"
+        className="rounded-md border p-5"
+        style={{
+          borderColor: "var(--border-soft)",
+          background: "var(--bg-page)",
+        }}
+      >
+        <p
+          className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+          style={{ color: "var(--text-faint)" }}
+        >
+          Whoop
+        </p>
+        <h2
+          className="mt-1 text-[1rem] font-semibold tracking-tight"
+          style={{ color: "var(--text)" }}
+        >
+          Auto-fill the morning check-in from your Whoop.
+        </h2>
+        <div className="mt-4">
+          <WhoopPanel
+            configured={whoopConfigured}
+            connected={whoopStatus.connected}
+            lastSyncedAt={whoopStatus.lastSyncedAt?.toISOString() ?? null}
+            flag={whoopFlag ?? null}
           />
         </div>
       </section>

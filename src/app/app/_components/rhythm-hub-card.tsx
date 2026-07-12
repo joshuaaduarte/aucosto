@@ -44,6 +44,14 @@ export type MorningCardState = {
 
 export type MorningHabit = { id: string; title: string; completedToday: boolean };
 
+export type WhoopPrefill = {
+  /** "HH:mm" — Whoop's auto-detected wake moment. */
+  wakeTime: string;
+  sleepMinutes: number;
+  /** 0–100, when Whoop has scored today's recovery. */
+  recoveryScore: number | null;
+};
+
 function CardShell({
   accent,
   children,
@@ -85,17 +93,19 @@ function prettyTime(value: string): string {
 
 /* ── State A: log wake time ──────────────────────────────────────── */
 
-function MorningStart() {
+function MorningStart({ whoop }: { whoop: WhoopPrefill | null }) {
   const router = useRouter();
-  // Static default keeps render pure; the real wake time fills in after mount.
-  const [wake, setWake] = useState("07:00");
+  // Whoop's auto-detected wake time wins; otherwise a static default keeps
+  // render pure and the real clock time fills in after mount.
+  const [wake, setWake] = useState(whoop?.wakeTime ?? "07:00");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (whoop) return; // already prefilled from Whoop
     const raf = requestAnimationFrame(() => setWake(toTimeValue(new Date())));
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [whoop]);
 
   async function startMorning() {
     if (pending) return;
@@ -105,7 +115,14 @@ function MorningStart() {
       const res = await fetch("/api/rhythms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "morning", wakeTime: wake }),
+        body: JSON.stringify({
+          action: "morning",
+          wakeTime: wake,
+          // Only trust Whoop's sleep duration while its wake time is what's
+          // being submitted — an edited time means Whoop missed something.
+          sleepMinutes:
+            whoop && wake === whoop.wakeTime ? whoop.sleepMinutes : undefined,
+        }),
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -130,8 +147,16 @@ function MorningStart() {
             Good morning
           </p>
           <p className="mt-0.5 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
-            What time did you wake up?
+            {whoop ? "Whoop caught your wake-up:" : "What time did you wake up?"}
           </p>
+          {whoop ? (
+            <p className="mt-1 text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+              Slept ~{formatRhythmDuration(whoop.sleepMinutes)}
+              {whoop.recoveryScore !== null
+                ? ` · recovery ${whoop.recoveryScore}%`
+                : ""}
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -395,9 +420,12 @@ export function RhythmHubCard({
   morning,
   morningHabits,
   sleepBackfillShowing,
+  whoop = null,
 }: {
   morning: MorningCardState | null;
   morningHabits: MorningHabit[];
+  /** Whoop's auto-detected wake data, when connected and fresh. */
+  whoop?: WhoopPrefill | null;
   /**
    * The always-on sleep card is currently rendering the backfill form (no sleep
    * logged for the cycle, before the evening bedtime window). It already prompts
@@ -431,8 +459,10 @@ export function RhythmHubCard({
   if (morning?.started) {
     return <MorningInProgress morning={morning} habits={morningHabits} />;
   }
-  // No wake time captured yet. If the sleep backfill card is already asking for
-  // it, defer to that one card rather than showing a second wake-time prompt.
-  if (sleepBackfillShowing) return null;
-  return <MorningStart />;
+  // No wake time captured yet. If the sleep backfill card is already asking
+  // for it, defer to that one card rather than showing a second wake-time
+  // prompt — unless Whoop already knows the answer, in which case the one-tap
+  // confirm is the better prompt.
+  if (sleepBackfillShowing && !whoop) return null;
+  return <MorningStart whoop={whoop} />;
 }
