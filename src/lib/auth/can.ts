@@ -22,7 +22,8 @@ export type Tool =
   | "insight"
   | "push"
   | "whoop"
-  | "location";
+  | "location"
+  | "work";
 export type Action = "read" | "write";
 
 export function can(

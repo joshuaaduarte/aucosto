@@ -96,6 +96,26 @@ const EVENT_LABELS: Record<string, string> = {
   "location.arrived": "arrived at a place",
   "location.left": "left a place",
 
+  // work
+  "work.area_created": "added a work area",
+  "work.area_updated": "updated a work area",
+  "work.project_created": "added a work project",
+  "work.project_updated": "updated a work project",
+  "work.person_created": "added a work contact",
+  "work.person_updated": "updated a work contact",
+  "work.meeting_created": "added a work meeting",
+  "work.meeting_updated": "updated a work meeting",
+  "work.task_created": "added a work task",
+  "work.task_updated": "updated a work task",
+  "work.task_completed": "completed a work task",
+  "work.task_reopened": "reopened a work task",
+  "work.task_deleted": "deleted a work task",
+  "work.note_created": "logged a work note",
+  "work.note_deleted": "deleted a work note",
+  "work.decision_logged": "logged a work decision",
+  "work.decision_resolved": "resolved a work decision",
+  "work.review_saved": "saved a work review",
+
   // user
   "user.privacy_updated": "updated privacy settings",
 };

@@ -1,0 +1,194 @@
+// Work domain — a life/work context that is broader than a single project.
+// A WorkWorkspace (first: "Lucid") holds Areas (ongoing responsibilities),
+// Projects (bounded efforts), People, Meetings, Tasks, Notes/Decisions, and
+// Reviews (daily shutdown + weekly review).
+//
+// NOTE: applied to the live DB via ensureWorkTables() raw SQL in
+// src/lib/services/work/shared.ts (same pattern as rolodex/reflect/rhythms —
+// `prisma migrate dev` currently demands a destructive reset). These models
+// live here so a regular `prisma generate` (which Vercel runs on build) picks
+// up the types. All models are Work-prefixed: the projects tool already owns
+// the bare `Area` / `Project` names.
+
+model WorkWorkspace {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  areas    WorkArea[]
+  projects WorkProject[]
+  people   WorkPerson[]
+  meetings WorkMeeting[]
+  tasks    WorkTask[]
+  notes    WorkNote[]
+  reviews  WorkReview[]
+
+  @@index([userId])
+}
+
+model WorkArea {
+  id           String  @id @default(cuid())
+  userId       String
+  workspaceId  String
+  name         String
+  description  String?
+  currentFocus String?
+  status       String  @default("active") // active | archived
+  sortOrder    Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace WorkWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projects  WorkProject[]
+  tasks     WorkTask[]
+
+  @@index([userId, workspaceId, status])
+}
+
+model WorkProject {
+  id          String    @id @default(cuid())
+  userId      String
+  workspaceId String
+  areaId      String?
+  name        String
+  outcome     String? // what "done" looks like
+  status      String    @default("active") // active | waiting | paused | done
+  dueDate     DateTime?
+  nextAction  String?
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace WorkWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  area      WorkArea?     @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  tasks     WorkTask[]
+
+  @@index([userId, workspaceId, status])
+  @@index([userId, dueDate])
+}
+
+model WorkPerson {
+  id              String  @id @default(cuid())
+  userId          String
+  workspaceId     String
+  name            String
+  role            String?
+  relationship    String? // manager | report | peer | stakeholder | other
+  team            String?
+  notes           String? // relationship context
+  oneOnOneNotes   String? // running 1:1 log
+  rolodexPersonId String? // optional link into the Rolodex
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace WorkWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  meetings  WorkMeeting[]
+  tasks     WorkTask[]
+
+  @@index([userId, workspaceId])
+}
+
+model WorkMeeting {
+  id              String    @id @default(cuid())
+  userId          String
+  workspaceId     String
+  title           String
+  scheduledAt     DateTime? // first / next occurrence
+  durationMinutes Int?
+  recurrence      String    @default("none") // none | daily | weekly | biweekly | monthly
+  personId        String?
+  projectId       String?
+  areaId          String?
+  agenda          String? // prep notes / agenda
+  notes           String? // what happened / decisions
+  status          String    @default("active") // active | archived
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace WorkWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  person    WorkPerson?   @relation(fields: [personId], references: [id], onDelete: SetNull)
+  tasks     WorkTask[]
+
+  @@index([userId, workspaceId, status])
+  @@index([userId, scheduledAt])
+}
+
+model WorkTask {
+  id          String    @id @default(cuid())
+  userId      String
+  workspaceId String
+  title       String
+  status      String    @default("open") // open | waiting | done
+  kind        String    @default("task") // task | prep | followup
+  dueDate     DateTime?
+  isImportant Boolean   @default(false)
+  waitingOn   String? // who/what we're waiting on (status = waiting)
+  notes       String?
+  areaId      String?
+  projectId   String?
+  personId    String?
+  meetingId   String?
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace WorkWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  area      WorkArea?     @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  project   WorkProject?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  person    WorkPerson?   @relation(fields: [personId], references: [id], onDelete: SetNull)
+  meeting   WorkMeeting?  @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+
+  @@index([userId, workspaceId, status, dueDate])
+  @@index([userId, workspaceId, status, isImportant])
+}
+
+model WorkNote {
+  id          String   @id @default(cuid())
+  userId      String
+  workspaceId String
+  kind        String   @default("note") // note | decision
+  title       String?
+  body        String
+  resolved    Boolean  @default(false) // decisions: settled or still open
+  areaId      String?
+  projectId   String?
+  personId    String?
+  meetingId   String?
+  occurredAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  workspace WorkWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([userId, workspaceId, occurredAt])
+  @@index([userId, workspaceId, kind, resolved])
+}
+
+model WorkReview {
+  id             String  @id @default(cuid())
+  userId         String
+  workspaceId    String
+  kind           String // shutdown | weekly
+  periodKey      String // shutdown: YYYY-MM-DD; weekly: Monday's YYYY-MM-DD
+  looseEnds      String? // shutdown: open loops captured at end of day
+  tomorrowFocus  String? // shutdown: first work focus for tomorrow
+  wins           String? // weekly
+  challenges     String? // weekly
+  nextPriorities String? // weekly: next week's priorities
+  energy         Int? // weekly: 1–5
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace WorkWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId, kind, periodKey])
+  @@index([userId, workspaceId, kind])
+}
