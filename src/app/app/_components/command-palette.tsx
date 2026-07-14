@@ -31,6 +31,7 @@ const NAVIGATE_ITEMS: Array<{ label: string; href: string }> = [
   { label: "Tasks", href: "/app/do" },
   { label: "Habits", href: "/app/habits" },
   { label: "Projects", href: "/app/projects" },
+  { label: "Work", href: "/app/work" },
   { label: "Reflect", href: "/app/reflect" },
   { label: "Insights", href: "/app/insights" },
   { label: "Rolodex", href: "/app/rolodex" },

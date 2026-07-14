@@ -97,6 +97,15 @@ function ProjectsIcon() {
     </svg>
   );
 }
+function BriefcaseIcon() {
+  return (
+    <svg {...ip}>
+      <rect x="1.75" y="4.5" width="11.5" height="8" rx="1.25" />
+      <path d="M5.5 4.5V3.25c0-.55.45-1 1-1h2c.55 0 1 .45 1 1V4.5" />
+      <path d="M1.75 7.75h11.5" />
+    </svg>
+  );
+}
 function RolodexIcon() {
   return (
     <svg {...ip}>
@@ -173,6 +182,7 @@ const navItems: NavItem[] = [
   { href: "/app/habits", label: "Habits", match: (p) => p.startsWith("/app/habits"), finance: false, icon: <RepeatIcon /> },
   { href: "/app/time", label: "Time", match: (p) => p.startsWith("/app/time"), finance: false, icon: <ClockIcon /> },
   { href: "/app/projects", label: "Projects", match: (p) => p.startsWith("/app/projects"), finance: false, icon: <ProjectsIcon /> },
+  { href: "/app/work", label: "Work", match: (p) => p.startsWith("/app/work"), finance: false, icon: <BriefcaseIcon /> },
   { href: "/app/rolodex", label: "Rolodex", match: (p) => p.startsWith("/app/rolodex"), finance: false, icon: <RolodexIcon /> },
   { href: "/app/reflect", label: "Reflect", match: (p) => p.startsWith("/app/reflect"), finance: false, icon: <ReflectIcon /> },
   { href: "/app/insights", label: "Insights", match: (p) => p.startsWith("/app/insights"), finance: false, icon: <TrendIcon /> },
