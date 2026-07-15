@@ -29,6 +29,8 @@ export type ProjectCardView = {
   energyType: string;
   timeBudgetHours: string;
   targetDateValue: string;
+  /** Work workspace name when linked into the Work Hub (e.g. "Lucid"). */
+  workLabel: string | null;
 };
 
 /**
@@ -135,6 +137,20 @@ export function ProjectCard({
             {view.name}
           </h3>
         </div>
+
+        {view.workLabel ? (
+          <span
+            className="self-start rounded px-1.5 py-0.5 text-[0.625rem] font-medium"
+            style={{
+              background: "var(--bg-tint)",
+              border: "1px solid var(--border-faint)",
+              color: "var(--text-muted)",
+            }}
+            title={`Linked to the ${view.workLabel} work workspace`}
+          >
+            💼 {view.workLabel}
+          </span>
+        ) : null}
 
         <div className="flex-1" />
 

@@ -17,8 +17,10 @@ export {
   updateArea,
   createProject,
   updateProject,
+  deleteWorkProject,
   createWorkPerson,
   updateWorkPerson,
+  deleteWorkPerson,
   createMeeting,
   updateMeeting,
   createTask,
@@ -37,3 +39,27 @@ export {
   type WorkNoteInput,
   type WorkReviewInput,
 } from "./mutations";
+export {
+  // Orchestrators that route work objects through the owning tools.
+  createWorkTask,
+  updateWorkTask,
+  setWorkTaskDone,
+  deleteWorkTask,
+  createWorkMeeting,
+  updateWorkMeeting,
+  archiveWorkMeeting,
+  createCoworker,
+  linkCoworker,
+  createLinkedWorkProject,
+  linkExistingProject,
+  // Cross-surface reads for /app/do, /app/rolodex, /app/projects, assistant.
+  listCoworkerCandidates,
+  listUnlinkedProjectOptions,
+  getWorkContextForDoItems,
+  getWorkContextForRolodexPerson,
+  getWorkspaceNamesByProjectId,
+  getWorkAssistantSummary,
+  type DoItemWorkContext,
+  type RolodexWorkContext,
+  type WorkAssistantSummary,
+} from "./integrations";

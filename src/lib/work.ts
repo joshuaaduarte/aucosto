@@ -36,6 +36,8 @@ export interface WorkProjectSummary {
   nextAction: string | null;
   notes: string | null;
   updatedAt: string;
+  /** Linked Aucosto Project id (the canonical project) — null when work-only. */
+  linkedProjectId: string | null;
 }
 
 export interface WorkPersonSummary {
@@ -46,6 +48,8 @@ export interface WorkPersonSummary {
   team: string | null;
   notes: string | null;
   oneOnOneNotes: string | null;
+  /** Linked RolodexPerson id (the canonical contact) — null when work-only. */
+  rolodexPersonId: string | null;
 }
 
 export interface WorkMeetingSummary {
@@ -60,6 +64,8 @@ export interface WorkMeetingSummary {
   agenda: string | null;
   notes: string | null;
   status: string;
+  /** Linked CalendarItem id (the canonical schedule entry) — null when unscheduled. */
+  calendarItemId: string | null;
 }
 
 export interface WorkTaskSummary {
@@ -77,6 +83,8 @@ export interface WorkTaskSummary {
   meetingId: string | null;
   completedAt: string | null;
   createdAt: string;
+  /** Linked DoItem id (the canonical task) — null for legacy work-only rows. */
+  doItemId: string | null;
 }
 
 export interface WorkNoteSummary {
@@ -260,4 +268,97 @@ export function dueLabel(iso: string | null, today: Date): string | null {
 export function meetingTimeLabel(iso: string | null): string {
   if (!iso) return "Unscheduled";
   return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+// ── Integration helpers (Work ↔ Do / Calendar / Rolodex / Projects) ───────
+// Pure functions used by the work service when it routes work objects through
+// the owning tools. Kept here so they stay unit-testable without a DB.
+
+/**
+ * Lane for the DoItem backing a work task: due today/overdue or flagged
+ * important lands in "today" (so it surfaces on the main Today hub), everything
+ * else queues in "next".
+ */
+export function workTaskLane(
+  dueDate: string | null,
+  isImportant: boolean,
+  today: Date,
+): "today" | "next" {
+  if (isImportant) return "today";
+  if (!dueDate) return "next";
+  const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+  return new Date(dueDate) <= endOfToday ? "today" : "next";
+}
+
+/** Calendar window for a scheduled work meeting (default 30 minutes). */
+export function meetingCalendarWindow(
+  scheduledAt: string,
+  durationMinutes: number | null | undefined,
+): { startsAt: Date; endsAt: Date } {
+  const startsAt = new Date(scheduledAt);
+  const minutes = durationMinutes && durationMinutes > 0 ? durationMinutes : 30;
+  return { startsAt, endsAt: new Date(startsAt.getTime() + minutes * 60_000) };
+}
+
+/**
+ * Effective status of a work task whose canonical row is a DoItem: completion
+ * and waiting state flow in from the Do list, so finishing a task on /app/do
+ * finishes it in Work too (and vice versa via the service orchestrators).
+ */
+export function resolveLinkedTaskStatus(
+  workStatus: string,
+  doStatus: string | null | undefined,
+): WorkTaskStatus {
+  if (workStatus === "done" || doStatus === "done") return "done";
+  if (workStatus === "waiting" || doStatus === "waiting") return "waiting";
+  return "open";
+}
+
+/**
+ * Effective status of a work project linked to an Aucosto Project. The
+ * canonical project's terminal/paused states win; otherwise the work-side
+ * status (which can express "waiting") is kept.
+ */
+export function resolveLinkedProjectStatus(
+  workStatus: string,
+  projectStatus: string | null | undefined,
+): WorkProjectStatus {
+  if (projectStatus === "done") return "done";
+  if (projectStatus === "paused" && workStatus !== "done") return "paused";
+  if (workStatus === "waiting" || workStatus === "paused" || workStatus === "done") {
+    return workStatus;
+  }
+  return "active";
+}
+
+/** Minimal shape of a Rolodex person for coworker-candidate filtering. */
+export interface CoworkerCandidateInput {
+  id: string;
+  displayName: string;
+  organization: string | null;
+  relationshipType: string | null;
+  contactKind: string;
+}
+
+/**
+ * Rolodex people that look like coworkers at the workspace's organization and
+ * aren't linked into the workspace yet. Matches `organization` containing the
+ * workspace name (case-insensitive, so workspace "Lucid" matches org
+ * "Lucid Motors") or `relationshipType === "coworker"`.
+ */
+export function filterCoworkerCandidates<T extends CoworkerCandidateInput>(
+  persons: T[],
+  linkedRolodexIds: Iterable<string | null>,
+  workspaceName: string,
+): T[] {
+  const linked = new Set([...linkedRolodexIds].filter(Boolean));
+  const needle = workspaceName.trim().toLowerCase();
+  return persons.filter((person) => {
+    if (linked.has(person.id)) return false;
+    if (person.contactKind !== "person") return false;
+    const orgMatch =
+      needle.length > 0 &&
+      (person.organization?.toLowerCase().includes(needle) ?? false);
+    return orgMatch || person.relationshipType === "coworker";
+  });
 }

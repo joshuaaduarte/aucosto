@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   dueLabel,
   WORK_PROJECT_STATUSES,
@@ -7,7 +8,12 @@ import {
   type WorkTaskSummary,
   type WorkWorkspaceSummary,
 } from "@/lib/work";
-import { createProjectAction, updateProjectAction } from "../actions";
+import {
+  createProjectAction,
+  linkProjectAction,
+  unlinkProjectAction,
+  updateProjectAction,
+} from "../actions";
 import { WorkForm } from "./work-form";
 import { Disclosure, Empty, FieldLabel, Meta, Section, StatusPill, type WorkNameMaps } from "./ui";
 
@@ -19,6 +25,7 @@ export function ProjectsSection({
   notes,
   maps,
   today,
+  linkOptions,
 }: {
   workspace: WorkWorkspaceSummary;
   projects: WorkProjectSummary[];
@@ -27,6 +34,8 @@ export function ProjectsSection({
   notes: WorkNoteSummary[];
   maps: WorkNameMaps;
   today: Date;
+  /** Aucosto Projects not yet linked into this workspace. */
+  linkOptions: Array<{ id: string; name: string }>;
 }) {
   const openTaskCount = new Map<string, number>();
   for (const task of tasks) {
@@ -53,12 +62,22 @@ export function ProjectsSection({
                 style={i === projects.length - 1 ? undefined : { borderBottom: "1px solid var(--border-faint)" }}
               >
                 <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                  <span
-                    className="text-[0.875rem] font-medium"
-                    style={{ color: project.status === "done" ? "var(--text-faint)" : "var(--text)" }}
-                  >
-                    {project.name}
-                  </span>
+                  {project.linkedProjectId ? (
+                    <Link
+                      href={`/app/projects/${project.linkedProjectId}`}
+                      className="text-[0.875rem] font-medium hover:underline"
+                      style={{ color: project.status === "done" ? "var(--text-faint)" : "var(--text)" }}
+                    >
+                      {project.name}
+                    </Link>
+                  ) : (
+                    <span
+                      className="text-[0.875rem] font-medium"
+                      style={{ color: project.status === "done" ? "var(--text-faint)" : "var(--text)" }}
+                    >
+                      {project.name}
+                    </span>
+                  )}
                   <StatusPill status={project.status} />
                   {project.dueDate && <Meta>Due {dueLabel(project.dueDate, today)}</Meta>}
                   {project.areaId && maps.areas.has(project.areaId) && (
@@ -81,7 +100,7 @@ export function ProjectsSection({
                     Outcome: {project.outcome}
                   </p>
                 )}
-                <div className="mt-1">
+                <div className="mt-1 flex flex-wrap items-center gap-3">
                   <Disclosure summary="Edit">
                     <WorkForm action={updateProjectAction} submitLabel="Save project">
                       <input type="hidden" name="id" value={project.id} />
@@ -89,6 +108,19 @@ export function ProjectsSection({
                       <ProjectFields areas={areas} project={project} />
                     </WorkForm>
                   </Disclosure>
+                  {project.linkedProjectId && (
+                    <form action={unlinkProjectAction}>
+                      <input type="hidden" name="id" value={project.id} />
+                      <button
+                        type="submit"
+                        className="text-[0.75rem] font-medium"
+                        style={{ color: "var(--text-ghost)" }}
+                        title="Remove from this workspace — the project itself stays in Projects."
+                      >
+                        Unlink
+                      </button>
+                    </form>
+                  )}
                 </div>
               </li>
             ))}
@@ -96,12 +128,54 @@ export function ProjectsSection({
         )}
       </Section>
 
+      {linkOptions.length > 0 && (
+        <Section title="Link an existing project">
+          <div className="px-3 py-2.5">
+            <form action={linkProjectAction} className="flex flex-wrap items-end gap-2">
+              <input type="hidden" name="workspaceId" value={workspace.id} />
+              <label className="block min-w-[12rem] flex-1">
+                <FieldLabel>Project</FieldLabel>
+                <select name="projectId" required className="field" defaultValue="">
+                  <option value="" disabled>
+                    Choose a project…
+                  </option>
+                  {linkOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {areas.length > 0 && (
+                <label className="block">
+                  <FieldLabel>Area</FieldLabel>
+                  <select name="areaId" defaultValue="" className="field">
+                    <option value="">—</option>
+                    {areas.map((area) => (
+                      <option key={area.id} value={area.id}>
+                        {area.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <button type="submit" className="btn-ink px-3 py-1.5 text-[0.8125rem] font-medium">
+                Link to {workspace.name}
+              </button>
+            </form>
+          </div>
+        </Section>
+      )}
+
       <Section title="New project">
         <div className="px-3 py-2.5">
           <WorkForm action={createProjectAction} submitLabel="Add project">
             <input type="hidden" name="workspaceId" value={workspace.id} />
             <ProjectFields areas={areas} />
           </WorkForm>
+          <p className="mt-1.5 text-[0.6875rem]" style={{ color: "var(--text-faint)" }}>
+            Also created in Projects, so time tracking and tasks work like any other project.
+          </p>
         </div>
       </Section>
     </div>

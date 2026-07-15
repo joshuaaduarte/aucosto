@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import {
   DO_LANE_DESCRIPTIONS,
@@ -12,6 +13,7 @@ import {
   type HabitTaskSummary,
 } from "@/lib/services/habits";
 import { listProjects } from "@/lib/services/projects";
+import { getWorkContextForDoItems } from "@/lib/services/work";
 import { estimationSparkline } from "@/lib/insights";
 import { Sparkline } from "../insights/_components/charts";
 import { DoCreateForm } from "./create-form";
@@ -124,13 +126,39 @@ function OverflowList<T>({
   );
 }
 
-export default async function DoPage() {
+export default async function DoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ context?: string }>;
+}) {
+  const { context: rawContext } = await searchParams;
   const userId = await resolveActiveUserId();
-  const [items, habitTasks, projects] = await Promise.all([
+  const [allItems, allHabitTasks, projects, workContext] = await Promise.all([
     listDoItems(userId, { includeDone: true }),
     listHabitTaskItems(userId),
     listProjects(userId),
+    getWorkContextForDoItems(userId),
   ]);
+
+  // Optional work-context filter: work tasks are ordinary DoItems linked into
+  // a Work workspace; the pills only appear once such links exist.
+  const context =
+    workContext.size > 0 && (rawContext === "work" || rawContext === "personal")
+      ? rawContext
+      : "all";
+  const items = allItems.filter((item) =>
+    context === "work"
+      ? workContext.has(item.id)
+      : context === "personal"
+        ? !workContext.has(item.id)
+        : true,
+  );
+  const workspaceName =
+    workContext.size > 0
+      ? [...workContext.values()][0]!.workspaceName
+      : null;
+  // Recurring habit tasks are personal by nature — hide them in the work view.
+  const habitTasks = context === "work" ? [] : allHabitTasks;
 
   const activeItems = items.filter((item) => item.status !== "done");
   const doneItems = items.filter((item) => item.status === "done");
@@ -247,6 +275,35 @@ export default async function DoPage() {
             : ""}
         </p>
       </header>
+
+      {workspaceName ? (
+        <nav className="fade-in flex gap-1" aria-label="Task context">
+          {(
+            [
+              { id: "all", label: "All", href: "/app/do" },
+              { id: "work", label: workspaceName, href: "/app/do?context=work" },
+              { id: "personal", label: "Personal", href: "/app/do?context=personal" },
+            ] as const
+          ).map((option) => {
+            const active = option.id === context;
+            return (
+              <Link
+                key={option.id}
+                href={option.href}
+                aria-current={active ? "page" : undefined}
+                className="rounded-full px-3 py-1 text-[0.75rem] font-medium transition-colors"
+                style={{
+                  background: active ? "var(--text)" : "transparent",
+                  color: active ? "var(--bg-page)" : "var(--text-muted)",
+                  border: `1px solid ${active ? "var(--text)" : "var(--border-faint)"}`,
+                }}
+              >
+                {option.label}
+              </Link>
+            );
+          })}
+        </nav>
+      ) : null}
 
       <section
         className="fade-in-delay-1 grid gap-px overflow-hidden rounded-md border sm:grid-cols-2 xl:grid-cols-3"

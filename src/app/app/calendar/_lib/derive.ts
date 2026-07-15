@@ -170,6 +170,7 @@ export function calendarItemColor(
   if (item.kind === "external") return UNCATEGORIZED_COLOR;
   if (item.sourceTool === "do") return categoryColor("do");
   if (item.sourceTool === "habit") return categoryColor("habit");
+  if (item.sourceTool === "work") return categoryColor("work");
   return categoryColor("calendar");
 }
 

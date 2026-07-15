@@ -4,14 +4,17 @@ import {
   getOrCreateDefaultWorkspace,
   getReview,
   listAreas,
+  listCoworkerCandidates,
   listMeetings,
   listNotes,
   listPeople,
   listProjects,
   listTasks,
+  listUnlinkedProjectOptions,
 } from "@/lib/services/work";
 import { workDayKey, workWeekKey } from "@/lib/work";
 import { buildNameMaps } from "./_components/ui";
+import { SetupSection } from "./_components/setup-section";
 import { TodaySection } from "./_components/today-section";
 import { ProjectsSection } from "./_components/projects-section";
 import { AreasSection } from "./_components/areas-section";
@@ -59,17 +62,26 @@ export default async function WorkPage({
   }
 
   const today = new Date();
-  const [areas, projects, people, meetings, tasks, notes, shutdown, weekly] = await Promise.all([
-    listAreas(userId, workspace.id),
-    listProjects(userId, workspace.id),
-    listPeople(userId, workspace.id),
-    listMeetings(userId, workspace.id),
-    listTasks(userId, workspace.id),
-    listNotes(userId, workspace.id),
-    getReview(userId, workspace.id, "shutdown", workDayKey(today)),
-    getReview(userId, workspace.id, "weekly", workWeekKey(today)),
-  ]);
+  const [areas, projects, people, meetings, tasks, notes, shutdown, weekly, candidates, projectOptions] =
+    await Promise.all([
+      listAreas(userId, workspace.id),
+      listProjects(userId, workspace.id),
+      listPeople(userId, workspace.id),
+      listMeetings(userId, workspace.id),
+      listTasks(userId, workspace.id),
+      listNotes(userId, workspace.id),
+      getReview(userId, workspace.id, "shutdown", workDayKey(today)),
+      getReview(userId, workspace.id, "weekly", workWeekKey(today)),
+      listCoworkerCandidates(userId, workspace.id, workspace.name),
+      listUnlinkedProjectOptions(userId, workspace.id),
+    ]);
   const maps = buildNameMaps(areas, projects, people, meetings);
+  const isEmptyWorkspace =
+    areas.length === 0 &&
+    projects.length === 0 &&
+    people.length === 0 &&
+    meetings.length === 0 &&
+    tasks.length === 0;
 
   return (
     <div className="space-y-5">
@@ -117,7 +129,10 @@ export default async function WorkPage({
       </nav>
 
       <div className="fade-in-delay-2">
-        {tab === "today" && (
+        {tab === "today" && isEmptyWorkspace ? (
+          <SetupSection workspace={workspace} candidates={candidates} projectOptions={projectOptions} />
+        ) : null}
+        {tab === "today" && !isEmptyWorkspace && (
           <TodaySection
             workspace={workspace}
             tasks={tasks}
@@ -136,13 +151,19 @@ export default async function WorkPage({
             notes={notes}
             maps={maps}
             today={today}
+            linkOptions={projectOptions}
           />
         )}
         {tab === "areas" && (
           <AreasSection workspace={workspace} areas={areas} projects={projects} tasks={tasks} />
         )}
         {tab === "people" && (
-          <PeopleSection workspace={workspace} people={people} tasks={tasks} />
+          <PeopleSection
+            workspace={workspace}
+            people={people}
+            tasks={tasks}
+            candidates={candidates}
+          />
         )}
         {tab === "meetings" && (
           <MeetingsSection

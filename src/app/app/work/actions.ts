@@ -6,28 +6,37 @@ import { resolveActiveUserId } from "@/lib/viewer-context";
 import {
   createArea,
   updateArea,
-  createProject,
   updateProject,
-  createWorkPerson,
   updateWorkPerson,
-  createMeeting,
-  updateMeeting,
-  createTask,
-  updateTask,
-  setTaskDone,
-  deleteTask,
+  deleteWorkPerson,
+  deleteWorkProject,
   createNote,
   setNoteResolved,
   deleteNote,
   saveReview,
+  getOrCreateDefaultWorkspace,
+  // Orchestrators — work objects are created in the owning tools (Do,
+  // Calendar, Rolodex, Projects) and linked into the workspace.
+  createWorkTask,
+  updateWorkTask,
+  setWorkTaskDone,
+  deleteWorkTask,
+  createWorkMeeting,
+  updateWorkMeeting,
+  archiveWorkMeeting,
+  createCoworker,
+  linkCoworker,
+  createLinkedWorkProject,
+  linkExistingProject,
 } from "@/lib/services/work";
 import { workDayKey, workWeekKey } from "@/lib/work";
 
 export type WorkFormState = { error?: string } | undefined;
 
-function revalidateWork() {
+function revalidateWork(...toolPaths: string[]) {
   revalidatePath("/app");
   revalidatePath("/app/work");
+  for (const path of toolPaths) revalidatePath(path);
 }
 
 async function requireViewer(): Promise<string | null> {
@@ -88,6 +97,7 @@ function parse<S extends z.ZodType>(schema: S, formData: FormData): Parsed<S> {
 async function runForm(
   work: (userId: string) => Promise<void>,
   fallback: string,
+  toolPaths: string[] = [],
 ): Promise<WorkFormState> {
   const userId = await requireViewer();
   if (!userId) return { error: "Not signed in." };
@@ -96,7 +106,7 @@ async function runForm(
   } catch (error) {
     return { error: error instanceof Error ? error.message : fallback };
   }
-  revalidateWork();
+  revalidateWork(...toolPaths);
   return undefined;
 }
 
@@ -125,8 +135,11 @@ export async function createTaskAction(
   const { workspaceId, isImportant, ...input } = parsed.data;
   return runForm(
     (userId) =>
-      createTask(userId, workspaceId, { ...input, isImportant: isImportant === "on" }).then(() => {}),
+      createWorkTask(userId, workspaceId, { ...input, isImportant: isImportant === "on" }).then(
+        () => {},
+      ),
     "Could not create the task.",
+    ["/app/do"],
   );
 }
 
@@ -139,13 +152,14 @@ export async function updateTaskAction(
   const { id: taskId, workspaceId: _ws, isImportant, waitingOn, ...input } = parsed.data;
   return runForm(
     (userId) =>
-      updateTask(userId, taskId, {
+      updateWorkTask(userId, taskId, {
         ...input,
         waitingOn,
         status: waitingOn ? "waiting" : "open",
         isImportant: isImportant === "on",
       }),
     "Could not update the task.",
+    ["/app/do"],
   );
 }
 
@@ -155,8 +169,8 @@ export async function toggleTaskDoneAction(formData: FormData): Promise<void> {
   const taskId = formData.get("id");
   const done = formData.get("done") === "true";
   if (typeof taskId !== "string" || !taskId) return;
-  await setTaskDone(userId, taskId, done);
-  revalidateWork();
+  await setWorkTaskDone(userId, taskId, done);
+  revalidateWork("/app/do");
 }
 
 export async function deleteTaskAction(formData: FormData): Promise<void> {
@@ -164,8 +178,8 @@ export async function deleteTaskAction(formData: FormData): Promise<void> {
   if (!userId) return;
   const taskId = formData.get("id");
   if (typeof taskId !== "string" || !taskId) return;
-  await deleteTask(userId, taskId);
-  revalidateWork();
+  await deleteWorkTask(userId, taskId);
+  revalidateWork("/app/do");
 }
 
 /** One-click prep / follow-up task from a meeting row. */
@@ -183,12 +197,12 @@ export async function addMeetingTaskAction(formData: FormData): Promise<void> {
   if (!parsed.success) return;
   const { workspaceId, meetingId, meetingTitle, kind, title } = parsed.data;
   const fallback = kind === "prep" ? `Prep for ${meetingTitle}` : `Follow up on ${meetingTitle}`;
-  await createTask(userId, workspaceId, {
+  await createWorkTask(userId, workspaceId, {
     title: title || fallback,
     kind,
     meetingId,
   });
-  revalidateWork();
+  revalidateWork("/app/do");
 }
 
 // ── Projects ──────────────────────────────────────────────────────────────
@@ -212,8 +226,9 @@ export async function createProjectAction(
   if (!parsed.ok) return { error: parsed.error };
   const { workspaceId, ...input } = parsed.data;
   return runForm(
-    (userId) => createProject(userId, workspaceId, input).then(() => {}),
+    (userId) => createLinkedWorkProject(userId, workspaceId, input).then(() => {}),
     "Could not create the project.",
+    ["/app/projects"],
   );
 }
 
@@ -227,7 +242,31 @@ export async function updateProjectAction(
   return runForm(
     (userId) => updateProject(userId, projectId, input),
     "Could not update the project.",
+    ["/app/projects"],
   );
+}
+
+/** Mark an existing Aucosto Project as part of the workspace. */
+export async function linkProjectAction(formData: FormData): Promise<void> {
+  const userId = await requireViewer();
+  if (!userId) return;
+  const schema = z.object({ workspaceId: id, projectId: id, areaId: optionalId });
+  const parsed = schema.safeParse(fd(formData));
+  if (!parsed.success) return;
+  await linkExistingProject(userId, parsed.data.workspaceId, parsed.data.projectId, {
+    areaId: parsed.data.areaId,
+  });
+  revalidateWork("/app/projects");
+}
+
+/** Unlink a project from the workspace (the Aucosto Project is kept). */
+export async function unlinkProjectAction(formData: FormData): Promise<void> {
+  const userId = await requireViewer();
+  if (!userId) return;
+  const workProjectId = formData.get("id");
+  if (typeof workProjectId !== "string" || !workProjectId) return;
+  await deleteWorkProject(userId, workProjectId);
+  revalidateWork("/app/projects");
 }
 
 // ── Areas ─────────────────────────────────────────────────────────────────
@@ -294,8 +333,14 @@ export async function createPersonAction(
   if (!parsed.ok) return { error: parsed.error };
   const { workspaceId, ...input } = parsed.data;
   return runForm(
-    (userId) => createWorkPerson(userId, workspaceId, input).then(() => {}),
+    async (userId) => {
+      // Saved as a Rolodex coworker at the workspace's organization, then
+      // linked in — Work never grows its own duplicate contacts table.
+      const workspace = await getOrCreateDefaultWorkspace(userId);
+      await createCoworker(userId, workspaceId, workspace?.name ?? "Work", input);
+    },
     "Could not add the person.",
+    ["/app/rolodex"],
   );
 }
 
@@ -303,13 +348,39 @@ export async function updatePersonAction(
   _prev: WorkFormState,
   formData: FormData,
 ): Promise<WorkFormState> {
-  const parsed = parse(personSchema.extend({ id }), formData);
+  // `name` is optional here: for Rolodex-linked people the name is managed on
+  // the Rolodex record, so the Work edit form doesn't submit one.
+  const parsed = parse(
+    personSchema.extend({ id, name: z.string().trim().min(1).max(200).optional() }),
+    formData,
+  );
   if (!parsed.ok) return { error: parsed.error };
   const { id: personId, workspaceId: _ws, ...input } = parsed.data;
   return runForm(
     (userId) => updateWorkPerson(userId, personId, input),
     "Could not update the person.",
   );
+}
+
+/** Connect an existing Rolodex person into the workspace. */
+export async function linkPersonAction(formData: FormData): Promise<void> {
+  const userId = await requireViewer();
+  if (!userId) return;
+  const schema = z.object({ workspaceId: id, rolodexPersonId: id });
+  const parsed = schema.safeParse(fd(formData));
+  if (!parsed.success) return;
+  await linkCoworker(userId, parsed.data.workspaceId, parsed.data.rolodexPersonId);
+  revalidateWork("/app/rolodex");
+}
+
+/** Remove a person from the workspace (their Rolodex record is kept). */
+export async function removePersonAction(formData: FormData): Promise<void> {
+  const userId = await requireViewer();
+  if (!userId) return;
+  const workPersonId = formData.get("id");
+  if (typeof workPersonId !== "string" || !workPersonId) return;
+  await deleteWorkPerson(userId, workPersonId);
+  revalidateWork("/app/rolodex");
 }
 
 // ── Meetings ──────────────────────────────────────────────────────────────
@@ -340,8 +411,9 @@ export async function createMeetingAction(
   if (!parsed.ok) return { error: parsed.error };
   const { workspaceId, ...input } = parsed.data;
   return runForm(
-    (userId) => createMeeting(userId, workspaceId, input).then(() => {}),
+    (userId) => createWorkMeeting(userId, workspaceId, input).then(() => {}),
     "Could not create the meeting.",
+    ["/app/calendar"],
   );
 }
 
@@ -353,8 +425,9 @@ export async function updateMeetingAction(
   if (!parsed.ok) return { error: parsed.error };
   const { id: meetingId, workspaceId: _ws, ...input } = parsed.data;
   return runForm(
-    (userId) => updateMeeting(userId, meetingId, input),
+    (userId) => updateWorkMeeting(userId, meetingId, input),
     "Could not update the meeting.",
+    ["/app/calendar"],
   );
 }
 
@@ -363,8 +436,8 @@ export async function archiveMeetingAction(formData: FormData): Promise<void> {
   if (!userId) return;
   const meetingId = formData.get("id");
   if (typeof meetingId !== "string" || !meetingId) return;
-  await updateMeeting(userId, meetingId, { status: "archived" });
-  revalidateWork();
+  await archiveWorkMeeting(userId, meetingId);
+  revalidateWork("/app/calendar");
 }
 
 // ── Notes / decisions ─────────────────────────────────────────────────────

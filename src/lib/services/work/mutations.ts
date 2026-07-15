@@ -92,6 +92,8 @@ export interface WorkProjectInput {
   nextAction?: string | null;
   notes?: string | null;
   areaId?: string | null;
+  /** Aucosto Project id this work project wraps (column "projectId"). */
+  linkedProjectId?: string | null;
 }
 
 export async function createProject(
@@ -104,8 +106,8 @@ export async function createProject(
   const id = randomUUID();
   await prisma.$executeRawUnsafe(
     `INSERT INTO "WorkProject"
-       ("id", "userId", "workspaceId", "areaId", "name", "outcome", "status", "dueDate", "nextAction", "notes")
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::timestamptz, $9, $10)`,
+       ("id", "userId", "workspaceId", "areaId", "name", "outcome", "status", "dueDate", "nextAction", "notes", "projectId")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::timestamptz, $9, $10, $11)`,
     id,
     userId,
     workspaceId,
@@ -116,9 +118,24 @@ export async function createProject(
     input.dueDate || null,
     input.nextAction?.trim() || null,
     input.notes?.trim() || null,
+    input.linkedProjectId || null,
   );
   await recordEvent({ userId, tool: "work", type: "work.project_created", refId: id, meta: { name: input.name } });
   return id;
+}
+
+/** Remove a work project row (the linked Aucosto Project, if any, is kept). */
+export async function deleteWorkProject(
+  userId: string,
+  workProjectId: string,
+): Promise<void> {
+  requireCan(userId, "work", "write");
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM "WorkProject" WHERE "id" = $1 AND "userId" = $2`,
+    workProjectId,
+    userId,
+  );
+  await recordEvent({ userId, tool: "work", type: "work.project_unlinked", refId: workProjectId });
 }
 
 export async function updateProject(
@@ -154,6 +171,8 @@ export interface WorkPersonInput {
   team?: string | null;
   notes?: string | null;
   oneOnOneNotes?: string | null;
+  /** Canonical RolodexPerson this row links into the workspace. */
+  rolodexPersonId?: string | null;
 }
 
 export async function createWorkPerson(
@@ -166,8 +185,8 @@ export async function createWorkPerson(
   const id = randomUUID();
   await prisma.$executeRawUnsafe(
     `INSERT INTO "WorkPerson"
-       ("id", "userId", "workspaceId", "name", "role", "relationship", "team", "notes", "oneOnOneNotes")
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+       ("id", "userId", "workspaceId", "name", "role", "relationship", "team", "notes", "oneOnOneNotes", "rolodexPersonId")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
     id,
     userId,
     workspaceId,
@@ -177,9 +196,24 @@ export async function createWorkPerson(
     input.team?.trim() || null,
     input.notes?.trim() || null,
     input.oneOnOneNotes?.trim() || null,
+    input.rolodexPersonId || null,
   );
   await recordEvent({ userId, tool: "work", type: "work.person_created", refId: id, meta: { name: input.name } });
   return id;
+}
+
+/** Remove a person from the workspace (their Rolodex record is kept). */
+export async function deleteWorkPerson(
+  userId: string,
+  workPersonId: string,
+): Promise<void> {
+  requireCan(userId, "work", "write");
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM "WorkPerson" WHERE "id" = $1 AND "userId" = $2`,
+    workPersonId,
+    userId,
+  );
+  await recordEvent({ userId, tool: "work", type: "work.person_removed", refId: workPersonId });
 }
 
 export async function updateWorkPerson(
@@ -211,6 +245,8 @@ export interface WorkMeetingInput {
   areaId?: string | null;
   agenda?: string | null;
   notes?: string | null;
+  /** Canonical CalendarItem backing the scheduled occurrence. */
+  calendarItemId?: string | null;
 }
 
 export async function createMeeting(
@@ -224,8 +260,8 @@ export async function createMeeting(
   await prisma.$executeRawUnsafe(
     `INSERT INTO "WorkMeeting"
        ("id", "userId", "workspaceId", "title", "scheduledAt", "durationMinutes",
-        "recurrence", "personId", "projectId", "areaId", "agenda", "notes")
-     VALUES ($1, $2, $3, $4, $5::timestamptz, $6, $7, $8, $9, $10, $11, $12)`,
+        "recurrence", "personId", "projectId", "areaId", "agenda", "notes", "calendarItemId")
+     VALUES ($1, $2, $3, $4, $5::timestamptz, $6, $7, $8, $9, $10, $11, $12, $13)`,
     id,
     userId,
     workspaceId,
@@ -238,6 +274,7 @@ export async function createMeeting(
     input.areaId || null,
     input.agenda?.trim() || null,
     input.notes?.trim() || null,
+    input.calendarItemId || null,
   );
   await recordEvent({ userId, tool: "work", type: "work.meeting_created", refId: id, meta: { title: input.title } });
   return id;
@@ -262,6 +299,8 @@ export async function updateMeeting(
       agenda: patch.agenda === undefined ? undefined : patch.agenda?.trim() || null,
       notes: patch.notes === undefined ? undefined : patch.notes?.trim() || null,
       status: patch.status,
+      calendarItemId:
+        patch.calendarItemId === undefined ? undefined : patch.calendarItemId || null,
     },
     { timestamptzCols: ["scheduledAt"] },
   );
@@ -281,6 +320,8 @@ export interface WorkTaskInput {
   projectId?: string | null;
   personId?: string | null;
   meetingId?: string | null;
+  /** Canonical DoItem backing this task. */
+  doItemId?: string | null;
 }
 
 export async function createTask(
@@ -294,8 +335,8 @@ export async function createTask(
   await prisma.$executeRawUnsafe(
     `INSERT INTO "WorkTask"
        ("id", "userId", "workspaceId", "title", "status", "kind", "dueDate", "isImportant",
-        "waitingOn", "notes", "areaId", "projectId", "personId", "meetingId")
-     VALUES ($1, $2, $3, $4, $5, $6, $7::timestamptz, $8, $9, $10, $11, $12, $13, $14)`,
+        "waitingOn", "notes", "areaId", "projectId", "personId", "meetingId", "doItemId")
+     VALUES ($1, $2, $3, $4, $5, $6, $7::timestamptz, $8, $9, $10, $11, $12, $13, $14, $15)`,
     id,
     userId,
     workspaceId,
@@ -310,6 +351,7 @@ export async function createTask(
     input.projectId || null,
     input.personId || null,
     input.meetingId || null,
+    input.doItemId || null,
   );
   await recordEvent({ userId, tool: "work", type: "work.task_created", refId: id, meta: { title: input.title } });
   return id;

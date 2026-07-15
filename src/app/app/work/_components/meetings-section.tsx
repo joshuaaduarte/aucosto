@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   WORK_RECURRENCES,
   meetingTimeLabel,
@@ -77,6 +78,15 @@ export function MeetingsSection({
                     {meeting.personId && maps.people.has(meeting.personId) && (
                       <Meta>· {maps.people.get(meeting.personId)}</Meta>
                     )}
+                    {meeting.calendarItemId && (
+                      <Link
+                        href="/app/calendar"
+                        className="pill text-[0.6875rem] hover:underline"
+                        style={{ background: "var(--bg-tint-strong)", color: "var(--text)" }}
+                      >
+                        On calendar
+                      </Link>
+                    )}
                   </div>
                   {meeting.agenda && (
                     <p className="mt-0.5 whitespace-pre-line text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
@@ -139,6 +149,10 @@ export function MeetingsSection({
             <input type="hidden" name="workspaceId" value={workspace.id} />
             <MeetingFields people={people} />
           </WorkForm>
+          <p className="mt-1.5 text-[0.6875rem]" style={{ color: "var(--text-faint)" }}>
+            Scheduled meetings are saved to the calendar; repeats stay here and the calendar
+            carries the next occurrence.
+          </p>
         </div>
       </Section>
     </div>

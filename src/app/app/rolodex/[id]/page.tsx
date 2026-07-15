@@ -13,6 +13,7 @@ import {
   ensureInsightTables,
   listInsightsForPerson,
 } from "@/lib/services/captured-insights";
+import { getWorkContextForRolodexPerson } from "@/lib/services/work";
 import { InteractionTimeline } from "./_interaction-timeline";
 import { RelationshipsSection } from "./_relationships-section";
 import { InsightsSection } from "./_insights-section";
@@ -56,13 +57,15 @@ export default async function PersonDetailPage({
 
   await ensureInsightTables().catch(() => {});
 
-  const [linkedCalendar, linkedTime, personInsights, relations, allPersons] = await Promise.all([
-    getLinkedCalendarItems(userId, id).catch(() => []),
-    getLinkedTimeEntries(userId, id).catch(() => []),
-    listInsightsForPerson(userId, id, { limit: 10 }).catch(() => []),
-    listRelationsForEntity(userId, id).catch(() => []),
-    listPersons(userId).catch(() => []),
-  ]);
+  const [linkedCalendar, linkedTime, personInsights, relations, allPersons, workContexts] =
+    await Promise.all([
+      getLinkedCalendarItems(userId, id).catch(() => []),
+      getLinkedTimeEntries(userId, id).catch(() => []),
+      listInsightsForPerson(userId, id, { limit: 10 }).catch(() => []),
+      listRelationsForEntity(userId, id).catch(() => []),
+      listPersons(userId).catch(() => []),
+      getWorkContextForRolodexPerson(userId, id).catch(() => []),
+    ]);
 
   const dueFollowUps = person.interactions.filter((i) => i.followUpNeeded);
 
@@ -111,6 +114,33 @@ export default async function PersonDetailPage({
           </Link>
         </header>
       </div>
+
+      {/* Work context (linked into a Work workspace) */}
+      {workContexts.length > 0 && (
+        <section className="fade-in-delay-1 space-y-2">
+          {workContexts.map((ctx) => (
+            <Link
+              key={ctx.workPersonId}
+              href="/app/work?tab=people"
+              className="flex items-center justify-between rounded-lg px-3 py-2.5"
+              style={{ background: "var(--bg-tint)", border: "1px solid var(--border-faint)" }}
+            >
+              <span className="text-[0.875rem]" style={{ color: "var(--text)" }}>
+                <span className="font-medium">💼 {ctx.workspaceName}</span>
+                {[ctx.role, ctx.relationship, ctx.team].filter(Boolean).length > 0 && (
+                  <span style={{ color: "var(--text-muted)" }}>
+                    {" · "}
+                    {[ctx.role, ctx.relationship, ctx.team].filter(Boolean).join(" · ")}
+                  </span>
+                )}
+              </span>
+              <span className="shrink-0 text-[0.8125rem]" style={{ color: "var(--text-ghost)" }}>
+                Work Hub →
+              </span>
+            </Link>
+          ))}
+        </section>
+      )}
 
       {/* Notes */}
       {person.notes && (
