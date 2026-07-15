@@ -11,6 +11,7 @@ import {
   listAreas,
   listBoardProjects,
 } from "@/lib/services/projects";
+import { getWorkspaceNamesByProjectId } from "@/lib/services/work";
 import { NewProjectSheet } from "./_components/new-project-sheet";
 import { ProjectList } from "./_components/project-list";
 import type { ProjectCardView } from "./_components/project-card";
@@ -23,10 +24,11 @@ export default async function ProjectsPage() {
   const userId = await resolveActiveUserId();
   const now = new Date();
 
-  const [cards, areas, allocation] = await Promise.all([
+  const [cards, areas, allocation, workNames] = await Promise.all([
     listBoardProjects(userId),
     listAreas(userId),
     getWeekAllocation(userId),
+    getWorkspaceNamesByProjectId(userId),
   ]);
 
   const views: ProjectCardView[] = cards.map((card, index) => ({
@@ -49,6 +51,7 @@ export default async function ProjectsPage() {
     energyType: card.energyType,
     timeBudgetHours: card.timeBudgetMinutes ? String(card.timeBudgetMinutes / 60) : "",
     targetDateValue: card.targetDate ? card.targetDate.toLocaleDateString("en-CA") : "",
+    workLabel: workNames.get(card.id) ?? null,
   }));
 
   const total = allocation.totalMinutes;

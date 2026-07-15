@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { dueLabel, taskKindLabel, type WorkTaskSummary } from "@/lib/work";
 import { deleteTaskAction, toggleTaskDoneAction, updateTaskAction } from "../actions";
 import { WorkForm } from "./work-form";
@@ -114,6 +115,16 @@ function TaskRow({
           {links.map((label) => (
             <Meta key={label}>· {label}</Meta>
           ))}
+          {task.doItemId && !done && (
+            <Link
+              href="/app/do"
+              className="text-[0.6875rem] hover:underline"
+              style={{ color: "var(--text-ghost)" }}
+              title="This task lives on the Do List"
+            >
+              · in Do
+            </Link>
+          )}
         </div>
         {!done && (
           <div className="mt-0.5">

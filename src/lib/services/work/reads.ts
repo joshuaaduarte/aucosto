@@ -93,12 +93,21 @@ export async function listProjects(
 ): Promise<WorkProjectSummary[]> {
   requireCan(userId, "work", "read");
   try {
+    // Linked Aucosto Projects are canonical: name/target date flow in from the
+    // Project row so edits on /app/projects show up here without duplication.
     const rows = await prisma.$queryRawUnsafe<ProjectRow[]>(
-      `SELECT "id", "areaId", "name", "outcome", "status", "dueDate", "nextAction", "notes", "updatedAt"
-       FROM "WorkProject"
-       WHERE "userId" = $1 AND "workspaceId" = $2
-       ORDER BY CASE "status" WHEN 'active' THEN 0 WHEN 'waiting' THEN 1 WHEN 'paused' THEN 2 ELSE 3 END,
-                "dueDate" ASC NULLS LAST, "updatedAt" DESC`,
+      `SELECT wp."id", wp."areaId",
+              COALESCE(p."name", wp."name") AS "name",
+              wp."outcome", wp."status",
+              COALESCE(wp."dueDate", p."targetDate") AS "dueDate",
+              COALESCE(wp."nextAction", p."nextAction") AS "nextAction",
+              wp."notes", wp."updatedAt", wp."projectId",
+              p."status" AS "linkedStatus"
+       FROM "WorkProject" wp
+       LEFT JOIN "Project" p ON p."id" = wp."projectId" AND p."userId" = wp."userId"
+       WHERE wp."userId" = $1 AND wp."workspaceId" = $2
+       ORDER BY CASE wp."status" WHEN 'active' THEN 0 WHEN 'waiting' THEN 1 WHEN 'paused' THEN 2 ELSE 3 END,
+                "dueDate" ASC NULLS LAST, wp."updatedAt" DESC`,
       userId,
       workspaceId,
     );
@@ -115,11 +124,19 @@ export async function listPeople(
 ): Promise<WorkPersonSummary[]> {
   requireCan(userId, "work", "read");
   try {
+    // Linked Rolodex people are canonical: the display name follows the
+    // Rolodex row; the work-side role wins when set (job context can be more
+    // specific than the general contact record).
     const rows = await prisma.$queryRawUnsafe<PersonRow[]>(
-      `SELECT "id", "name", "role", "relationship", "team", "notes", "oneOnOneNotes"
-       FROM "WorkPerson"
-       WHERE "userId" = $1 AND "workspaceId" = $2
-       ORDER BY CASE "relationship" WHEN 'manager' THEN 0 ELSE 1 END, "name" ASC`,
+      `SELECT wp."id",
+              COALESCE(r."displayName", wp."name") AS "name",
+              COALESCE(wp."role", r."role") AS "role",
+              wp."relationship", wp."team", wp."notes", wp."oneOnOneNotes",
+              wp."rolodexPersonId"
+       FROM "WorkPerson" wp
+       LEFT JOIN "RolodexPerson" r ON r."id" = wp."rolodexPersonId" AND r."userId" = wp."userId"
+       WHERE wp."userId" = $1 AND wp."workspaceId" = $2
+       ORDER BY CASE wp."relationship" WHEN 'manager' THEN 0 ELSE 1 END, "name" ASC`,
       userId,
       workspaceId,
     );
@@ -136,11 +153,23 @@ export async function listMeetings(
 ): Promise<WorkMeetingSummary[]> {
   requireCan(userId, "work", "read");
   try {
+    // Linked CalendarItems are canonical: title/time/duration flow in from the
+    // calendar so rescheduling on /app/calendar moves the work meeting too.
     const rows = await prisma.$queryRawUnsafe<MeetingRow[]>(
-      `SELECT "id", "title", "scheduledAt", "durationMinutes", "recurrence",
-              "personId", "projectId", "areaId", "agenda", "notes", "status"
-       FROM "WorkMeeting"
-       WHERE "userId" = $1 AND "workspaceId" = $2 AND "status" <> 'archived'
+      `SELECT m."id",
+              COALESCE(c."title", m."title") AS "title",
+              COALESCE(c."startsAt", m."scheduledAt") AS "scheduledAt",
+              COALESCE(
+                (EXTRACT(EPOCH FROM (c."endsAt" - c."startsAt")) / 60)::int,
+                m."durationMinutes"
+              ) AS "durationMinutes",
+              m."recurrence", m."personId", m."projectId", m."areaId",
+              m."agenda", m."notes", m."status", m."calendarItemId"
+       FROM "WorkMeeting" m
+       LEFT JOIN "CalendarItem" c
+         ON c."id" = m."calendarItemId" AND c."userId" = m."userId"
+        AND c."status" <> 'cancelled'
+       WHERE m."userId" = $1 AND m."workspaceId" = $2 AND m."status" <> 'archived'
        ORDER BY "scheduledAt" ASC NULLS LAST`,
       userId,
       workspaceId,
@@ -159,13 +188,24 @@ export async function listTasks(
 ): Promise<WorkTaskSummary[]> {
   requireCan(userId, "work", "read");
   try {
+    // Linked DoItems are canonical: title and completion state flow in from
+    // the Do list, so checking a task off on /app/do closes it here too.
     const rows = await prisma.$queryRawUnsafe<TaskRow[]>(
-      `SELECT "id", "title", "status", "kind", "dueDate", "isImportant", "waitingOn",
-              "notes", "areaId", "projectId", "personId", "meetingId", "completedAt", "createdAt"
-       FROM "WorkTask"
-       WHERE "userId" = $1 AND "workspaceId" = $2
-         AND ("status" <> 'done' OR "completedAt" >= $3::timestamptz)
-       ORDER BY "status" ASC, "dueDate" ASC NULLS LAST, "createdAt" ASC`,
+      `SELECT t."id",
+              COALESCE(d."title", t."title") AS "title",
+              t."status", t."kind", t."dueDate", t."isImportant", t."waitingOn",
+              t."notes", t."areaId", t."projectId", t."personId", t."meetingId",
+              COALESCE(t."completedAt", d."completedAt") AS "completedAt",
+              t."createdAt", t."doItemId",
+              d."status" AS "doStatus"
+       FROM "WorkTask" t
+       LEFT JOIN "DoItem" d ON d."id" = t."doItemId" AND d."userId" = t."userId"
+       WHERE t."userId" = $1 AND t."workspaceId" = $2
+         AND (
+           (t."status" <> 'done' AND COALESCE(d."status", '') <> 'done')
+           OR COALESCE(t."completedAt", d."completedAt") >= $3::timestamptz
+         )
+       ORDER BY t."status" ASC, t."dueDate" ASC NULLS LAST, t."createdAt" ASC`,
       userId,
       workspaceId,
       (opts.includeDoneSince ?? new Date(Date.now() - 7 * 86_400_000)).toISOString(),

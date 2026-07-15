@@ -1,5 +1,9 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import {
+  resolveLinkedProjectStatus,
+  resolveLinkedTaskStatus,
+} from "@/lib/work";
 import type {
   WorkAreaSummary,
   WorkMeetingSummary,
@@ -193,6 +197,20 @@ async function _createWorkTables(): Promise<void> {
         UNIQUE ("userId", "workspaceId", "kind", "periodKey")
       )
     `);
+    // Link columns tying Work rows to their canonical objects in the owning
+    // tools (added after the initial tables shipped — idempotent ALTERs cover
+    // both fresh and existing databases). No FK constraints on purpose: the
+    // referenced tables are owned by other tools and reads fall back to the
+    // Work-side copy when a link dangles.
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE "WorkTask" ADD COLUMN IF NOT EXISTS "doItemId" TEXT`,
+    );
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE "WorkMeeting" ADD COLUMN IF NOT EXISTS "calendarItemId" TEXT`,
+    );
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE "WorkProject" ADD COLUMN IF NOT EXISTS "projectId" TEXT`,
+    );
   } catch (error) {
     workTablesReady = null;
     console.error("[work] ensureWorkTables failed", error);
@@ -232,6 +250,9 @@ export type ProjectRow = {
   nextAction: string | null;
   notes: string | null;
   updatedAt: Date;
+  projectId: string | null;
+  /** Status of the linked Aucosto Project (joined), null when unlinked. */
+  linkedStatus: string | null;
 };
 
 export type PersonRow = {
@@ -242,6 +263,7 @@ export type PersonRow = {
   team: string | null;
   notes: string | null;
   oneOnOneNotes: string | null;
+  rolodexPersonId: string | null;
 };
 
 export type MeetingRow = {
@@ -256,6 +278,7 @@ export type MeetingRow = {
   agenda: string | null;
   notes: string | null;
   status: string;
+  calendarItemId: string | null;
 };
 
 export type TaskRow = {
@@ -273,6 +296,9 @@ export type TaskRow = {
   meetingId: string | null;
   completedAt: Date | null;
   createdAt: Date;
+  doItemId: string | null;
+  /** Status of the linked DoItem (joined), null when unlinked. */
+  doStatus: string | null;
 };
 
 export type NoteRow = {
@@ -306,11 +332,13 @@ export function rowToArea(row: AreaRow): WorkAreaSummary {
 }
 
 export function rowToProject(row: ProjectRow): WorkProjectSummary {
+  const { projectId, linkedStatus, ...rest } = row;
   return {
-    ...row,
-    status: row.status as WorkProjectSummary["status"],
+    ...rest,
+    status: resolveLinkedProjectStatus(row.status, linkedStatus),
     dueDate: iso(row.dueDate),
     updatedAt: iso(row.updatedAt) ?? "",
+    linkedProjectId: projectId,
   };
 }
 
@@ -327,9 +355,12 @@ export function rowToMeeting(row: MeetingRow): WorkMeetingSummary {
 }
 
 export function rowToTask(row: TaskRow): WorkTaskSummary {
+  const { doStatus, ...rest } = row;
   return {
-    ...row,
-    status: row.status as WorkTaskSummary["status"],
+    ...rest,
+    status: row.doItemId
+      ? resolveLinkedTaskStatus(row.status, doStatus)
+      : (row.status as WorkTaskSummary["status"]),
     kind: row.kind as WorkTaskSummary["kind"],
     dueDate: iso(row.dueDate),
     completedAt: iso(row.completedAt),

@@ -60,6 +60,7 @@ model WorkProject {
   dueDate     DateTime?
   nextAction  String?
   notes       String?
+  projectId   String? // linked Aucosto Project (the canonical project row)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -108,6 +109,7 @@ model WorkMeeting {
   agenda          String? // prep notes / agenda
   notes           String? // what happened / decisions
   status          String    @default("active") // active | archived
+  calendarItemId  String? // linked CalendarItem (the canonical schedule entry)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -135,6 +137,7 @@ model WorkTask {
   projectId   String?
   personId    String?
   meetingId   String?
+  doItemId    String? // linked DoItem (the canonical task row)
   completedAt DateTime?
 
   createdAt DateTime @default(now())

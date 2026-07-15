@@ -1,10 +1,17 @@
+import Link from "next/link";
+import type { RolodexPersonSummary } from "@/lib/services/rolodex";
 import {
   WORK_RELATIONSHIPS,
   type WorkPersonSummary,
   type WorkTaskSummary,
   type WorkWorkspaceSummary,
 } from "@/lib/work";
-import { createPersonAction, updatePersonAction } from "../actions";
+import {
+  createPersonAction,
+  linkPersonAction,
+  removePersonAction,
+  updatePersonAction,
+} from "../actions";
 import { WorkForm } from "./work-form";
 import { Disclosure, Empty, FieldLabel, Meta, Section } from "./ui";
 
@@ -12,10 +19,12 @@ export function PeopleSection({
   workspace,
   people,
   tasks,
+  candidates,
 }: {
   workspace: WorkWorkspaceSummary;
   people: WorkPersonSummary[];
   tasks: WorkTaskSummary[];
+  candidates: RolodexPersonSummary[];
 }) {
   const openFollowUps = new Map<string, WorkTaskSummary[]>();
   for (const task of tasks) {
@@ -41,9 +50,19 @@ export function PeopleSection({
                   style={i === people.length - 1 ? undefined : { borderBottom: "1px solid var(--border-faint)" }}
                 >
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                    <span className="text-[0.875rem] font-medium" style={{ color: "var(--text)" }}>
-                      {person.name}
-                    </span>
+                    {person.rolodexPersonId ? (
+                      <Link
+                        href={`/app/rolodex/${person.rolodexPersonId}`}
+                        className="text-[0.875rem] font-medium hover:underline"
+                        style={{ color: "var(--text)" }}
+                      >
+                        {person.name}
+                      </Link>
+                    ) : (
+                      <span className="text-[0.875rem] font-medium" style={{ color: "var(--text)" }}>
+                        {person.name}
+                      </span>
+                    )}
                     {person.role && <Meta>{person.role}</Meta>}
                     {person.relationship && (
                       <span
@@ -72,7 +91,7 @@ export function PeopleSection({
                       {person.notes}
                     </p>
                   )}
-                  <div className="mt-1">
+                  <div className="mt-1 flex flex-wrap items-center gap-3">
                     <Disclosure summary={person.oneOnOneNotes ? "1:1 notes & edit" : "Edit"}>
                       <WorkForm action={updatePersonAction} submitLabel="Save person">
                         <input type="hidden" name="id" value={person.id} />
@@ -80,6 +99,21 @@ export function PeopleSection({
                         <PersonFields person={person} />
                       </WorkForm>
                     </Disclosure>
+                    <form action={removePersonAction}>
+                      <input type="hidden" name="id" value={person.id} />
+                      <button
+                        type="submit"
+                        className="text-[0.75rem] font-medium"
+                        style={{ color: "var(--text-ghost)" }}
+                        title={
+                          person.rolodexPersonId
+                            ? "Remove from this workspace — their Rolodex record stays."
+                            : "Remove from this workspace."
+                        }
+                      >
+                        Remove
+                      </button>
+                    </form>
                   </div>
                 </li>
               );
@@ -88,12 +122,50 @@ export function PeopleSection({
         )}
       </Section>
 
+      {candidates.length > 0 && (
+        <Section title="Connect from Rolodex">
+          <ul>
+            {candidates.map((candidate, i) => (
+              <li
+                key={candidate.id}
+                className="flex items-baseline justify-between gap-2 px-3 py-2"
+                style={
+                  i === candidates.length - 1 ? undefined : { borderBottom: "1px solid var(--border-faint)" }
+                }
+              >
+                <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+                  <Link
+                    href={`/app/rolodex/${candidate.id}`}
+                    className="text-[0.875rem] font-medium hover:underline"
+                    style={{ color: "var(--text)" }}
+                  >
+                    {candidate.displayName}
+                  </Link>
+                  {candidate.organization && <Meta>{candidate.organization}</Meta>}
+                  {candidate.relationshipType && <Meta>· {candidate.relationshipType}</Meta>}
+                </div>
+                <form action={linkPersonAction} className="shrink-0">
+                  <input type="hidden" name="workspaceId" value={workspace.id} />
+                  <input type="hidden" name="rolodexPersonId" value={candidate.id} />
+                  <button type="submit" className="btn-ghost px-2.5 py-1 text-[0.75rem] font-medium">
+                    Connect
+                  </button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
       <Section title="Add person">
         <div className="px-3 py-2.5">
           <WorkForm action={createPersonAction} submitLabel="Add person">
             <input type="hidden" name="workspaceId" value={workspace.id} />
             <PersonFields />
           </WorkForm>
+          <p className="mt-1.5 text-[0.6875rem]" style={{ color: "var(--text-faint)" }}>
+            Saved to the Rolodex as a coworker at {workspace.name} and linked into this workspace.
+          </p>
         </div>
       </Section>
     </div>
@@ -101,17 +173,35 @@ export function PeopleSection({
 }
 
 function PersonFields({ person }: { person?: WorkPersonSummary }) {
+  const linked = Boolean(person?.rolodexPersonId);
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <input
-          name="name"
-          required
-          maxLength={200}
-          defaultValue={person?.name ?? ""}
-          placeholder="Name"
-          className="field col-span-2"
-        />
+        {linked ? (
+          <p
+            className="col-span-2 self-center text-[0.75rem]"
+            style={{ color: "var(--text-faint)" }}
+          >
+            Name lives in the{" "}
+            <Link
+              href={`/app/rolodex/${person!.rolodexPersonId}/edit`}
+              className="underline"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Rolodex record
+            </Link>
+            .
+          </p>
+        ) : (
+          <input
+            name="name"
+            required
+            maxLength={200}
+            defaultValue={person?.name ?? ""}
+            placeholder="Name"
+            className="field col-span-2"
+          />
+        )}
         <input
           name="role"
           maxLength={200}

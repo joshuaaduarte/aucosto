@@ -34,6 +34,10 @@ import {
   ensureInsightTables,
   listRecentInsights,
 } from "@/lib/services/captured-insights";
+import {
+  getWorkAssistantSummary,
+  type WorkAssistantSummary,
+} from "@/lib/services/work";
 import { getReflection } from "@/lib/services/reflect";
 import { getUserProfile } from "@/lib/services/user";
 import { getTodayWakeStatus } from "@/lib/services/rhythms";
@@ -161,6 +165,9 @@ export type AssistantSnapshot = {
       unresolvedMentionCount: number;
     };
 
+    /** Work Hub rollup (Lucid): meetings, must-dos, waiting/decision counts. */
+    work: WorkAssistantSummary | null;
+
     recentInsights: Array<{ text: string; sourceTool: string; occurredAt: string }>;
   };
 
@@ -238,6 +245,7 @@ export async function buildAssistantSnapshot(
     recentlyMentioned,
     unresolvedMentions,
     recentCapturedInsights,
+    workSummary,
   ] = await Promise.all([
     getRunningEntry(userId),
     listCalendarItems(userId, { from: todayStart, to: tomorrowStart }),
@@ -258,6 +266,7 @@ export async function buildAssistantSnapshot(
     getRecentlyMentioned(userId).catch(() => []),
     listUnresolvedMentions(userId).catch(() => []),
     listRecentInsights(userId, { limit: 5 }).catch(() => []),
+    getWorkAssistantSummary(userId).catch(() => null),
   ]);
 
   const financeVisible = userRecord?.financeVisible ?? false;
@@ -484,6 +493,8 @@ export async function buildAssistantSnapshot(
       recentlyMentioned,
       unresolvedMentionCount: unresolvedMentions.length,
     },
+
+    work: workSummary,
 
     recentInsights: recentCapturedInsights.map((i) => ({
       text: i.text,
