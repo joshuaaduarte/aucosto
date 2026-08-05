@@ -1,4 +1,4 @@
-// aucosto service worker — Web Push only.
+// aucosto service worker - Web Push plus same-device reminder tests.
 //
 // Deliberately NO fetch handler / caching: a stale-cache bug on a personal
 // dashboard is worse than requiring a connection. This file exists so the
@@ -18,7 +18,7 @@ self.addEventListener("push", (event) => {
   try {
     if (event.data) payload = { ...payload, ...event.data.json() };
   } catch {
-    // Non-JSON payload — fall back to the defaults.
+    // Non-JSON payload - fall back to the defaults.
   }
   event.waitUntil(
     self.registration.showNotification(payload.title, {
@@ -30,20 +30,41 @@ self.addEventListener("push", (event) => {
   );
 });
 
+self.addEventListener("message", (event) => {
+  if (!event.data || event.data.type !== "AUCOSTO_REMINDER") return;
+
+  event.waitUntil(
+    self.registration.showNotification(event.data.title || "Open Aucosto", {
+      body:
+        event.data.body ||
+        "Check the hub, confirm your timer, and choose the next task.",
+      tag: "aucosto-use-reminder",
+      renotify: true,
+      icon: "/apple-icon",
+      badge: "/apple-icon",
+      data: { url: event.data.url || "/app" },
+    }),
+  );
+});
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || "/app";
+  const targetUrl = new URL(
+    event.notification.data?.url || "/app",
+    self.location.origin,
+  ).href;
+
   event.waitUntil(
     self.clients
       .matchAll({ type: "window", includeUncontrolled: true })
       .then((clients) => {
         for (const client of clients) {
-          if ("focus" in client) {
-            client.navigate(url);
+          if (client.url.startsWith(self.location.origin) && "focus" in client) {
+            client.navigate(targetUrl);
             return client.focus();
           }
         }
-        return self.clients.openWindow(url);
+        return self.clients.openWindow(targetUrl);
       }),
   );
 });

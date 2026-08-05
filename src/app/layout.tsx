@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   description: "A personal workspace for time, money, calendar, and daily life.",
   applicationName: "Aucosto",
   // Installed-app (Add to Home Screen) behavior on iOS: run standalone
-  // without Safari chrome, extend under the status bar (black-translucent —
+  // without Safari chrome, extend under the status bar (black-translucent -
   // the mobile header pads itself with --safe-area-top to compensate).
   appleWebApp: {
     capable: true,
@@ -51,7 +51,7 @@ export default function RootLayout({
       lang="en"
       className={`${interTight.variable} ${jetbrains.variable} h-full antialiased`}
       // The beforeInteractive theme script sets data-theme from localStorage
-      // before hydration — an intentional, attribute-level mismatch.
+      // before hydration - an intentional, attribute-level mismatch.
       suppressHydrationWarning
     >
       <head>

@@ -2,6 +2,7 @@ import { getViewerContext } from "@/lib/viewer-context";
 import { getWhoopConfig } from "@/lib/whoop";
 import { getWhoopStatus } from "@/lib/services/whoop";
 import { PrivacyPanel } from "../privacy-panel";
+import { LocationPanel } from "./location-panel";
 import { NotificationsPanel } from "./notifications-panel";
 import { WhoopPanel } from "./whoop-panel";
 
@@ -97,6 +98,31 @@ export default async function SettingsPage({
         </h2>
         <div className="mt-4">
           <NotificationsPanel />
+        </div>
+      </section>
+
+      <section
+        id="location"
+        className="rounded-md border p-5"
+        style={{
+          borderColor: "var(--border-soft)",
+          background: "var(--bg-page)",
+        }}
+      >
+        <p
+          className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+          style={{ color: "var(--text-faint)" }}
+        >
+          Location
+        </p>
+        <h2
+          className="mt-1 text-[1rem] font-semibold tracking-tight"
+          style={{ color: "var(--text)" }}
+        >
+          Foreground check-ins from this browser.
+        </h2>
+        <div className="mt-4">
+          <LocationPanel />
         </div>
       </section>
 
