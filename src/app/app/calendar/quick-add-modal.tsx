@@ -14,6 +14,15 @@ const QUICK_TEMPLATES = [
   { title: "Admin", start: "11:00", end: "11:45" },
   { title: "Wedding planning", start: "19:00", end: "20:00" },
 ];
+const WEEKDAYS = [
+  { value: 1, label: "M" },
+  { value: 2, label: "T" },
+  { value: 3, label: "W" },
+  { value: 4, label: "T" },
+  { value: 5, label: "F" },
+  { value: 6, label: "S" },
+  { value: 0, label: "S" },
+];
 
 function pad2(value: number) {
   return String(value).padStart(2, "0");
@@ -73,6 +82,7 @@ export function CalendarQuickAddModal({
   const [end, setEnd] = useState(() => nextHalfHourWindow().end);
   const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
+  const [repeat, setRepeat] = useState("none");
 
   // Recompute the default window each time the modal opens cold, so it always
   // anchors to the next half-hour from *now*, not from page load.
@@ -153,6 +163,7 @@ export function CalendarQuickAddModal({
     setEnd(range.end);
     setLocation("");
     setNotes("");
+    setRepeat("none");
   }
 
   return (
@@ -435,6 +446,65 @@ export function CalendarQuickAddModal({
                   />
                 </div>
               </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label
+                    className="block text-[0.75rem] font-medium"
+                    style={{ color: "var(--text-muted)" }}
+                    htmlFor="quick-repeat"
+                  >
+                    Repeat
+                  </label>
+                  <select
+                    id="quick-repeat"
+                    name="repeat"
+                    className="field"
+                    value={repeat}
+                    onChange={(event) => setRepeat(event.target.value)}
+                  >
+                    <option value="none">Does not repeat</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="weekdays">Weekdays</option>
+                    <option value="custom">Custom weekdays</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label
+                    className="block text-[0.75rem] font-medium"
+                    style={{ color: "var(--text-muted)" }}
+                    htmlFor="quick-repeat-until"
+                  >
+                    Repeat until
+                  </label>
+                  <input
+                    id="quick-repeat-until"
+                    name="repeatUntil"
+                    type="date"
+                    className="field"
+                    disabled={repeat === "none"}
+                  />
+                </div>
+              </div>
+
+              {repeat === "custom" ? (
+                <div className="flex flex-wrap gap-2">
+                  {WEEKDAYS.map((day) => (
+                    <label key={day.value} className="pill cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="repeatWeekdays"
+                        value={day.value}
+                        className="mr-1"
+                        defaultChecked={day.value >= 1 && day.value <= 5}
+                      />
+                      {day.label}
+                    </label>
+                  ))}
+                </div>
+              ) : null}
 
               <div className="flex items-center justify-between gap-3 pt-1">
                 <button

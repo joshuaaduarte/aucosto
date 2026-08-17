@@ -29,6 +29,7 @@ import {
 } from "../actions";
 import { CategoryPicker, type PickableCategory } from "./category-picker";
 import type { TimelineBlock } from "../_lib/timeline";
+import { recurrenceLabel, type RecurrenceRule } from "@/lib/recurrence";
 
 export type TimelineItemPayload = {
   id: string;
@@ -39,12 +40,23 @@ export type TimelineItemPayload = {
   status: string;
   /** Assigned TimeCategory id (raw-SQL column), or null. */
   categoryId: string | null;
+  recurrenceRule?: RecurrenceRule | null;
+  recurrenceParentId?: string | null;
 };
 
 export type TimelineBlockPayload =
   | { type: "entry"; entry: EditableEntry }
   | { type: "running" }
   | { type: "item"; item: TimelineItemPayload };
+
+function repeatValue(rule: RecurrenceRule | null | undefined) {
+  if (!rule) return "none";
+  if (rule.frequency === "daily") return "daily";
+  if (rule.frequency === "monthly") return "monthly";
+  if (rule.weekdays?.join(",") === "1,2,3,4,5") return "weekdays";
+  if (rule.weekdays?.length) return "custom";
+  return "weekly";
+}
 
 export function TimelineBlockButton({
   block,
@@ -281,6 +293,7 @@ export function CalendarBlockModal({
   const [pending, startTransition] = useTransition();
   const [deleteArmed, setDeleteArmed] = useState(false);
   const [categoryId, setCategoryId] = useState(item?.categoryId ?? "");
+  const [repeat, setRepeat] = useState(() => repeatValue(item?.recurrenceRule ?? null));
   const titleRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -308,6 +321,7 @@ export function CalendarBlockModal({
 
   const fieldKey = item?.id ?? "new";
   const headingId = `timeline-item-title-${fieldKey}`;
+  const isRecurring = Boolean(item?.recurrenceRule || item?.recurrenceParentId);
 
   return createPortal(
     <div className="calendar-modal-backdrop" role="presentation" onPointerDown={(e) => e.stopPropagation()} onClick={onClose}>
@@ -444,6 +458,77 @@ export function CalendarBlockModal({
             </div>
           </div>
 
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label
+                className="block text-[0.75rem] font-medium"
+                style={{ color: "var(--text-muted)" }}
+                htmlFor={`timeline-item-repeat-${fieldKey}`}
+              >
+                Repeat
+              </label>
+              <select
+                id={`timeline-item-repeat-${fieldKey}`}
+                name="repeat"
+                className="field"
+                value={repeat}
+                onChange={(event) => setRepeat(event.target.value)}
+                disabled={Boolean(item?.recurrenceParentId)}
+              >
+                <option value="none">Does not repeat</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="weekdays">Weekdays</option>
+                <option value="custom">Custom weekdays</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label
+                className="block text-[0.75rem] font-medium"
+                style={{ color: "var(--text-muted)" }}
+                htmlFor={`timeline-item-repeat-until-${fieldKey}`}
+              >
+                Repeat until
+              </label>
+              <input
+                id={`timeline-item-repeat-until-${fieldKey}`}
+                name="repeatUntil"
+                type="date"
+                className="field"
+                disabled={repeat === "none" || Boolean(item?.recurrenceParentId)}
+              />
+            </div>
+          </div>
+
+          {repeat === "custom" && !item?.recurrenceParentId ? (
+            <div className="flex flex-wrap gap-2">
+              {[1, 2, 3, 4, 5, 6, 0].map((day) => (
+                <label key={day} className="pill cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="repeatWeekdays"
+                    value={day}
+                    className="mr-1"
+                    defaultChecked={
+                      item?.recurrenceRule?.weekdays?.includes(day) ??
+                      (day >= 1 && day <= 5)
+                    }
+                  />
+                  {["S", "M", "T", "W", "T", "F", "S"][day]}
+                </label>
+              ))}
+            </div>
+          ) : null}
+
+          {isRecurring ? (
+            <p className="text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+              {item?.recurrenceParentId
+                ? "This is one occurrence in a recurring series."
+                : recurrenceLabel(item?.recurrenceRule)}
+            </p>
+          ) : null}
+
           <div
             className="sticky bottom-0 -mx-4 mt-2 flex flex-wrap items-center justify-between gap-2 border-t px-4 pb-1 pt-3 sm:-mx-5 sm:px-5"
             style={{
@@ -476,6 +561,25 @@ export function CalendarBlockModal({
                   >
                     {deleteArmed ? "Sure?" : "Delete"}
                   </button>
+                  {isRecurring ? (
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => {
+                        const formData = new FormData();
+                        formData.set("id", item.id);
+                        formData.set("scope", "series");
+                        startTransition(async () => {
+                          await deleteCalendarItemAction(formData);
+                          router.refresh();
+                          onClose();
+                        });
+                      }}
+                      className="btn-ghost"
+                    >
+                      Delete series
+                    </button>
+                  ) : null}
                   {item.status !== "done" ? (
                     <button
                       type="button"

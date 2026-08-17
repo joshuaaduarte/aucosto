@@ -6,6 +6,11 @@ import { recordEvent } from "@/lib/services/events";
 import { ensureTimeCategoryTable } from "@/lib/services/time-categories";
 import type { CalendarItem } from "@/generated/prisma/client";
 import { Prisma } from "@/generated/prisma/client";
+import {
+  expandRecurrence,
+  normalizeRecurrenceRule,
+  type RecurrenceRule,
+} from "@/lib/recurrence";
 
 export type CalendarRange = { from: Date; to: Date };
 
@@ -23,7 +28,28 @@ export type CreateCalendarItemInput = {
   sourceTool?: string | null;
   sourceRefId?: string | null;
   externalId?: string | null;
+  recurrenceRule?: RecurrenceRule | null;
 };
+
+export type CalendarOccurrence = CalendarItem & {
+  recurrenceRule: Prisma.JsonValue | null;
+  recurrenceParentId: string | null;
+  recurrenceOriginalStart: Date | null;
+};
+
+const VIRTUAL_ID_SEPARATOR = "::";
+
+export function virtualCalendarItemId(parentId: string, originalStart: Date) {
+  return `${parentId}${VIRTUAL_ID_SEPARATOR}${originalStart.toISOString()}`;
+}
+
+function parseVirtualCalendarItemId(id: string) {
+  const [parentId, originalStartIso] = id.split(VIRTUAL_ID_SEPARATOR);
+  if (!parentId || !originalStartIso) return null;
+  const originalStart = new Date(originalStartIso);
+  if (Number.isNaN(originalStart.getTime())) return null;
+  return { parentId, originalStart };
+}
 
 // ── Category column (raw SQL, like TimeCategory itself) ────────────────────
 // `CalendarItem.categoryId` is added out-of-band: the generated Prisma client
@@ -69,16 +95,21 @@ export async function getCalendarItemCategoryIds(
   requireCan(userId, "calendar", "read");
   const result = new Map<string, string | null>();
   if (ids.length === 0) return result;
+  const backingIds = ids.map((id) => parseVirtualCalendarItemId(id)?.parentId ?? id);
   try {
     await ensureCalendarCategoryColumn();
     const rows = await prisma.$queryRaw<Array<{ id: string; categoryId: string | null }>>(
       Prisma.sql`
         SELECT "id", "categoryId"
         FROM "CalendarItem"
-        WHERE "userId" = ${userId} AND "id" IN (${Prisma.join(ids)})
+        WHERE "userId" = ${userId} AND "id" IN (${Prisma.join(backingIds)})
       `,
     );
-    for (const row of rows) result.set(row.id, row.categoryId);
+    const byBackingId = new Map(rows.map((row) => [row.id, row.categoryId]));
+    for (const id of ids) {
+      const backingId = parseVirtualCalendarItemId(id)?.parentId ?? id;
+      result.set(id, byBackingId.get(backingId) ?? null);
+    }
   } catch (error) {
     console.error("[calendar] getCalendarItemCategoryIds failed", error);
   }
@@ -124,18 +155,58 @@ function isMissingCalendarTableError(error: unknown) {
 export async function listCalendarItems(
   userId: string,
   range: CalendarRange,
-): Promise<CalendarItem[]> {
+): Promise<CalendarOccurrence[]> {
   requireCan(userId, "calendar", "read");
   try {
-    return await prisma.calendarItem.findMany({
+    const directItems = await prisma.calendarItem.findMany({
       where: {
         userId,
         startsAt: { lt: range.to },
         endsAt: { gt: range.from },
         status: { not: "cancelled" },
+        OR: [{ recurrenceRule: { equals: Prisma.DbNull } }, { recurrenceParentId: { not: null } }],
       },
       orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }],
     });
+    const recurringParents = await prisma.calendarItem.findMany({
+      where: {
+        userId,
+        startsAt: { lt: range.to },
+        recurrenceRule: { not: Prisma.DbNull },
+        recurrenceParentId: null,
+        status: { not: "cancelled" },
+      },
+      orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }],
+    });
+    const exceptions = directItems.filter((item) => item.recurrenceParentId);
+    const exceptionByOriginal = new Map(
+      exceptions
+        .filter((item) => item.recurrenceParentId && item.recurrenceOriginalStart)
+        .map((item) => [
+          `${item.recurrenceParentId}:${item.recurrenceOriginalStart!.toISOString()}`,
+          item,
+        ]),
+    );
+    const generated = recurringParents.flatMap((parent) => {
+      const rule = normalizeRecurrenceRule(parent.recurrenceRule as RecurrenceRule | null);
+      if (!rule) return [];
+      return expandRecurrence(parent.startsAt, parent.endsAt, rule, range)
+        .filter((occurrence) => {
+          const key = `${parent.id}:${occurrence.originalStart.toISOString()}`;
+          return !exceptionByOriginal.has(key);
+        })
+        .map((occurrence) => ({
+          ...parent,
+          id: virtualCalendarItemId(parent.id, occurrence.originalStart),
+          startsAt: occurrence.startsAt,
+          endsAt: occurrence.endsAt,
+          recurrenceParentId: parent.id,
+          recurrenceOriginalStart: occurrence.originalStart,
+        }));
+    });
+    return [...directItems, ...generated]
+      .filter((item) => item.status !== "cancelled")
+      .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime() || a.createdAt.getTime() - b.createdAt.getTime());
   } catch (error) {
     if (isMissingCalendarTableError(error)) {
       return [];
@@ -147,24 +218,12 @@ export async function listCalendarItems(
 export async function listUpcomingCalendarItems(
   userId: string,
   options: { from?: Date; limit?: number } = {},
-): Promise<CalendarItem[]> {
+): Promise<CalendarOccurrence[]> {
   requireCan(userId, "calendar", "read");
-  try {
-    return await prisma.calendarItem.findMany({
-      where: {
-        userId,
-        endsAt: { gte: options.from ?? new Date() },
-        status: { not: "cancelled" },
-      },
-      orderBy: [{ startsAt: "asc" }],
-      take: options.limit ?? 10,
-    });
-  } catch (error) {
-    if (isMissingCalendarTableError(error)) {
-      return [];
-    }
-    throw error;
-  }
+  const from = options.from ?? new Date();
+  const to = new Date(from);
+  to.setDate(to.getDate() + 90);
+  return (await listCalendarItems(userId, { from, to })).slice(0, options.limit ?? 10);
 }
 
 export async function createCalendarItem(
@@ -194,6 +253,9 @@ export async function createCalendarItem(
         sourceTool: input.sourceTool ?? null,
         sourceRefId: input.sourceRefId ?? null,
         externalId: input.externalId ?? null,
+        recurrenceRule: input.recurrenceRule
+          ? (normalizeRecurrenceRule(input.recurrenceRule) as Prisma.InputJsonValue)
+          : Prisma.DbNull,
       },
     });
   } catch (error) {
@@ -226,6 +288,41 @@ export async function updateCalendarItem(
   input: Partial<CreateCalendarItemInput> & { status?: string },
 ): Promise<CalendarItem | null> {
   requireCan(userId, "calendar", "write");
+  const virtual = parseVirtualCalendarItemId(id);
+  if (virtual) {
+    const parent = await prisma.calendarItem.findFirst({
+      where: { id: virtual.parentId, userId },
+    });
+    if (!parent) return null;
+    const durationMs = parent.endsAt.getTime() - parent.startsAt.getTime();
+    const startsAt = input.startsAt ?? virtual.originalStart;
+    const endsAt = input.endsAt ?? new Date(startsAt.getTime() + durationMs);
+    validateWindow(startsAt, endsAt);
+    return createCalendarItem(userId, {
+      title: input.title ?? parent.title,
+      startsAt,
+      endsAt,
+      notes: input.notes === undefined ? parent.notes : input.notes,
+      location: input.location === undefined ? parent.location : input.location,
+      kind: input.kind ?? parent.kind,
+      status: input.status ?? parent.status,
+      allDay: input.allDay ?? parent.allDay,
+      categoryId: input.categoryId,
+      sourceTool: parent.sourceTool,
+      sourceRefId: parent.sourceRefId,
+      recurrenceRule: null,
+      externalId: null,
+    }).then(async (exception) => {
+      await prisma.calendarItem.update({
+        where: { id: exception.id },
+        data: {
+          recurrenceParentId: parent.id,
+          recurrenceOriginalStart: virtual.originalStart,
+        },
+      });
+      return prisma.calendarItem.findUnique({ where: { id: exception.id } });
+    });
+  }
 
   let existing: CalendarItem | null;
   try {
@@ -256,6 +353,12 @@ export async function updateCalendarItem(
         kind: input.kind ?? undefined,
         status: input.status ?? undefined,
         allDay: input.allDay ?? undefined,
+        recurrenceRule:
+          input.recurrenceRule === undefined
+            ? undefined
+            : input.recurrenceRule
+              ? (normalizeRecurrenceRule(input.recurrenceRule) as Prisma.InputJsonValue)
+              : Prisma.DbNull,
       },
     });
   } catch (error) {
@@ -283,6 +386,40 @@ export async function updateCalendarItem(
 
 export async function deleteCalendarItem(userId: string, id: string): Promise<void> {
   requireCan(userId, "calendar", "write");
+  const virtual = parseVirtualCalendarItemId(id);
+  if (virtual) {
+    const parent = await prisma.calendarItem.findFirst({
+      where: { id: virtual.parentId, userId },
+    });
+    if (!parent) return;
+    await prisma.calendarItem.create({
+      data: {
+        userId,
+        title: parent.title,
+        kind: parent.kind,
+        status: "cancelled",
+        startsAt: virtual.originalStart,
+        endsAt: new Date(
+          virtual.originalStart.getTime() +
+            (parent.endsAt.getTime() - parent.startsAt.getTime()),
+        ),
+        allDay: parent.allDay,
+        notes: parent.notes,
+        location: parent.location,
+        sourceTool: parent.sourceTool,
+        sourceRefId: parent.sourceRefId,
+        recurrenceParentId: parent.id,
+        recurrenceOriginalStart: virtual.originalStart,
+      },
+    });
+    await recordEvent({
+      userId,
+      tool: "calendar",
+      type: "calendar.deleted",
+      refId: id,
+    });
+    return;
+  }
   let count = 0;
   try {
     ({ count } = await prisma.calendarItem.deleteMany({

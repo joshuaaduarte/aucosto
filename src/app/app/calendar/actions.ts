@@ -24,6 +24,26 @@ function parseOptionalString(value: FormDataEntryValue | null) {
   return normalized.length > 0 ? normalized : null;
 }
 
+function parseRecurrenceRule(formData: FormData) {
+  const repeat = parseOptionalString(formData.get("repeat"));
+  if (!repeat || repeat === "none") return null;
+  const until = parseOptionalString(formData.get("repeatUntil"));
+  const untilIso = until ? new Date(`${until}T23:59:59`).toISOString() : null;
+  if (repeat === "daily") return { frequency: "daily" as const, until: untilIso };
+  if (repeat === "monthly") return { frequency: "monthly" as const, until: untilIso };
+  if (repeat === "weekdays") {
+    return { frequency: "weekly" as const, weekdays: [1, 2, 3, 4, 5], until: untilIso };
+  }
+  if (repeat === "custom") {
+    const weekdays = formData
+      .getAll("repeatWeekdays")
+      .map((value) => Number(value))
+      .filter((value) => Number.isInteger(value) && value >= 0 && value <= 6);
+    return { frequency: "weekly" as const, weekdays, until: untilIso };
+  }
+  return { frequency: "weekly" as const, until: untilIso };
+}
+
 export async function createCalendarBlockAction(formData: FormData) {
   const userId = await resolveActiveUserId();
   const title = String(formData.get("title") ?? "");
@@ -49,6 +69,7 @@ export async function createCalendarBlockAction(formData: FormData) {
     status: "confirmed",
     sourceTool: doItemId ? "do" : habitId ? "habit" : null,
     sourceRefId: doItemId ?? habitId,
+    recurrenceRule: parseRecurrenceRule(formData),
   });
   if (doItemId) {
     await updateDoItem(userId, doItemId, { status: "scheduled" });
@@ -126,6 +147,7 @@ export async function updateCalendarBlockAction(formData: FormData) {
     location,
     categoryId,
     status: "confirmed",
+    recurrenceRule: parseRecurrenceRule(formData),
   });
   if (updatedItem && notes) {
     try {
@@ -224,7 +246,10 @@ export async function logHabitBlockDoneAction(formData: FormData) {
 
 export async function deleteCalendarItemAction(formData: FormData) {
   const userId = await resolveActiveUserId();
-  const id = String(formData.get("id") ?? "");
+  let id = String(formData.get("id") ?? "");
+  if (formData.get("scope") === "series") {
+    id = id.split("::")[0] ?? id;
+  }
   await deleteCalendarItem(userId, id);
   revalidateCalendar();
 }

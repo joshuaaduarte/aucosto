@@ -47,6 +47,13 @@ export type QuickStartRecent = {
   color: string;
 };
 
+export type QuickStartPrediction = {
+  key: string;
+  label: string;
+  category: string;
+  reason: string;
+};
+
 export type StartPayload = {
   label: string;
   category?: string;
@@ -61,6 +68,7 @@ export function QuickStartChips({
   tasks = [],
   habits = [],
   recents = [],
+  predictions = [],
   categoryManage,
   runningHabit = null,
   onSwitchHabitLogRequired,
@@ -70,6 +78,7 @@ export function QuickStartChips({
   tasks?: QuickStartTask[];
   habits?: QuickStartHabit[];
   recents?: QuickStartRecent[];
+  predictions?: QuickStartPrediction[];
   categoryManage?: ReactNode;
   /** The habit linked to the currently-running timer, when used as the
    * running card's switch panel — check/count habits need an explicit log
@@ -109,6 +118,42 @@ export function QuickStartChips({
 
   return (
     <div className="space-y-3">
+      {predictions.length > 0 && (
+        <ChipGroup label="Likely now">
+          {predictions.map((prediction) => {
+            const key = `prediction:${prediction.key}`;
+            return (
+              <button
+                key={key}
+                type="button"
+                disabled={pending}
+                onClick={() =>
+                  start(key, {
+                    label: prediction.label,
+                    category: prediction.category,
+                  })
+                }
+                className="inline-flex shrink-0 items-center gap-1.5 rounded px-2.5 py-1.5 text-[0.75rem] font-medium transition-colors [@media(pointer:coarse)]:min-h-[2.75rem]"
+                style={chipStyle(startingKey === key)}
+                title={prediction.reason}
+              >
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full ink-pulse"
+                  style={{ background: "var(--accent)" }}
+                  aria-hidden
+                />
+                <span className="max-w-[16ch] truncate">
+                  {startingKey === key ? "Starting..." : prediction.label}
+                </span>
+                <span style={{ color: "var(--text-faint)" }}>
+                  {prediction.reason}
+                </span>
+              </button>
+            );
+          })}
+        </ChipGroup>
+      )}
+
       {habits.length > 0 && (
         <ChipGroup label="Habits">
           {habits.map((habit) => {

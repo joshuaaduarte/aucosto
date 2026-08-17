@@ -293,6 +293,8 @@ export default async function CalendarPage({
         endValue: formatTimeValue(item.endsAt),
         status: item.status,
         categoryId: categoryIdByItem.get(item.id) ?? null,
+        recurrenceRule: item.recurrenceRule as any,
+        recurrenceParentId: item.recurrenceParentId,
       },
     };
   }

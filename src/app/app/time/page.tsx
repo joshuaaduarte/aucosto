@@ -36,6 +36,7 @@ import type { DayGap } from "@/lib/time-insights";
 import { weeklyTrackedSparkline } from "@/lib/insights";
 import { Sparkline } from "../insights/_components/charts";
 import { categoryColor, normalizeCategory } from "@/lib/time-categories";
+import { predictCurrentTimeOptions } from "@/lib/time-predictions";
 import { EntryDeleteButton, EntryNoteIndicator } from "./entry-row";
 import { AddEntryButton, EntryEditButton } from "./entry-editor";
 import { GapBackfillCard } from "./gap-backfill-card";
@@ -486,9 +487,17 @@ export default async function TimePage() {
     });
     if (recentChips.length >= 5) break;
   }
+  const predictions = predictCurrentTimeOptions({
+    now,
+    calendarItems: todayCalendarItems,
+    habits: habitList,
+    recents: recent,
+    limit: 3,
+  });
 
   const quickStart = (
     <QuickStartChips
+      predictions={predictions}
       categories={quickStartCategories}
       calendarItems={calendarSuggestions}
       tasks={quickStartTasks}
