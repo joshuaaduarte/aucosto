@@ -203,7 +203,7 @@ export function QuickStartChips({
           type="button"
           disabled={pending}
           onClick={() => start(primary.key, primary.payload)}
-          className="group flex w-full items-center justify-between gap-3 rounded-md border px-4 py-3 text-left transition-colors [@media(pointer:coarse)]:min-h-[3.5rem]"
+          className="group flex w-full items-center justify-between gap-3 rounded-md border px-4 py-3.5 text-left transition-colors sm:py-3 [@media(pointer:coarse)]:min-h-[4rem]"
           style={{
             background: "var(--bg-page)",
             borderColor: "var(--border-soft)",
@@ -232,7 +232,7 @@ export function QuickStartChips({
             </span>
           </span>
           <span
-            className="shrink-0 rounded px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wider"
+            className="hidden shrink-0 rounded px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wider min-[420px]:inline-flex"
             style={{ background: "var(--accent-tint)", color: "var(--accent-strong)" }}
           >
             {isSwitchMode ? "Switch" : "Start"}
@@ -240,8 +240,8 @@ export function QuickStartChips({
         </button>
       ) : null}
 
-      <div className="flex items-center gap-2">
-        <div className="min-w-0 flex flex-1 gap-1.5 overflow-x-auto no-scrollbar">
+      <div className="space-y-2 sm:flex sm:items-center sm:gap-2 sm:space-y-0">
+        <div className="grid min-w-0 flex-1 grid-cols-1 gap-1.5 sm:flex sm:overflow-x-auto sm:no-scrollbar">
           {alternatives.map((option) => (
             <OptionChip
               key={option.key}
@@ -256,10 +256,10 @@ export function QuickStartChips({
         {uniqueOptions.length > 0 ? (
           <button
             type="button"
-            className="btn-ghost shrink-0 px-2.5 py-1.5 text-[0.75rem]"
+            className="btn-ghost h-10 w-full shrink-0 px-2.5 py-1.5 text-[0.75rem] sm:h-auto sm:w-auto"
             onClick={() => setPickerOpen(true)}
           >
-            More
+            More options
           </button>
         ) : null}
       </div>
@@ -275,8 +275,17 @@ export function QuickStartChips({
             aria-modal="true"
             aria-labelledby="quick-start-picker-title"
             className="calendar-modal"
+            style={{
+              paddingBottom:
+                "calc(1rem + var(--mobile-tabbar-height, 0px) + var(--timer-bar-height, 0px) + var(--safe-area-bottom, 0px))",
+            }}
             onClick={(event) => event.stopPropagation()}
           >
+            <div
+              className="mx-auto mb-3 h-1 w-10 rounded-full sm:hidden"
+              style={{ background: "var(--border)" }}
+              aria-hidden
+            />
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p
@@ -319,7 +328,7 @@ export function QuickStartChips({
                           setPickerOpen(false);
                           start(option.key, option.payload);
                         }}
-                        className="flex w-full items-center justify-between gap-3 rounded px-3 py-2.5 text-left transition-colors"
+                        className="flex w-full items-center justify-between gap-3 rounded px-3 py-3 text-left transition-colors [@media(pointer:coarse)]:min-h-[3.25rem]"
                         style={{ background: "var(--bg-tint)", color: "var(--text)" }}
                       >
                         <span className="flex min-w-0 items-center gap-2.5">
@@ -340,7 +349,7 @@ export function QuickStartChips({
                             </span>
                           </span>
                         </span>
-                        <span className="text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+                        <span className="hidden text-[0.75rem] sm:inline" style={{ color: "var(--text-faint)" }}>
                           {isSwitchMode ? "Switch" : "Start"}
                         </span>
                       </button>
@@ -402,7 +411,7 @@ function OptionChip({
       type="button"
       disabled={disabled}
       onClick={onStart}
-      className="inline-flex shrink-0 items-center gap-1.5 rounded px-2.5 py-1.5 text-[0.75rem] font-medium transition-colors [@media(pointer:coarse)]:min-h-[2.75rem]"
+      className="inline-flex w-full shrink-0 items-center gap-2 rounded px-3 py-2 text-left text-[0.8125rem] font-medium transition-colors sm:w-auto sm:gap-1.5 sm:px-2.5 sm:py-1.5 sm:text-[0.75rem] [@media(pointer:coarse)]:min-h-[2.75rem]"
       style={style}
       title={option.reason ?? option.detail}
     >
@@ -411,8 +420,11 @@ function OptionChip({
         style={{ background: option.color }}
         aria-hidden
       />
-      <span className="max-w-[16ch] truncate">
+      <span className="min-w-0 flex-1 truncate sm:max-w-[16ch]">
         {active ? "Starting..." : option.label}
+      </span>
+      <span className="shrink-0 text-[0.75rem] sm:hidden" style={{ color: "var(--text-faint)" }}>
+        {option.detail}
       </span>
     </button>
   );
