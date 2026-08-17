@@ -83,14 +83,16 @@ export function RunningCard({
   // Check/count habits need an explicit log before switching away — route
   // switch-panel taps through the same modal used by "Log and stop".
   const switchPanelNode =
-    switchPanel && habit && isValidElement(switchPanel)
+    switchPanel && isValidElement(switchPanel)
       ? cloneElement(
           switchPanel as React.ReactElement<{
+            mode?: "start" | "switch";
             runningHabit?: { id: string; isMinuteHabit: boolean } | null;
             onSwitchHabitLogRequired?: (payload: StartPayload) => void;
           }>,
           {
-            runningHabit: { id: habit.id, isMinuteHabit },
+            mode: "switch",
+            runningHabit: habit ? { id: habit.id, isMinuteHabit } : null,
             onSwitchHabitLogRequired: (payload: StartPayload) => {
               setSwitchPayload(payload);
               setReflectOpen(true);
