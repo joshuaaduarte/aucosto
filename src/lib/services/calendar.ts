@@ -59,6 +59,7 @@ function parseVirtualCalendarItemId(id: string) {
 // has run with the current schema, this can be folded into the typed client.
 
 let categoryColumnReady: Promise<void> | null = null;
+let recurrenceColumnsReady: Promise<void> | null = null;
 
 /**
  * Idempotently add `CalendarItem.categoryId` (FK → TimeCategory). Memoized per
@@ -81,6 +82,39 @@ export function ensureCalendarCategoryColumn(): Promise<void> {
       });
   }
   return categoryColumnReady;
+}
+
+export function ensureCalendarRecurrenceColumns(): Promise<void> {
+  if (!recurrenceColumnsReady) {
+    recurrenceColumnsReady = (async () => {
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE "CalendarItem" ADD COLUMN IF NOT EXISTS "recurrenceRule" JSONB;',
+      );
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE "CalendarItem" ADD COLUMN IF NOT EXISTS "recurrenceParentId" TEXT;',
+      );
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE "CalendarItem" ADD COLUMN IF NOT EXISTS "recurrenceOriginalStart" TIMESTAMP(3);',
+      );
+      await prisma.$executeRawUnsafe(
+        'CREATE INDEX IF NOT EXISTS "CalendarItem_userId_recurrenceParentId_recurrenceOriginalStart_idx" ON "CalendarItem"("userId", "recurrenceParentId", "recurrenceOriginalStart");',
+      );
+    })()
+      .then(() => undefined)
+      .catch((error) => {
+        recurrenceColumnsReady = null;
+        console.error("[calendar] ensureCalendarRecurrenceColumns failed", error);
+        throw error;
+      });
+  }
+  return recurrenceColumnsReady;
+}
+
+async function ensureCalendarRuntimeColumns() {
+  await Promise.all([
+    ensureCalendarCategoryColumn(),
+    ensureCalendarRecurrenceColumns(),
+  ]);
 }
 
 /**
@@ -158,6 +192,7 @@ export async function listCalendarItems(
 ): Promise<CalendarOccurrence[]> {
   requireCan(userId, "calendar", "read");
   try {
+    await ensureCalendarRecurrenceColumns();
     const directItems = await prisma.calendarItem.findMany({
       where: {
         userId,
@@ -239,6 +274,7 @@ export async function createCalendarItem(
 
   let item: CalendarItem;
   try {
+    await ensureCalendarRuntimeColumns();
     item = await prisma.calendarItem.create({
       data: {
         userId,
@@ -290,6 +326,7 @@ export async function updateCalendarItem(
   requireCan(userId, "calendar", "write");
   const virtual = parseVirtualCalendarItemId(id);
   if (virtual) {
+    await ensureCalendarRecurrenceColumns();
     const parent = await prisma.calendarItem.findFirst({
       where: { id: virtual.parentId, userId },
     });
@@ -326,6 +363,7 @@ export async function updateCalendarItem(
 
   let existing: CalendarItem | null;
   try {
+    await ensureCalendarRecurrenceColumns();
     existing = await prisma.calendarItem.findFirst({ where: { id, userId } });
   } catch (error) {
     if (isMissingCalendarTableError(error)) {
@@ -388,6 +426,7 @@ export async function deleteCalendarItem(userId: string, id: string): Promise<vo
   requireCan(userId, "calendar", "write");
   const virtual = parseVirtualCalendarItemId(id);
   if (virtual) {
+    await ensureCalendarRecurrenceColumns();
     const parent = await prisma.calendarItem.findFirst({
       where: { id: virtual.parentId, userId },
     });
@@ -422,6 +461,7 @@ export async function deleteCalendarItem(userId: string, id: string): Promise<vo
   }
   let count = 0;
   try {
+    await ensureCalendarRecurrenceColumns();
     ({ count } = await prisma.calendarItem.deleteMany({
       where: { id, userId },
     }));
