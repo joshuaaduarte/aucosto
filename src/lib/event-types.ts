@@ -17,6 +17,10 @@ const EVENT_LABELS: Record<string, string> = {
   // reflect
   "reflect.saved": "saved a daily reflection",
 
+  // day plan
+  "plan.saved": "planned the day",
+  "plan.confirmed": "confirmed the day's plan",
+
   // finance — manual edits
   "finance.account_created": "added a finance account",
   "finance.account_updated": "updated a finance account",

@@ -25,6 +25,7 @@ type PaletteItem = {
 
 const NAVIGATE_ITEMS: Array<{ label: string; href: string }> = [
   { label: "Hub", href: "/app" },
+  { label: "Plan the day", href: "/app/plan" },
   { label: "Time", href: "/app/time" },
   { label: "Finance", href: "/app/finance" },
   { label: "Calendar", href: "/app/calendar" },
@@ -38,6 +39,7 @@ const NAVIGATE_ITEMS: Array<{ label: string; href: string }> = [
 ];
 
 const QUICK_ACTION_ITEMS: Array<{ label: string; href: string }> = [
+  { label: "Plan tomorrow", href: "/app/plan" },
   { label: "New task", href: "/app/do" },
   { label: "Start timer", href: "/app/time" },
   { label: "Log habit", href: "/app/habits" },

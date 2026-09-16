@@ -13,6 +13,8 @@ import {
 import { listReflections, listRecentMoods } from "@/lib/services/reflect";
 import { getWhoopMorningPrefill } from "@/lib/services/whoop";
 import { getCurrentPlace } from "@/lib/services/location";
+import { getLastActivityBefore, listPlannedBlocks } from "@/lib/services/day-plan";
+import { deriveReturnState, startOfDay as startOfPlanDay } from "@/lib/day-plan";
 import {
   buildDayFacts,
   deriveInsightOfTheDay,
@@ -44,6 +46,7 @@ import { ProjectsProgressSection } from "./_components/projects-progress-section
 import { QuickActionsSection } from "./_components/quick-actions-section";
 import { InsightOfTheDayCard } from "./_components/insight-of-the-day";
 import { ReflectSection } from "./_components/reflect-section";
+import { ReturnCard } from "./_components/return-card";
 import { WorkspaceSection } from "./_components/workspace-section";
 import { deriveDailyDigest } from "./_lib/daily-digest";
 import { deriveHubPrompts } from "./_lib/hub-prompts";
@@ -296,6 +299,20 @@ export default async function HubPage() {
     }),
   });
 
+  // Re-entry after a gap. Both reads are cosmetic — a failure here must never
+  // take down the hub, so each falls back to the "not returning" shape.
+  const [lastActivityAt, todayPlan] = userId
+    ? await Promise.all([
+        getLastActivityBefore(userId, startOfPlanDay(now)).catch(() => null),
+        listPlannedBlocks(userId, startOfPlanDay(now)).catch(() => []),
+      ])
+    : [null, []];
+  const returnState = deriveReturnState({
+    lastActiveAt: lastActivityAt,
+    now,
+    defaultWindowStart: todayStart,
+  });
+
   const subline = composeSubline({
     runningEntry,
     weekTotalMs,
@@ -321,6 +338,13 @@ export default async function HubPage() {
             : null
         }
       />
+
+      {returnState.isReturning ? (
+        <ReturnCard
+          awayDays={returnState.awayDays}
+          hasPlanToday={todayPlan.length > 0}
+        />
+      ) : null}
 
       {/* Hero first: the one recommendation. Stat tiles support it below. */}
       <FocusModuleCard focus={focus} />
@@ -393,6 +417,7 @@ export default async function HubPage() {
         reflectedToday={reflectedToday}
         isEvening={isEvening}
         streak={reflectStreak}
+        isReturning={returnState.isReturning}
       />
 
       <CrossToolCallout

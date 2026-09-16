@@ -11,6 +11,7 @@ export function ReflectSection({
   reflectedToday,
   isEvening,
   streak = 0,
+  isReturning = false,
 }: {
   /** Last 7 local day keys, oldest first (today last). */
   days: string[];
@@ -19,8 +20,15 @@ export function ReflectSection({
   isEvening: boolean;
   /** Consecutive-day reflection streak (today or yesterday anchored). */
   streak?: number;
+  /** True when re-entering after a gap — the past week is all blanks, and
+   *  rendering it prices the gap as failure at exactly the wrong moment. */
+  isReturning?: boolean;
 }) {
   const showNudge = isEvening && !reflectedToday;
+  // On a return the dots and the streak both describe the gap, so show
+  // neither: the strip restarts from today.
+  const visibleDays = isReturning ? days.slice(-1) : days;
+  const visibleStreak = isReturning ? 0 : streak;
 
   return (
     <section
@@ -44,8 +52,11 @@ export function ReflectSection({
         >
           Reflection
         </span>
-        <span className="flex items-center gap-1.5" aria-label="Last 7 days of mood">
-          {days.map((day) => {
+        <span
+          className="flex items-center gap-1.5"
+          aria-label={isReturning ? "Today's mood" : "Last 7 days of mood"}
+        >
+          {visibleDays.map((day) => {
             const mood = moodsByDay[day];
             return (
               <span
@@ -62,13 +73,13 @@ export function ReflectSection({
             );
           })}
         </span>
-        {streak >= 2 ? (
+        {visibleStreak >= 2 ? (
           <span
             className="shrink-0 rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold tabular"
             style={{ background: "var(--bg-tint)", color: "var(--text-muted)" }}
-            title={`${streak} days reflected in a row`}
+            title={`${visibleStreak} days reflected in a row`}
           >
-            🔥 {streak}
+            🔥 {visibleStreak}
           </span>
         ) : null}
       </Link>
