@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_PLAN_SLOTS,
   RETURN_GAP_DAYS,
+  defaultSlotsForDay,
   deriveReturnState,
   describeAway,
+  resolvePlanMode,
   planSummaryLine,
   slotWindow,
   startOfDay,
@@ -99,5 +101,66 @@ describe("planSummaryLine", () => {
 
   it("returns an empty string for an empty plan", () => {
     expect(planSummaryLine([])).toBe("");
+  });
+});
+
+describe("resolvePlanMode", () => {
+  it("confirms when today already has a plan, whatever the hour", () => {
+    for (const hour of [5, 12, 22]) {
+      expect(
+        resolvePlanMode({ now: new Date(2026, 8, 16, hour), hasPlanToday: true }),
+      ).toEqual({ kind: "confirm", dayOffset: 0 });
+    }
+  });
+
+  it("plans TODAY when waking with nothing planned", () => {
+    // The 5am push lands here — offering tomorrow would be useless.
+    expect(
+      resolvePlanMode({ now: new Date(2026, 8, 16, 5), hasPlanToday: false }),
+    ).toEqual({ kind: "plan", dayOffset: 0 });
+  });
+
+  it("rolls forward to tomorrow once the day is spent", () => {
+    expect(
+      resolvePlanMode({ now: new Date(2026, 8, 16, 21), hasPlanToday: false }),
+    ).toEqual({ kind: "plan", dayOffset: 1 });
+  });
+
+  it("switches at the cutoff hour", () => {
+    const before = resolvePlanMode({ now: new Date(2026, 8, 16, 16, 59), hasPlanToday: false });
+    const after = resolvePlanMode({ now: new Date(2026, 8, 16, 17, 0), hasPlanToday: false });
+    expect(before.dayOffset).toBe(0);
+    expect(after.dayOffset).toBe(1);
+  });
+});
+
+describe("defaultSlotsForDay", () => {
+  it("offers the full template for tomorrow", () => {
+    expect(
+      defaultSlotsForDay({ now: new Date(2026, 8, 16, 21), dayOffset: 1 }),
+    ).toEqual(DEFAULT_PLAN_SLOTS);
+  });
+
+  it("keeps every slot when planning today at dawn", () => {
+    expect(
+      defaultSlotsForDay({ now: new Date(2026, 8, 16, 5), dayOffset: 0 }),
+    ).toHaveLength(3);
+  });
+
+  it("drops slots that have already passed", () => {
+    const slots = defaultSlotsForDay({ now: new Date(2026, 8, 16, 14), dayOffset: 0 });
+    expect(slots.every((slot) => slot.startHour >= 15)).toBe(true);
+    expect(slots.map((slot) => slot.key)).toEqual(["recovery"]);
+  });
+
+  it("falls back to a single next-hour block late in the day", () => {
+    const slots = defaultSlotsForDay({ now: new Date(2026, 8, 16, 22), dayOffset: 0 });
+    expect(slots).toHaveLength(1);
+    expect(slots[0]!.startHour).toBe(23);
+  });
+
+  it("never suggests an hour past 23", () => {
+    const slots = defaultSlotsForDay({ now: new Date(2026, 8, 16, 23, 55), dayOffset: 0 });
+    expect(slots[0]!.startHour).toBeLessThanOrEqual(23);
   });
 });

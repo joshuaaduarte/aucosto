@@ -38,6 +38,14 @@ function CalendarIcon() {
     </svg>
   );
 }
+function PlanIcon() {
+  return (
+    <svg {...ip}>
+      <rect x="2" y="3" width="11" height="10" rx="1.5" />
+      <path d="M5 6.5h5M5 9.5h3" />
+    </svg>
+  );
+}
 function ClockIcon() {
   return (
     <svg {...ip}>
@@ -177,6 +185,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: "/app", label: "Today", match: (p) => p === "/app", finance: false, icon: <HomeIcon /> },
+  { href: "/app/plan", label: "Plan", match: (p) => p.startsWith("/app/plan"), finance: false, icon: <PlanIcon /> },
   { href: "/app/calendar", label: "Calendar", match: (p) => p.startsWith("/app/calendar"), finance: false, icon: <CalendarIcon /> },
   { href: "/app/do", label: "Do List", match: (p) => p.startsWith("/app/do"), finance: false, icon: <ListIcon /> },
   { href: "/app/habits", label: "Habits", match: (p) => p.startsWith("/app/habits"), finance: false, icon: <RepeatIcon /> },

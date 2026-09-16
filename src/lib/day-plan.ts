@@ -54,6 +54,65 @@ export function slotWindow(
   return { startsAt, endsAt };
 }
 
+/** After this local hour there isn't enough of the day left to be worth
+ *  shaping, so planning rolls forward to tomorrow. */
+export const PLAN_TODAY_CUTOFF_HOUR = 17;
+
+export type PlanMode =
+  | { kind: "confirm"; dayOffset: 0 }
+  | { kind: "plan"; dayOffset: 0 | 1 };
+
+/**
+ * What the plan screen should do right now.
+ *
+ * The case this exists for: waking at 5am with nothing planned. The screen
+ * must offer to shape *today* — offering tomorrow would be answering a
+ * question nobody asked, and it's the morning push that lands the user here.
+ * Late in the day the same emptiness means the opposite, so planning rolls
+ * forward to tomorrow.
+ */
+export function resolvePlanMode(options: {
+  now: Date;
+  hasPlanToday: boolean;
+  cutoffHour?: number;
+}): PlanMode {
+  if (options.hasPlanToday) return { kind: "confirm", dayOffset: 0 };
+  const cutoff = options.cutoffHour ?? PLAN_TODAY_CUTOFF_HOUR;
+  return { kind: "plan", dayOffset: options.now.getHours() < cutoff ? 0 : 1 };
+}
+
+/**
+ * Default slots for a day, skipping any that have already passed.
+ *
+ * Suggesting a 9:00 AM focus block at 2pm is the kind of small wrongness that
+ * makes a tool feel like it isn't paying attention — and it costs a correction
+ * on every single block.
+ */
+export function defaultSlotsForDay(options: {
+  now: Date;
+  dayOffset: 0 | 1;
+}): PlanSlot[] {
+  if (options.dayOffset === 1) return DEFAULT_PLAN_SLOTS;
+
+  // Round up to the next whole hour, leaving a few minutes of runway.
+  const earliest = options.now.getMinutes() > 50
+    ? options.now.getHours() + 2
+    : options.now.getHours() + 1;
+
+  const usable = DEFAULT_PLAN_SLOTS.filter((slot) => slot.startHour >= earliest);
+  if (usable.length > 0) return usable;
+
+  // Nothing left in the template — offer a single block starting next hour.
+  return [
+    {
+      key: "now",
+      label: "Next block",
+      startHour: Math.min(23, earliest),
+      durationMinutes: 60,
+    },
+  ];
+}
+
 export type ReturnState = {
   /** Whole days since the last recorded activity. 0 when active today. */
   awayDays: number;

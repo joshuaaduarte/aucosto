@@ -6,7 +6,7 @@
 
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
-import { DEFAULT_PLAN_SLOTS } from "@/lib/day-plan";
+import type { PlanSlot } from "@/lib/day-plan";
 import { savePlanAction } from "./actions";
 
 type State = { ok?: true; blocks?: number; error?: string } | null;
@@ -22,9 +22,12 @@ function hourLabel(hour: number): string {
 
 export function PlanForm({
   target,
+  slots,
   initial,
 }: {
   target: "today" | "tomorrow";
+  /** Suggested starting slots — already filtered to hours still ahead. */
+  slots: PlanSlot[];
   /** Existing plan, so re-opening the screen edits rather than duplicates. */
   initial: Array<{ title: string; startHour: number; durationMinutes: number }>;
 }) {
@@ -32,7 +35,7 @@ export function PlanForm({
   const [rows, setRows] = useState(() =>
     initial.length > 0
       ? initial
-      : DEFAULT_PLAN_SLOTS.map((slot) => ({
+      : slots.map((slot) => ({
           title: "",
           startHour: slot.startHour,
           durationMinutes: slot.durationMinutes,
@@ -75,9 +78,7 @@ export function PlanForm({
               name="title"
               value={row.title}
               onChange={(event) => update(index, { title: event.target.value })}
-              placeholder={
-                DEFAULT_PLAN_SLOTS[index]?.label ?? "What's the block?"
-              }
+              placeholder={slots[index]?.label ?? "What's the block?"}
               className="field w-full"
               autoComplete="off"
               maxLength={120}
@@ -131,7 +132,14 @@ export function PlanForm({
             onClick={() =>
               setRows((prev) => [
                 ...prev,
-                { title: "", startHour: 15, durationMinutes: 60 },
+                {
+                  title: "",
+                  startHour: Math.min(
+                    23,
+                    (prev[prev.length - 1]?.startHour ?? 8) + 2,
+                  ),
+                  durationMinutes: 60,
+                },
               ])
             }
           >
@@ -147,8 +155,10 @@ export function PlanForm({
       ) : null}
       {state?.ok ? (
         <p className="text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
-          Saved {state.blocks} {state.blocks === 1 ? "block" : "blocks"}. You&apos;ll
-          get a nudge in the morning to confirm.
+          Saved {state.blocks} {state.blocks === 1 ? "block" : "blocks"}.
+          {target === "tomorrow"
+            ? " You'll get a nudge in the morning to confirm."
+            : " Start one whenever you're ready."}
         </p>
       ) : null}
     </form>

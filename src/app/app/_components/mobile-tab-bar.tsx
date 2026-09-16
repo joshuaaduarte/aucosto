@@ -80,6 +80,16 @@ type MoreTool = {
 
 const MORE_TOOLS: MoreTool[] = [
   {
+    href: "/app/plan",
+    label: "Plan",
+    icon: (
+      <svg {...ip}>
+        <rect x="2" y="3" width="11" height="10" rx="1.5" />
+        <path d="M5 6.5h5M5 9.5h3" />
+      </svg>
+    ),
+  },
+  {
     href: "/app/habits",
     label: "Habits",
     icon: (

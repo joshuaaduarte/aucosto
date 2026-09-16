@@ -770,3 +770,12 @@ input.field[type="time"]::-webkit-datetime-edit {
     animation: ruleDraw 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
   }
 }
+
+/* Hub "More" disclosure — hide the native marker so the chevron in the
+   summary is the only affordance (Safari needs the -webkit- rule). */
+.hub-more > summary::-webkit-details-marker {
+  display: none;
+}
+.hub-more > summary::marker {
+  content: "";
+}

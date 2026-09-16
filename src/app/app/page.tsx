@@ -14,7 +14,11 @@ import { listReflections, listRecentMoods } from "@/lib/services/reflect";
 import { getWhoopMorningPrefill } from "@/lib/services/whoop";
 import { getCurrentPlace } from "@/lib/services/location";
 import { getLastActivityBefore, listPlannedBlocks } from "@/lib/services/day-plan";
-import { deriveReturnState, startOfDay as startOfPlanDay } from "@/lib/day-plan";
+import {
+  PLAN_TODAY_CUTOFF_HOUR,
+  deriveReturnState,
+  startOfDay as startOfPlanDay,
+} from "@/lib/day-plan";
 import {
   buildDayFacts,
   deriveInsightOfTheDay,
@@ -46,7 +50,9 @@ import { ProjectsProgressSection } from "./_components/projects-progress-section
 import { QuickActionsSection } from "./_components/quick-actions-section";
 import { InsightOfTheDayCard } from "./_components/insight-of-the-day";
 import { ReflectSection } from "./_components/reflect-section";
+import { HubMore } from "./_components/hub-more";
 import { ReturnCard } from "./_components/return-card";
+import { TodayPlanCard, type HubPlanBlock } from "./_components/today-plan-card";
 import { WorkspaceSection } from "./_components/workspace-section";
 import { deriveDailyDigest } from "./_lib/daily-digest";
 import { deriveHubPrompts } from "./_lib/hub-prompts";
@@ -307,6 +313,21 @@ export default async function HubPage() {
         listPlannedBlocks(userId, startOfPlanDay(now)).catch(() => []),
       ])
     : [null, []];
+  const hubPlanBlocks: HubPlanBlock[] = todayPlan
+    .slice()
+    .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())
+    .map((block) => ({
+      id: block.id,
+      title: block.title,
+      timeLabel: block.startsAt.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        timeZone: timezone,
+      }),
+      past: block.endsAt < now,
+    }));
+  const canPlanToday = now.getHours() < PLAN_TODAY_CUTOFF_HOUR;
+
   const returnState = deriveReturnState({
     lastActiveAt: lastActivityAt,
     now,
@@ -346,7 +367,17 @@ export default async function HubPage() {
         />
       ) : null}
 
-      {/* Hero first: the one recommendation. Stat tiles support it below. */}
+      {/* The plan outranks a generated recommendation: it's what the morning
+          nudge asked about, and it's the user's own answer. */}
+      {userId ? (
+        <TodayPlanCard
+          blocks={hubPlanBlocks}
+          runningLabel={runningEntry?.label ?? null}
+          canPlanToday={canPlanToday}
+        />
+      ) : null}
+
+      {/* Then the one generated recommendation. Stat tiles support it below. */}
       <FocusModuleCard focus={focus} />
 
       {userId ? (
@@ -427,24 +458,26 @@ export default async function HubPage() {
         thisMonthSpentCents={thisMonthSpentCents}
       />
 
-      <QuickActionsSection
-        runningEntry={runningEntry}
-        weekTotalMs={weekTotalMs}
-        financeVisible={financeVisible}
-        financeLocked={financeLocked}
-        financeHasPin={financeHasPin}
-        thisMonthSpentCents={thisMonthSpentCents}
-        lastMonthSpentCents={lastMonthSpentCents}
-        upcomingCalendar={upcomingCalendar}
-        suggestedTasks={suggestedTasks}
-        suggestedHabits={suggestedHabits}
-      />
+      <HubMore>
+        <QuickActionsSection
+          runningEntry={runningEntry}
+          weekTotalMs={weekTotalMs}
+          financeVisible={financeVisible}
+          financeLocked={financeLocked}
+          financeHasPin={financeHasPin}
+          thisMonthSpentCents={thisMonthSpentCents}
+          lastMonthSpentCents={lastMonthSpentCents}
+          upcomingCalendar={upcomingCalendar}
+          suggestedTasks={suggestedTasks}
+          suggestedHabits={suggestedHabits}
+        />
 
-      <DecisionPromptsSection prompts={prompts} />
+        <DecisionPromptsSection prompts={prompts} />
 
-      <ConnectionsSection connections={connections} />
+        <ConnectionsSection connections={connections} />
 
-      <WorkspaceSection financeVisible={financeVisible} />
+        <WorkspaceSection financeVisible={financeVisible} />
+      </HubMore>
     </div>
   );
 }
