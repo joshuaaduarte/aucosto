@@ -92,6 +92,7 @@ const EditTimeEntryInput = z.object({
   title: z.string().min(1).max(200).optional(),
   startedAt: z.string().optional(), // ISO
   endedAt: z.string().optional(),   // ISO
+  categoryName: z.string().optional(),
 });
 
 const LogTimeEntryInput = z.object({
@@ -671,7 +672,7 @@ async function previewEditTimeEntry(
   if (!parsed.success) {
     return err(parsed.error.issues[0]?.message ?? "Invalid input");
   }
-  const { entryId, title, startedAt, endedAt } = parsed.data;
+  const { entryId, title, startedAt, endedAt, categoryName } = parsed.data;
   const warnings: string[] = [];
 
   if (startedAt && Number.isNaN(new Date(startedAt).getTime())) {
@@ -688,7 +689,7 @@ async function previewEditTimeEntry(
     return err(`Time entry "${entryId}" not found`);
   }
 
-  if (title === undefined && startedAt === undefined && endedAt === undefined) {
+  if (title === undefined && startedAt === undefined && endedAt === undefined && categoryName === undefined) {
     warnings.push("No changes specified");
   }
 
@@ -712,6 +713,7 @@ async function previewEditTimeEntry(
     `Before: ${beforeStart}–${beforeEnd} · ${beforeDur}`,
     `After: ${fmtClock(afterStart)}–${afterEndStr} · ${afterDur}`,
   ];
+  if (categoryName) lines.push(`Category: ${categoryName}`);
 
   return {
     ok: true,
@@ -721,6 +723,7 @@ async function previewEditTimeEntry(
       title: title ?? null,
       startedAtIso: startedAt ?? null,
       endedAtIso: endedAt ?? null,
+      category: categoryName ?? null,
     },
     warnings,
   };
@@ -1062,6 +1065,7 @@ async function executeEditTimeEntry(
   if (n.title) patch.label = String(n.title);
   if (n.startedAtIso) patch.startedAt = new Date(String(n.startedAtIso));
   if (n.endedAtIso) patch.endedAt = new Date(String(n.endedAtIso));
+  if (typeof n.category === "string") patch.category = n.category;
 
   const updated = await updateEntry(userId, String(n.entryId), patch);
   if (!updated) return err2(`Time entry "${n.entryId}" not found`);
