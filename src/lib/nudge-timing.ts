@@ -83,6 +83,45 @@ export function slotForHour(hour: number): NudgeSlot {
   return hour < 12 ? "morning" : "evening";
 }
 
+/** Local hours the nudges go out at — what preferredNudgeHours() picked from
+ *  the owner's histogram. Re-check with scripts/derive-nudge-times.ts. */
+export const NUDGE_LOCAL_HOURS: Record<NudgeSlot, number> = {
+  morning: 5,
+  evening: 21,
+};
+
+/** UTC offsets the owner's zone takes across the year (LA: PDT -7, PST -8). */
+export const ZONE_UTC_OFFSETS = [-7, -8] as const;
+
+/**
+ * UTC hours a cron must fire at to hit `localHour` in every DST state.
+ *
+ * Vercel crons are UTC-only, so a single cron line drifts an hour twice a
+ * year. Instead vercel.json schedules one line per offset, and the route
+ * keeps only the run whose local hour matches (see `slotDueAt`).
+ */
+export function cronUtcHours(
+  localHour: number,
+  offsets: readonly number[] = ZONE_UTC_OFFSETS,
+): number[] {
+  const hours = offsets.map((offset) => localHourToUtcHour(localHour, offset));
+  return [...new Set(hours)].sort((a, b) => a - b);
+}
+
+/**
+ * The nudge due at this local hour, or null when the cron fired on the
+ * off-DST line and should stay quiet. Exactly one of each slot's cron lines
+ * lands on its target hour on any given day.
+ */
+export function slotDueAt(
+  localHour: number,
+  hours: Record<NudgeSlot, number> = NUDGE_LOCAL_HOURS,
+): NudgeSlot | null {
+  if (localHour === hours.morning) return "morning";
+  if (localHour === hours.evening) return "evening";
+  return null;
+}
+
 /** Convert a local hour to the UTC hour a cron must fire at.
  *  `offsetHours` is the local zone's offset from UTC (LA in PDT = -7). */
 export function localHourToUtcHour(hour: number, offsetHours: number): number {

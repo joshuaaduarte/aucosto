@@ -1,9 +1,13 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   buildConfirmNudge,
   buildPlanNudge,
+  cronUtcHours,
   localHourToUtcHour,
+  NUDGE_LOCAL_HOURS,
   preferredNudgeHours,
+  slotDueAt,
   slotForHour,
   type ActivityHour,
 } from "@/lib/nudge-timing";
@@ -73,6 +77,48 @@ describe("slotForHour / localHourToUtcHour", () => {
     expect(localHourToUtcHour(5, -7)).toBe(12); // 05:00 PDT -> 12:00 UTC
     expect(localHourToUtcHour(21, -7)).toBe(4); // 21:00 PDT -> 04:00 UTC
     expect(localHourToUtcHour(0, -7)).toBe(7);
+  });
+});
+
+describe("DST-proof cron schedule", () => {
+  it("needs one UTC line per offset for each slot", () => {
+    expect(cronUtcHours(5)).toEqual([12, 13]); // 05:00 in PDT, PST
+    expect(cronUtcHours(21)).toEqual([4, 5]); // 21:00 in PDT, PST
+    expect(cronUtcHours(5, [-7, -7])).toEqual([12]);
+  });
+
+  it("sends on exactly one line per slot in each DST state", () => {
+    for (const offset of [-7, -8]) {
+      for (const slot of ["morning", "evening"] as const) {
+        const due = cronUtcHours(NUDGE_LOCAL_HOURS[slot])
+          .map((utc) => ((utc + offset) % 24 + 24) % 24)
+          .map((local) => slotDueAt(local));
+        expect(due.filter((d) => d === slot)).toHaveLength(1);
+        expect(due.filter((d) => d !== slot && d !== null)).toHaveLength(0);
+      }
+    }
+  });
+
+  it("stays quiet off the target hours", () => {
+    expect(slotDueAt(4)).toBeNull();
+    expect(slotDueAt(20)).toBeNull();
+    expect(slotDueAt(5)).toBe("morning");
+    expect(slotDueAt(21)).toBe("evening");
+  });
+
+  it("matches vercel.json", () => {
+    const config = JSON.parse(readFileSync("vercel.json", "utf8")) as {
+      crons: { path: string; schedule: string }[];
+    };
+    const scheduled = config.crons
+      .filter((cron) => cron.path === "/api/cron/nudges")
+      .map((cron) => Number(cron.schedule.split(" ")[1]))
+      .sort((a, b) => a - b);
+    const expected = [
+      ...cronUtcHours(NUDGE_LOCAL_HOURS.morning),
+      ...cronUtcHours(NUDGE_LOCAL_HOURS.evening),
+    ].sort((a, b) => a - b);
+    expect(scheduled).toEqual(expected);
   });
 });
 

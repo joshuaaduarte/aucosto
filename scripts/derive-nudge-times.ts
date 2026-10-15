@@ -14,7 +14,7 @@
 
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { localHourToUtcHour, preferredNudgeHours, type ActivityHour } from "../src/lib/nudge-timing";
+import { cronUtcHours, preferredNudgeHours, type ActivityHour } from "../src/lib/nudge-timing";
 
 const ZONE = process.env.APP_TIMEZONE ?? "America/Los_Angeles";
 const LOCAL = `at time zone 'UTC' at time zone '${ZONE}'`;
@@ -22,6 +22,20 @@ const LOCAL = `at time zone 'UTC' at time zone '${ZONE}'`;
 // Bulk backfills would drown out real usage; count distinct active day-hours
 // rather than raw event rows for the same reason.
 const EXCLUDED_TYPES = ["time.category_updated"];
+
+/** Distinct UTC offsets (in hours) `zone` uses during `year` — January and
+ *  July cover both sides of DST in either hemisphere. */
+function zoneOffsets(zone: string, year: number): number[] {
+  const offsets = [0, 6].map((month) => {
+    const label = new Date(Date.UTC(year, month, 1, 12)).toLocaleString("en-US", {
+      timeZone: zone,
+      timeZoneName: "shortOffset",
+    });
+    const match = label.match(/GMT([+-]\d+)?/);
+    return match?.[1] ? Number(match[1]) : 0;
+  });
+  return [...new Set(offsets)];
+}
 
 async function main() {
   const url = process.env.DATABASE_URL;
@@ -51,15 +65,19 @@ async function main() {
 
   const { morningHour, eveningHour } = preferredNudgeHours(hours);
 
-  // Cron runs in UTC year-round; compute the offset for "now" so the printed
-  // lines match the current DST state (re-check after a DST flip).
-  const offsetHours = -new Date().getTimezoneOffset() / 60;
+  // Cron runs in UTC year-round, so print one line per DST offset the zone
+  // takes this year; the route sends only on the line matching local time.
+  const offsets = zoneOffsets(ZONE, new Date().getFullYear());
 
   console.log(`\nPreferred local hours: morning ${morningHour}:00, evening ${eveningHour}:00`);
-  console.log(`Current offset from UTC: ${offsetHours}\n`);
+  console.log(`UTC offsets this year: ${offsets.join(", ")}`);
+  console.log("Update NUDGE_LOCAL_HOURS / ZONE_UTC_OFFSETS in src/lib/nudge-timing.ts if these changed.\n");
   console.log("vercel.json crons:");
-  console.log(`  { "path": "/api/cron/nudges", "schedule": "0 ${localHourToUtcHour(morningHour, offsetHours)} * * *" }`);
-  console.log(`  { "path": "/api/cron/nudges", "schedule": "0 ${localHourToUtcHour(eveningHour, offsetHours)} * * *" }`);
+  for (const hour of [morningHour, eveningHour]) {
+    for (const utcHour of cronUtcHours(hour, offsets)) {
+      console.log(`  { "path": "/api/cron/nudges", "schedule": "0 ${utcHour} * * *" }`);
+    }
+  }
 
   await prisma.$disconnect();
 }

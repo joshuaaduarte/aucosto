@@ -268,7 +268,7 @@ OAuth connect lives at Settings → Whoop; hidden guidance shows until `WHOOP_CL
 
 ### Web Push (implemented)
 
-`public/sw.js` is push-only — **never add a fetch/caching handler**. Nudges are sent by `/api/cron/nudges` (two vercel.json crons, UTC times chosen for LA mornings/evenings), each skipped when the thing it nudges for already happened. iOS only delivers pushes to the installed home-screen app.
+`public/sw.js` is push-only — **never add a fetch/caching handler**. Nudges are sent by `/api/cron/nudges` (four vercel.json crons — each slot has one UTC line per DST offset, and the route sends only on the line whose local hour matches `NUDGE_LOCAL_HOURS` in `src/lib/nudge-timing.ts`; a test keeps vercel.json in sync), each skipped when the thing it nudges for already happened. iOS only delivers pushes to the installed home-screen app.
 
 ### Location signals (implemented)
 

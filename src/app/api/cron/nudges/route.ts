@@ -4,9 +4,11 @@
 //
 // Timing: the cron hours are derived from the owner's own activity histogram
 // rather than guessed — see src/lib/nudge-timing.ts, and re-derive with
-// `npx tsx --env-file=.env scripts/derive-nudge-times.ts`. The slot is then
-// read off the server clock, which instrumentation.ts pins to the owner's
-// timezone.
+// `npx tsx --env-file=.env scripts/derive-nudge-times.ts`. Vercel crons are
+// UTC-only, so each slot has two cron lines (one per DST offset) and this
+// route sends only on the run whose local hour — read off the server clock,
+// which instrumentation.ts pins to the owner's timezone — matches the target.
+// `?slot=morning|evening` forces a slot for manual end-to-end checks.
 //
 // Content lives in src/lib/nudge-resolver.ts: the evening nudge asks for
 // tomorrow's blocks (plan-ahead beats a plain reminder), and the morning nudge
@@ -18,7 +20,7 @@
 // so they stay testable without sending to real devices.
 
 import { NextResponse } from "next/server";
-import { slotForHour } from "@/lib/nudge-timing";
+import { slotDueAt, type NudgeSlot } from "@/lib/nudge-timing";
 import { resolveNudge } from "@/lib/nudge-resolver";
 import { listSubscribedUserIds, sendPushToUser } from "@/lib/services/push";
 
@@ -32,7 +34,14 @@ export async function GET(request: Request) {
   }
 
   const now = new Date();
-  const slot = slotForHour(now.getHours());
+  const forced = new URL(request.url).searchParams.get("slot");
+  const slot: NudgeSlot | null =
+    forced === "morning" || forced === "evening" ? forced : slotDueAt(now.getHours());
+  if (!slot) {
+    // The other DST state's cron line — its twin sends this slot.
+    return NextResponse.json({ ok: true, slot: null, hour: now.getHours() });
+  }
+
   const userIds = await listSubscribedUserIds();
   let sent = 0;
   let skipped = 0;
