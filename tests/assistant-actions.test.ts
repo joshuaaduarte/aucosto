@@ -669,3 +669,100 @@ describe("delete_calendar_event", () => {
     expect(services.deleteCalendarItem).toHaveBeenCalledWith("user-1", "evt-1");
   });
 });
+
+describe("delete_project", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  function mockProjects(existing: { id: string; name: string }[] = []) {
+    return {
+      listBoardProjects: vi.fn().mockResolvedValue(existing),
+      createBoardProject: vi.fn(),
+      updateProject: vi.fn(),
+      deleteProject: vi.fn().mockResolvedValue(undefined),
+    };
+  }
+
+  it("is registered as medium risk with confirmation required", () => {
+    expect(ACTION_REGISTRY["delete_project"]!.risk).toBe("medium");
+    expect(ACTION_REGISTRY["delete_project"]!.confirmationRequired).toBe(true);
+    expect(ACTION_REGISTRY["delete_project"]!.supported).toBe(true);
+  });
+
+  it("previews with a permanence warning", async () => {
+    vi.doMock("@/lib/services/projects", () =>
+      mockProjects([{ id: "p1", name: "Old Project" }]),
+    );
+    const { previewAction } = await import("@/lib/assistant-action-executor");
+    const result = await previewAction("user-1", "delete_project", {
+      projectName: "Old Project",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.previewText).toContain("Delete project");
+    expect(result.previewText).toContain("Old Project");
+    expect(result.warnings.join(" ")).toContain("permanently");
+    expect(result.normalizedInput.projectId).toBe("p1");
+  });
+
+  it("refuses ambiguous names and suggests projectId", async () => {
+    vi.doMock("@/lib/services/projects", () =>
+      mockProjects([
+        { id: "p1", name: "Health & Fitness" },
+        { id: "p2", name: "Health & Fitness" },
+      ]),
+    );
+    const { previewAction } = await import("@/lib/assistant-action-executor");
+    const result = await previewAction("user-1", "delete_project", {
+      projectName: "Health & Fitness",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("Ambiguous");
+    expect(result.candidates!.length).toBe(2);
+  });
+
+  it("resolves by projectId when names are ambiguous", async () => {
+    vi.doMock("@/lib/services/projects", () =>
+      mockProjects([
+        { id: "p1", name: "Health & Fitness" },
+        { id: "p2", name: "Health & Fitness" },
+      ]),
+    );
+    const { previewAction } = await import("@/lib/assistant-action-executor");
+    const result = await previewAction("user-1", "delete_project", {
+      projectId: "p2",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.normalizedInput.projectId).toBe("p2");
+  });
+
+  it("errors when the project does not exist", async () => {
+    vi.doMock("@/lib/services/projects", () => mockProjects([]));
+    const { previewAction } = await import("@/lib/assistant-action-executor");
+    const result = await previewAction("user-1", "delete_project", {
+      projectName: "Nope",
+    });
+
+    expect(result.ok).toBe(false);
+  });
+
+  it("executes the delete through the service", async () => {
+    const services = mockProjects([{ id: "p1", name: "Old Project" }]);
+    vi.doMock("@/lib/services/projects", () => services);
+    const { executeAction } = await import("@/lib/assistant-action-executor");
+    const result = await executeAction("user-1", "delete_project", {
+      projectName: "Old Project",
+      deleteTasks: true,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.recordType).toBe("Project");
+    expect(services.deleteProject).toHaveBeenCalledOnce();
+    expect(services.deleteProject).toHaveBeenCalledWith("user-1", "p1", {
+      deleteTasks: true,
+    });
+  });
+});

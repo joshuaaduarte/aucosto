@@ -10,7 +10,7 @@ import {
   upsertReflection,
   buildReflectionSnapshot,
 } from "@/lib/services/reflect";
-import { updateProject, listBoardProjects, createBoardProject } from "@/lib/services/projects";
+import { updateProject, listBoardProjects, createBoardProject, deleteProject } from "@/lib/services/projects";
 import {
   updateProjectPlan,
   addProjectQuestion,
@@ -136,6 +136,16 @@ const CreateProjectInput = z.object({
     .optional(),
 });
 
+const DeleteProjectInput = z
+  .object({
+    projectName: z.string().min(1).optional(),
+    projectId: z.string().min(1).optional(),
+    deleteTasks: z.boolean().default(false),
+  })
+  .refine((v) => v.projectName || v.projectId, {
+    message: "Provide projectName or projectId",
+  });
+
 const UpdateCalendarEventInput = z.object({
   eventId: z.string().min(1),
   title: z.string().min(1).max(200).optional(),
@@ -245,6 +255,7 @@ export const ACTION_INPUT_SCHEMAS: Record<string, z.ZodTypeAny> = {
   add_reflection: AddReflectionInput,
   update_project: UpdateProjectInput,
   create_project: CreateProjectInput,
+  delete_project: DeleteProjectInput,
   update_project_plan: UpdateProjectPlanInput,
   add_project_milestone: AddProjectMilestoneInput,
   add_project_question: AddProjectQuestionInput,
@@ -880,6 +891,56 @@ async function previewCreateProject(
   };
 }
 
+async function previewDeleteProject(
+  userId: string,
+  raw: unknown,
+): Promise<PreviewResult> {
+  const parsed = DeleteProjectInput.safeParse(raw);
+  if (!parsed.success) {
+    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+  }
+  const { projectName, projectId, deleteTasks } = parsed.data;
+
+  let project: { id: string; name: string } | null = null;
+  if (projectId) {
+    const projects = await listBoardProjects(userId);
+    const found = projects.find((p) => p.id === projectId);
+    if (!found) return err(`Project "${projectId}" not found`);
+    project = found;
+  } else {
+    const resolved = await resolveProjectByName(userId, projectName!);
+    if (!resolved.found) {
+      return errAmbiguous(
+        resolved.candidates.length === 0
+          ? `No project found matching "${projectName}"`
+          : `Ambiguous project match for "${projectName}" — use projectId to pick one`,
+        resolved.candidates,
+      );
+    }
+    project = resolved.match;
+  }
+
+  const warnings = [
+    `This permanently deletes the project "${project.name}". This cannot be undone.`,
+  ];
+  if (deleteTasks) {
+    warnings.push("All tasks linked to this project will also be deleted.");
+  } else {
+    warnings.push("Tasks linked to this project will be kept (unlinked).");
+  }
+
+  return {
+    ok: true,
+    previewText: `Delete project "${project.name}"`,
+    normalizedInput: {
+      projectId: project.id,
+      projectName: project.name,
+      deleteTasks,
+    },
+    warnings,
+  };
+}
+
 // ── Execute handlers ──────────────────────────────────────────────────────
 
 async function executeCreateTask(
@@ -1117,6 +1178,21 @@ async function executeCreateProject(
     recordId: id,
     recordType: "Project",
     summary: `Created project "${n.name}"`,
+  };
+}
+
+async function executeDeleteProject(
+  userId: string,
+  n: Record<string, unknown>,
+): Promise<ExecuteResult> {
+  await deleteProject(userId, String(n.projectId), {
+    deleteTasks: n.deleteTasks === true,
+  });
+  return {
+    ok: true,
+    recordId: String(n.projectId),
+    recordType: "Project",
+    summary: `Deleted project "${n.projectName}"`,
   };
 }
 
@@ -1646,6 +1722,7 @@ const PREVIEWS: Record<
   add_reflection: previewAddReflection,
   update_project: previewUpdateProject,
   create_project: previewCreateProject,
+  delete_project: previewDeleteProject,
   // project planning
   update_project_plan: previewUpdateProjectPlan,
   add_project_milestone: previewAddProjectMilestone,
@@ -1678,6 +1755,7 @@ const EXECUTES: Record<
   add_reflection: executeAddReflection,
   update_project: executeUpdateProject,
   create_project: executeCreateProject,
+  delete_project: executeDeleteProject,
   // project planning
   update_project_plan: executeUpdateProjectPlan,
   add_project_milestone: executeAddProjectMilestone,
