@@ -35,9 +35,11 @@ import {
   calendarQuerySchema,
   fetchAssistantCalendar,
   fetchAssistantHabits,
+  fetchAssistantPeopleTime,
   fetchAssistantProjects,
   fetchAssistantTasks,
   habitsQuerySchema,
+  peopleTimeQuerySchema,
   tasksQuerySchema,
 } from "@/lib/assistant-lists";
 
@@ -100,6 +102,16 @@ const calendarToolInput = z.object({
     .string()
     .optional()
     .describe("ISO datetime with offset; defaults to from + 7 days"),
+});
+const peopleTimeToolInput = z.object({
+  from: z
+    .string()
+    .optional()
+    .describe("ISO datetime with offset; defaults to 7 days ago"),
+  to: z
+    .string()
+    .optional()
+    .describe("ISO datetime with offset; defaults to now"),
 });
 const historyToolInput = z.object({
   limit: z.number().int().min(1).max(100).optional(),
@@ -172,6 +184,12 @@ export function buildToolCatalog(): McpToolDef[] {
       description:
         "List calendar blocks in a date range (max 90 days, defaults to the next 7 days).",
       inputSchema: toJsonSchema(calendarToolInput),
+    },
+    {
+      name: "assistant_list_people_time",
+      description:
+        "Per-person time totals for a date range (max 90 days, defaults to the last 7 days): minutes with each Rolodex person, broken down by category. Answers 'who am I spending time with?'",
+      inputSchema: toJsonSchema(peopleTimeToolInput),
     },
     {
       name: "assistant_action_history",
@@ -346,6 +364,14 @@ async function callTool(
       });
       if (!parsed.success) return toolError(`Invalid arguments: ${parsed.error.message}`);
       return { content: toolText(await fetchAssistantCalendar(userId, parsed.data)) };
+    }
+    case "assistant_list_people_time": {
+      const parsed = peopleTimeQuerySchema.safeParse({
+        from: args.from,
+        to: args.to,
+      });
+      if (!parsed.success) return toolError(`Invalid arguments: ${parsed.error.message}`);
+      return { content: toolText(await fetchAssistantPeopleTime(userId, parsed.data)) };
     }
     case "assistant_action_history": {
       const parsed = historyToolInput.safeParse(args);

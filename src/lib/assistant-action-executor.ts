@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { createDoItem, updateDoItem, getDoItemSummary } from "@/lib/services/do";
 import { getRunningEntry, startEntry, stopRunning, updateEntry, listRecentEntries, createPastEntry } from "@/lib/services/time";
+import { setEntryPeople } from "@/lib/services/time-people";
 import { listHabits, logHabitProgress, createHabit } from "@/lib/services/habits";
 import { createCalendarItem, getCalendarItem, updateCalendarItem, deleteCalendarItem } from "@/lib/services/calendar";
 import {
@@ -79,6 +80,7 @@ const StartTimerInput = z.object({
   title: z.string().min(1).max(200),
   categoryName: z.string().optional(),
   habitName: z.string().optional(),
+  personNames: z.array(z.string()).optional(),
 });
 
 const StopTimerInput = z.object({
@@ -93,6 +95,7 @@ const EditTimeEntryInput = z.object({
   startedAt: z.string().optional(), // ISO
   endedAt: z.string().optional(),   // ISO
   categoryName: z.string().optional(),
+  personNames: z.array(z.string()).optional(),
 });
 
 const LogTimeEntryInput = z.object({
@@ -101,6 +104,7 @@ const LogTimeEntryInput = z.object({
   endedAt: z.string(),   // ISO datetime
   categoryName: z.string().optional(),
   notes: z.string().optional(),
+  personNames: z.array(z.string()).optional(),
 });
 
 const LogHabitInput = z.object({
@@ -325,6 +329,47 @@ async function resolveHabitByName(
       name: h.title,
       bucket: h.bucket ?? "",
     })),
+  };
+}
+
+/**
+ * Resolve display names to Rolodex person IDs. Exact display-name matches win;
+ * a single fuzzy match is accepted; zero or ambiguous matches produce a
+ * warning and are skipped (never fail the whole action, never guess).
+ */
+async function resolvePeopleByNames(
+  userId: string,
+  names: string[],
+): Promise<{ personIds: string[]; labels: string[]; warnings: string[] }> {
+  const ids: string[] = [];
+  const labels: string[] = [];
+  const warnings: string[] = [];
+  for (const raw of names) {
+    const name = raw.trim();
+    if (!name) continue;
+    const lower = name.toLowerCase();
+    const matches = await findPersonByName(userId, name);
+    const exact = matches.filter((m) => m.displayName.toLowerCase() === lower);
+    const pool = exact.length > 0 ? exact : matches;
+    if (pool.length === 1) {
+      ids.push(pool[0]!.id);
+      labels.push(pool[0]!.displayName);
+    } else if (pool.length === 0) {
+      warnings.push(
+        `No Rolodex person matched "${name}" — no one linked for that name`,
+      );
+    } else {
+      warnings.push(
+        `Multiple people matched "${name}" (${pool
+          .map((p) => p.displayName)
+          .join(", ")}) — skipping to avoid a wrong link`,
+      );
+    }
+  }
+  return {
+    personIds: [...new Set(ids)],
+    labels: [...new Set(labels)],
+    warnings,
   };
 }
 
@@ -585,7 +630,7 @@ async function previewStartTimer(
   if (!parsed.success) {
     return err(parsed.error.issues[0]?.message ?? "Invalid input");
   }
-  const { title, categoryName, habitName } = parsed.data;
+  const { title, categoryName, habitName, personNames } = parsed.data;
   const warnings: string[] = [];
   let habitId: string | null = null;
 
@@ -598,16 +643,27 @@ async function previewStartTimer(
     }
   }
 
+  let personIds: string[] = [];
+  let peopleNote = "";
+  if (personNames) {
+    const resolved = await resolvePeopleByNames(userId, personNames);
+    personIds = resolved.personIds;
+    warnings.push(...resolved.warnings);
+    peopleNote =
+      resolved.labels.length > 0 ? ` · with ${resolved.labels.join(", ")}` : "";
+  }
+
   const running = await getRunningEntry(userId);
   const stopNote = running ? ` (stops running timer: "${running.label}")` : "";
 
   return {
     ok: true,
-    previewText: `Start timer "${title}"${categoryName ? ` [${categoryName}]` : ""}${stopNote}`,
+    previewText: `Start timer "${title}"${categoryName ? ` [${categoryName}]` : ""}${peopleNote}${stopNote}`,
     normalizedInput: {
       title,
       category: categoryName ?? null,
       habitId,
+      personIds,
     },
     warnings,
   };
@@ -672,7 +728,7 @@ async function previewEditTimeEntry(
   if (!parsed.success) {
     return err(parsed.error.issues[0]?.message ?? "Invalid input");
   }
-  const { entryId, title, startedAt, endedAt, categoryName } = parsed.data;
+  const { entryId, title, startedAt, endedAt, categoryName, personNames } = parsed.data;
   const warnings: string[] = [];
 
   if (startedAt && Number.isNaN(new Date(startedAt).getTime())) {
@@ -689,7 +745,7 @@ async function previewEditTimeEntry(
     return err(`Time entry "${entryId}" not found`);
   }
 
-  if (title === undefined && startedAt === undefined && endedAt === undefined && categoryName === undefined) {
+  if (title === undefined && startedAt === undefined && endedAt === undefined && categoryName === undefined && personNames === undefined) {
     warnings.push("No changes specified");
   }
 
@@ -715,6 +771,18 @@ async function previewEditTimeEntry(
   ];
   if (categoryName) lines.push(`Category: ${categoryName}`);
 
+  // personNames uses replace semantics: the provided list becomes the full
+  // linked set (pass [] to clear). Omitted => leave links untouched.
+  let personIds: string[] | null = null;
+  if (personNames !== undefined) {
+    const resolved = await resolvePeopleByNames(userId, personNames);
+    personIds = resolved.personIds;
+    warnings.push(...resolved.warnings);
+    lines.push(
+      `People: ${resolved.labels.length > 0 ? resolved.labels.join(", ") : "(none — links cleared)"}`,
+    );
+  }
+
   return {
     ok: true,
     previewText: lines.join("\n"),
@@ -724,6 +792,7 @@ async function previewEditTimeEntry(
       startedAtIso: startedAt ?? null,
       endedAtIso: endedAt ?? null,
       category: categoryName ?? null,
+      personIds,
     },
     warnings,
   };
@@ -1035,6 +1104,13 @@ async function executeStartTimer(
     category: n.category ? String(n.category) : null,
     habitId: n.habitId ? String(n.habitId) : null,
   });
+  if (Array.isArray(n.personIds) && n.personIds.length > 0) {
+    await setEntryPeople(
+      userId,
+      entry.id,
+      n.personIds.filter((id): id is string => typeof id === "string"),
+    );
+  }
   return {
     ok: true,
     recordId: entry.id,
@@ -1069,6 +1145,13 @@ async function executeEditTimeEntry(
 
   const updated = await updateEntry(userId, String(n.entryId), patch);
   if (!updated) return err2(`Time entry "${n.entryId}" not found`);
+  if (Array.isArray(n.personIds)) {
+    await setEntryPeople(
+      userId,
+      updated.id,
+      n.personIds.filter((id): id is string => typeof id === "string"),
+    );
+  }
   return {
     ok: true,
     recordId: updated.id,
@@ -1085,7 +1168,7 @@ async function previewLogTimeEntry(
   if (!parsed.success) {
     return err(parsed.error.issues[0]?.message ?? "Invalid input");
   }
-  const { title, startedAt, endedAt, categoryName, notes } = parsed.data;
+  const { title, startedAt, endedAt, categoryName, notes, personNames } = parsed.data;
 
   const start = new Date(startedAt);
   const end = new Date(endedAt);
@@ -1093,9 +1176,20 @@ async function previewLogTimeEntry(
   if (Number.isNaN(end.getTime())) return err("Invalid endedAt — must be an ISO datetime string");
   if (end <= start) return err("End time must be after start time.");
 
+  const warnings: string[] = [];
+  let personIds: string[] = [];
+  let peopleNote = "";
+  if (personNames) {
+    const resolved = await resolvePeopleByNames(userId, personNames);
+    personIds = resolved.personIds;
+    warnings.push(...resolved.warnings);
+    peopleNote =
+      resolved.labels.length > 0 ? ` · with ${resolved.labels.join(", ")}` : "";
+  }
+
   const lines = [
     `Log time entry "${title}"`,
-    `${fmtClock(start)}–${fmtClock(end)} · ${fmtMinutes(Math.round((end.getTime() - start.getTime()) / 60000))}`,
+    `${fmtClock(start)}–${fmtClock(end)} · ${fmtMinutes(Math.round((end.getTime() - start.getTime()) / 60000))}${peopleNote}`,
   ];
   if (categoryName) lines.push(`Category: ${categoryName}`);
   if (notes) lines.push(`Notes: ${notes}`);
@@ -1109,8 +1203,9 @@ async function previewLogTimeEntry(
       endedAt: end.toISOString(),
       category: categoryName ?? null,
       notes: notes ?? null,
+      personIds,
     },
-    warnings: [],
+    warnings,
   };
 }
 
@@ -1126,6 +1221,13 @@ async function executeLogTimeEntry(
     startedAt: new Date(String(n.startedAt)),
     endedAt: new Date(String(n.endedAt)),
   });
+  if (Array.isArray(n.personIds) && n.personIds.length > 0) {
+    await setEntryPeople(
+      userId,
+      entry.id,
+      n.personIds.filter((id): id is string => typeof id === "string"),
+    );
+  }
   return {
     ok: true,
     recordId: entry.id,

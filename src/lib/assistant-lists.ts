@@ -15,6 +15,10 @@ import {
   listCalendarItems,
   type CalendarOccurrence,
 } from "@/lib/services/calendar";
+import {
+  personTimeSummary,
+  type PersonTimeSummary,
+} from "@/lib/services/time-people";
 
 // ── Query schemas ───────────────────────────────────────────────────────────
 
@@ -229,4 +233,59 @@ export async function fetchAssistantCalendar(
     to: query.to,
   });
   return { items: items.map(serializeCalendarItem), count: items.length };
+}
+
+const MAX_PEOPLE_TIME_RANGE_DAYS = 90;
+
+export const peopleTimeQuerySchema = z
+  .object({
+    from: z.string().datetime({ offset: true }).optional(),
+    to: z.string().datetime({ offset: true }).optional(),
+  })
+  .transform(({ from, to }) => {
+    const now = new Date();
+    const toDate = to ? new Date(to) : now;
+    const fromDate = from
+      ? new Date(from)
+      : new Date(toDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+    return { from: fromDate, to: toDate };
+  })
+  .refine(({ from, to }) => to.getTime() > from.getTime(), {
+    message: '"to" must be after "from"',
+  })
+  .refine(
+    ({ from, to }) =>
+      to.getTime() - from.getTime() <=
+      MAX_PEOPLE_TIME_RANGE_DAYS * 24 * 60 * 60 * 1000,
+    { message: `Date range cannot exceed ${MAX_PEOPLE_TIME_RANGE_DAYS} days` },
+  );
+export type PeopleTimeQuery = z.infer<typeof peopleTimeQuerySchema>;
+
+export interface AssistantPersonTimeRow {
+  personId: string;
+  displayName: string;
+  totalMinutes: number;
+  entryCount: number;
+  byCategory: { category: string; minutes: number }[];
+}
+
+function serializePersonTime(s: PersonTimeSummary): AssistantPersonTimeRow {
+  return {
+    personId: s.personId,
+    displayName: s.displayName,
+    totalMinutes: s.totalMinutes,
+    entryCount: s.entryCount,
+    byCategory: s.byCategory,
+  };
+}
+
+export async function fetchAssistantPeopleTime(
+  userId: string,
+  query: PeopleTimeQuery,
+): Promise<{ items: AssistantPersonTimeRow[]; count: number }> {
+  const summaries = await personTimeSummary(userId, {
+    from: query.from,
+    to: query.to,
+  });
+  return { items: summaries.map(serializePersonTime), count: summaries.length };
 }

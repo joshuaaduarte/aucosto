@@ -282,6 +282,35 @@ Defaults: `from` = now, `to` = from + 7 days.
 
 ---
 
+### `GET /api/assistant/people-time`
+Per-person time totals for a date range (max 90 days) — "who am I spending time
+with?" Minutes are attributed in full to every linked person (a 60-minute
+dinner with two people counts 60 minutes each).
+
+**Query params:** `?from=<ISO datetime with offset>` `?to=<ISO datetime with offset>`.
+Defaults: `to` = now, `from` = to − 7 days.
+
+**Response shape:**
+```json
+{
+  "items": [
+    {
+      "personId": "p1",
+      "displayName": "Ana",
+      "totalMinutes": 150,
+      "entryCount": 2,
+      "byCategory": [
+        { "category": "eating", "minutes": 90 },
+        { "category": "social", "minutes": 60 }
+      ]
+    }
+  ],
+  "count": 1
+}
+```
+
+---
+
 ### `POST /api/assistant/mcp`
 Minimal MCP server (stateless Streamable HTTP, JSON-RPC 2.0 over POST; no
 SSE). Same auth as above. Nine tools: `assistant_snapshot`,
@@ -432,6 +461,40 @@ Edit time entry: Commute
 Before: 8:55 AM–5:52 PM · 8h 56m
 After: 8:55 AM–9:15 AM · 20m
 ```
+
+### Linking people to time entries (medium risk)
+
+`start_timer`, `log_time_entry`, and `edit_time_entry` accept an optional
+`personNames` array of Rolodex display names. Names resolve exact-first, then
+single fuzzy match; unknown or ambiguous names produce a warning and are
+skipped — the action never fails and never guesses.
+
+- On `start_timer` / `log_time_entry`, resolved people are linked to the new entry.
+- On `edit_time_entry`, `personNames` uses **replace semantics**: the provided
+  list becomes the full linked set. Pass `[]` to clear links; omit the field
+  to leave links untouched.
+```
+POST /api/assistant/actions/preview
+{
+  "action": "log_time_entry",
+  "input": {
+    "title": "Tennis",
+    "startedAt": "2024-06-24T18:00:00.000Z",
+    "endedAt": "2024-06-24T19:30:00.000Z",
+    "personNames": ["Ana", "Cecil"]
+  }
+}
+```
+
+Preview text:
+```
+Log time entry "Tennis"
+6:00 PM–7:30 PM · 1h 30m · with Ana, Cecil
+```
+
+Links live in the `TimeEntryPerson` join table (many-to-many: one entry can
+involve several people). Query them via `GET /api/assistant/people-time` or
+the `assistant_list_people_time` MCP tool.
 
 ---
 
