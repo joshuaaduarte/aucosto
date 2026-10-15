@@ -74,6 +74,13 @@ export const ACTION_REGISTRY: Record<string, ActionDef> = {
     supported: true,
     description: "Edit a completed time entry's title or times",
   },
+  log_time_entry: {
+    action: "log_time_entry",
+    risk: "medium",
+    confirmationRequired: true,
+    supported: true,
+    description: "Log a completed time entry with explicit start and end times (backfill)",
+  },
   log_habit: {
     action: "log_habit",
     risk: "low",

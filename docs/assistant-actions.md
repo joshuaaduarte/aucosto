@@ -306,7 +306,7 @@ through the same risk gating and audit trail as the REST routes. See
 
 Current risk assignments:
 - `low`: `create_task`, `log_habit`, `create_habit`, `add_reflection`, `create_project`
-- `medium`: `complete_task`, `update_task`, `create_calendar_block`, `update_calendar_event`, `delete_calendar_event`, `delete_project`, `start_timer`, `stop_timer`, `edit_time_entry`, `update_project`
+- `medium`: `complete_task`, `update_task`, `create_calendar_block`, `update_calendar_event`, `delete_calendar_event`, `delete_project`, `start_timer`, `stop_timer`, `edit_time_entry`, `log_time_entry`, `update_project`
 - `high`: `finance_write` (also `supported: false`)
 
 ---

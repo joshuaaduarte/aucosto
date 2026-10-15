@@ -350,6 +350,12 @@ describe("new write actions: registry", () => {
     expect(ACTION_REGISTRY["update_calendar_event"]!.confirmationRequired).toBe(true);
     expect(ACTION_REGISTRY["update_calendar_event"]!.supported).toBe(true);
   });
+
+  it("log_time_entry has medium risk and requires confirmation", () => {
+    expect(ACTION_REGISTRY["log_time_entry"]!.risk).toBe("medium");
+    expect(ACTION_REGISTRY["log_time_entry"]!.confirmationRequired).toBe(true);
+    expect(ACTION_REGISTRY["log_time_entry"]!.supported).toBe(true);
+  });
 });
 
 describe("create_project preview", () => {
@@ -602,6 +608,84 @@ describe("new write actions: execute", () => {
     const patch = updateCalendarItem.mock.calls[0]![2];
     expect(patch.title).toBe("Dentist!!");
     expect(patch.startsAt).toBeUndefined();
+  });
+
+  it("executeEditTimeEntry updates times via preview-normalized input", async () => {
+    const startedAt = new Date("2024-06-24T08:55:00.000Z");
+    const endedAt = new Date("2024-06-24T17:52:00.000Z");
+    const updateEntry = vi.fn().mockResolvedValue({ id: "entry-abc", label: "Commute" });
+    vi.doMock("@/lib/services/time", () => ({
+      getRunningEntry: vi.fn(),
+      startEntry: vi.fn(),
+      stopRunning: vi.fn(),
+      updateEntry,
+      listRecentEntries: vi.fn().mockResolvedValue([
+        { id: "entry-abc", label: "Commute", category: "commute", startedAt, endedAt },
+      ]),
+      createPastEntry: vi.fn(),
+    }));
+
+    const { executeAction } = await import("@/lib/assistant-action-executor");
+    const result = await executeAction("user-1", "edit_time_entry", {
+      entryId: "entry-abc",
+      startedAt: "2024-06-24T09:00:00.000Z",
+      endedAt: "2024-06-24T09:30:00.000Z",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(updateEntry).toHaveBeenCalledOnce();
+    const patch = updateEntry.mock.calls[0]![2];
+    expect(patch.startedAt).toEqual(new Date("2024-06-24T09:00:00.000Z"));
+    expect(patch.endedAt).toEqual(new Date("2024-06-24T09:30:00.000Z"));
+  });
+
+  it("executeLogTimeEntry creates a past entry with explicit times", async () => {
+    const createPastEntry = vi.fn().mockResolvedValue({ id: "e-2", label: "Morning workout" });
+    vi.doMock("@/lib/services/time", () => ({
+      getRunningEntry: vi.fn(),
+      startEntry: vi.fn(),
+      stopRunning: vi.fn(),
+      updateEntry: vi.fn(),
+      listRecentEntries: vi.fn(),
+      createPastEntry,
+    }));
+
+    const { executeAction } = await import("@/lib/assistant-action-executor");
+    const result = await executeAction("user-1", "log_time_entry", {
+      title: "Morning workout",
+      startedAt: "2026-10-15T13:30:00.000Z",
+      endedAt: "2026-10-15T13:50:00.000Z",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.recordId).toBe("e-2");
+    expect(result.recordType).toBe("TimeEntry");
+    expect(createPastEntry).toHaveBeenCalledOnce();
+    const input = createPastEntry.mock.calls[0]![1];
+    expect(input.label).toBe("Morning workout");
+    expect(input.startedAt).toEqual(new Date("2026-10-15T13:30:00.000Z"));
+    expect(input.endedAt).toEqual(new Date("2026-10-15T13:50:00.000Z"));
+  });
+
+  it("previewLogTimeEntry rejects end before start", async () => {
+    vi.doMock("@/lib/services/time", () => ({
+      getRunningEntry: vi.fn(),
+      startEntry: vi.fn(),
+      stopRunning: vi.fn(),
+      updateEntry: vi.fn(),
+      listRecentEntries: vi.fn(),
+      createPastEntry: vi.fn(),
+    }));
+
+    const { previewAction } = await import("@/lib/assistant-action-executor");
+    const result = await previewAction("user-1", "log_time_entry", {
+      title: "Bad block",
+      startedAt: "2026-10-15T14:00:00.000Z",
+      endedAt: "2026-10-15T13:00:00.000Z",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("after start");
   });
 });
 
