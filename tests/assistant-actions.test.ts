@@ -639,6 +639,33 @@ describe("new write actions: execute", () => {
     expect(patch.endedAt).toEqual(new Date("2024-06-24T09:30:00.000Z"));
   });
 
+  it("executeEditTimeEntry passes category through to updateEntry", async () => {
+    const startedAt = new Date("2024-06-24T08:55:00.000Z");
+    const endedAt = new Date("2024-06-24T17:52:00.000Z");
+    const updateEntry = vi.fn().mockResolvedValue({ id: "entry-abc", label: "Commute" });
+    vi.doMock("@/lib/services/time", () => ({
+      getRunningEntry: vi.fn(),
+      startEntry: vi.fn(),
+      stopRunning: vi.fn(),
+      updateEntry,
+      listRecentEntries: vi.fn().mockResolvedValue([
+        { id: "entry-abc", label: "Commute", category: "commute", startedAt, endedAt },
+      ]),
+      createPastEntry: vi.fn(),
+    }));
+
+    const { executeAction } = await import("@/lib/assistant-action-executor");
+    const result = await executeAction("user-1", "edit_time_entry", {
+      entryId: "entry-abc",
+      categoryName: "exercise",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(updateEntry).toHaveBeenCalledOnce();
+    const patch = updateEntry.mock.calls[0]![2];
+    expect(patch.category).toBe("exercise");
+  });
+
   it("executeLogTimeEntry creates a past entry with explicit times", async () => {
     const createPastEntry = vi.fn().mockResolvedValue({ id: "e-2", label: "Morning workout" });
     vi.doMock("@/lib/services/time", () => ({
