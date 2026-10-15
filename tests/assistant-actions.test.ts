@@ -331,3 +331,341 @@ describe("log_habit ambiguity", () => {
     expect(result.previewText).toContain("Meditate");
   });
 });
+
+describe("new write actions: registry", () => {
+  it("create_project has low risk and needs no confirmation", () => {
+    expect(ACTION_REGISTRY["create_project"]!.risk).toBe("low");
+    expect(ACTION_REGISTRY["create_project"]!.confirmationRequired).toBe(false);
+    expect(ACTION_REGISTRY["create_project"]!.supported).toBe(true);
+  });
+
+  it("create_habit has low risk and needs no confirmation", () => {
+    expect(ACTION_REGISTRY["create_habit"]!.risk).toBe("low");
+    expect(ACTION_REGISTRY["create_habit"]!.confirmationRequired).toBe(false);
+    expect(ACTION_REGISTRY["create_habit"]!.supported).toBe(true);
+  });
+
+  it("update_calendar_event has medium risk and requires confirmation", () => {
+    expect(ACTION_REGISTRY["update_calendar_event"]!.risk).toBe("medium");
+    expect(ACTION_REGISTRY["update_calendar_event"]!.confirmationRequired).toBe(true);
+    expect(ACTION_REGISTRY["update_calendar_event"]!.supported).toBe(true);
+  });
+});
+
+describe("create_project preview", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  function mockProjects(existing: { id: string; name: string }[] = []) {
+    vi.doMock("@/lib/services/projects", () => ({
+      listBoardProjects: vi.fn().mockResolvedValue(existing),
+      createBoardProject: vi.fn().mockResolvedValue("proj-new"),
+      updateProject: vi.fn(),
+    }));
+  }
+
+  it("previews a new project with its fields", async () => {
+    mockProjects([]);
+    const { previewAction } = await import("@/lib/assistant-action-executor");
+    const result = await previewAction("user-1", "create_project", {
+      name: "Split-Flap Display",
+      intent: "Build a working split-flap display",
+      timeBudgetMinutes: 180,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.previewText).toContain("Split-Flap Display");
+    expect(result.previewText).toContain("3h/week");
+    expect(result.normalizedInput.name).toBe("Split-Flap Display");
+    expect(result.warnings).toHaveLength(0);
+  });
+
+  it("warns when a project with the same name exists", async () => {
+    mockProjects([{ id: "p1", name: "Split-Flap Display" }]);
+    const { previewAction } = await import("@/lib/assistant-action-executor");
+    const result = await previewAction("user-1", "create_project", {
+      name: "split-flap display",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(result.warnings[0]).toContain("already exists");
+  });
+
+  it("rejects an empty name", async () => {
+    mockProjects([]);
+    const { previewAction } = await import("@/lib/assistant-action-executor");
+    const result = await previewAction("user-1", "create_project", { name: "" });
+
+    expect(result.ok).toBe(false);
+  });
+});
+
+describe("create_habit preview", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  function mockHabits(existing: { id: string; title: string }[] = []) {
+    vi.doMock("@/lib/services/habits", () => ({
+      listHabits: vi.fn().mockResolvedValue(existing),
+      logHabitProgress: vi.fn(),
+      createHabit: vi.fn().mockResolvedValue({ id: "habit-new", title: "Weigh-in" }),
+    }));
+  }
+
+  it("previews a new habit with cadence and goal", async () => {
+    mockHabits([]);
+    const { previewAction } = await import("@/lib/assistant-action-executor");
+    const result = await previewAction("user-1", "create_habit", {
+      title: "Weigh-in",
+      cadence: "daily",
+      dayPart: "morning",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.previewText).toContain("Weigh-in");
+    expect(result.previewText).toContain("daily");
+    expect(result.normalizedInput.title).toBe("Weigh-in");
+  });
+
+  it("warns on duplicate habit title", async () => {
+    mockHabits([{ id: "h1", title: "Weigh-in" }]);
+    const { previewAction } = await import("@/lib/assistant-action-executor");
+    const result = await previewAction("user-1", "create_habit", { title: "weigh-in" });
+
+    expect(result.ok).toBe(true);
+    expect(result.warnings.length).toBeGreaterThan(0);
+  });
+
+  it("rejects an invalid cadence", async () => {
+    mockHabits([]);
+    const { previewAction } = await import("@/lib/assistant-action-executor");
+    const result = await previewAction("user-1", "create_habit", {
+      title: "Weigh-in",
+      cadence: "hourly",
+    });
+
+    expect(result.ok).toBe(false);
+  });
+});
+
+describe("update_calendar_event preview", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  const existing = {
+    id: "evt-1",
+    title: "Dentist",
+    startsAt: new Date("2026-10-20T14:00:00"),
+    endsAt: new Date("2026-10-20T15:00:00"),
+  };
+
+  function mockCalendar(item: typeof existing | null) {
+    vi.doMock("@/lib/services/calendar", () => ({
+      createCalendarItem: vi.fn(),
+      getCalendarItem: vi.fn().mockResolvedValue(item),
+      updateCalendarItem: vi.fn().mockResolvedValue(item && { ...item, id: "evt-1" }),
+    }));
+  }
+
+  it("errors when the event does not exist", async () => {
+    mockCalendar(null);
+    const { previewAction } = await import("@/lib/assistant-action-executor");
+    const result = await previewAction("user-1", "update_calendar_event", {
+      eventId: "nope",
+      title: "New title",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("not found");
+  });
+
+  it("previews a title change", async () => {
+    mockCalendar(existing);
+    const { previewAction } = await import("@/lib/assistant-action-executor");
+    const result = await previewAction("user-1", "update_calendar_event", {
+      eventId: "evt-1",
+      title: "Dentist appointment",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.previewText).toContain("Dentist");
+    expect(result.previewText).toContain("Dentist appointment");
+    expect(result.normalizedInput.title).toBe("Dentist appointment");
+    expect(result.normalizedInput.timeChanged).toBe(false);
+  });
+
+  it("previews a reschedule with partial time input", async () => {
+    mockCalendar(existing);
+    const { previewAction } = await import("@/lib/assistant-action-executor");
+    const result = await previewAction("user-1", "update_calendar_event", {
+      eventId: "evt-1",
+      startTime: "16:00",
+      endTime: "17:00",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.previewText).toContain("16:00–17:00");
+    expect(result.normalizedInput.timeChanged).toBe(true);
+  });
+
+  it("errors when no changes are specified", async () => {
+    mockCalendar(existing);
+    const { previewAction } = await import("@/lib/assistant-action-executor");
+    const result = await previewAction("user-1", "update_calendar_event", {
+      eventId: "evt-1",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("No changes");
+  });
+
+  it("errors when end time is before start time", async () => {
+    mockCalendar(existing);
+    const { previewAction } = await import("@/lib/assistant-action-executor");
+    const result = await previewAction("user-1", "update_calendar_event", {
+      eventId: "evt-1",
+      startTime: "16:00",
+      endTime: "15:00",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("after start time");
+  });
+});
+
+describe("new write actions: execute", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it("executeCreateProject calls the board project service", async () => {
+    const createBoardProject = vi.fn().mockResolvedValue("proj-new");
+    vi.doMock("@/lib/services/projects", () => ({
+      listBoardProjects: vi.fn().mockResolvedValue([]),
+      createBoardProject,
+      updateProject: vi.fn(),
+    }));
+
+    const { executeAction } = await import("@/lib/assistant-action-executor");
+    const result = await executeAction("user-1", "create_project", { name: "Health" });
+
+    expect(result.ok).toBe(true);
+    expect(result.recordId).toBe("proj-new");
+    expect(result.recordType).toBe("Project");
+    expect(createBoardProject).toHaveBeenCalledOnce();
+  });
+
+  it("executeCreateHabit calls the habit service", async () => {
+    const createHabit = vi.fn().mockResolvedValue({ id: "habit-new", title: "Weigh-in" });
+    vi.doMock("@/lib/services/habits", () => ({
+      listHabits: vi.fn().mockResolvedValue([]),
+      logHabitProgress: vi.fn(),
+      createHabit,
+    }));
+
+    const { executeAction } = await import("@/lib/assistant-action-executor");
+    const result = await executeAction("user-1", "create_habit", { title: "Weigh-in" });
+
+    expect(result.ok).toBe(true);
+    expect(result.recordId).toBe("habit-new");
+    expect(result.recordType).toBe("Habit");
+    expect(createHabit).toHaveBeenCalledOnce();
+  });
+
+  it("executeUpdateCalendarEvent patches only changed fields", async () => {
+    const item = {
+      id: "evt-1",
+      title: "Dentist",
+      startsAt: new Date("2026-10-20T14:00:00"),
+      endsAt: new Date("2026-10-20T15:00:00"),
+    };
+    const updateCalendarItem = vi.fn().mockResolvedValue({ ...item, title: "Dentist!!" });
+    vi.doMock("@/lib/services/calendar", () => ({
+      createCalendarItem: vi.fn(),
+      getCalendarItem: vi.fn().mockResolvedValue(item),
+      updateCalendarItem,
+    }));
+
+    const { executeAction } = await import("@/lib/assistant-action-executor");
+    const result = await executeAction("user-1", "update_calendar_event", {
+      eventId: "evt-1",
+      title: "Dentist!!",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.recordType).toBe("CalendarItem");
+    expect(updateCalendarItem).toHaveBeenCalledOnce();
+    const patch = updateCalendarItem.mock.calls[0]![2];
+    expect(patch.title).toBe("Dentist!!");
+    expect(patch.startsAt).toBeUndefined();
+  });
+});
+
+describe("delete_calendar_event", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  const existing = {
+    id: "evt-1",
+    title: "Dentist",
+    startsAt: new Date("2026-10-20T14:00:00"),
+    endsAt: new Date("2026-10-20T15:00:00"),
+  };
+
+  function mockCalendar(item: typeof existing | null) {
+    return {
+      createCalendarItem: vi.fn(),
+      getCalendarItem: vi.fn().mockResolvedValue(item),
+      updateCalendarItem: vi.fn(),
+      deleteCalendarItem: vi.fn().mockResolvedValue(undefined),
+    };
+  }
+
+  it("is registered as medium risk with confirmation required", () => {
+    expect(ACTION_REGISTRY["delete_calendar_event"]!.risk).toBe("medium");
+    expect(ACTION_REGISTRY["delete_calendar_event"]!.confirmationRequired).toBe(true);
+    expect(ACTION_REGISTRY["delete_calendar_event"]!.supported).toBe(true);
+  });
+
+  it("previews the event to be deleted", async () => {
+    vi.doMock("@/lib/services/calendar", () => mockCalendar(existing));
+    const { previewAction } = await import("@/lib/assistant-action-executor");
+    const result = await previewAction("user-1", "delete_calendar_event", {
+      eventId: "evt-1",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.previewText).toContain("Delete calendar event");
+    expect(result.previewText).toContain("Dentist");
+  });
+
+  it("errors when the event does not exist", async () => {
+    vi.doMock("@/lib/services/calendar", () => mockCalendar(null));
+    const { previewAction } = await import("@/lib/assistant-action-executor");
+    const result = await previewAction("user-1", "delete_calendar_event", {
+      eventId: "nope",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("not found");
+  });
+
+  it("executes the delete through the service", async () => {
+    const services = mockCalendar(existing);
+    vi.doMock("@/lib/services/calendar", () => services);
+    const { executeAction } = await import("@/lib/assistant-action-executor");
+    const result = await executeAction("user-1", "delete_calendar_event", {
+      eventId: "evt-1",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.recordType).toBe("CalendarItem");
+    expect(services.deleteCalendarItem).toHaveBeenCalledOnce();
+    expect(services.deleteCalendarItem).toHaveBeenCalledWith("user-1", "evt-1");
+  });
+});

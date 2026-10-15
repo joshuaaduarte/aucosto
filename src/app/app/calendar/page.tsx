@@ -19,6 +19,7 @@ import {
 } from "@/lib/viewer-context";
 import { startOfWeek } from "@/lib/time";
 import { sumDurations } from "@/lib/time-summary";
+import type { RecurrenceRule } from "@/lib/recurrence";
 import {
   addDays,
   buildWeekDays,
@@ -293,7 +294,7 @@ export default async function CalendarPage({
         endValue: formatTimeValue(item.endsAt),
         status: item.status,
         categoryId: categoryIdByItem.get(item.id) ?? null,
-        recurrenceRule: item.recurrenceRule as any,
+        recurrenceRule: item.recurrenceRule as RecurrenceRule | null,
         recurrenceParentId: item.recurrenceParentId,
       },
     };

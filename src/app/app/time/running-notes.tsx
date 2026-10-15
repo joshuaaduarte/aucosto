@@ -120,9 +120,13 @@ export function RunningNotes({
 
   const slash = useSlashCommands(notes, cursor, spliceTextarea);
 
-  useEffect(() => {
+  // Reset the suggestion index whenever the slash query changes (render-time
+  // adjustment instead of an effect that calls setState).
+  const [prevSlashQuery, setPrevSlashQuery] = useState(slash.query);
+  if (slash.query !== prevSlashQuery) {
+    setPrevSlashQuery(slash.query);
     setSlashIndex(0);
-  }, [slash.query]);
+  }
 
   const habitQuery = useMemo(() => {
     if (!habitPicker) return "";
@@ -137,9 +141,13 @@ export function RunningNotes({
     return habitList.filter((habit) => habit.name.toLowerCase().includes(habitQuery)).slice(0, 6);
   }, [habitPicker, habitList, habitQuery]);
 
-  useEffect(() => {
+  // Reset the habit suggestion index whenever the habit query changes
+  // (render-time adjustment instead of an effect that calls setState).
+  const [prevHabitQuery, setPrevHabitQuery] = useState(habitQuery);
+  if (habitQuery !== prevHabitQuery) {
+    setPrevHabitQuery(habitQuery);
     setHabitIndex(0);
-  }, [habitQuery]);
+  }
 
   function openHabitPicker(start: number) {
     setHabitPicker({ start });
