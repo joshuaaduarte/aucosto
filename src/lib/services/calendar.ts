@@ -261,6 +261,24 @@ export async function listUpcomingCalendarItems(
   return (await listCalendarItems(userId, { from, to })).slice(0, options.limit ?? 10);
 }
 
+/** Fetch a single calendar item by id. A virtual occurrence id resolves to its parent. */
+export async function getCalendarItem(
+  userId: string,
+  id: string,
+): Promise<CalendarItem | null> {
+  requireCan(userId, "calendar", "read");
+  const backingId = parseVirtualCalendarItemId(id)?.parentId ?? id;
+  try {
+    await ensureCalendarRuntimeColumns();
+    return await prisma.calendarItem.findFirst({
+      where: { id: backingId, userId },
+    });
+  } catch (error) {
+    if (isMissingCalendarTableError(error)) return null;
+    throw error;
+  }
+}
+
 export async function createCalendarItem(
   userId: string,
   input: CreateCalendarItemInput,

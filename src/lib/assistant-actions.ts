@@ -39,6 +39,13 @@ export const ACTION_REGISTRY: Record<string, ActionDef> = {
     supported: true,
     description: "Add a planned calendar block",
   },
+  update_calendar_event: {
+    action: "update_calendar_event",
+    risk: "medium",
+    confirmationRequired: true,
+    supported: true,
+    description: "Update a calendar event's title, time, or notes",
+  },
   start_timer: {
     action: "start_timer",
     risk: "medium",
@@ -67,6 +74,13 @@ export const ACTION_REGISTRY: Record<string, ActionDef> = {
     supported: true,
     description: "Log progress or completion for a habit",
   },
+  create_habit: {
+    action: "create_habit",
+    risk: "low",
+    confirmationRequired: false,
+    supported: true,
+    description: "Create a new habit",
+  },
   add_reflection: {
     action: "add_reflection",
     risk: "low",
@@ -80,6 +94,13 @@ export const ACTION_REGISTRY: Record<string, ActionDef> = {
     confirmationRequired: true,
     supported: true,
     description: "Update project status or notes",
+  },
+  create_project: {
+    action: "create_project",
+    risk: "low",
+    confirmationRequired: false,
+    supported: true,
+    description: "Create a new project",
   },
   finance_write: {
     action: "finance_write",
