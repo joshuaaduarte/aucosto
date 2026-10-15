@@ -16,9 +16,21 @@ Design principles:
 
 ## 2. Authentication
 
-All endpoints require a valid session cookie — the same session used by the web app. Call `auth()` is verified on every request; `401 Unauthorized` is returned if absent.
+All endpoints accept **either** of:
 
-There is no separate API key. The assistant must be in an authenticated browser session or use session cookie forwarding.
+1. A valid session cookie — the same session used by the web app. `auth()` is
+   verified on every request; `401 Unauthorized` is returned if absent.
+2. A bearer token: `Authorization: Bearer $ASSISTANT_API_SECRET`, where the
+   secret is configured via the `ASSISTANT_API_SECRET` env var. The token
+   resolves to the owner user (single-user app). Constant-time comparison,
+   mirroring `/api/location/ingest`. If the env var is unset, bearer auth is
+   unavailable and session-cookie access keeps working unchanged.
+
+Security note: the bearer key is **owner-equivalent**. Like a logged-in
+session, it bypasses viewer context — demo mode, the app privacy lock, and
+the finance visibility gate are not enforced on assistant routes. Treat the
+secret like a password (server env only, never logged or committed). See
+`docs/agent-api.md` for deploy, rotation, and MCP client setup.
 
 ---
 
@@ -157,6 +169,130 @@ Returns recent audit rows for the authenticated user.
   "count": 1
 }
 ```
+
+---
+
+### `GET /api/assistant/tasks`
+List tasks/do items with IDs. The snapshot only shows today's open tasks;
+use this when you need IDs (e.g. `complete_task` and `update_task` require
+`taskId`) or the full backlog.
+
+**Query params:** `?includeDone=false` `?limit=100` (max 200)
+
+**Response shape:**
+```json
+{
+  "items": [
+    {
+      "id": "task_abc",
+      "title": "Write the report",
+      "lane": "next",
+      "status": "open",
+      "bucket": "today",
+      "projectId": "p1",
+      "projectName": "Aucosto",
+      "habitId": null,
+      "habitTitle": null,
+      "estimatedMinutes": 30,
+      "actualMinutes": null,
+      "notes": "draft first",
+      "completedAt": null,
+      "createdAt": "2024-06-23T10:00:00.000Z",
+      "updatedAt": "2024-06-24T10:00:00.000Z"
+    }
+  ],
+  "count": 1
+}
+```
+
+### `GET /api/assistant/habits`
+List habits with IDs, streaks, and today's completion state.
+
+**Query params:** `?includeArchived=false`
+
+**Response shape:**
+```json
+{
+  "items": [
+    {
+      "id": "h1",
+      "title": "Read",
+      "bucket": "evening",
+      "currentStreak": 5,
+      "longestStreak": 12,
+      "completedToday": true,
+      "dueToday": true,
+      "needsSaveToday": false,
+      "targetLabel": "daily",
+      "dayPartLabel": "Evening"
+    }
+  ],
+  "count": 1
+}
+```
+
+### `GET /api/assistant/projects`
+List projects with IDs, status, open task counts, and next actions.
+
+**Response shape:**
+```json
+{
+  "items": [
+    {
+      "id": "p1",
+      "name": "Aucosto",
+      "status": "active",
+      "openTaskCount": 3,
+      "doneTaskCount": 7,
+      "nextAction": "Ship the API",
+      "lastWorkedAt": "2024-06-24T08:00:00.000Z",
+      "daysUntilTarget": 10
+    }
+  ],
+  "count": 1
+}
+```
+
+### `GET /api/assistant/calendar`
+List calendar blocks in a date range (max 90 days).
+
+**Query params:** `?from=<ISO datetime with offset>` `?to=<ISO datetime with offset>`.
+Defaults: `from` = now, `to` = from + 7 days.
+
+**Response shape:**
+```json
+{
+  "items": [
+    {
+      "id": "c1",
+      "title": "Deep work",
+      "kind": "block",
+      "status": "confirmed",
+      "startsAt": "2024-06-25T16:00:00.000Z",
+      "endsAt": "2024-06-25T18:00:00.000Z",
+      "allDay": false,
+      "location": "Home office",
+      "notes": null,
+      "sourceTool": "do"
+    }
+  ],
+  "count": 1
+}
+```
+
+---
+
+### `POST /api/assistant/mcp`
+Minimal MCP server (stateless Streamable HTTP, JSON-RPC 2.0 over POST; no
+SSE). Same auth as above. Nine tools: `assistant_snapshot`,
+`assistant_capabilities`, `assistant_preview_action`,
+`assistant_execute_action`, `assistant_list_tasks`, `assistant_list_habits`,
+`assistant_list_projects`, `assistant_list_calendar`,
+`assistant_action_history`.
+
+Tool input contracts reuse the executor's zod schemas; preview/execute go
+through the same risk gating and audit trail as the REST routes. See
+`docs/agent-api.md` for client configuration.
 
 ---
 
