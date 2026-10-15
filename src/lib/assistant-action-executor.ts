@@ -3,14 +3,14 @@ import { z } from "zod";
 
 import { createDoItem, updateDoItem, getDoItemSummary } from "@/lib/services/do";
 import { getRunningEntry, startEntry, stopRunning, updateEntry, listRecentEntries } from "@/lib/services/time";
-import { listHabits, logHabitProgress } from "@/lib/services/habits";
-import { createCalendarItem } from "@/lib/services/calendar";
+import { listHabits, logHabitProgress, createHabit } from "@/lib/services/habits";
+import { createCalendarItem, getCalendarItem, updateCalendarItem } from "@/lib/services/calendar";
 import {
   getReflection,
   upsertReflection,
   buildReflectionSnapshot,
 } from "@/lib/services/reflect";
-import { updateProject, listBoardProjects } from "@/lib/services/projects";
+import { updateProject, listBoardProjects, createBoardProject } from "@/lib/services/projects";
 import {
   updateProjectPlan,
   addProjectQuestion,
@@ -100,6 +100,19 @@ const LogHabitInput = z.object({
   note: z.string().optional(),
 });
 
+const CreateHabitInput = z.object({
+  title: z.string().min(1).max(200),
+  cadence: z.enum(["daily", "weekdays", "weekly", "custom"]).default("daily"),
+  dayPart: z.enum(["morning", "day", "evening", "anytime"]).default("anytime"),
+  targetCount: z.number().int().positive().max(100000).optional(),
+  goalUnit: z.enum(["check", "count", "minutes"]).default("check"),
+  notes: z.string().max(2000).optional(),
+  reminderTime: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/, "reminderTime must be HH:MM")
+    .optional(),
+});
+
 const AddReflectionInput = z.object({
   mood: z.number().min(1).max(5).optional(),
   note: z.string().optional(),
@@ -109,6 +122,37 @@ const UpdateProjectInput = z.object({
   projectName: z.string().min(1),
   status: z.enum(["active", "paused", "done"]).optional(),
   notes: z.string().optional(),
+});
+
+const CreateProjectInput = z.object({
+  name: z.string().min(1).max(200),
+  intent: z.string().max(1000).optional(),
+  status: z.string().max(50).optional(),
+  energyType: z.string().max(50).optional(),
+  timeBudgetMinutes: z.number().int().positive().max(10080).optional(),
+  targetDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "targetDate must be YYYY-MM-DD")
+    .optional(),
+});
+
+const UpdateCalendarEventInput = z.object({
+  eventId: z.string().min(1),
+  title: z.string().min(1).max(200).optional(),
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD")
+    .optional(),
+  startTime: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/, "startTime must be HH:MM")
+    .optional(),
+  endTime: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/, "endTime must be HH:MM")
+    .optional(),
+  notes: z.string().max(5000).optional(),
+  location: z.string().max(300).optional(),
 });
 
 const UpdateProjectPlanInput = z.object({
@@ -187,12 +231,15 @@ export const ACTION_INPUT_SCHEMAS: Record<string, z.ZodTypeAny> = {
   complete_task: CompleteTaskInput,
   update_task: UpdateTaskInput,
   create_calendar_block: CreateCalendarBlockInput,
+  update_calendar_event: UpdateCalendarEventInput,
   start_timer: StartTimerInput,
   stop_timer: StopTimerInput,
   edit_time_entry: EditTimeEntryInput,
   log_habit: LogHabitInput,
+  create_habit: CreateHabitInput,
   add_reflection: AddReflectionInput,
   update_project: UpdateProjectInput,
+  create_project: CreateProjectInput,
   update_project_plan: UpdateProjectPlanInput,
   add_project_milestone: AddProjectMilestoneInput,
   add_project_question: AddProjectQuestionInput,
@@ -262,6 +309,18 @@ async function resolveHabitByName(
 // is pinned to the app timezone by src/instrumentation.ts.
 function parseDateTimeLocal(date: string, time: string): Date {
   return new Date(`${date}T${time}:00`);
+}
+
+// Extract local "YYYY-MM-DD" / "HH:MM" parts from a Date (same TZ assumption).
+function localDatePart(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function localTimePart(d: Date): string {
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 // ── Preview handlers ──────────────────────────────────────────────────────
@@ -405,6 +464,65 @@ async function previewCreateCalendarBlock(
       startsAtIso: startsAt.toISOString(),
       endsAtIso: endsAt.toISOString(),
       notes: notes ?? null,
+    },
+    warnings: [],
+  };
+}
+
+async function previewUpdateCalendarEvent(
+  userId: string,
+  raw: unknown,
+): Promise<PreviewResult> {
+  const parsed = UpdateCalendarEventInput.safeParse(raw);
+  if (!parsed.success) {
+    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+  }
+  const { eventId, title, date, startTime, endTime, notes, location } = parsed.data;
+
+  const item = await getCalendarItem(userId, eventId);
+  if (!item) return err(`Calendar event "${eventId}" not found`);
+
+  const newTitle = title ?? item.title;
+  const newDate = date ?? localDatePart(item.startsAt);
+  const newStartTime = startTime ?? localTimePart(item.startsAt);
+  const newEndTime = endTime ?? localTimePart(item.endsAt);
+  const startsAt = parseDateTimeLocal(newDate, newStartTime);
+  const endsAt = parseDateTimeLocal(newDate, newEndTime);
+  if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+    return err("Invalid date or time");
+  }
+  if (endsAt <= startsAt) {
+    return err("End time must be after start time");
+  }
+
+  const changes: string[] = [];
+  if (title !== undefined && title !== item.title) changes.push(`title → "${title}"`);
+  if (
+    startsAt.getTime() !== item.startsAt.getTime() ||
+    endsAt.getTime() !== item.endsAt.getTime()
+  ) {
+    changes.push(`time → ${newDate} ${newStartTime}–${newEndTime}`);
+  }
+  if (notes !== undefined) changes.push(`notes updated`);
+  if (location !== undefined) changes.push(`location → ${location || "none"}`);
+  if (changes.length === 0) return err("No changes specified");
+
+  return {
+    ok: true,
+    previewText: `Update calendar event "${item.title}": ${changes.join(", ")}`,
+    normalizedInput: {
+      eventId,
+      beforeTitle: item.title,
+      title: title ?? null,
+      startsAtIso: startsAt.toISOString(),
+      endsAtIso: endsAt.toISOString(),
+      timeChanged:
+        startsAt.getTime() !== item.startsAt.getTime() ||
+        endsAt.getTime() !== item.endsAt.getTime(),
+      notes: notes ?? null,
+      notesChanged: notes !== undefined,
+      location: location ?? null,
+      locationChanged: location !== undefined,
     },
     warnings: [],
   };
@@ -594,6 +712,45 @@ async function previewLogHabit(
   };
 }
 
+async function previewCreateHabit(
+  userId: string,
+  raw: unknown,
+): Promise<PreviewResult> {
+  const parsed = CreateHabitInput.safeParse(raw);
+  if (!parsed.success) {
+    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+  }
+  const { title, cadence, dayPart, targetCount, goalUnit, notes, reminderTime } = parsed.data;
+
+  const warnings: string[] = [];
+  const habits = await listHabits(userId);
+  if (habits.some((h) => h.title.toLowerCase() === title.trim().toLowerCase())) {
+    warnings.push(`A habit named "${title.trim()}" already exists`);
+  }
+
+  const lines: string[] = [`Create habit "${title.trim()}"`];
+  lines.push(`Cadence: ${cadence}${dayPart !== "anytime" ? ` · ${dayPart}` : ""}`);
+  if (goalUnit !== "check" || targetCount !== undefined) {
+    lines.push(`Goal: ${targetCount ?? 1} ${goalUnit}`);
+  }
+  if (reminderTime) lines.push(`Reminder: ${reminderTime}`);
+
+  return {
+    ok: true,
+    previewText: lines.join("\n"),
+    normalizedInput: {
+      title: title.trim(),
+      cadence,
+      dayPart,
+      targetCount: targetCount ?? null,
+      goalUnit,
+      notes: notes ?? null,
+      reminderTime: reminderTime ?? null,
+    },
+    warnings,
+  };
+}
+
 async function previewAddReflection(
   _userId: string,
   raw: unknown,
@@ -655,6 +812,43 @@ async function previewUpdateProject(
       notes: notes ?? null,
     },
     warnings: [],
+  };
+}
+
+async function previewCreateProject(
+  userId: string,
+  raw: unknown,
+): Promise<PreviewResult> {
+  const parsed = CreateProjectInput.safeParse(raw);
+  if (!parsed.success) {
+    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+  }
+  const { name, intent, status, energyType, timeBudgetMinutes, targetDate } = parsed.data;
+
+  const warnings: string[] = [];
+  const projects = await listBoardProjects(userId);
+  if (projects.some((p) => p.name.toLowerCase() === name.trim().toLowerCase())) {
+    warnings.push(`A project named "${name.trim()}" already exists`);
+  }
+
+  const lines: string[] = [`Create project "${name.trim()}"`];
+  if (intent) lines.push(`Intent: ${intent.slice(0, 80)}${intent.length > 80 ? "…" : ""}`);
+  if (status) lines.push(`Status: ${status}`);
+  if (timeBudgetMinutes) lines.push(`Time budget: ${fmtMinutes(timeBudgetMinutes)}/week`);
+  if (targetDate) lines.push(`Target date: ${targetDate}`);
+
+  return {
+    ok: true,
+    previewText: lines.join("\n"),
+    normalizedInput: {
+      name: name.trim(),
+      intent: intent ?? null,
+      status: status ?? null,
+      energyType: energyType ?? null,
+      timeBudgetMinutes: timeBudgetMinutes ?? null,
+      targetDateIso: targetDate ? new Date(`${targetDate}T12:00:00`).toISOString() : null,
+    },
+    warnings,
   };
 }
 
@@ -799,6 +993,27 @@ async function executeLogHabit(
   };
 }
 
+async function executeCreateHabit(
+  userId: string,
+  n: Record<string, unknown>,
+): Promise<ExecuteResult> {
+  const habit = await createHabit(userId, {
+    title: String(n.title),
+    cadence: n.cadence as "daily" | "weekdays" | "weekly" | "custom",
+    dayPart: n.dayPart as "morning" | "day" | "evening" | "anytime",
+    targetCount: typeof n.targetCount === "number" ? n.targetCount : undefined,
+    goalUnit: n.goalUnit as "check" | "count" | "minutes",
+    notes: n.notes ? String(n.notes) : null,
+    reminderTime: n.reminderTime ? String(n.reminderTime) : null,
+  });
+  return {
+    ok: true,
+    recordId: habit.id,
+    recordType: "Habit",
+    summary: `Created habit "${habit.title}"`,
+  };
+}
+
 async function executeAddReflection(
   userId: string,
   n: Record<string, unknown>,
@@ -854,6 +1069,55 @@ async function executeUpdateProject(
     recordId: updated.id,
     recordType: "Project",
     summary: `Updated project "${updated.name}"`,
+  };
+}
+
+async function executeCreateProject(
+  userId: string,
+  n: Record<string, unknown>,
+): Promise<ExecuteResult> {
+  const id = await createBoardProject(userId, {
+    name: String(n.name),
+    intent: n.intent ? String(n.intent) : null,
+    status: n.status ? String(n.status) : null,
+    energyType: n.energyType ? String(n.energyType) : null,
+    timeBudgetMinutes: typeof n.timeBudgetMinutes === "number" ? n.timeBudgetMinutes : null,
+    targetDate: n.targetDateIso ? new Date(String(n.targetDateIso)) : null,
+  });
+  return {
+    ok: true,
+    recordId: id,
+    recordType: "Project",
+    summary: `Created project "${n.name}"`,
+  };
+}
+
+async function executeUpdateCalendarEvent(
+  userId: string,
+  n: Record<string, unknown>,
+): Promise<ExecuteResult> {
+  const patch: {
+    title?: string;
+    startsAt?: Date;
+    endsAt?: Date;
+    notes?: string | null;
+    location?: string | null;
+  } = {};
+  if (n.title) patch.title = String(n.title);
+  if (n.timeChanged) {
+    patch.startsAt = new Date(String(n.startsAtIso));
+    patch.endsAt = new Date(String(n.endsAtIso));
+  }
+  if (n.notesChanged) patch.notes = n.notes ? String(n.notes) : null;
+  if (n.locationChanged) patch.location = n.location ? String(n.location) : null;
+
+  const updated = await updateCalendarItem(userId, String(n.eventId), patch);
+  if (!updated) return err2(`Calendar event "${n.eventId}" not found`);
+  return {
+    ok: true,
+    recordId: updated.id,
+    recordType: "CalendarItem",
+    summary: `Updated calendar event "${updated.title}"`,
   };
 }
 
@@ -1331,12 +1595,15 @@ const PREVIEWS: Record<
   complete_task: previewCompleteTask,
   update_task: previewUpdateTask,
   create_calendar_block: previewCreateCalendarBlock,
+  update_calendar_event: previewUpdateCalendarEvent,
   start_timer: previewStartTimer,
   stop_timer: previewStopTimer,
   edit_time_entry: previewEditTimeEntry,
   log_habit: previewLogHabit,
+  create_habit: previewCreateHabit,
   add_reflection: previewAddReflection,
   update_project: previewUpdateProject,
+  create_project: previewCreateProject,
   // project planning
   update_project_plan: previewUpdateProjectPlan,
   add_project_milestone: previewAddProjectMilestone,
@@ -1359,12 +1626,15 @@ const EXECUTES: Record<
   complete_task: executeCompleteTask,
   update_task: executeUpdateTask,
   create_calendar_block: executeCreateCalendarBlock,
+  update_calendar_event: executeUpdateCalendarEvent,
   start_timer: executeStartTimer,
   stop_timer: executeStopTimer,
   edit_time_entry: executeEditTimeEntry,
   log_habit: executeLogHabit,
+  create_habit: executeCreateHabit,
   add_reflection: executeAddReflection,
   update_project: executeUpdateProject,
+  create_project: executeCreateProject,
   // project planning
   update_project_plan: executeUpdateProjectPlan,
   add_project_milestone: executeAddProjectMilestone,
