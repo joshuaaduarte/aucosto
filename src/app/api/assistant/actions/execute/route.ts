@@ -1,5 +1,5 @@
-import { auth } from "@/auth";
 import { ACTION_REGISTRY } from "@/lib/assistant-actions";
+import { resolveAssistantAuth } from "@/lib/assistant-auth";
 import { executeAction } from "@/lib/assistant-action-executor";
 import { recordAudit } from "@/lib/services/assistant-audit";
 import { NextRequest, NextResponse } from "next/server";
@@ -7,11 +7,11 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authed = await resolveAssistantAuth(req);
+  if (!authed) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const userId = session.user.id;
+  const userId = authed.userId;
 
   let body: unknown;
   try {

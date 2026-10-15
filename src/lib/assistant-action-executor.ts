@@ -178,6 +178,33 @@ const AddGiftIdeaInput = z.object({
   idea: z.string().min(1).max(300),
 });
 
+// ── Action → input schema map ──────────────────────────────────────────────
+// Exported so the MCP wrapper (and any future API surface) can reuse the
+// same input contracts as the HTTP preview/execute endpoints.
+
+export const ACTION_INPUT_SCHEMAS: Record<string, z.ZodTypeAny> = {
+  create_task: CreateTaskInput,
+  complete_task: CompleteTaskInput,
+  update_task: UpdateTaskInput,
+  create_calendar_block: CreateCalendarBlockInput,
+  start_timer: StartTimerInput,
+  stop_timer: StopTimerInput,
+  edit_time_entry: EditTimeEntryInput,
+  log_habit: LogHabitInput,
+  add_reflection: AddReflectionInput,
+  update_project: UpdateProjectInput,
+  update_project_plan: UpdateProjectPlanInput,
+  add_project_milestone: AddProjectMilestoneInput,
+  add_project_question: AddProjectQuestionInput,
+  add_project_blocker: AddProjectBlockerInput,
+  set_project_next_action: SetProjectNextActionInput,
+  create_rolodex_person: CreateRolodexPersonInput,
+  update_rolodex_person: UpdateRolodexPersonInput,
+  add_rolodex_interaction: AddRolodexInteractionInput,
+  add_person_followup: AddPersonFollowupInput,
+  add_gift_idea: AddGiftIdeaInput,
+};
+
 // ── Name resolvers (read-only) ────────────────────────────────────────────
 
 type ResolveResult<T> =
