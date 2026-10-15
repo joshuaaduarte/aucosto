@@ -7,14 +7,21 @@
 //   3. I'm still doing it        — one timer, backdated to the gap start.
 // Each opens a focused bottom-sheet (centered dialog on desktop). Dismiss
 // hides the card until the next gap.
+//
+// Above those, up to three one-tap fills (src/lib/gap-suggestions.ts) cover
+// the common case without a form: tap → filled, with a few seconds to Undo
+// before the page refreshes onto the next gap.
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import {
   backfillEntry,
   backfillSegment,
   backfillAndContinue,
+  quickFillGap,
+  undoQuickFill,
+  type QuickFillUndo,
 } from "./actions";
 import type { QuickStartCategory } from "./quick-start-chips";
 import { useBodyScrollLock } from "../_components/use-body-scroll-lock";
@@ -64,12 +71,28 @@ function hhmm(date: Date) {
   });
 }
 
+export type GapSuggestionView = {
+  key: string;
+  kind: "plan" | "continue" | "usual";
+  label: string;
+  category: string | null;
+  color: string;
+  startIso: string;
+  endIso: string;
+  extendEntryId?: string;
+  reason: string;
+};
+
+/** How long the "Filled · Undo" state stays up before refreshing. */
+const UNDO_WINDOW_MS = 6000;
+
 export function GapBackfillCard({
   gapStartIso,
   gapEndIso,
   gapMinutes,
   categories,
   sinceWakeup = false,
+  suggestions = [],
 }: {
   gapStartIso: string;
   /** End of the gap — the page's "now" when it rendered. */
@@ -78,8 +101,72 @@ export function GapBackfillCard({
   categories: QuickStartCategory[];
   /** Gap is anchored at this morning's wake time, not the last entry. */
   sinceWakeup?: boolean;
+  /** One-tap fills, most specific first. */
+  suggestions?: GapSuggestionView[];
 }) {
   const router = useRouter();
+  const [filled, setFilled] = useState<{
+    label: string;
+    rangeLabel: string;
+    undo: QuickFillUndo;
+  } | null>(null);
+  const [fillError, setFillError] = useState<string | null>(null);
+  const [filling, startFilling] = useTransition();
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    },
+    [],
+  );
+
+  const finishFill = () => {
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    refreshTimer.current = null;
+    setFilled(null);
+    router.refresh();
+  };
+
+  const applySuggestion = (suggestion: GapSuggestionView) => {
+    setFillError(null);
+    startFilling(async () => {
+      const result = await quickFillGap({
+        label: suggestion.label,
+        category: suggestion.category,
+        startedAt: suggestion.startIso,
+        endedAt: suggestion.endIso,
+        extendEntryId: suggestion.extendEntryId,
+      });
+      if (!result.ok) {
+        setFillError(result.error);
+        return;
+      }
+      setFilled({
+        label: suggestion.label,
+        rangeLabel: formatGapRange(new Date(suggestion.startIso), new Date(suggestion.endIso)),
+        undo: result.undo,
+      });
+      refreshTimer.current = setTimeout(finishFill, UNDO_WINDOW_MS);
+    });
+  };
+
+  const undoFill = () => {
+    if (!filled) return;
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    refreshTimer.current = null;
+    const { undo } = filled;
+    startFilling(async () => {
+      const result = await undoQuickFill(undo);
+      if (!result.ok) {
+        setFillError(result.error ?? "Could not undo.");
+        finishFill();
+        return;
+      }
+      // Nothing was revalidated, so the page already shows the pre-fill gap.
+      setFilled(null);
+    });
+  };
   // Track which gap was dismissed by its start ISO, not a bare boolean. When an
   // entry is deleted the server recomputes a *different* gap (new startIso) and
   // re-sends props; a boolean would keep suppressing the card. Keying on the
@@ -125,6 +212,34 @@ export function GapBackfillCard({
     },
   ];
 
+  if (filled) {
+    return (
+      <article
+        className="flex items-center justify-between gap-3 rounded-md px-5 py-3.5"
+        style={{
+          background: "var(--bg-tint)",
+          border: "1px solid var(--border-faint)",
+        }}
+        role="status"
+      >
+        <p className="min-w-0 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
+          <span className="font-semibold" style={{ color: "var(--text)" }}>
+            Filled
+          </span>{" "}
+          {filled.rangeLabel} · {filled.label}
+        </p>
+        <div className="flex shrink-0 items-center gap-1">
+          <button type="button" className="btn-ghost" onClick={undoFill} disabled={filling}>
+            Undo
+          </button>
+          <button type="button" className="btn-ink" onClick={finishFill} disabled={filling}>
+            Done
+          </button>
+        </div>
+      </article>
+    );
+  }
+
   return (
     <>
       <article
@@ -169,7 +284,79 @@ export function GapBackfillCard({
           </button>
         </div>
 
-        <div className="mt-4 grid gap-2">
+        {suggestions.length > 0 ? (
+          <div className="mt-4">
+            <p
+              className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+              style={{ color: "var(--text-faint)" }}
+            >
+              One tap
+            </p>
+            <div className="mt-2 grid gap-2">
+              {suggestions.map((suggestion) => {
+                const partial =
+                  suggestion.startIso !== gapStartIso || suggestion.endIso !== gapEndIso;
+                return (
+                  <button
+                    key={suggestion.key}
+                    type="button"
+                    disabled={filling}
+                    onClick={() => applySuggestion(suggestion)}
+                    className="flex items-center gap-3 rounded-lg border px-3.5 py-2.5 text-left transition-colors disabled:opacity-60"
+                    style={{
+                      borderColor: "var(--border-soft)",
+                      background: "var(--bg-page)",
+                    }}
+                  >
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ background: suggestion.color }}
+                      aria-hidden
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span
+                        className="block truncate text-[0.875rem] font-semibold tracking-tight"
+                        style={{ color: "var(--text)" }}
+                      >
+                        {suggestion.kind === "continue"
+                          ? `Still ${suggestion.label}`
+                          : suggestion.label}
+                      </span>
+                      <span
+                        className="mt-0.5 block text-[0.75rem]"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        {suggestion.reason}
+                        {partial
+                          ? ` · ${formatGapRange(new Date(suggestion.startIso), new Date(suggestion.endIso))}`
+                          : ""}
+                      </span>
+                    </span>
+                    <span
+                      className="shrink-0 text-[0.75rem] font-medium"
+                      style={{ color: "var(--text-faint)" }}
+                    >
+                      Fill
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {fillError ? (
+              <div className="mt-2">
+                <ErrorNote message={fillError} />
+              </div>
+            ) : null}
+            <p
+              className="mt-4 text-[0.6875rem] font-semibold uppercase tracking-wider"
+              style={{ color: "var(--text-faint)" }}
+            >
+              Or fill it yourself
+            </p>
+          </div>
+        ) : null}
+
+        <div className={suggestions.length > 0 ? "mt-2 grid gap-2" : "mt-4 grid gap-2"}>
           {options.map((option) => (
             <button
               key={option.mode}

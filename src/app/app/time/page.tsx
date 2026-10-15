@@ -37,6 +37,7 @@ import { weeklyTrackedSparkline } from "@/lib/insights";
 import { Sparkline } from "../insights/_components/charts";
 import { categoryColor, normalizeCategory } from "@/lib/time-categories";
 import { predictCurrentTimeOptions } from "@/lib/time-predictions";
+import { suggestGapFills } from "@/lib/gap-suggestions";
 import { EntryDeleteButton, EntryNoteIndicator } from "./entry-row";
 import { AddEntryButton, EntryEditButton } from "./entry-editor";
 import { GapBackfillCard } from "./gap-backfill-card";
@@ -432,6 +433,53 @@ export default async function TimePage() {
         maxHours: sinceWakeup ? 18 : 12,
       });
 
+  // One-tap fills for that gap: the plan block it overlaps, "kept going" on
+  // the entry it follows, or what usually fills this time of day.
+  let gapSuggestions: {
+    key: string;
+    kind: "plan" | "continue" | "usual";
+    label: string;
+    category: string | null;
+    color: string;
+    startIso: string;
+    endIso: string;
+    extendEntryId?: string;
+    reason: string;
+  }[] = [];
+  if (gap) {
+    const overlapping = todayCalendarItems.filter(
+      (item) => item.startsAt < gap.end && item.endsAt > gap.start,
+    );
+    const blockCategoryIds = overlapping.length
+      ? await getCalendarItemCategoryIds(userId, overlapping.map((item) => item.id))
+      : new Map<string, string | null>();
+    const categoryNameById = new Map(allCategories.map((category) => [category.id, category.name]));
+    const previousEntry = sinceWakeup
+      ? null
+      : (windowEntries.find(
+          (entry) => entry.endedAt && lastEndedAt && entry.endedAt.getTime() === lastEndedAt.getTime(),
+        ) ?? null);
+    gapSuggestions = suggestGapFills({
+      gap,
+      plannedBlocks: overlapping.map((item) => {
+        const categoryId = blockCategoryIds.get(item.id);
+        return { ...item, category: categoryId ? categoryNameById.get(categoryId) ?? null : null };
+      }),
+      previousEntry,
+      history: eightWeekEntries,
+    }).map((suggestion) => ({
+      key: suggestion.key,
+      kind: suggestion.kind,
+      label: suggestion.label,
+      category: suggestion.category,
+      color: colorFor(suggestion.category),
+      startIso: suggestion.start.toISOString(),
+      endIso: suggestion.end.toISOString(),
+      extendEntryId: suggestion.extendEntryId,
+      reason: suggestion.reason,
+    }));
+  }
+
   // "What specifically?" suggestions: labels recently used in the running
   // entry's category (looks across the last 7 days and the recent archive).
   const runningRecentLabels = running
@@ -627,6 +675,7 @@ export default async function TimePage() {
             gapMinutes={gap.minutes}
             categories={quickStartCategories}
             sinceWakeup={sinceWakeup}
+            suggestions={gapSuggestions}
           />
         </section>
       ) : null}

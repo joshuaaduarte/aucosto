@@ -443,6 +443,92 @@ export async function backfillAndContinue(formData: FormData) {
   revalidatePath("/app/calendar");
 }
 
+// One-tap gap fill (see src/lib/gap-suggestions.ts). Either creates an entry
+// for the span or, for "kept going", extends the entry the gap followed so one
+// continuous activity stays one row. Returns what Undo needs. Like
+// backfillSegment it does NOT revalidate: the card holds an Undo window open
+// and refreshes once that closes, or the recomputed gap would unmount it.
+export type QuickFillUndo =
+  | { kind: "delete"; entryId: string }
+  | { kind: "restore-end"; entryId: string; endedAtIso: string };
+
+export type QuickFillResult =
+  | { ok: true; undo: QuickFillUndo }
+  | { ok: false; error: string };
+
+const quickFillSchema = z.object({
+  label: z.string().trim().min(1, "Label is required").max(200),
+  category: z.string().trim().max(80).nullable(),
+  startedAt: z.string().min(1),
+  endedAt: z.string().min(1),
+  extendEntryId: z.string().trim().min(1).optional(),
+});
+
+export async function quickFillGap(input: {
+  label: string;
+  category: string | null;
+  startedAt: string;
+  endedAt: string;
+  extendEntryId?: string;
+}): Promise<QuickFillResult> {
+  const parsed = quickFillSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+  try {
+    const userId = await resolveActiveUserId();
+    const startedAt = new Date(parsed.data.startedAt);
+    const endedAt = new Date(parsed.data.endedAt);
+    if (parsed.data.extendEntryId) {
+      const entry = await timeService.updateEntry(userId, parsed.data.extendEntryId, {
+        endedAt,
+      });
+      if (!entry) return { ok: false, error: "That entry no longer exists." };
+      return {
+        ok: true,
+        undo: {
+          kind: "restore-end",
+          entryId: entry.id,
+          endedAtIso: startedAt.toISOString(),
+        },
+      };
+    }
+    const entry = await timeService.createPastEntry(userId, {
+      label: parsed.data.label,
+      category: parsed.data.category,
+      startedAt,
+      endedAt,
+    });
+    return { ok: true, undo: { kind: "delete", entryId: entry.id } };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Could not fill the gap.",
+    };
+  }
+}
+
+export async function undoQuickFill(
+  undo: QuickFillUndo,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const userId = await resolveActiveUserId();
+    if (undo.kind === "delete") {
+      await timeService.deleteEntry(userId, undo.entryId);
+    } else {
+      await timeService.updateEntry(userId, undo.entryId, {
+        endedAt: new Date(undo.endedAtIso),
+      });
+    }
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Could not undo.",
+    };
+  }
+}
+
 export async function stopEntry() {
   const userId = await resolveActiveUserId();
   const habitId = (await timeService.getRunningEntry(userId))?.habitId ?? null;

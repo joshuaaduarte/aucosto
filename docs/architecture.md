@@ -36,7 +36,9 @@ The daily command center, composed from every other tool.
   chips), `running-card.tsx` (live timer, describe-row, switch panel,
   stop/reflect flows), `quick-start-chips.tsx` (one-tap starts: calendar
   now/next, tasks, habits, preset categories), `gap-backfill-card.tsx`
-  (untracked-gap prompt), `entry-editor.tsx` (add/edit modal — exported
+  (untracked-gap prompt; leads with one-tap fills from
+  `src/lib/gap-suggestions.ts` — plan block / kept going / usual at this
+  hour — via `quickFillGap` + `undoQuickFill`), `entry-editor.tsx` (add/edit modal — exported
   `EntryModal` is reused by the calendar timeline), `entry-row.tsx`
   (two-step delete + note indicator), `insights-section.tsx`.
 - **Pure libs:** `src/lib/time.ts` (formatting, day/week starts),
