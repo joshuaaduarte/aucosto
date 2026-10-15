@@ -305,8 +305,8 @@ through the same risk gating and audit trail as the REST routes. See
 | `high` | `true` | Always rejected — cannot execute via API |
 
 Current risk assignments:
-- `low`: `create_task`, `log_habit`, `add_reflection`
-- `medium`: `complete_task`, `update_task`, `create_calendar_block`, `start_timer`, `stop_timer`, `edit_time_entry`, `update_project`
+- `low`: `create_task`, `log_habit`, `create_habit`, `add_reflection`, `create_project`
+- `medium`: `complete_task`, `update_task`, `create_calendar_block`, `update_calendar_event`, `delete_calendar_event`, `start_timer`, `stop_timer`, `edit_time_entry`, `update_project`
 - `high`: `finance_write` (also `supported: false`)
 
 ---
@@ -333,6 +333,46 @@ Create task: Spend 30 minutes on Aucosto actions
 Project: Aucosto
 Lane: today
 ```
+
+### Create project (low risk, no confirmation needed)
+```
+POST /api/assistant/actions/execute
+{
+  "action": "create_project",
+  "input": {
+    "name": "Split-Flap Display",
+    "intent": "Build a working split-flap display for the office",
+    "timeBudgetMinutes": 180
+  },
+  "source": { "actor": "openclaw" }
+}
+```
+
+### Create habit (low risk, no confirmation needed)
+```
+POST /api/assistant/actions/execute
+{
+  "action": "create_habit",
+  "input": {
+    "title": "Weigh-in",
+    "cadence": "daily",
+    "dayPart": "morning"
+  },
+  "source": { "actor": "openclaw" }
+}
+```
+
+### Update calendar event (medium risk — preview first, then confirm)
+```
+POST /api/assistant/actions/preview
+{
+  "action": "update_calendar_event",
+  "input": { "eventId": "<id-from-calendar>", "startTime": "16:00", "endTime": "17:00" },
+  "source": { "actor": "openclaw" }
+}
+```
+Then execute with `"confirmed": true`. Partial time input keeps the
+event's original date; only changed fields are patched.
 
 ### Log habit (low risk)
 ```
@@ -520,7 +560,8 @@ If a mention matches 0 or 2+ existing contacts, treat it as ambiguous — do not
 ## 9. What's Explicitly NOT Supported
 
 - **Finance writes** — `finance_write` is in the registry as `supported: false`, `risk: "high"`. Any attempt returns a 400.
-- **Deletes** — no `delete_task`, `delete_time_entry`, etc.
+- **Deletes** — only `delete_calendar_event` is supported (medium risk,
+  confirmation required). No `delete_task`, `delete_time_entry`, etc.
 - **Bulk operations** — no "complete all tasks in lane" or "delete all today's entries."
 - **Task lookup by name** — `complete_task` and `update_task` require a `taskId`. There is no name-based task lookup (task names are non-unique).
 - **Running timer edits by name** — `edit_time_entry` requires an `entryId`. Use the snapshot to find the running timer's ID first.

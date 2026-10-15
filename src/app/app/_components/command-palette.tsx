@@ -86,10 +86,19 @@ export function CommandPalette() {
     };
   }, []);
 
-  useEffect(() => {
+  // Reset the palette whenever it opens (render-time adjustment instead of an
+  // effect that calls setState).
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (open) {
       setQuery("");
       setActiveIndex(0);
+    }
+  }
+
+  useEffect(() => {
+    if (open) {
       requestAnimationFrame(() => inputRef.current?.focus());
     }
   }, [open]);
@@ -98,10 +107,6 @@ export function CommandPalette() {
     () => ALL_ITEMS.filter((item) => fuzzyMatch(query, item.label)),
     [query],
   );
-
-  useEffect(() => {
-    setActiveIndex(0);
-  }, [query]);
 
   const close = useCallback(() => setOpen(false), []);
 
@@ -213,7 +218,10 @@ export function CommandPalette() {
           <input
             ref={inputRef}
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setActiveIndex(0);
+            }}
             placeholder="Jump to a tool or action…"
             className="w-full bg-transparent text-[0.9375rem] outline-none"
             style={{ color: "var(--text)" }}
