@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "zod";
 
 import { createDoItem, updateDoItem, getDoItemSummary } from "@/lib/services/do";
-import { getRunningEntry, startEntry, stopRunning, updateEntry, listRecentEntries } from "@/lib/services/time";
+import { getRunningEntry, startEntry, stopRunning, updateEntry, listRecentEntries, createPastEntry } from "@/lib/services/time";
 import { listHabits, logHabitProgress, createHabit } from "@/lib/services/habits";
 import { createCalendarItem, getCalendarItem, updateCalendarItem, deleteCalendarItem } from "@/lib/services/calendar";
 import {
@@ -92,6 +92,14 @@ const EditTimeEntryInput = z.object({
   title: z.string().min(1).max(200).optional(),
   startedAt: z.string().optional(), // ISO
   endedAt: z.string().optional(),   // ISO
+});
+
+const LogTimeEntryInput = z.object({
+  title: z.string().min(1).max(200),
+  startedAt: z.string(), // ISO datetime
+  endedAt: z.string(),   // ISO datetime
+  categoryName: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 const LogHabitInput = z.object({
@@ -250,6 +258,7 @@ export const ACTION_INPUT_SCHEMAS: Record<string, z.ZodTypeAny> = {
   start_timer: StartTimerInput,
   stop_timer: StopTimerInput,
   edit_time_entry: EditTimeEntryInput,
+  log_time_entry: LogTimeEntryInput,
   log_habit: LogHabitInput,
   create_habit: CreateHabitInput,
   add_reflection: AddReflectionInput,
@@ -1064,6 +1073,63 @@ async function executeEditTimeEntry(
   };
 }
 
+async function previewLogTimeEntry(
+  userId: string,
+  raw: unknown,
+): Promise<PreviewResult> {
+  const parsed = LogTimeEntryInput.safeParse(raw);
+  if (!parsed.success) {
+    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+  }
+  const { title, startedAt, endedAt, categoryName, notes } = parsed.data;
+
+  const start = new Date(startedAt);
+  const end = new Date(endedAt);
+  if (Number.isNaN(start.getTime())) return err("Invalid startedAt — must be an ISO datetime string");
+  if (Number.isNaN(end.getTime())) return err("Invalid endedAt — must be an ISO datetime string");
+  if (end <= start) return err("End time must be after start time.");
+
+  const lines = [
+    `Log time entry "${title}"`,
+    `${fmtClock(start)}–${fmtClock(end)} · ${fmtMinutes(Math.round((end.getTime() - start.getTime()) / 60000))}`,
+  ];
+  if (categoryName) lines.push(`Category: ${categoryName}`);
+  if (notes) lines.push(`Notes: ${notes}`);
+
+  return {
+    ok: true,
+    previewText: lines.join("\n"),
+    normalizedInput: {
+      title,
+      startedAt: start.toISOString(),
+      endedAt: end.toISOString(),
+      category: categoryName ?? null,
+      notes: notes ?? null,
+    },
+    warnings: [],
+  };
+}
+
+async function executeLogTimeEntry(
+  userId: string,
+  n: Record<string, unknown>,
+): Promise<ExecuteResult> {
+  // Input was validated and normalized by previewLogTimeEntry.
+  const entry = await createPastEntry(userId, {
+    label: String(n.title),
+    category: typeof n.category === "string" ? n.category : null,
+    notes: typeof n.notes === "string" ? n.notes : null,
+    startedAt: new Date(String(n.startedAt)),
+    endedAt: new Date(String(n.endedAt)),
+  });
+  return {
+    ok: true,
+    recordId: entry.id,
+    recordType: "TimeEntry",
+    summary: `Logged time entry "${entry.label}"`,
+  };
+}
+
 async function executeLogHabit(
   userId: string,
   n: Record<string, unknown>,
@@ -1717,6 +1783,7 @@ const PREVIEWS: Record<
   start_timer: previewStartTimer,
   stop_timer: previewStopTimer,
   edit_time_entry: previewEditTimeEntry,
+  log_time_entry: previewLogTimeEntry,
   log_habit: previewLogHabit,
   create_habit: previewCreateHabit,
   add_reflection: previewAddReflection,
@@ -1750,6 +1817,7 @@ const EXECUTES: Record<
   start_timer: executeStartTimer,
   stop_timer: executeStopTimer,
   edit_time_entry: executeEditTimeEntry,
+  log_time_entry: executeLogTimeEntry,
   log_habit: executeLogHabit,
   create_habit: executeCreateHabit,
   add_reflection: executeAddReflection,
