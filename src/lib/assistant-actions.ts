@@ -109,6 +109,13 @@ export const ACTION_REGISTRY: Record<string, ActionDef> = {
     supported: true,
     description: "Create a new project",
   },
+  delete_project: {
+    action: "delete_project",
+    risk: "medium",
+    confirmationRequired: true,
+    supported: true,
+    description: "Delete a project and optionally its tasks (confirmation required)",
+  },
   finance_write: {
     action: "finance_write",
     risk: "high",
