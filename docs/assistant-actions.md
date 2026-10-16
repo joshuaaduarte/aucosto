@@ -311,13 +311,39 @@ Defaults: `to` = now, `from` = to − 7 days.
 
 ---
 
+### `GET /api/assistant/reflections`
+Daily mood/reflection series for a date range (max 90 days) — the data behind
+mood/energy trend views and correlations like "do table-tennis days score
+higher?" One row per day **that has a reflection record**; days without a
+reflection are omitted (not returned as nulls).
+
+**Query params:** `?from=<YYYY-MM-DD>` `?to=<YYYY-MM-DD>`.
+Defaults: `to` = today, `from` = to − 30 days.
+
+**Response shape:**
+```json
+{
+  "items": [
+    { "date": "2026-10-10", "mood": 4, "note": "Went well: Shipped the PR\nTired by evening" },
+    { "date": "2026-10-12", "mood": 5, "note": null }
+  ],
+  "count": 2
+}
+```
+
+The `note` combines the reflection's prose fields (`wentWell`, `carryForward`,
+`freeNotes`) into a single string, or is `null` when all are empty.
+
+---
+
 ### `POST /api/assistant/mcp`
 Minimal MCP server (stateless Streamable HTTP, JSON-RPC 2.0 over POST; no
-SSE). Same auth as above. Nine tools: `assistant_snapshot`,
+SSE). Same auth as above. Twelve tools: `assistant_snapshot`,
 `assistant_capabilities`, `assistant_preview_action`,
 `assistant_execute_action`, `assistant_list_tasks`, `assistant_list_habits`,
 `assistant_list_projects`, `assistant_list_calendar`,
-`assistant_action_history`.
+`assistant_list_people_time`, `assistant_list_planned_vs_actual`,
+`assistant_list_reflections`, `assistant_action_history`.
 
 Tool input contracts reuse the executor's zod schemas; preview/execute go
 through the same risk gating and audit trail as the REST routes. See

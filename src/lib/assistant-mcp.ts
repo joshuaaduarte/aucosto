@@ -38,10 +38,12 @@ import {
   fetchAssistantPeopleTime,
   fetchAssistantPlannedVsActual,
   fetchAssistantProjects,
+  fetchAssistantReflections,
   fetchAssistantTasks,
   habitsQuerySchema,
   peopleTimeQuerySchema,
   plannedVsActualQuerySchema,
+  reflectionsQuerySchema,
   tasksQuerySchema,
 } from "@/lib/assistant-lists";
 
@@ -120,6 +122,16 @@ const plannedVsActualToolInput = z.object({
     .string()
     .optional()
     .describe("YYYY-MM-DD; defaults to today (server-local)"),
+});
+const reflectionsToolInput = z.object({
+  from: z
+    .string()
+    .optional()
+    .describe("YYYY-MM-DD; defaults to 30 days ago"),
+  to: z
+    .string()
+    .optional()
+    .describe("YYYY-MM-DD; defaults to today"),
 });
 const historyToolInput = z.object({
   limit: z.number().int().min(1).max(100).optional(),
@@ -204,6 +216,12 @@ export function buildToolCatalog(): McpToolDef[] {
       description:
         "Planned vs actual for one calendar day (defaults to today): each block with its planned window, linked time entries, duration delta, and start-time drift. Answers 'did I do what I planned?'",
       inputSchema: toJsonSchema(plannedVsActualToolInput),
+    },
+    {
+      name: "assistant_list_reflections",
+      description:
+        "Daily mood/reflection series for a date range (max 90 days, defaults to the last 30 days): one row per day that has a reflection — date, mood (1-5), and note. Days without a reflection are omitted. Powers mood/energy trend views and correlations like 'do table-tennis days score higher?'",
+      inputSchema: toJsonSchema(reflectionsToolInput),
     },
     {
       name: "assistant_action_history",
@@ -393,6 +411,14 @@ async function callTool(
       });
       if (!parsed.success) return toolError(`Invalid arguments: ${parsed.error.message}`);
       return { content: toolText(await fetchAssistantPlannedVsActual(userId, parsed.data)) };
+    }
+    case "assistant_list_reflections": {
+      const parsed = reflectionsQuerySchema.safeParse({
+        from: args.from,
+        to: args.to,
+      });
+      if (!parsed.success) return toolError(`Invalid arguments: ${parsed.error.message}`);
+      return { content: toolText(await fetchAssistantReflections(userId, parsed.data)) };
     }
     case "assistant_action_history": {
       const parsed = historyToolInput.safeParse(args);

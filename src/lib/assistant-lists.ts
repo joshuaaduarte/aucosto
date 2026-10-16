@@ -24,6 +24,11 @@ import {
   listEntriesForCalendarEvents,
   localDayBounds,
 } from "@/lib/services/time-calendar";
+import {
+  listReflectionsBetween,
+  type DailyReflectionRecord,
+} from "@/lib/services/reflect";
+import { dayKey } from "@/lib/reflect";
 
 // ── Query schemas ───────────────────────────────────────────────────────────
 
@@ -412,4 +417,109 @@ function localDatePartFor(d: Date): string {
   const mo = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${mo}-${day}`;
+}
+// ── Reflections trend ───────────────────────────────────────────────────────
+
+const MAX_REFLECTIONS_RANGE_DAYS = 90;
+const DEFAULT_REFLECTIONS_RANGE_DAYS = 30;
+
+function isValidDateKey(value: string): boolean {
+  const parts = value.split("-").map(Number);
+  if (parts.length !== 3) return false;
+  const [year, month, day] = parts;
+  if (
+    year === undefined ||
+    month === undefined ||
+    day === undefined ||
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day)
+  ) {
+    return false;
+  }
+  // Round-trip through a real calendar: rejects 2026-13-40, 2026-02-30, …
+  const dt = new Date(Date.UTC(year, month - 1, day));
+  return (
+    dt.getUTCFullYear() === year &&
+    dt.getUTCMonth() === month - 1 &&
+    dt.getUTCDate() === day
+  );
+}
+
+/** Shift a YYYY-MM-DD key by whole days, staying on UTC midnight. */
+function shiftDateKey(key: string, days: number): string {
+  const dt = new Date(`${key}T00:00:00.000Z`);
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return dt.toISOString().slice(0, 10);
+}
+
+/** Whole days between two YYYY-MM-DD keys (to − from). */
+function daysBetweenKeys(from: string, to: string): number {
+  const fromMs = Date.parse(`${from}T00:00:00.000Z`);
+  const toMs = Date.parse(`${to}T00:00:00.000Z`);
+  return Math.round((toMs - fromMs) / (24 * 60 * 60 * 1000));
+}
+
+const dateKeyString = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD")
+  .refine(isValidDateKey, "not a real calendar date");
+
+export const reflectionsQuerySchema = z
+  .object({
+    from: dateKeyString.optional(),
+    to: dateKeyString.optional(),
+  })
+  .transform(({ from, to }) => {
+    // dayKey uses the server's pinned (owner) timezone, matching the
+    // date-key semantics of the DailyReflection rows.
+    const toKey = to ?? dayKey(new Date());
+    const fromKey = from ?? shiftDateKey(toKey, -DEFAULT_REFLECTIONS_RANGE_DAYS);
+    return { from: fromKey, to: toKey };
+  })
+  .refine(({ from, to }) => to >= from, {
+    message: '"to" must be on or after "from"',
+  })
+  .refine(
+    ({ from, to }) =>
+      daysBetweenKeys(from, to) <= MAX_REFLECTIONS_RANGE_DAYS,
+    { message: `Date range cannot exceed ${MAX_REFLECTIONS_RANGE_DAYS} days` },
+  );
+export type ReflectionsQuery = z.infer<typeof reflectionsQuerySchema>;
+
+export interface AssistantReflectionRow {
+  date: string;
+  mood: number | null;
+  note: string | null;
+}
+
+export function serializeReflection(
+  record: DailyReflectionRecord,
+): AssistantReflectionRow {
+  const parts: string[] = [];
+  if (record.wentWell?.trim()) {
+    parts.push(`Went well: ${record.wentWell.trim()}`);
+  }
+  if (record.carryForward?.trim()) {
+    parts.push(`Carry forward: ${record.carryForward.trim()}`);
+  }
+  if (record.freeNotes?.trim()) {
+    parts.push(record.freeNotes.trim());
+  }
+  return {
+    date: record.dateKey,
+    mood: record.mood ?? null,
+    note: parts.length > 0 ? parts.join("\n") : null,
+  };
+}
+
+export async function fetchAssistantReflections(
+  userId: string,
+  query: ReflectionsQuery,
+): Promise<{ items: AssistantReflectionRow[]; count: number }> {
+  const records = await listReflectionsBetween(userId, {
+    fromKey: query.from,
+    toKey: query.to,
+  });
+  return { items: records.map(serializeReflection), count: records.length };
 }
