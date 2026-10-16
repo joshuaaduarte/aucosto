@@ -88,6 +88,13 @@ export const ACTION_REGISTRY: Record<string, ActionDef> = {
     supported: true,
     description: "Log a completed time entry with explicit start and end times (backfill). Supports categoryName, personNames, and calendarEventId / calendarTitle (link a planned calendar block).",
   },
+  delete_time_entry: {
+    action: "delete_time_entry",
+    risk: "medium",
+    confirmationRequired: true,
+    supported: true,
+    description: "Delete one completed time entry by id. Refuses running timers (stop_timer first); removes linked people (TimeEntryPerson).",
+  },
   log_habit: {
     action: "log_habit",
     risk: "low",

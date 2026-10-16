@@ -111,6 +111,24 @@ export async function setEntryPeople(
   }
 }
 
+/**
+ * Remove all people links for a time entry. Unlike setEntryPeople this does
+ * not require the entry to still exist — it is the cleanup step used when
+ * deleting an entry, so no orphaned rows remain in the join table.
+ */
+export async function clearEntryPeople(
+  userId: string,
+  timeEntryId: string,
+): Promise<void> {
+  requireCan(userId, "time", "write");
+  await ensureTimeEntryPersonTable();
+  await prisma.$executeRawUnsafe(
+    'DELETE FROM "TimeEntryPerson" WHERE "userId" = $1 AND "timeEntryId" = $2',
+    userId,
+    timeEntryId,
+  );
+}
+
 /** Person IDs linked to one time entry. Empty when the table is missing. */
 export async function listEntryPeople(
   userId: string,
