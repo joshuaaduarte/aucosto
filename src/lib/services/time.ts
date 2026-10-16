@@ -9,6 +9,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { requireCan } from "@/lib/auth/can";
 import { recordEvent } from "@/lib/services/events";
+import { ensureTimeEntryCalendarLinkColumn } from "@/lib/services/time-calendar";
 import type { DoItem, Habit, TimeEntry } from "@/generated/prisma/client";
 
 export type RunningTimeEntry = TimeEntry & {
@@ -20,6 +21,10 @@ export async function getRunningEntry(
   userId: string,
 ): Promise<RunningTimeEntry | null> {
   requireCan(userId, "time", "read");
+  // The implicit full-field select below includes TimeEntry.calendarEventId,
+  // which is created via raw SQL rather than prisma migrate — ensure it
+  // exists first (same pattern as listDoItems in do/reads.ts).
+  await ensureTimeEntryCalendarLinkColumn();
   return prisma.timeEntry.findFirst({
     where: { userId, endedAt: null },
     include: {
@@ -54,6 +59,7 @@ export async function listRecentEntries(
   options: { limit?: number } = {},
 ): Promise<RecentTimeEntry[]> {
   requireCan(userId, "time", "read");
+  await ensureTimeEntryCalendarLinkColumn();
   return prisma.timeEntry.findMany({
     where: { userId, endedAt: { not: null } },
     include: {
@@ -65,11 +71,32 @@ export async function listRecentEntries(
   });
 }
 
+/**
+ * Fetch a single time entry by id (any age), or null when it doesn't exist
+ * or belongs to another user. Used by the assistant's edit preview so old
+ * entries aren't falsely reported as "not found".
+ */
+export async function getTimeEntry(
+  userId: string,
+  id: string,
+): Promise<RecentTimeEntry | null> {
+  requireCan(userId, "time", "read");
+  await ensureTimeEntryCalendarLinkColumn();
+  return prisma.timeEntry.findFirst({
+    where: { id, userId },
+    include: {
+      doItem: { select: { id: true, title: true } },
+      habit: { select: { id: true, title: true } },
+    },
+  });
+}
+
 export async function listCompletedSince(
   userId: string,
   since: Date,
 ): Promise<TimeEntry[]> {
   requireCan(userId, "time", "read");
+  await ensureTimeEntryCalendarLinkColumn();
   return prisma.timeEntry.findMany({
     where: { userId, startedAt: { gte: since }, endedAt: { not: null } },
   });
@@ -81,6 +108,7 @@ export async function listEntriesBetween(
   range: { from: Date; to: Date },
 ): Promise<TimeEntry[]> {
   requireCan(userId, "time", "read");
+  await ensureTimeEntryCalendarLinkColumn();
   return prisma.timeEntry.findMany({
     where: {
       userId,
@@ -105,6 +133,7 @@ export async function createPastEntry(
   },
 ): Promise<TimeEntry> {
   requireCan(userId, "time", "write");
+  await ensureTimeEntryCalendarLinkColumn();
   if (
     Number.isNaN(input.startedAt.getTime()) ||
     Number.isNaN(input.endedAt.getTime())
@@ -153,6 +182,7 @@ export async function startEntry(
   },
 ): Promise<TimeEntry> {
   requireCan(userId, "time", "write");
+  await ensureTimeEntryCalendarLinkColumn();
   const now = new Date();
   const startedAt = input.startedAt ?? now;
   if (Number.isNaN(startedAt.getTime())) {
@@ -202,6 +232,7 @@ export async function updateEntry(
   },
 ): Promise<TimeEntry | null> {
   requireCan(userId, "time", "write");
+  await ensureTimeEntryCalendarLinkColumn();
   const existing = await prisma.timeEntry.findFirst({ where: { id, userId } });
   if (!existing) return null;
 

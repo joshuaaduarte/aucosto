@@ -49,15 +49,13 @@ function mockTimeService() {
     stopRunning: vi.fn(),
     updateEntry,
     createPastEntry,
-    listRecentEntries: vi.fn().mockResolvedValue([
-      {
-        id: "entry-1",
-        label: "Deep work",
-        category: "work",
-        startedAt: new Date("2026-10-15T13:00:00.000Z"),
-        endedAt: new Date("2026-10-15T14:00:00.000Z"),
-      },
-    ]),
+    getTimeEntry: vi.fn().mockResolvedValue({
+      id: "entry-1",
+      label: "Deep work",
+      category: "work",
+      startedAt: new Date("2026-10-15T13:00:00.000Z"),
+      endedAt: new Date("2026-10-15T14:00:00.000Z"),
+    }),
   }));
   return { startEntry, createPastEntry, updateEntry };
 }

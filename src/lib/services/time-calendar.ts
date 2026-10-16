@@ -143,9 +143,9 @@ export function localDayBounds(day: Date = new Date()): { from: Date; to: Date }
 
 /**
  * Resolve a calendar title against one day's blocks (defaults to today).
- * Exact title match wins; a single fuzzy (substring, either direction) match
- * is accepted; zero or ambiguous matches produce a warning and no link —
- * never fails, never guesses.
+ * Exact title match (case-insensitive) wins; anything else warns and skips —
+ * a single close match suggests the exact title instead of linking, and zero
+ * or ambiguous matches never link. Never fails, never guesses.
  */
 export async function resolveCalendarBlockByTitle(
   userId: string,
@@ -160,34 +160,49 @@ export async function resolveCalendarBlockByTitle(
   const blocks = await listCalendarItems(userId, localDayBounds(day));
   const lower = query.toLowerCase();
   const exact = blocks.filter((b) => b.title.toLowerCase() === lower);
-  const fuzzy =
-    exact.length > 0
-      ? exact
-      : blocks.filter(
-          (b) =>
-            b.title.toLowerCase().includes(lower) ||
-            lower.includes(b.title.toLowerCase()),
-        );
-  if (fuzzy.length === 1) {
-    const block = fuzzy[0]!;
+  if (exact.length === 1) {
+    const block = exact[0]!;
     return {
       eventId: backingCalendarItemId(block.id),
       title: block.title,
       warnings: [],
     };
   }
-  if (fuzzy.length === 0) {
+  const fuzzy = blocks.filter(
+    (b) =>
+      b.title.toLowerCase().includes(lower) ||
+      lower.includes(b.title.toLowerCase()),
+  );
+  const pool = exact.length > 1 ? exact : fuzzy;
+  if (pool.length === 1) {
+    const block = pool[0]!;
     return {
       eventId: null,
       title: null,
-      warnings: [`No calendar block matched "${query}" — no calendar link added`],
+      warnings: [
+        `"${query}" is close to "${block.title}" but not an exact match — no calendar link added. Pass the exact block title to link it.`,
+      ],
+    };
+  }
+  if (pool.length === 0) {
+    const known =
+      blocks.length > 0
+        ? ` Today's blocks: ${blocks
+            .slice(0, 8)
+            .map((b) => `"${b.title}"`)
+            .join(", ")}${blocks.length > 8 ? ` (+${blocks.length - 8} more)` : ""}.`
+        : " There are no blocks scheduled today.";
+    return {
+      eventId: null,
+      title: null,
+      warnings: [`No calendar block matched "${query}" — no calendar link added.${known}`],
     };
   }
   return {
     eventId: null,
     title: null,
     warnings: [
-      `Multiple calendar blocks matched "${query}" (${fuzzy
+      `Multiple calendar blocks matched "${query}" (${pool
         .map((b) => b.title)
         .join(", ")}) — skipping to avoid a wrong link`,
     ],

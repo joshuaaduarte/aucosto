@@ -235,15 +235,13 @@ describe("edit_time_entry preview shows before and after", () => {
 
     vi.doMock("@/lib/services/time", () => ({
       getRunningEntry: vi.fn().mockResolvedValue(null),
-      listRecentEntries: vi.fn().mockResolvedValue([
-        {
-          id: "entry-abc",
-          label: "Commute",
-          category: "commute",
-          startedAt,
-          endedAt,
-        },
-      ]),
+      getTimeEntry: vi.fn().mockResolvedValue({
+        id: "entry-abc",
+        label: "Commute",
+        category: "commute",
+        startedAt,
+        endedAt,
+      }),
       startEntry: vi.fn(),
       stopRunning: vi.fn(),
       updateEntry: vi.fn(),
@@ -264,7 +262,7 @@ describe("edit_time_entry preview shows before and after", () => {
   it("returns error when entry not found", async () => {
     vi.doMock("@/lib/services/time", () => ({
       getRunningEntry: vi.fn().mockResolvedValue(null),
-      listRecentEntries: vi.fn().mockResolvedValue([]),
+      getTimeEntry: vi.fn().mockResolvedValue(null),
       startEntry: vi.fn(),
       stopRunning: vi.fn(),
       updateEntry: vi.fn(),
@@ -639,9 +637,9 @@ describe("new write actions: execute", () => {
       startEntry: vi.fn(),
       stopRunning: vi.fn(),
       updateEntry,
-      listRecentEntries: vi.fn().mockResolvedValue([
+      getTimeEntry: vi.fn().mockResolvedValue(
         { id: "entry-abc", label: "Commute", category: "commute", startedAt, endedAt },
-      ]),
+      ),
       createPastEntry: vi.fn(),
     }));
 
@@ -659,7 +657,7 @@ describe("new write actions: execute", () => {
     expect(patch.endedAt).toEqual(new Date("2024-06-24T09:30:00.000Z"));
   });
 
-  it("executeEditTimeEntry passes category through to updateEntry", async () => {
+  it("executeEditTimeEntry normalizes category to the canonical name", async () => {
     const startedAt = new Date("2024-06-24T08:55:00.000Z");
     const endedAt = new Date("2024-06-24T17:52:00.000Z");
     const updateEntry = vi.fn().mockResolvedValue({ id: "entry-abc", label: "Commute" });
@@ -668,10 +666,13 @@ describe("new write actions: execute", () => {
       startEntry: vi.fn(),
       stopRunning: vi.fn(),
       updateEntry,
-      listRecentEntries: vi.fn().mockResolvedValue([
+      getTimeEntry: vi.fn().mockResolvedValue(
         { id: "entry-abc", label: "Commute", category: "commute", startedAt, endedAt },
-      ]),
+      ),
       createPastEntry: vi.fn(),
+    }));
+    vi.doMock("@/lib/services/time-categories", () => ({
+      listTimeCategories: vi.fn().mockResolvedValue([{ name: "Exercise" }]),
     }));
 
     const { executeAction } = await import("@/lib/assistant-action-executor");
@@ -683,7 +684,7 @@ describe("new write actions: execute", () => {
     expect(result.ok).toBe(true);
     expect(updateEntry).toHaveBeenCalledOnce();
     const patch = updateEntry.mock.calls[0]![2];
-    expect(patch.category).toBe("exercise");
+    expect(patch.category).toBe("Exercise");
   });
 
   it("executeLogTimeEntry creates a past entry with explicit times", async () => {
@@ -812,6 +813,9 @@ describe("delete_project", () => {
       createBoardProject: vi.fn(),
       updateProject: vi.fn(),
       deleteProject: vi.fn().mockResolvedValue(undefined),
+      getProjectDeleteImpact: vi
+        .fn()
+        .mockResolvedValue({ projectTaskCount: 1, doItemCount: 2, timeEntryCount: 0 }),
     };
   }
 
@@ -833,6 +837,9 @@ describe("delete_project", () => {
     expect(result.ok).toBe(true);
     expect(result.previewText).toContain("Delete project");
     expect(result.previewText).toContain("Old Project");
+    expect(result.previewText).toContain("Blast radius:");
+    expect(result.previewText).toContain("1 project task will be permanently deleted");
+    expect(result.previewText).toContain("2 to-do items will be kept but unlinked");
     expect(result.warnings.join(" ")).toContain("permanently");
     expect(result.normalizedInput.projectId).toBe("p1");
   });

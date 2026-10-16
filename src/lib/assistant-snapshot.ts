@@ -3,6 +3,11 @@
 // No DB access happens here — every field is derived from data the service
 // layer already returns. This is a control panel, not a coach: no prose,
 // no recommendations, just facts and binary flags.
+//
+// Resilience: this is a composite read over ~20 service calls. Per
+// docs/lessons.md #4 ("layout reads must never throw"), one failing service
+// degrades its section to empty/null — logged server-side and reported in
+// `degradedSections` — instead of 500ing the whole response.
 
 import "server-only";
 
@@ -173,6 +178,13 @@ export type AssistantSnapshot = {
 
   signals: Signals;
   briefing: Briefing;
+
+  /**
+   * Labels of sections whose service call threw and was degraded to
+   * empty/null for this response. Consumers should treat a degraded section
+   * as "unknown", not "genuinely empty".
+   */
+  degradedSections: string[];
 };
 
 function toHHMM(date: Date): string {
@@ -218,11 +230,34 @@ export async function buildAssistantSnapshot(
   const todayKey = dayKey(now);
   const yesterdayKey = dayKey(yesterdayStart);
 
+  // One failing service must never take down the composite: each section
+  // degrades to its fallback, the failure is logged, and the label lands in
+  // `degradedSections` so consumers can tell "unknown" from "empty".
+  const degradedSections: string[] = [];
+  async function section<T>(
+    label: string,
+    fallback: T,
+    work: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await work();
+    } catch (error) {
+      console.error(
+        `[assistant-snapshot] section "${label}" failed; degrading`,
+        error,
+      );
+      degradedSections.push(label);
+      return fallback;
+    }
+  }
+
   await Promise.all([
-    ensureProjectBoardTables(),
-    ensureProjectPlanningColumns().catch(() => {}),
-    ensureRolodexTables().catch(() => {}),
-    ensureInsightTables().catch(() => {}),
+    section("ensure.project-board", undefined, () => ensureProjectBoardTables()),
+    section("ensure.project-planning", undefined, () =>
+      ensureProjectPlanningColumns(),
+    ),
+    section("ensure.rolodex", undefined, () => ensureRolodexTables()),
+    section("ensure.insights", undefined, () => ensureInsightTables()),
   ]);
 
   const [
@@ -247,26 +282,36 @@ export async function buildAssistantSnapshot(
     recentCapturedInsights,
     workSummary,
   ] = await Promise.all([
-    getRunningEntry(userId),
-    listCalendarItems(userId, { from: todayStart, to: tomorrowStart }),
-    listCompletedSince(userId, todayStart),
-    listEntriesBetween(userId, { from: yesterdayStart, to: todayStart }),
-    listEntriesBetween(userId, { from: sevenDaysAgo, to: now }),
-    listDoItems(userId, { includeDone: true }),
-    listHabits(userId),
-    listBoardProjects(userId),
-    listRecentEvents(userId, { limit: 10 }),
-    getTodayWakeStatus(userId),
-    getReflection(userId, yesterdayKey),
-    getUserProfile(userId),
-    listAccounts(userId),
-    listProjectPlanSummaries(userId).catch(() => []),
-    getUpcomingBirthdays(userId).catch(() => []),
-    getDueFollowUps(userId).catch(() => []),
-    getRecentlyMentioned(userId).catch(() => []),
-    listUnresolvedMentions(userId).catch(() => []),
-    listRecentInsights(userId, { limit: 5 }).catch(() => []),
-    getWorkAssistantSummary(userId).catch(() => null),
+    section("time.running", null, () => getRunningEntry(userId)),
+    section("calendar.today", [], () =>
+      listCalendarItems(userId, { from: todayStart, to: tomorrowStart }),
+    ),
+    section("time.completedToday", [], () =>
+      listCompletedSince(userId, todayStart),
+    ),
+    section("time.yesterday", [], () =>
+      listEntriesBetween(userId, { from: yesterdayStart, to: todayStart }),
+    ),
+    section("time.week", [], () =>
+      listEntriesBetween(userId, { from: sevenDaysAgo, to: now }),
+    ),
+    section("do.items", [], () => listDoItems(userId, { includeDone: true })),
+    section("habits", [], () => listHabits(userId)),
+    section("projects.board", [], () => listBoardProjects(userId)),
+    section("events.recent", [], () => listRecentEvents(userId, { limit: 10 })),
+    section("rhythms.wake", null, () => getTodayWakeStatus(userId)),
+    section("reflect.yesterday", null, () => getReflection(userId, yesterdayKey)),
+    section("user.profile", null, () => getUserProfile(userId)),
+    section("finance.accounts", [], () => listAccounts(userId)),
+    section("projects.plans", [], () => listProjectPlanSummaries(userId)),
+    section("rolodex.birthdays", [], () => getUpcomingBirthdays(userId)),
+    section("rolodex.followUps", [], () => getDueFollowUps(userId)),
+    section("rolodex.mentions", [], () => getRecentlyMentioned(userId)),
+    section("rolodex.unresolved", [], () => listUnresolvedMentions(userId)),
+    section("insights.recent", [], () =>
+      listRecentInsights(userId, { limit: 5 }),
+    ),
+    section("work.summary", null, () => getWorkAssistantSummary(userId)),
   ]);
 
   const financeVisible = userRecord?.financeVisible ?? false;
@@ -446,7 +491,7 @@ export async function buildAssistantSnapshot(
     today: {
       date: todayKey,
       localTime: toHHMM(now),
-      wokeUpAt: wakeStatus.wakeTime,
+      wokeUpAt: wakeStatus?.wakeTime ?? null,
       calendar: {
         items: calendarItems,
         totalScheduledMinutes,
@@ -520,5 +565,6 @@ export async function buildAssistantSnapshot(
     facts,
     signals,
     briefing,
+    degradedSections,
   };
 }
