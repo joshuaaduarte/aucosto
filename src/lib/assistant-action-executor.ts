@@ -89,6 +89,15 @@ const StopTimerInput = z.object({
   note: z.string().optional(),
 });
 
+const SwapTimerInput = z.object({
+  title: z.string().min(1).max(200),
+  categoryName: z.string().optional(),
+  habitName: z.string().optional(),
+  personNames: z.array(z.string()).optional(),
+  endedAtLocal: z.string().optional(), // swap moment, "YYYY-MM-DDTHH:MM:SS" local; omit for now
+  note: z.string().optional(), // note attached to the stopped entry
+});
+
 const EditTimeEntryInput = z.object({
   entryId: z.string().min(1),
   title: z.string().min(1).max(200).optional(),
@@ -262,6 +271,7 @@ export const ACTION_INPUT_SCHEMAS: Record<string, z.ZodTypeAny> = {
   delete_calendar_event: DeleteCalendarEventInput,
   start_timer: StartTimerInput,
   stop_timer: StopTimerInput,
+  swap_timer: SwapTimerInput,
   edit_time_entry: EditTimeEntryInput,
   log_time_entry: LogTimeEntryInput,
   log_habit: LogHabitInput,
@@ -720,6 +730,86 @@ async function previewStopTimer(
   };
 }
 
+async function previewSwapTimer(
+  userId: string,
+  raw: unknown,
+): Promise<PreviewResult> {
+  const parsed = SwapTimerInput.safeParse(raw);
+  if (!parsed.success) {
+    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+  }
+  const { title, categoryName, habitName, personNames, endedAtLocal, note } = parsed.data;
+  const warnings: string[] = [];
+  let habitId: string | null = null;
+
+  if (habitName) {
+    const resolved = await resolveHabitByName(userId, habitName);
+    if (!resolved.found) {
+      warnings.push(`Habit "${habitName}" not found — timer will start without habit link`);
+    } else {
+      habitId = resolved.match.id;
+    }
+  }
+
+  let personIds: string[] = [];
+  let peopleNote = "";
+  if (personNames) {
+    const resolved = await resolvePeopleByNames(userId, personNames);
+    personIds = resolved.personIds;
+    warnings.push(...resolved.warnings);
+    peopleNote =
+      resolved.labels.length > 0 ? ` · with ${resolved.labels.join(", ")}` : "";
+  }
+
+  const running = await getRunningEntry(userId);
+  if (!running) {
+    return err(
+      "No timer is currently running — use start_timer to begin a new timer instead",
+    );
+  }
+
+  const now = new Date();
+  // Interpret endedAtLocal in server TZ (pinned by instrumentation.ts to APP_TIMEZONE)
+  const swapAt = endedAtLocal ? new Date(endedAtLocal) : now;
+
+  if (Number.isNaN(swapAt.getTime())) {
+    return err("Invalid endedAtLocal — must be a datetime string like '2024-06-24T09:15:00'");
+  }
+  if (swapAt.getTime() > now.getTime() + 60_000) {
+    return err("Swap time cannot be in the future");
+  }
+  if (swapAt.getTime() < running.startedAt.getTime()) {
+    return err("Swap time can't be before the running timer started");
+  }
+
+  const stoppedMin = Math.max(
+    0,
+    Math.round((swapAt.getTime() - running.startedAt.getTime()) / 60000),
+  );
+
+  const lines = [
+    `Swap timer: stop "${running.label}" → start "${title}"`,
+    `Stopped: ${fmtClock(running.startedAt)}–${fmtClock(swapAt)} · ${fmtMinutes(stoppedMin)}${note ? " · note attached" : ""}`,
+    `Started: "${title}"${categoryName ? ` [${categoryName}]` : ""}${peopleNote}`,
+  ];
+
+  return {
+    ok: true,
+    previewText: lines.join("\n"),
+    normalizedInput: {
+      stoppedEntryId: running.id,
+      stoppedLabel: running.label,
+      swappedAtIso: swapAt.toISOString(),
+      title,
+      category: categoryName ?? null,
+      habitId,
+      personIds,
+      note: note ?? null,
+    },
+    warnings,
+  };
+}
+
 async function previewEditTimeEntry(
   userId: string,
   raw: unknown,
@@ -1130,6 +1220,42 @@ async function executeStopTimer(
     recordId: null,
     recordType: "TimeEntry",
     summary: "Stopped running timer",
+  };
+}
+
+async function executeSwapTimer(
+  userId: string,
+  n: Record<string, unknown>,
+): Promise<ExecuteResult> {
+  // Input was validated and normalized by previewSwapTimer.
+  const swapAt = new Date(String(n.swappedAtIso));
+  const stoppedEntryId = String(n.stoppedEntryId);
+  const stoppedLabel = String(n.stoppedLabel ?? "");
+
+  // The same instant serves as the old entry's end and the new entry's start —
+  // no gap between the two activities.
+  await stopRunning(userId, swapAt);
+  const entry = await startEntry(userId, {
+    label: String(n.title),
+    category: n.category ? String(n.category) : null,
+    habitId: n.habitId ? String(n.habitId) : null,
+    startedAt: swapAt,
+  });
+  if (typeof n.note === "string" && n.note.length > 0) {
+    await updateEntry(userId, stoppedEntryId, { notes: n.note });
+  }
+  if (Array.isArray(n.personIds) && n.personIds.length > 0) {
+    await setEntryPeople(
+      userId,
+      entry.id,
+      n.personIds.filter((id): id is string => typeof id === "string"),
+    );
+  }
+  return {
+    ok: true,
+    recordId: entry.id,
+    recordType: "TimeEntry",
+    summary: `Swapped timer: stopped "${stoppedLabel}", started "${entry.label}"`,
   };
 }
 
@@ -1888,6 +2014,7 @@ const PREVIEWS: Record<
   delete_calendar_event: previewDeleteCalendarEvent,
   start_timer: previewStartTimer,
   stop_timer: previewStopTimer,
+  swap_timer: previewSwapTimer,
   edit_time_entry: previewEditTimeEntry,
   log_time_entry: previewLogTimeEntry,
   log_habit: previewLogHabit,
@@ -1922,6 +2049,7 @@ const EXECUTES: Record<
   delete_calendar_event: executeDeleteCalendarEvent,
   start_timer: executeStartTimer,
   stop_timer: executeStopTimer,
+  swap_timer: executeSwapTimer,
   edit_time_entry: executeEditTimeEntry,
   log_time_entry: executeLogTimeEntry,
   log_habit: executeLogHabit,

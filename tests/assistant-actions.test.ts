@@ -877,3 +877,208 @@ describe("delete_project", () => {
     });
   });
 });
+describe("swap_timer", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  // Format a Date as a "YYYY-MM-DDTHH:MM:SS" local-time string, matching how
+  // the executor parses endedAtLocal (server local time).
+  function toLocalInput(d: Date): string {
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  }
+
+  function mockTime(running: boolean = true) {
+    const mocks = {
+      getRunningEntry: vi.fn().mockResolvedValue(
+        running
+          ? {
+              id: "entry-old",
+              label: "Lunch",
+              category: "food",
+              startedAt: new Date(Date.now() - 30 * 60 * 1000), // 30 min ago
+              endedAt: null,
+            }
+          : null,
+      ),
+      startEntry: vi
+        .fn()
+        .mockResolvedValue({ id: "entry-new", label: "Deep work" }),
+      stopRunning: vi.fn().mockResolvedValue(undefined),
+      updateEntry: vi.fn().mockResolvedValue(null),
+      listRecentEntries: vi.fn().mockResolvedValue([]),
+      createPastEntry: vi.fn(),
+    };
+    vi.doMock("@/lib/services/time", () => mocks);
+    return mocks;
+  }
+
+  function mockHabitsAndPeople() {
+    vi.doMock("@/lib/services/habits", () => ({
+      listHabits: vi.fn().mockResolvedValue([]),
+      logHabitProgress: vi.fn(),
+      createHabit: vi.fn(),
+    }));
+    vi.doMock("@/lib/services/rolodex", () => ({
+      findPersonByName: vi.fn().mockResolvedValue([
+        {
+          id: "person-ana",
+          displayName: "Ana",
+          firstName: "Ana",
+          lastName: null,
+          aliases: [],
+        },
+      ]),
+      createPerson: vi.fn(),
+      updatePerson: vi.fn(),
+      addInteraction: vi.fn(),
+      getPerson: vi.fn(),
+    }));
+    const setEntryPeople = vi.fn().mockResolvedValue(undefined);
+    vi.doMock("@/lib/services/time-people", () => ({
+      setEntryPeople,
+      listEntryPeople: vi.fn(),
+      personTimeSummary: vi.fn(),
+    }));
+    return { setEntryPeople };
+  }
+
+  it("is registered as medium risk with confirmation required", () => {
+    expect(ACTION_REGISTRY["swap_timer"]!.risk).toBe("medium");
+    expect(ACTION_REGISTRY["swap_timer"]!.confirmationRequired).toBe(true);
+    expect(ACTION_REGISTRY["swap_timer"]!.supported).toBe(true);
+  });
+
+  it("previews the stop and the start with a backdated swap time", async () => {
+    mockTime(true);
+    mockHabitsAndPeople();
+    const swapAt = new Date(Date.now() - 5 * 60 * 1000); // 5 min ago
+    const { previewAction } = await import("@/lib/assistant-action-executor");
+    const result = await previewAction("user-1", "swap_timer", {
+      title: "Deep work",
+      categoryName: "work",
+      personNames: ["Ana"],
+      endedAtLocal: toLocalInput(swapAt),
+      note: "wrapped up lunch",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.previewText).toContain('Swap timer: stop "Lunch" → start "Deep work"');
+    expect(result.previewText).toContain('Stopped:');
+    expect(result.previewText).toContain('[work]');
+    expect(result.previewText).toContain("with Ana");
+    expect(result.previewText).toContain("note attached");
+    expect(result.normalizedInput.stoppedEntryId).toBe("entry-old");
+    expect(result.normalizedInput.stoppedLabel).toBe("Lunch");
+    expect(result.normalizedInput.personIds).toEqual(["person-ana"]);
+    expect(result.normalizedInput.note).toBe("wrapped up lunch");
+    // Round-trips through the local-time parser to the same instant (to the second).
+    const iso = String(result.normalizedInput.swappedAtIso);
+    expect(Math.abs(new Date(iso).getTime() - swapAt.getTime())).toBeLessThan(2000);
+  });
+
+  it("errors when no timer is running", async () => {
+    mockTime(false);
+    mockHabitsAndPeople();
+    const { previewAction } = await import("@/lib/assistant-action-executor");
+    const result = await previewAction("user-1", "swap_timer", {
+      title: "Deep work",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("No timer is currently running");
+  });
+
+  it("warns when the habit is not found", async () => {
+    mockTime(true);
+    mockHabitsAndPeople();
+    const { previewAction } = await import("@/lib/assistant-action-executor");
+    const result = await previewAction("user-1", "swap_timer", {
+      title: "Deep work",
+      habitName: "Nonexistent habit",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(result.warnings[0]).toContain("not found");
+    expect(result.normalizedInput.habitId).toBe(null);
+  });
+
+  it("rejects a swap time before the timer started", async () => {
+    mockTime(true);
+    mockHabitsAndPeople();
+    const { previewAction } = await import("@/lib/assistant-action-executor");
+    const result = await previewAction("user-1", "swap_timer", {
+      title: "Deep work",
+      endedAtLocal: toLocalInput(new Date(Date.now() - 60 * 60 * 1000)), // 1h ago, before start
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("before the running timer started");
+  });
+
+  it("rejects a swap time in the future", async () => {
+    mockTime(true);
+    mockHabitsAndPeople();
+    const { previewAction } = await import("@/lib/assistant-action-executor");
+    const result = await previewAction("user-1", "swap_timer", {
+      title: "Deep work",
+      endedAtLocal: toLocalInput(new Date(Date.now() + 60 * 60 * 1000)), // 1h ahead
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("future");
+  });
+
+  it("executes the atomic stop+start with a shared instant, note, and people", async () => {
+    const time = mockTime(true);
+    const { setEntryPeople } = mockHabitsAndPeople();
+    const swapAt = new Date(Date.now() - 5 * 60 * 1000); // 5 min ago
+    const { executeAction } = await import("@/lib/assistant-action-executor");
+    const result = await executeAction("user-1", "swap_timer", {
+      title: "Deep work",
+      categoryName: "work",
+      personNames: ["Ana"],
+      endedAtLocal: toLocalInput(swapAt),
+      note: "wrapped up lunch",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.recordId).toBe("entry-new");
+    expect(result.recordType).toBe("TimeEntry");
+    expect(result.summary).toContain('stopped "Lunch"');
+    expect(result.summary).toContain('started "Deep work"');
+
+    expect(time.stopRunning).toHaveBeenCalledOnce();
+    const stopAt: Date = time.stopRunning.mock.calls[0]![1];
+    expect(Math.abs(stopAt.getTime() - swapAt.getTime())).toBeLessThan(2000);
+    expect(time.startEntry).toHaveBeenCalledOnce();
+    const startInput = time.startEntry.mock.calls[0]![1];
+    expect(startInput.label).toBe("Deep work");
+    expect(startInput.category).toBe("work");
+    // Same instant for the stop and the start — no gap between the two.
+    expect(startInput.startedAt.getTime()).toBe(stopAt.getTime());
+    expect(time.updateEntry).toHaveBeenCalledOnce();
+    expect(time.updateEntry).toHaveBeenCalledWith("user-1", "entry-old", {
+      notes: "wrapped up lunch",
+    });
+    expect(setEntryPeople).toHaveBeenCalledOnce();
+    expect(setEntryPeople).toHaveBeenCalledWith("user-1", "entry-new", ["person-ana"]);
+  });
+
+  it("executes without optional fields when omitted", async () => {
+    const time = mockTime(true);
+    const { setEntryPeople } = mockHabitsAndPeople();
+    const { executeAction } = await import("@/lib/assistant-action-executor");
+    const result = await executeAction("user-1", "swap_timer", {
+      title: "Deep work",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(time.stopRunning).toHaveBeenCalledOnce();
+    expect(time.updateEntry).not.toHaveBeenCalled();
+    expect(setEntryPeople).not.toHaveBeenCalled();
+    expect(time.startEntry.mock.calls[0]![1].category).toBe(null);
+  });
+});
