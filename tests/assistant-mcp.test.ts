@@ -35,8 +35,8 @@ describe("summarizeJsonSchema", () => {
 describe("buildToolCatalog", () => {
   const tools = buildToolCatalog();
 
-  it("exposes ten tools", () => {
-    expect(tools).toHaveLength(10);
+  it("exposes eleven tools", () => {
+    expect(tools).toHaveLength(11);
   });
 
   it("has unique names", () => {
@@ -64,6 +64,7 @@ describe("buildToolCatalog", () => {
       "assistant_list_projects",
       "assistant_list_calendar",
       "assistant_list_people_time",
+      "assistant_list_planned_vs_actual",
       "assistant_action_history",
     ]);
   });
@@ -72,6 +73,15 @@ describe("buildToolCatalog", () => {
     const preview = tools.find((t) => t.name === "assistant_preview_action")!;
     expect(preview.description).toContain("create_task");
     expect(preview.description).toContain("title* (string)");
+  });
+
+  it("gives assistant_list_planned_vs_actual an optional date input", () => {
+    const tool = tools.find((t) => t.name === "assistant_list_planned_vs_actual")!;
+    expect(tool.description).toContain("Planned vs actual");
+    const schema = tool.inputSchema as {
+      properties: Record<string, unknown>;
+    };
+    expect(Object.keys(schema.properties)).toContain("date");
   });
 });
 
@@ -127,7 +137,7 @@ describe("handleMcpRequest", () => {
     });
     expect(status).toBe(200);
     const tools = (body as { result: { tools: unknown[] } }).result.tools;
-    expect(tools).toHaveLength(10);
+    expect(tools).toHaveLength(11);
   });
 
   it("accepts notifications without a response body", async () => {

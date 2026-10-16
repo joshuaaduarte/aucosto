@@ -58,7 +58,7 @@ export const ACTION_REGISTRY: Record<string, ActionDef> = {
     risk: "medium",
     confirmationRequired: true,
     supported: true,
-    description: "Start a new time entry. Supports categoryName, habitName, and personNames (Rolodex people to link).",
+    description: "Start a new time entry. Supports categoryName, habitName, personNames (Rolodex people to link), and calendarEventId / calendarTitle (link a planned calendar block).",
   },
   stop_timer: {
     action: "stop_timer",
@@ -79,7 +79,7 @@ export const ACTION_REGISTRY: Record<string, ActionDef> = {
     risk: "medium",
     confirmationRequired: true,
     supported: true,
-    description: "Log a completed time entry with explicit start and end times (backfill). Supports categoryName and personNames.",
+    description: "Log a completed time entry with explicit start and end times (backfill). Supports categoryName, personNames, and calendarEventId / calendarTitle (link a planned calendar block).",
   },
   log_habit: {
     action: "log_habit",

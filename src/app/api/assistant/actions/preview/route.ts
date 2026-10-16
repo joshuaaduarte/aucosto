@@ -82,6 +82,7 @@ export async function POST(req: NextRequest) {
     previewText: preview.previewText,
     normalizedInput: preview.normalizedInput,
     warnings: preview.warnings,
+    suggestedCalendarLink: preview.suggestedCalendarLink ?? null,
     auditId,
   });
 }
