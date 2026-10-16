@@ -335,7 +335,7 @@ through the same risk gating and audit trail as the REST routes. See
 
 Current risk assignments:
 - `low`: `create_task`, `log_habit`, `create_habit`, `add_reflection`, `create_project`
-- `medium`: `complete_task`, `update_task`, `create_calendar_block`, `update_calendar_event`, `delete_calendar_event`, `delete_project`, `start_timer`, `stop_timer`, `edit_time_entry`, `log_time_entry`, `update_project`
+- `medium`: `complete_task`, `update_task`, `create_calendar_block`, `update_calendar_event`, `delete_calendar_event`, `delete_project`, `start_timer`, `stop_timer`, `swap_timer`, `edit_time_entry`, `log_time_entry`, `update_project`
 - `high`: `finance_write` (also `supported: false`)
 
 ---
@@ -442,6 +442,35 @@ POST /api/assistant/actions/execute
 }
 ```
 
+### Swap timer (medium risk — preview first, then confirm)
+
+Atomically stops the currently running timer and starts a new one in a
+single action, replacing the stop → find → edit → start dance. The optional
+`note` is saved onto the stopped entry (e.g. what was accomplished);
+`categoryName`, `habitName`, and `personNames` apply to the *new* timer.
+If no timer is running, it just starts the new one and the note is ignored.
+```
+POST /api/assistant/actions/preview
+{
+  "action": "swap_timer",
+  "input": {
+    "title": "Deep work",
+    "note": "Finished the repair dashboard",
+    "categoryName": "work",
+    "personNames": ["Ana"]
+  },
+  "source": { "actor": "openclaw" }
+}
+```
+
+Preview text:
+```
+Stop "Commute" (running 42m) and start "Deep work" [work] · with Ana
+Note saved on stopped entry: "Finished the repair dashboard"
+```
+
+Then execute with `"confirmed": true` as usual.
+
 ### Edit time entry (medium risk)
 ```
 POST /api/assistant/actions/preview
@@ -464,12 +493,14 @@ After: 8:55 AM–9:15 AM · 20m
 
 ### Linking people to time entries (medium risk)
 
-`start_timer`, `log_time_entry`, and `edit_time_entry` accept an optional
-`personNames` array of Rolodex display names. Names resolve exact-first, then
-single fuzzy match; unknown or ambiguous names produce a warning and are
-skipped — the action never fails and never guesses.
+`start_timer`, `swap_timer`, `log_time_entry`, and `edit_time_entry` accept an
+optional `personNames` array of Rolodex display names. Names resolve
+exact-first, then single fuzzy match; unknown or ambiguous names produce a
+warning and are skipped — the action never fails and never guesses.
 
-- On `start_timer` / `log_time_entry`, resolved people are linked to the new entry.
+- On `start_timer` / `swap_timer` / `log_time_entry`, resolved people are
+  linked to the new entry (`swap_timer` links them to the newly started timer,
+  not the stopped one).
 - On `edit_time_entry`, `personNames` uses **replace semantics**: the provided
   list becomes the full linked set. Pass `[]` to clear links; omit the field
   to leave links untouched.
