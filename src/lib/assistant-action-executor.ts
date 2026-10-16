@@ -2,8 +2,9 @@ import "server-only";
 import { z } from "zod";
 
 import { createDoItem, updateDoItem, getDoItemSummary } from "@/lib/services/do";
-import { getRunningEntry, startEntry, stopRunning, updateEntry, listRecentEntries, createPastEntry, deleteEntry } from "@/lib/services/time";
+import { getRunningEntry, startEntry, stopRunning, updateEntry, listRecentEntries, createPastEntry, deleteEntry, getTimeEntry } from "@/lib/services/time";
 import { setEntryPeople, listEntryPeople, clearEntryPeople } from "@/lib/services/time-people";
+import { listTimeCategories } from "@/lib/services/time-categories";
 import {
   setEntryCalendarLink,
   resolveCalendarBlockByTitle,
@@ -18,7 +19,7 @@ import {
   upsertReflection,
   buildReflectionSnapshot,
 } from "@/lib/services/reflect";
-import { updateProject, listBoardProjects, createBoardProject, deleteProject } from "@/lib/services/projects";
+import { updateProject, listBoardProjects, createBoardProject, deleteProject, getProjectDeleteImpact } from "@/lib/services/projects";
 import {
   updateProjectPlan,
   addProjectQuestion,
@@ -84,33 +85,52 @@ export interface LogTimeEntryBatchResult {
 // ── Input schemas ─────────────────────────────────────────────────────────
 
 const CreateTaskInput = z.object({
-  title: z.string().min(1).max(200),
+  title: z
+    .string({ error: "title is required (1–200 characters)" })
+    .min(1, "title cannot be empty")
+    .max(200, "title must be 200 characters or fewer"),
   projectName: z.string().optional(),
   bucket: z.enum(["today", "next", "later", "someday", "backlog"]).default("someday"),
   notes: z.string().optional(),
 });
 
 const CompleteTaskInput = z.object({
-  taskId: z.string().min(1),
+  taskId: z
+    .string({ error: "taskId is required" })
+    .min(1, "taskId cannot be empty"),
 });
 
 const UpdateTaskInput = z.object({
-  taskId: z.string().min(1),
-  title: z.string().min(1).max(200).optional(),
+  taskId: z
+    .string({ error: "taskId is required" })
+    .min(1, "taskId cannot be empty"),
+  title: z.string().min(1, "title cannot be empty").max(200, "title must be 200 characters or fewer").optional(),
   bucket: z.enum(["today", "next", "later", "someday"]).optional(),
   projectName: z.string().optional(),
 });
 
 const CreateCalendarBlockInput = z.object({
-  title: z.string().min(1).max(200),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  startTime: z.string().regex(/^\d{2}:\d{2}$/),
-  endTime: z.string().regex(/^\d{2}:\d{2}$/),
+  title: z
+    .string({ error: "title is required (1–200 characters)" })
+    .min(1, "title cannot be empty")
+    .max(200, "title must be 200 characters or fewer"),
+  date: z
+    .string({ error: "date is required" })
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD (e.g. 2026-10-16)"),
+  startTime: z
+    .string({ error: "startTime is required" })
+    .regex(/^\d{2}:\d{2}$/, "startTime must be HH:MM from 00:00 to 23:59"),
+  endTime: z
+    .string({ error: "endTime is required" })
+    .regex(/^\d{2}:\d{2}$/, "endTime must be HH:MM from 00:00 to 23:59"),
   notes: z.string().optional(),
 });
 
 const StartTimerInput = z.object({
-  title: z.string().min(1).max(200),
+  title: z
+    .string({ error: "title is required (1–200 characters)" })
+    .min(1, "title cannot be empty")
+    .max(200, "title must be 200 characters or fewer"),
   categoryName: z.string().optional(),
   habitName: z.string().optional(),
   personNames: z.array(z.string()).optional(),
@@ -127,7 +147,10 @@ const StopTimerInput = z.object({
 });
 
 const SwapTimerInput = z.object({
-  title: z.string().min(1).max(200),
+  title: z
+    .string({ error: "title is required (1–200 characters)" })
+    .min(1, "title cannot be empty")
+    .max(200, "title must be 200 characters or fewer"),
   note: z.string().optional(), // saved onto the STOPPED entry
   categoryName: z.string().optional(),
   habitName: z.string().optional(),
@@ -135,8 +158,10 @@ const SwapTimerInput = z.object({
 });
 
 const EditTimeEntryInput = z.object({
-  entryId: z.string().min(1),
-  title: z.string().min(1).max(200).optional(),
+  entryId: z
+    .string({ error: "entryId is required — copy the id from the Time view" })
+    .min(1, "entryId cannot be empty"),
+  title: z.string().min(1, "title cannot be empty").max(200, "title must be 200 characters or fewer").optional(),
   startedAt: z.string().optional(), // ISO
   endedAt: z.string().optional(),   // ISO
   categoryName: z.string().optional(),
@@ -144,9 +169,12 @@ const EditTimeEntryInput = z.object({
 });
 
 const LogTimeEntryInput = z.object({
-  title: z.string().min(1).max(200),
-  startedAt: z.string(), // ISO datetime
-  endedAt: z.string(),   // ISO datetime
+  title: z
+    .string({ error: "title is required (1–200 characters)" })
+    .min(1, "title cannot be empty")
+    .max(200, "title must be 200 characters or fewer"),
+  startedAt: z.string({ error: "startedAt is required (ISO datetime, e.g. 2026-10-16T09:00:00)" }),
+  endedAt: z.string({ error: "endedAt is required (ISO datetime, e.g. 2026-10-16T10:00:00)" }),
   categoryName: z.string().optional(),
   notes: z.string().optional(),
   personNames: z.array(z.string()).optional(),
@@ -171,13 +199,18 @@ const LogTimeEntriesInput = z.object({
 });
 
 const LogHabitInput = z.object({
-  habitName: z.string().min(1),
-  value: z.number().positive().optional(),
+  habitName: z
+    .string({ error: "habitName is required" })
+    .min(1, "habitName cannot be empty"),
+  value: z.number().positive("value must be a positive number").optional(),
   note: z.string().optional(),
 });
 
 const CreateHabitInput = z.object({
-  title: z.string().min(1).max(200),
+  title: z
+    .string({ error: "title is required (1–200 characters)" })
+    .min(1, "title cannot be empty")
+    .max(200, "title must be 200 characters or fewer"),
   cadence: z.enum(["daily", "weekdays", "weekly", "custom"]).default("daily"),
   dayPart: z.enum(["morning", "day", "evening", "anytime"]).default("anytime"),
   targetCount: z.number().int().positive().max(100000).optional(),
@@ -194,17 +227,31 @@ const AddReflectionInput = z.object({
   note: z.string().optional(),
 });
 
-const UpdateProjectInput = z.object({
-  projectName: z.string().min(1),
-  status: z.enum(["active", "paused", "done"]).optional(),
-  notes: z.string().optional(),
-});
+const UpdateProjectInput = z
+  .object({
+    projectName: z.string().min(1).optional(),
+    /** Explicit project id (wins over projectName when both are given). */
+    projectId: z.string().min(1).optional(),
+    status: z.enum(["active", "paused", "done"]).optional(),
+    notes: z.string().optional(),
+  })
+  .refine((v) => v.projectName || v.projectId, {
+    message: "Provide projectName or projectId to identify the project to update",
+  });
 
 const CreateProjectInput = z.object({
   name: z.string().min(1).max(200),
   intent: z.string().max(1000).optional(),
-  status: z.string().max(50).optional(),
-  energyType: z.string().max(50).optional(),
+  status: z
+    .enum(["exploring", "active", "final_push", "paused", "done"], {
+      error: "status must be one of: exploring, active, final_push, paused, done",
+    })
+    .optional(),
+  energyType: z
+    .enum(["deep", "light", "creative", "admin"], {
+      error: "energyType must be one of: deep, light, creative, admin",
+    })
+    .optional(),
   timeBudgetMinutes: z.number().int().positive().max(10080).optional(),
   targetDate: z
     .string()
@@ -249,34 +296,45 @@ const DeleteTimeEntryInput = z.object({
   entryId: z.string().min(1),
 });
 
-const UpdateProjectPlanInput = z.object({
-  projectName: z.string().min(1),
-  goal: z.string().max(1000).optional(),
-  whyItMatters: z.string().max(1000).optional(),
-  nextMilestone: z.string().max(500).optional(),
-  nextAction: z.string().max(500).optional(),
-  planNotes: z.string().max(5000).optional(),
-});
+/**
+ * Every project-planning action identifies its project by projectName or
+ * projectId (explicit id wins when both are given).
+ */
+const projectRefFields = {
+  projectName: z.string().min(1).optional(),
+  projectId: z.string().min(1).optional(),
+};
 
-const AddProjectMilestoneInput = z.object({
-  projectName: z.string().min(1),
-  milestone: z.string().min(1).max(500),
-});
+const projectRefRefine = {
+  message: "Provide projectName or projectId to identify the project",
+} as const;
 
-const AddProjectQuestionInput = z.object({
-  projectName: z.string().min(1),
-  question: z.string().min(1).max(500),
-});
+const UpdateProjectPlanInput = z
+  .object({
+    ...projectRefFields,
+    goal: z.string().max(1000).optional(),
+    whyItMatters: z.string().max(1000).optional(),
+    nextMilestone: z.string().max(500).optional(),
+    nextAction: z.string().max(500).optional(),
+    planNotes: z.string().max(5000).optional(),
+  })
+  .refine((v) => v.projectName || v.projectId, projectRefRefine);
 
-const AddProjectBlockerInput = z.object({
-  projectName: z.string().min(1),
-  blocker: z.string().min(1).max(500),
-});
+const AddProjectMilestoneInput = z
+  .object({ ...projectRefFields, milestone: z.string().min(1).max(500) })
+  .refine((v) => v.projectName || v.projectId, projectRefRefine);
 
-const SetProjectNextActionInput = z.object({
-  projectName: z.string().min(1),
-  nextAction: z.string().min(1).max(500),
-});
+const AddProjectQuestionInput = z
+  .object({ ...projectRefFields, question: z.string().min(1).max(500) })
+  .refine((v) => v.projectName || v.projectId, projectRefRefine);
+
+const AddProjectBlockerInput = z
+  .object({ ...projectRefFields, blocker: z.string().min(1).max(500) })
+  .refine((v) => v.projectName || v.projectId, projectRefRefine);
+
+const SetProjectNextActionInput = z
+  .object({ ...projectRefFields, nextAction: z.string().min(1).max(500) })
+  .refine((v) => v.projectName || v.projectId, projectRefRefine);
 
 const CreateRolodexPersonInput = z.object({
   displayName: z.string().min(1).max(200),
@@ -284,7 +342,10 @@ const CreateRolodexPersonInput = z.object({
   lastName: z.string().max(100).optional(),
   relationshipType: z.string().optional(),
   organization: z.string().max(200).optional(),
-  birthday: z.string().optional(),
+  birthday: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "birthday must be YYYY-MM-DD (e.g. 1990-05-14)")
+    .optional(),
   notes: z.string().max(5000).optional(),
 });
 
@@ -302,13 +363,19 @@ const AddRolodexInteractionInput = z.object({
   title: z.string().min(1).max(300),
   body: z.string().max(5000).optional(),
   followUpNeeded: z.boolean().optional(),
-  followUpDate: z.string().optional(),
+  followUpDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "followUpDate must be YYYY-MM-DD (e.g. 2026-10-20)")
+    .optional(),
 });
 
 const AddPersonFollowupInput = z.object({
   personName: z.string().min(1),
   title: z.string().min(1).max(300),
-  followUpDate: z.string().optional(),
+  followUpDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "followUpDate must be YYYY-MM-DD (e.g. 2026-10-20)")
+    .optional(),
 });
 
 const AddGiftIdeaInput = z.object({
@@ -353,10 +420,57 @@ export const ACTION_INPUT_SCHEMAS: Record<string, z.ZodTypeAny> = {
 };
 
 // ── Name resolvers (read-only) ────────────────────────────────────────────
+// Consistent policy for every name lookup across actions:
+//   - exact (case-insensitive) match wins;
+//   - a single close (substring) match is NEVER picked silently — optional
+//     links warn-and-skip with a suggestion, required names fail with a
+//     "did you mean …?" error;
+//   - zero or ambiguous matches never guess: required names fail listing
+//     candidates, optional links warn-and-skip.
 
 type ResolveResult<T> =
   | { found: true; match: T }
-  | { found: false; candidates: AmbiguityCandidate[] };
+  | { found: false; candidates: AmbiguityCandidate[]; suggestion?: string };
+export type NameMatchKind = "exact" | "close" | "ambiguous" | "none";
+
+export interface NameMatch<T> {
+  kind: NameMatchKind;
+  /** The single candidate for "exact" and "close"; null otherwise. */
+  match: T | null;
+  /** Close candidates: the one ("close") or the several ("ambiguous"). */
+  candidates: T[];
+}
+
+/**
+ * Classify a name against candidate items. `names` returns every name form an
+ * item can be matched by (e.g. display name plus aliases); "exact" means some
+ * form equals the query case-insensitively, "close" means exactly one item
+ * has a form containing the query.
+ */
+export function classifyNameMatch<T>(
+  items: T[],
+  name: string,
+  names: (item: T) => string[],
+): NameMatch<T> {
+  const lower = name.toLowerCase();
+  const exact = items.filter((item) =>
+    names(item).some((n) => n.toLowerCase() === lower),
+  );
+  if (exact.length === 1) return { kind: "exact", match: exact[0]!, candidates: [] };
+  if (exact.length > 1) return { kind: "ambiguous", match: null, candidates: exact };
+  const close = items.filter((item) =>
+    names(item).some((n) => n.toLowerCase().includes(lower)),
+  );
+  if (close.length === 1) return { kind: "close", match: close[0]!, candidates: close };
+  if (close.length > 1) return { kind: "ambiguous", match: null, candidates: close };
+  return { kind: "none", match: null, candidates: [] };
+}
+
+/** Everything a caller needs: the classification plus the full item list. */
+export interface ResolvedNames<T> {
+  match: NameMatch<T>;
+  all: T[];
+}
 
 async function resolveProjectByName(
   userId: string,
@@ -369,7 +483,16 @@ async function resolveProjectByName(
   if (exact.length === 1) return { found: true, match: exact[0]! };
 
   const partial = projects.filter((p) => p.name.toLowerCase().includes(lower));
-  if (partial.length === 1) return { found: true, match: partial[0]! };
+  if (partial.length === 1) {
+    // One close match: never pick it silently — hand back a suggestion so
+    // the caller can ask rather than guess.
+    const only = partial[0]!;
+    return {
+      found: false,
+      candidates: [{ id: only.id, name: only.name }],
+      suggestion: only.name,
+    };
+  }
 
   const pool = exact.length > 1 ? exact : partial;
   return {
@@ -378,34 +501,191 @@ async function resolveProjectByName(
   };
 }
 
-async function resolveHabitByName(
-  userId: string,
+/**
+ * Shared "project not found" message for project actions. Exact match wins;
+ * a single close match becomes a "did you mean" suggestion; several matches
+ * list candidates; zero matches point at the project list.
+ */
+function projectResolutionError(
   name: string,
-): Promise<ResolveResult<{ id: string; title: string; bucket: string | null }>> {
-  const habits = await listHabits(userId);
-  const lower = name.toLowerCase();
-
-  const exact = habits.filter((h) => h.title.toLowerCase() === lower);
-  if (exact.length === 1) return { found: true, match: exact[0]! };
-
-  const partial = habits.filter((h) => h.title.toLowerCase().includes(lower));
-  if (partial.length === 1) return { found: true, match: partial[0]! };
-
-  const pool = exact.length > 1 ? exact : partial;
-  return {
-    found: false,
-    candidates: pool.map((h) => ({
-      id: h.id,
-      name: h.title,
-      bucket: h.bucket ?? "",
-    })),
-  };
+  candidates: AmbiguityCandidate[],
+  suggestion: string | undefined,
+  idHint: boolean,
+): string {
+  const retry = idHint
+    ? " Retry with the exact project name, or pass projectId to pick one."
+    : "";
+  if (suggestion) {
+    return `No exact project match for "${name}" — did you mean "${suggestion}"?${retry}`;
+  }
+  if (candidates.length > 0) {
+    return `Ambiguous project match for "${name}" — ${candidates.length} projects match.${retry}`;
+  }
+  return `No project found matching "${name}". Use assistant_list_projects to see exact project names.`;
 }
 
 /**
- * Resolve display names to Rolodex person IDs. Exact display-name matches win;
- * a single fuzzy match is accepted; zero or ambiguous matches produce a
- * warning and are skipped (never fail the whole action, never guess).
+ * Resolve a project by explicit id (wins when given) or by name. Used by
+ * every project action so id formats and not-found behavior are identical.
+ */
+async function resolveProjectRef(
+  userId: string,
+  ref: { projectName?: string; projectId?: string },
+): Promise<
+  | { ok: true; project: { id: string; name: string } }
+  | { ok: false; error: string; candidates: AmbiguityCandidate[] }
+> {
+  if (ref.projectId) {
+    const projects = await listBoardProjects(userId);
+    const found = projects.find((p) => p.id === ref.projectId);
+    if (!found) {
+      return {
+        ok: false,
+        error: `Project id "${ref.projectId}" not found. Use assistant_list_projects to see valid project ids.`,
+        candidates: [],
+      };
+    }
+    return { ok: true, project: found };
+  }
+  const resolved = await resolveProjectByName(userId, ref.projectName!);
+  if (resolved.found) return { ok: true, project: resolved.match };
+  return {
+    ok: false,
+    error: projectResolutionError(
+      ref.projectName!,
+      resolved.candidates,
+      resolved.suggestion,
+      true,
+    ),
+    candidates: resolved.candidates,
+  };
+}
+
+async function resolveHabitByName(
+  userId: string,
+  name: string,
+): Promise<
+  ResolvedNames<{ id: string; title: string; bucket: string | null }>
+> {
+  const habits = await listHabits(userId);
+  return {
+    match: classifyNameMatch(habits, name, (h) => [h.title]),
+    all: habits,
+  };
+}
+
+/** Person name forms: display name plus first/last name and aliases. */
+function personNameForms(p: {
+  displayName: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  aliases: string[];
+}): string[] {
+  return [
+    p.displayName,
+    ...(p.firstName ? [p.firstName] : []),
+    ...(p.lastName ? [p.lastName] : []),
+    ...p.aliases,
+  ];
+}
+
+const KNOWN_LIST_LIMIT = 8;
+
+/** " Known projects: "A", "B" (+2 more)." — empty string when there's nothing. */
+function formatKnownList(names: string[], label: string): string {
+  if (names.length === 0) return "";
+  const shown = names.slice(0, KNOWN_LIST_LIMIT);
+  const more =
+    names.length > shown.length ? ` (+${names.length - shown.length} more)` : "";
+  return ` Known ${label}: ${shown.map((n) => `"${n}"`).join(", ")}${more}.`;
+}
+
+interface RequiredNameOpts<T> {
+  label: string;
+  input: string;
+  toCandidate: (item: T) => AmbiguityCandidate;
+  nameOf: (item: T) => string;
+  /** Extra guidance appended to the no-match error (e.g. where to list ids). */
+  hint?: string;
+}
+
+/**
+ * Required-name failure: exact wins (caller handles it); a single close match
+ * becomes a "did you mean …?" error (never picked silently); ambiguous lists
+ * candidates; none lists what exists. Always ok:false with candidates.
+ */
+function requiredNameError<T>(
+  resolved: ResolvedNames<T>,
+  opts: RequiredNameOpts<T>,
+): PreviewResult {
+  const { label, input } = opts;
+  const { match, all } = resolved;
+  if (match.kind === "close") {
+    const item = match.match!;
+    return errAmbiguous(
+      `No ${label} exactly matching "${input}" — did you mean "${opts.nameOf(item)}"? Pass the exact name and retry.`,
+      [opts.toCandidate(item)],
+    );
+  }
+  if (match.kind === "ambiguous") {
+    const names = match.candidates.map((c) => `"${opts.nameOf(c)}"`).join(", ");
+    return errAmbiguous(
+      `Ambiguous ${label} match for "${input}" — pass the exact name: ${names}.`,
+      match.candidates.map(opts.toCandidate),
+    );
+  }
+  const hint = opts.hint ? ` ${opts.hint}` : "";
+  return errAmbiguous(
+    `No ${label} found matching "${input}".${formatKnownList(all.map(opts.nameOf), `${label}s`)}${hint}`,
+    [],
+  );
+}
+
+interface OptionalNameOpts<T> {
+  label: string;
+  input: string;
+  nameOf: (item: T) => string;
+  /** Explains what happens without the link, e.g. "task will be created without a project". */
+  skipNote?: string;
+}
+
+/** Shared options for every required projectName lookup. */
+const PROJECT_NAME_OPTS = {
+  label: "project",
+  toCandidate: (p: { id: string; name: string }) => ({ id: p.id, name: p.name }),
+  nameOf: (p: { id: string; name: string }) => p.name,
+  hint: "List projects via GET /api/assistant/projects.",
+};
+
+
+/**
+ * Optional-link warning: returns null when the match is exact (caller links
+ * it); otherwise a warn-and-skip message — a close match suggests the exact
+ * name instead of linking, never silently picks.
+ */
+function optionalNameWarning<T>(
+  resolved: ResolvedNames<T>,
+  opts: OptionalNameOpts<T>,
+): string | null {
+  const { label, input, skipNote } = opts;
+  const { match } = resolved;
+  const tail = skipNote ? ` ${skipNote}` : "";
+  if (match.kind === "exact") return null;
+  if (match.kind === "close") {
+    return `"${input}" is close to "${opts.nameOf(match.match!)}" but not an exact match — not linked.${tail} Pass the exact name to link it.`;
+  }
+  if (match.kind === "ambiguous") {
+    const names = match.candidates.map((c) => opts.nameOf(c)).join(", ");
+    return `Multiple ${label}s matched "${input}" (${names}) — skipping to avoid a wrong link.${tail}`;
+  }
+  return `No ${label} matched "${input}" — skipping.${tail}`;
+}
+
+/**
+ * Resolve display names to Rolodex person IDs. Exact matches (display name,
+ * first/last name, or alias) win; a single close match warns and is skipped
+ * with a suggestion; zero or ambiguous matches warn and skip. Never fails the
+ * whole action, never guesses.
  */
 async function resolvePeopleByNames(
   userId: string,
@@ -417,22 +697,24 @@ async function resolvePeopleByNames(
   for (const raw of names) {
     const name = raw.trim();
     if (!name) continue;
-    const lower = name.toLowerCase();
     const matches = await findPersonByName(userId, name);
-    const exact = matches.filter((m) => m.displayName.toLowerCase() === lower);
-    const pool = exact.length > 0 ? exact : matches;
-    if (pool.length === 1) {
-      ids.push(pool[0]!.id);
-      labels.push(pool[0]!.displayName);
-    } else if (pool.length === 0) {
+    const m = classifyNameMatch(matches, name, personNameForms);
+    if (m.kind === "exact") {
+      ids.push(m.match!.id);
+      labels.push(m.match!.displayName);
+    } else if (m.kind === "close") {
       warnings.push(
-        `No Rolodex person matched "${name}" — no one linked for that name`,
+        `"${name}" is close to "${m.match!.displayName}" but not an exact match — not linked. Pass the exact name to link them.`,
+      );
+    } else if (m.kind === "ambiguous") {
+      warnings.push(
+        `Multiple people matched "${name}" (${m.candidates
+          .map((p) => p.displayName)
+          .join(", ")}) — skipping to avoid a wrong link`,
       );
     } else {
       warnings.push(
-        `Multiple people matched "${name}" (${pool
-          .map((p) => p.displayName)
-          .join(", ")}) — skipping to avoid a wrong link`,
+        `No Rolodex person matched "${name}" — no one linked for that name`,
       );
     }
   }
@@ -441,6 +723,53 @@ async function resolvePeopleByNames(
     labels: [...new Set(labels)],
     warnings,
   };
+}
+
+/**
+ * Resolve a category name against the user's time categories. An exact
+ * (case-insensitive) match is normalized to the stored name; a single close
+ * or ambiguous match warns and is skipped (never silently remapped); with no
+ * match at all the raw value is kept — categories are free text in the app,
+ * so this saves it as a new category — with a warning naming the existing
+ * categories.
+ */
+async function resolveCategoryName(
+  userId: string,
+  raw: string | undefined,
+): Promise<{ category: string | null; warnings: string[] }> {
+  const warnings: string[] = [];
+  const name = raw?.trim();
+  if (!name) return { category: null, warnings };
+  let categories: { name: string }[] = [];
+  try {
+    categories = await listTimeCategories(userId);
+  } catch (error) {
+    console.error("[assistant] listTimeCategories failed", error);
+  }
+  const m = classifyNameMatch(categories, name, (c) => [c.name]);
+  if (m.kind === "exact") return { category: m.match!.name, warnings };
+  const known = formatKnownList(
+    categories.map((c) => c.name),
+    "categories",
+  );
+  if (m.kind === "close") {
+    warnings.push(
+      `Category "${name}" is close to "${m.match!.name}" but not an exact match — not set. Pass the exact category name.${known}`,
+    );
+    return { category: null, warnings };
+  }
+  if (m.kind === "ambiguous") {
+    warnings.push(
+      `Category "${name}" matched several categories (${m.candidates
+        .map((c) => c.name)
+        .join(", ")}) — not set. Pass the exact category name.`,
+    );
+    return { category: null, warnings };
+  }
+  warnings.push(
+    `Category "${name}" is not one of your existing categories — it will be saved as a new category.${known}`,
+  );
+  return { category: name, warnings };
 }
 
 // ── Calendar link resolution (planned vs actual) ────────────────────────────
@@ -474,7 +803,7 @@ async function resolveCalendarLinkInput(
     const item = await getCalendarItem(userId, calendarEventId);
     if (!item) {
       warnings.push(
-        `Calendar event "${calendarEventId}" not found — continuing without a calendar link`,
+        `Calendar event "${calendarEventId}" not found — continuing without a calendar link. List events via GET /api/assistant/calendar to get a valid event id`,
       );
       return { eventId: null, title: null, warnings, linkedNote: "" };
     }
@@ -521,11 +850,43 @@ function coerceCalendarSuggestion(
 
 // ── Date helpers ──────────────────────────────────────────────────────────
 
-// Build a local Date from "YYYY-MM-DD" + "HH:MM". Node.js interprets date-time
-// strings without a timezone offset as local time (using process.env.TZ), which
-// is pinned to the app timezone by src/instrumentation.ts.
-function parseDateTimeLocal(date: string, time: string): Date {
-  return new Date(`${date}T${time}:00`);
+/**
+ * Parse "YYYY-MM-DD" + "HH:MM" as app-local time, strictly. Rejects impossible
+ * times ("24:00") and impossible dates ("2026-02-30") that the native Date
+ * parser silently rolls over into a different day.
+ */
+function parseLocalDateTimeStrict(
+  date: string,
+  time: string,
+): { ok: true; date: Date } | { ok: false; error: string } {
+  const tm = /^(\d{2}):(\d{2})$/.exec(time);
+  const hh = tm ? Number(tm[1]) : NaN;
+  const mm = tm ? Number(tm[2]) : NaN;
+  if (!tm || hh > 23 || mm > 59) {
+    return {
+      ok: false,
+      error: `"${time}" is not a valid time — use HH:MM from 00:00 to 23:59`,
+    };
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return {
+      ok: false,
+      error: `"${date}" is not a valid date — use YYYY-MM-DD (e.g. 2026-10-16)`,
+    };
+  }
+  const d = new Date(`${date}T${time}:00`);
+  if (Number.isNaN(d.getTime())) {
+    return { ok: false, error: `"${date} ${time}" is not a valid date/time` };
+  }
+  if (localDatePart(d) !== date) {
+    return { ok: false, error: `"${date}" is not a real calendar date` };
+  }
+  return { ok: true, date: d };
+}
+
+/** "Thing" not found by id, with a pointer to where valid ids come from. */
+function idNotFound(what: string, id: string, listHint: string): string {
+  return `${what} "${id}" not found — ${listHint}`;
 }
 
 // Extract local "YYYY-MM-DD" / "HH:MM" parts from a Date (same TZ assumption).
@@ -548,7 +909,7 @@ async function previewCreateTask(
 ): Promise<PreviewResult> {
   const parsed = CreateTaskInput.safeParse(raw);
   if (!parsed.success) {
-    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+    return zodErr(parsed.error);
   }
   const { title, projectName, bucket, notes } = parsed.data;
   const warnings: string[] = [];
@@ -557,11 +918,19 @@ async function previewCreateTask(
 
   if (projectName) {
     const resolved = await resolveProjectByName(userId, projectName);
-    if (!resolved.found) {
-      warnings.push(`Project "${projectName}" not found — task will be created without a project`);
-    } else {
+    if (resolved.found) {
       projectId = resolved.match.id;
       resolvedProjectName = resolved.match.name;
+    } else {
+      const skipNote = "Task will be created without a project.";
+      if (resolved.suggestion) {
+        warnings.push(`"${projectName}" is close to "${resolved.suggestion}" but not an exact match — not linked. ${skipNote} Pass the exact name to link it.`);
+      } else if (resolved.candidates.length > 0) {
+        const names = resolved.candidates.map((c) => c.name).join(", ");
+        warnings.push(`Multiple projects matched "${projectName}" (${names}) — skipping to avoid a wrong link. ${skipNote}`);
+      } else {
+        warnings.push(`No project matched "${projectName}" — skipping. ${skipNote}`);
+      }
     }
   }
 
@@ -587,11 +956,19 @@ async function previewCompleteTask(
 ): Promise<PreviewResult> {
   const parsed = CompleteTaskInput.safeParse(raw);
   if (!parsed.success) {
-    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+    return zodErr(parsed.error);
   }
   const { taskId } = parsed.data;
   const task = await getDoItemSummary(userId, taskId);
-  if (!task) return err(`Task "${taskId}" not found`);
+  if (!task) {
+    return err(
+      idNotFound(
+        "Task",
+        taskId,
+        "list tasks via GET /api/assistant/tasks to get a valid task id",
+      ),
+    );
+  }
   if (task.status === "done") {
     return err(`Task "${task.title}" is already done`);
   }
@@ -610,24 +987,42 @@ async function previewUpdateTask(
 ): Promise<PreviewResult> {
   const parsed = UpdateTaskInput.safeParse(raw);
   if (!parsed.success) {
-    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+    return zodErr(parsed.error);
   }
   const { taskId, title, bucket, projectName } = parsed.data;
   const task = await getDoItemSummary(userId, taskId);
-  if (!task) return err(`Task "${taskId}" not found`);
+  if (!task) {
+    return err(
+      idNotFound(
+        "Task",
+        taskId,
+        "list tasks via GET /api/assistant/tasks to get a valid task id",
+      ),
+    );
+  }
 
   const warnings: string[] = [];
   let projectId: string | undefined | null = undefined;
+  let resolvedProjectName: string | null = null;
 
   if (projectName !== undefined) {
     if (projectName === "") {
       projectId = null;
     } else {
       const resolved = await resolveProjectByName(userId, projectName);
-      if (!resolved.found) {
-        warnings.push(`Project "${projectName}" not found — project will not be changed`);
-      } else {
+      if (resolved.found) {
         projectId = resolved.match.id;
+        resolvedProjectName = resolved.match.name;
+      } else {
+        const skipNote = "Project will not be changed.";
+        if (resolved.suggestion) {
+          warnings.push(`"${projectName}" is close to "${resolved.suggestion}" but not an exact match — not linked. ${skipNote} Pass the exact name to link it.`);
+        } else if (resolved.candidates.length > 0) {
+          const names = resolved.candidates.map((c) => c.name).join(", ");
+          warnings.push(`Multiple projects matched "${projectName}" (${names}) — skipping to avoid a wrong link. ${skipNote}`);
+        } else {
+          warnings.push(`No project matched "${projectName}" — skipping. ${skipNote}`);
+        }
       }
     }
   }
@@ -642,13 +1037,28 @@ async function previewUpdateTask(
   if (projectId !== undefined) normalizedInput.projectId = projectId;
 
   const changes: string[] = [];
-  if (title) changes.push(`title → "${title}"`);
-  if (bucket) changes.push(`lane → [${bucket}]`);
-  if (projectId !== undefined) changes.push(`project → ${projectId ?? "none"}`);
+  if (title !== undefined && title !== task.title) changes.push(`title → "${title}"`);
+  if (bucket !== undefined && bucket !== task.lane) changes.push(`lane → [${bucket}]`);
+  if (projectId !== undefined) {
+    if (projectId === task.projectId) {
+      // Already on this project — not a change.
+      projectId = undefined;
+      delete normalizedInput.projectId;
+    } else {
+      changes.push(
+        projectId === null ? `project → none` : `project → "${resolvedProjectName}"`,
+      );
+    }
+  }
+  if (changes.length === 0) {
+    return err(
+      "No changes specified — pass at least one of: title, bucket, projectName",
+    );
+  }
 
   return {
     ok: true,
-    previewText: `Update task "${task.title}": ${changes.join(", ") || "no changes"}`,
+    previewText: `Update task "${task.title}": ${changes.join(", ")}`,
     normalizedInput,
     warnings,
   };
@@ -660,17 +1070,18 @@ async function previewCreateCalendarBlock(
 ): Promise<PreviewResult> {
   const parsed = CreateCalendarBlockInput.safeParse(raw);
   if (!parsed.success) {
-    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+    return zodErr(parsed.error);
   }
   const { title, date, startTime, endTime, notes } = parsed.data;
 
-  const startsAt = parseDateTimeLocal(date, startTime);
-  const endsAt = parseDateTimeLocal(date, endTime);
-  if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
-    return err("Invalid date or time");
-  }
-  if (endsAt <= startsAt) {
-    return err("End time must be after start time");
+  const startsAt = parseLocalDateTimeStrict(date, startTime);
+  if (!startsAt.ok) return err(`Invalid startTime: ${startsAt.error}`);
+  const endsAt = parseLocalDateTimeStrict(date, endTime);
+  if (!endsAt.ok) return err(`Invalid endTime: ${endsAt.error}`);
+  if (endsAt.date <= startsAt.date) {
+    return err(
+      `End time must be after start time (got ${startTime}–${endTime} on ${date})`,
+    );
   }
 
   return {
@@ -678,8 +1089,8 @@ async function previewCreateCalendarBlock(
     previewText: `Create calendar block "${title}" on ${date} ${startTime}–${endTime}`,
     normalizedInput: {
       title,
-      startsAtIso: startsAt.toISOString(),
-      endsAtIso: endsAt.toISOString(),
+      startsAtIso: startsAt.date.toISOString(),
+      endsAtIso: endsAt.date.toISOString(),
       notes: notes ?? null,
     },
     warnings: [],
@@ -692,36 +1103,49 @@ async function previewUpdateCalendarEvent(
 ): Promise<PreviewResult> {
   const parsed = UpdateCalendarEventInput.safeParse(raw);
   if (!parsed.success) {
-    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+    return zodErr(parsed.error);
   }
   const { eventId, title, date, startTime, endTime, notes, location } = parsed.data;
 
   const item = await getCalendarItem(userId, eventId);
-  if (!item) return err(`Calendar event "${eventId}" not found`);
+  if (!item) {
+    return err(
+      idNotFound(
+        "Calendar event",
+        eventId,
+        "list events via GET /api/assistant/calendar to get a valid event id",
+      ),
+    );
+  }
 
   const newDate = date ?? localDatePart(item.startsAt);
   const newStartTime = startTime ?? localTimePart(item.startsAt);
   const newEndTime = endTime ?? localTimePart(item.endsAt);
-  const startsAt = parseDateTimeLocal(newDate, newStartTime);
-  const endsAt = parseDateTimeLocal(newDate, newEndTime);
-  if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
-    return err("Invalid date or time");
-  }
-  if (endsAt <= startsAt) {
-    return err("End time must be after start time");
+  const startsAt = parseLocalDateTimeStrict(newDate, newStartTime);
+  if (!startsAt.ok) return err(`Invalid start time: ${startsAt.error}`);
+  const endsAt = parseLocalDateTimeStrict(newDate, newEndTime);
+  if (!endsAt.ok) return err(`Invalid end time: ${endsAt.error}`);
+  if (endsAt.date <= startsAt.date) {
+    return err(
+      `End time must be after start time (got ${newStartTime}–${newEndTime} on ${newDate})`,
+    );
   }
 
   const changes: string[] = [];
   if (title !== undefined && title !== item.title) changes.push(`title → "${title}"`);
   if (
-    startsAt.getTime() !== item.startsAt.getTime() ||
-    endsAt.getTime() !== item.endsAt.getTime()
+    startsAt.date.getTime() !== item.startsAt.getTime() ||
+    endsAt.date.getTime() !== item.endsAt.getTime()
   ) {
     changes.push(`time → ${newDate} ${newStartTime}–${newEndTime}`);
   }
   if (notes !== undefined) changes.push(`notes updated`);
   if (location !== undefined) changes.push(`location → ${location || "none"}`);
-  if (changes.length === 0) return err("No changes specified");
+  if (changes.length === 0) {
+    return err(
+      "No changes specified — pass at least one of: title, date, startTime, endTime, notes, location",
+    );
+  }
 
   return {
     ok: true,
@@ -730,11 +1154,11 @@ async function previewUpdateCalendarEvent(
       eventId,
       beforeTitle: item.title,
       title: title ?? null,
-      startsAtIso: startsAt.toISOString(),
-      endsAtIso: endsAt.toISOString(),
+      startsAtIso: startsAt.date.toISOString(),
+      endsAtIso: endsAt.date.toISOString(),
       timeChanged:
-        startsAt.getTime() !== item.startsAt.getTime() ||
-        endsAt.getTime() !== item.endsAt.getTime(),
+        startsAt.date.getTime() !== item.startsAt.getTime() ||
+        endsAt.date.getTime() !== item.endsAt.getTime(),
       notes: notes ?? null,
       notesChanged: notes !== undefined,
       location: location ?? null,
@@ -750,19 +1174,28 @@ async function previewDeleteCalendarEvent(
 ): Promise<PreviewResult> {
   const parsed = DeleteCalendarEventInput.safeParse(raw);
   if (!parsed.success) {
-    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+    return zodErr(parsed.error);
   }
   const { eventId } = parsed.data;
 
   const item = await getCalendarItem(userId, eventId);
-  if (!item) return err(`Calendar event "${eventId}" not found`);
+  if (!item) {
+    return err(
+      idNotFound(
+        "Calendar event",
+        eventId,
+        "list events via GET /api/assistant/calendar to get a valid event id",
+      ),
+    );
+  }
 
   return {
     ok: true,
     previewText:
       `Delete calendar event "${item.title}" ` +
       `on ${localDatePart(item.startsAt)} ` +
-      `${localTimePart(item.startsAt)}–${localTimePart(item.endsAt)}`,
+      `${localTimePart(item.startsAt)}–${localTimePart(item.endsAt)}` +
+      `\nThis permanently deletes the event. This cannot be undone.`,
     normalizedInput: { eventId, beforeTitle: item.title },
     warnings: [],
   };
@@ -774,7 +1207,7 @@ async function previewStartTimer(
 ): Promise<PreviewResult> {
   const parsed = StartTimerInput.safeParse(raw);
   if (!parsed.success) {
-    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+    return zodErr(parsed.error);
   }
   const { title, categoryName, habitName, personNames, calendarEventId, calendarTitle } = parsed.data;
   const warnings: string[] = [];
@@ -782,11 +1215,24 @@ async function previewStartTimer(
 
   if (habitName) {
     const resolved = await resolveHabitByName(userId, habitName);
-    if (!resolved.found) {
-      warnings.push(`Habit "${habitName}" not found — timer will start without habit link`);
+    const warning = optionalNameWarning(resolved, {
+      label: "habit",
+      input: habitName,
+      nameOf: (h) => h.title,
+      skipNote: "Timer will start without a habit link.",
+    });
+    if (warning) {
+      warnings.push(warning);
     } else {
-      habitId = resolved.match.id;
+      habitId = resolved.match.match!.id;
     }
+  }
+
+  let category: string | null = null;
+  if (categoryName) {
+    const resolved = await resolveCategoryName(userId, categoryName);
+    category = resolved.category;
+    warnings.push(...resolved.warnings);
   }
 
   let personIds: string[] = [];
@@ -822,10 +1268,10 @@ async function previewStartTimer(
 
   return {
     ok: true,
-    previewText: `Start timer "${title}"${categoryName ? ` [${categoryName}]` : ""}${peopleNote}${calendarLink.linkedNote}${stopNote}`,
+    previewText: `Start timer "${title}"${category ? ` [${category}]` : ""}${peopleNote}${calendarLink.linkedNote}${stopNote}`,
     normalizedInput: {
       title,
-      category: categoryName ?? null,
+      category,
       habitId,
       personIds,
       calendarEventId: calendarLink.eventId,
@@ -842,12 +1288,18 @@ async function previewStopTimer(
 ): Promise<PreviewResult> {
   const parsed = StopTimerInput.safeParse(raw);
   if (!parsed.success) {
-    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+    return zodErr(parsed.error);
   }
-  const { endedAtLocal, note } = parsed.data;
+  const { entryId, endedAtLocal, note } = parsed.data;
 
   const running = await getRunningEntry(userId);
   if (!running) return err("No timer is currently running");
+
+  if (entryId && entryId !== running.id) {
+    return err(
+      `entryId "${entryId}" does not match the running timer "${running.label}" (id "${running.id}") — pass entryId "${running.id}" or omit entryId to stop the running timer`,
+    );
+  }
 
   const now = new Date();
   // Interpret endedAtLocal in server TZ (pinned by instrumentation.ts to APP_TIMEZONE)
@@ -874,6 +1326,9 @@ async function previewStopTimer(
     `Proposed end: ${proposedEndClock}`,
     `Final duration: ${fmtMinutes(proposedDurationMin)}`,
   ];
+  if (note && note.trim().length > 0) {
+    lines.push(`Note: "${note.slice(0, 80)}${note.length > 80 ? "…" : ""}"`);
+  }
 
   return {
     ok: true,
@@ -893,7 +1348,7 @@ async function previewSwapTimer(
 ): Promise<PreviewResult> {
   const parsed = SwapTimerInput.safeParse(raw);
   if (!parsed.success) {
-    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+    return zodErr(parsed.error);
   }
   const { title, note, categoryName, habitName, personNames } = parsed.data;
   const warnings: string[] = [];
@@ -901,11 +1356,24 @@ async function previewSwapTimer(
 
   if (habitName) {
     const resolved = await resolveHabitByName(userId, habitName);
-    if (!resolved.found) {
-      warnings.push(`Habit "${habitName}" not found — timer will start without habit link`);
+    const warning = optionalNameWarning(resolved, {
+      label: "habit",
+      input: habitName,
+      nameOf: (h) => h.title,
+      skipNote: "Timer will start without a habit link.",
+    });
+    if (warning) {
+      warnings.push(warning);
     } else {
-      habitId = resolved.match.id;
+      habitId = resolved.match.match!.id;
     }
+  }
+
+  let category: string | null = null;
+  if (categoryName) {
+    const resolved = await resolveCategoryName(userId, categoryName);
+    category = resolved.category;
+    warnings.push(...resolved.warnings);
   }
 
   let personIds: string[] = [];
@@ -927,10 +1395,10 @@ async function previewSwapTimer(
     }
     return {
       ok: true,
-      previewText: `Start timer "${title}"${categoryName ? ` [${categoryName}]` : ""}${peopleNote}`,
+      previewText: `Start timer "${title}"${category ? ` [${category}]` : ""}${peopleNote}`,
       normalizedInput: {
         title,
-        category: categoryName ?? null,
+        category,
         habitId,
         personIds,
         note: null,
@@ -945,9 +1413,9 @@ async function previewSwapTimer(
     (Date.now() - running.startedAt.getTime()) / 60000,
   );
   const lines = [
-    `Stop "${running.label}" (running ${fmtMinutes(elapsedMin)}) and start "${title}"${categoryName ? ` [${categoryName}]` : ""}${peopleNote}`,
+    `Stop "${running.label}" (running ${fmtMinutes(elapsedMin)}) and start "${title}"${category ? ` [${category}]` : ""}${peopleNote}`,
   ];
-  if (note !== undefined) {
+  if (note !== undefined && note.trim().length > 0) {
     lines.push(
       `Note saved on stopped entry: "${note.slice(0, 80)}${note.length > 80 ? "…" : ""}"`,
     );
@@ -958,7 +1426,7 @@ async function previewSwapTimer(
     previewText: lines.join("\n"),
     normalizedInput: {
       title,
-      category: categoryName ?? null,
+      category,
       habitId,
       personIds,
       note: note ?? null,
@@ -975,31 +1443,48 @@ async function previewEditTimeEntry(
 ): Promise<PreviewResult> {
   const parsed = EditTimeEntryInput.safeParse(raw);
   if (!parsed.success) {
-    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+    return zodErr(parsed.error);
   }
   const { entryId, title, startedAt, endedAt, categoryName, personNames } = parsed.data;
   const warnings: string[] = [];
 
   if (startedAt && Number.isNaN(new Date(startedAt).getTime())) {
-    return err("Invalid startedAt — must be an ISO datetime string");
+    return err(
+      `Invalid startedAt "${startedAt}" — must be an ISO datetime string (e.g. 2026-10-16T09:00:00)`,
+    );
   }
   if (endedAt && Number.isNaN(new Date(endedAt).getTime())) {
-    return err("Invalid endedAt — must be an ISO datetime string");
+    return err(
+      `Invalid endedAt "${endedAt}" — must be an ISO datetime string (e.g. 2026-10-16T10:00:00)`,
+    );
   }
 
-  // Look up existing entry for before/after preview
-  const recent = await listRecentEntries(userId, { limit: 200 });
-  const existing = recent.find((e) => e.id === entryId);
+  // Look up existing entry for before/after preview (any age, not just recent).
+  const existing = await getTimeEntry(userId, entryId);
   if (!existing) {
-    return err(`Time entry "${entryId}" not found`);
+    return err(
+      idNotFound("Time entry", entryId, "copy the id from the Time view"),
+    );
   }
 
   if (title === undefined && startedAt === undefined && endedAt === undefined && categoryName === undefined && personNames === undefined) {
-    warnings.push("No changes specified");
+    return err(
+      "No changes specified — pass at least one of: title, startedAt, endedAt, categoryName, personNames",
+    );
   }
 
   const afterStart = startedAt ? new Date(startedAt) : existing.startedAt;
   const afterEnd = endedAt ? new Date(endedAt) : existing.endedAt;
+
+  if (afterEnd && afterEnd <= afterStart) {
+    return err("End time must be after start time");
+  }
+  if (
+    afterEnd &&
+    afterEnd.getTime() - afterStart.getTime() > 24 * 60 * 60 * 1000
+  ) {
+    return err("Entries are capped at 24 hours");
+  }
 
   const beforeStart = fmtClock(existing.startedAt);
   const beforeEnd = existing.endedAt ? fmtClock(existing.endedAt) : "running";
@@ -1018,7 +1503,14 @@ async function previewEditTimeEntry(
     `Before: ${beforeStart}–${beforeEnd} · ${beforeDur}`,
     `After: ${fmtClock(afterStart)}–${afterEndStr} · ${afterDur}`,
   ];
-  if (categoryName) lines.push(`Category: ${categoryName}`);
+
+  let category: string | null = null;
+  if (categoryName !== undefined) {
+    const resolved = await resolveCategoryName(userId, categoryName);
+    category = resolved.category;
+    warnings.push(...resolved.warnings);
+    lines.push(`Category: ${category ?? "(none)"}`);
+  }
 
   // personNames uses replace semantics: the provided list becomes the full
   // linked set (pass [] to clear). Omitted => leave links untouched.
@@ -1040,7 +1532,8 @@ async function previewEditTimeEntry(
       title: title ?? null,
       startedAtIso: startedAt ?? null,
       endedAtIso: endedAt ?? null,
-      category: categoryName ?? null,
+      category,
+      categoryChanged: categoryName !== undefined,
       personIds,
     },
     warnings,
@@ -1053,21 +1546,22 @@ async function previewLogHabit(
 ): Promise<PreviewResult> {
   const parsed = LogHabitInput.safeParse(raw);
   if (!parsed.success) {
-    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+    return zodErr(parsed.error);
   }
   const { habitName, value, note } = parsed.data;
 
   const resolved = await resolveHabitByName(userId, habitName);
-  if (!resolved.found) {
-    return errAmbiguous(
-      resolved.candidates.length === 0
-        ? `No habit found matching "${habitName}"`
-        : `Ambiguous habit match for "${habitName}"`,
-      resolved.candidates,
-    );
+  if (resolved.match.kind !== "exact") {
+    return requiredNameError(resolved, {
+      label: "habit",
+      input: habitName,
+      toCandidate: (h) => ({ id: h.id, name: h.title, bucket: h.bucket ?? "" }),
+      nameOf: (h) => h.title,
+      hint: "List habits via GET /api/assistant/habits.",
+    });
   }
 
-  const habit = resolved.match;
+  const habit = resolved.match.match!;
   return {
     ok: true,
     previewText: `Log habit "${habit.title}"${value !== undefined ? ` (${value}x)` : ""}`,
@@ -1087,7 +1581,7 @@ async function previewCreateHabit(
 ): Promise<PreviewResult> {
   const parsed = CreateHabitInput.safeParse(raw);
   if (!parsed.success) {
-    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+    return zodErr(parsed.error);
   }
   const { title, cadence, dayPart, targetCount, goalUnit, notes, reminderTime } = parsed.data;
 
@@ -1126,7 +1620,7 @@ async function previewAddReflection(
 ): Promise<PreviewResult> {
   const parsed = AddReflectionInput.safeParse(raw);
   if (!parsed.success) {
-    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+    return zodErr(parsed.error);
   }
   const { mood, note } = parsed.data;
   if (mood === undefined && note === undefined) {
@@ -1151,25 +1645,22 @@ async function previewUpdateProject(
 ): Promise<PreviewResult> {
   const parsed = UpdateProjectInput.safeParse(raw);
   if (!parsed.success) {
-    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+    return zodErr(parsed.error);
   }
-  const { projectName, status, notes } = parsed.data;
+  const { projectName, projectId, status, notes } = parsed.data;
 
-  const resolved = await resolveProjectByName(userId, projectName);
-  if (!resolved.found) {
-    return errAmbiguous(
-      resolved.candidates.length === 0
-        ? `No project found matching "${projectName}"`
-        : `Ambiguous project match for "${projectName}"`,
-      resolved.candidates,
-    );
-  }
+  const ref = await resolveProjectRef(userId, { projectName, projectId });
+  if (!ref.ok) return errAmbiguous(ref.error, ref.candidates);
 
-  const project = resolved.match;
+  const project = ref.project;
   const changes: string[] = [];
   if (status) changes.push(`status → ${status}`);
   if (notes !== undefined) changes.push(`notes updated`);
-  if (changes.length === 0) return err("No changes specified");
+  if (changes.length === 0) {
+    return err(
+      "No changes specified — pass at least one of: status, notes",
+    );
+  }
 
   return {
     ok: true,
@@ -1190,7 +1681,7 @@ async function previewCreateProject(
 ): Promise<PreviewResult> {
   const parsed = CreateProjectInput.safeParse(raw);
   if (!parsed.success) {
-    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+    return zodErr(parsed.error);
   }
   const { name, intent, status, energyType, timeBudgetMinutes, targetDate } = parsed.data;
 
@@ -1227,41 +1718,48 @@ async function previewDeleteProject(
 ): Promise<PreviewResult> {
   const parsed = DeleteProjectInput.safeParse(raw);
   if (!parsed.success) {
-    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+    return zodErr(parsed.error);
   }
   const { projectName, projectId, deleteTasks } = parsed.data;
 
-  let project: { id: string; name: string } | null = null;
-  if (projectId) {
-    const projects = await listBoardProjects(userId);
-    const found = projects.find((p) => p.id === projectId);
-    if (!found) return err(`Project "${projectId}" not found`);
-    project = found;
-  } else {
-    const resolved = await resolveProjectByName(userId, projectName!);
-    if (!resolved.found) {
-      return errAmbiguous(
-        resolved.candidates.length === 0
-          ? `No project found matching "${projectName}"`
-          : `Ambiguous project match for "${projectName}" — use projectId to pick one`,
-        resolved.candidates,
-      );
-    }
-    project = resolved.match;
-  }
+  const ref = await resolveProjectRef(userId, { projectName, projectId });
+  if (!ref.ok) return errAmbiguous(ref.error, ref.candidates);
+  const project = ref.project;
+
+  // Blast radius: project tasks cascade-delete with the project; to-do items
+  // are deleted only with deleteTasks (otherwise unlinked); time entries are
+  // always kept but unlinked.
+  const impact = await getProjectDeleteImpact(userId, project.id);
+  const plural = (n: number, one: string, many: string) =>
+    `${n} ${n === 1 ? one : many}`;
+
+  const lines = [
+    `Delete project "${project.name}"`,
+    "Blast radius:",
+    `- ${plural(impact.projectTaskCount, "project task", "project tasks")} will be permanently deleted`,
+    deleteTasks
+      ? `- ${plural(impact.doItemCount, "to-do item", "to-do items")} will also be deleted`
+      : `- ${plural(impact.doItemCount, "to-do item", "to-do items")} will be kept but unlinked from the project`,
+    `- ${plural(impact.timeEntryCount, "time entry", "time entries")} will be kept but unlinked from the project`,
+  ];
 
   const warnings = [
     `This permanently deletes the project "${project.name}". This cannot be undone.`,
   ];
+  if (impact.projectTaskCount > 0) {
+    warnings.push(
+      `The project's ${plural(impact.projectTaskCount, "task", "tasks")} will be deleted with it — they cannot be recovered.`,
+    );
+  }
   if (deleteTasks) {
-    warnings.push("All tasks linked to this project will also be deleted.");
+    warnings.push("All to-do items linked to this project will also be deleted.");
   } else {
-    warnings.push("Tasks linked to this project will be kept (unlinked).");
+    warnings.push("To-do items linked to this project will be kept (unlinked).");
   }
 
   return {
     ok: true,
-    previewText: `Delete project "${project.name}"`,
+    previewText: lines.join("\n"),
     normalizedInput: {
       projectId: project.id,
       projectName: project.name,
@@ -1439,7 +1937,7 @@ async function executeEditTimeEntry(
   if (n.title) patch.label = String(n.title);
   if (n.startedAtIso) patch.startedAt = new Date(String(n.startedAtIso));
   if (n.endedAtIso) patch.endedAt = new Date(String(n.endedAtIso));
-  if (typeof n.category === "string") patch.category = n.category;
+  if (n.categoryChanged) patch.category = typeof n.category === "string" ? n.category : null;
 
   const updated = await updateEntry(userId, String(n.entryId), patch);
   if (!updated) return err2(`Time entry "${n.entryId}" not found`);
@@ -1490,21 +1988,28 @@ async function validateLogTimeEntryInput(
 > {
   const parsed = LogTimeEntryInput.safeParse(raw);
   if (!parsed.success) {
-    return {
-      ok: false,
-      error: `entries[${index}]: ${parsed.error.issues[0]?.message ?? "Invalid input"}`,
-    };
+    return { ok: false, error: `entries[${index}]: ${formatZodError(parsed.error)}` };
   }
   const { title, startedAt, endedAt, categoryName, notes, personNames, calendarEventId, calendarTitle } = parsed.data;
   const label = `entries[${index}] "${title}"`;
 
   const start = new Date(startedAt);
   const end = new Date(endedAt);
-  if (Number.isNaN(start.getTime())) return { ok: false, error: `${label}: Invalid startedAt — must be an ISO datetime string` };
-  if (Number.isNaN(end.getTime())) return { ok: false, error: `${label}: Invalid endedAt — must be an ISO datetime string` };
+  if (Number.isNaN(start.getTime())) {
+    return { ok: false, error: `${label}: Invalid startedAt "${startedAt}" — must be an ISO datetime string (e.g. 2026-10-16T09:00:00)` };
+  }
+  if (Number.isNaN(end.getTime())) {
+    return { ok: false, error: `${label}: Invalid endedAt "${endedAt}" — must be an ISO datetime string (e.g. 2026-10-16T10:00:00)` };
+  }
   if (end <= start) return { ok: false, error: `${label}: End time must be after start time.` };
 
   const warnings: string[] = [];
+  let category: string | null = null;
+  if (categoryName) {
+    const resolved = await resolveCategoryName(userId, categoryName);
+    category = resolved.category;
+    warnings.push(...resolved.warnings);
+  }
   let personIds: string[] = [];
   let peopleNote = "";
   if (personNames) {
@@ -1535,6 +2040,12 @@ async function validateLogTimeEntryInput(
 
   const durationMinutes = Math.round((end.getTime() - start.getTime()) / 60000);
   const detailLine = `${fmtClock(start)}–${fmtClock(end)} · ${fmtMinutes(durationMinutes)}${peopleNote}${calendarLink.linkedNote}`;
+  const lines = [
+    `Log time entry "${title}"`,
+    detailLine,
+  ];
+  if (category) lines.push(`Category: ${category}`);
+  if (notes) lines.push(`Notes: ${notes}`);
 
   return {
     ok: true,
@@ -1542,7 +2053,7 @@ async function validateLogTimeEntryInput(
       title,
       startedAt: start.toISOString(),
       endedAt: end.toISOString(),
-      category: categoryName ?? null,
+      category,
       notes: notes ?? null,
       personIds,
       calendarEventId: calendarLink.eventId,
@@ -2044,13 +2555,41 @@ async function resolvePersonByName(
   if (exact.length === 1) return { found: true, match: { id: exact[0]!.id, name: exact[0]!.displayName } };
 
   const partial = persons.filter((p) => p.displayName.toLowerCase().includes(lower));
-  if (partial.length === 1) return { found: true, match: { id: partial[0]!.id, name: partial[0]!.displayName } };
+  if (partial.length === 1) {
+    // One close match: never pick it silently — hand back a suggestion so
+    // the caller can ask rather than guess.
+    const only = partial[0]!;
+    return {
+      found: false,
+      candidates: [{ id: only.id, name: only.displayName }],
+      suggestion: only.displayName,
+    };
+  }
 
   const pool = exact.length > 1 ? exact : partial;
   return {
     found: false,
     candidates: pool.map((p) => ({ id: p.id, name: p.displayName })),
   };
+}
+
+/**
+ * Shared "contact not found" message for Rolodex actions. Exact display-name
+ * match wins; a single close match becomes a "did you mean" suggestion;
+ * several matches list candidates; zero matches point at creation.
+ */
+function personResolutionError(
+  name: string,
+  candidates: AmbiguityCandidate[],
+  suggestion: string | undefined,
+): string {
+  if (suggestion) {
+    return `No exact contact match for "${name}" — did you mean "${suggestion}"? Retry with the exact display name.`;
+  }
+  if (candidates.length > 0) {
+    return `Ambiguous contact match for "${name}" — ${candidates.length} contacts match. Retry with the exact display name.`;
+  }
+  return `No contact found matching "${name}". Check the spelling, or create them with create_rolodex_person.`;
 }
 
 // ── Project planning preview/execute handlers ─────────────────────────────
@@ -2060,18 +2599,14 @@ async function previewUpdateProjectPlan(
   raw: unknown,
 ): Promise<PreviewResult> {
   const parsed = UpdateProjectPlanInput.safeParse(raw);
-  if (!parsed.success) return err(parsed.error.issues[0]?.message ?? "Invalid input");
+  if (!parsed.success) return zodErr(parsed.error);
 
-  const resolved = await resolveProjectByName(userId, parsed.data.projectName);
-  if (!resolved.found) {
-    return errAmbiguous(
-      resolved.candidates.length === 0
-        ? `No project found matching "${parsed.data.projectName}"`
-        : `Ambiguous project match for "${parsed.data.projectName}"`,
-      resolved.candidates,
-    );
-  }
-
+  const ref = await resolveProjectRef(userId, {
+    projectName: parsed.data.projectName,
+    projectId: parsed.data.projectId,
+  });
+  if (!ref.ok) return errAmbiguous(ref.error, ref.candidates);
+  const project = ref.project;
   const { goal, whyItMatters, nextMilestone, nextAction, planNotes } = parsed.data;
   const changes: string[] = [];
   if (goal !== undefined) changes.push("goal");
@@ -2083,10 +2618,10 @@ async function previewUpdateProjectPlan(
 
   return {
     ok: true,
-    previewText: `Update planning for "${resolved.match.name}": ${changes.join(", ")}`,
+    previewText: `Update planning for "${project.name}": ${changes.join(", ")}`,
     normalizedInput: {
-      projectId: resolved.match.id,
-      projectName: resolved.match.name,
+      projectId: project.id,
+      projectName: project.name,
       goal: goal ?? null,
       whyItMatters: whyItMatters ?? null,
       nextMilestone: nextMilestone ?? null,
@@ -2117,22 +2652,21 @@ async function previewAddProjectMilestone(
   raw: unknown,
 ): Promise<PreviewResult> {
   const parsed = AddProjectMilestoneInput.safeParse(raw);
-  if (!parsed.success) return err(parsed.error.issues[0]?.message ?? "Invalid input");
+  if (!parsed.success) return zodErr(parsed.error);
 
-  const resolved = await resolveProjectByName(userId, parsed.data.projectName);
-  if (!resolved.found) {
-    return errAmbiguous(
-      resolved.candidates.length === 0
-        ? `No project found matching "${parsed.data.projectName}"`
-        : `Ambiguous project match for "${parsed.data.projectName}"`,
-      resolved.candidates,
-    );
-  }
+  const ref = await resolveProjectRef(userId, {
+    projectName: parsed.data.projectName,
+    projectId: parsed.data.projectId,
+  });
+  if (!ref.ok) return errAmbiguous(ref.error, ref.candidates);
+  const project = ref.project;
 
+  const current = await getProjectPlan(userId, project.id);
+  const before = current?.nextMilestone ?? null;
   return {
     ok: true,
-    previewText: `Set next milestone for "${resolved.match.name}": "${parsed.data.milestone}"`,
-    normalizedInput: { projectId: resolved.match.id, projectName: resolved.match.name, milestone: parsed.data.milestone },
+    previewText: `Set next milestone for "${project.name}": "${parsed.data.milestone}"${before ? `\n(was: "${before}")` : ""}`,
+    normalizedInput: { projectId: project.id, projectName: project.name, milestone: parsed.data.milestone },
     warnings: [],
   };
 }
@@ -2150,23 +2684,32 @@ async function previewAddProjectQuestion(
   raw: unknown,
 ): Promise<PreviewResult> {
   const parsed = AddProjectQuestionInput.safeParse(raw);
-  if (!parsed.success) return err(parsed.error.issues[0]?.message ?? "Invalid input");
+  if (!parsed.success) return zodErr(parsed.error);
 
-  const resolved = await resolveProjectByName(userId, parsed.data.projectName);
-  if (!resolved.found) {
-    return errAmbiguous(
-      resolved.candidates.length === 0
-        ? `No project found matching "${parsed.data.projectName}"`
-        : `Ambiguous project match for "${parsed.data.projectName}"`,
-      resolved.candidates,
+  const ref = await resolveProjectRef(userId, {
+    projectName: parsed.data.projectName,
+    projectId: parsed.data.projectId,
+  });
+  if (!ref.ok) return errAmbiguous(ref.error, ref.candidates);
+  const project = ref.project;
+
+  const warnings: string[] = [];
+  const current = await getProjectPlan(userId, project.id);
+  if (
+    current?.openQuestions.some(
+      (q) => q.toLowerCase() === parsed.data.question.trim().toLowerCase(),
+    )
+  ) {
+    warnings.push(
+      `This question is already on "${project.name}"'s open questions list — adding it again will create a duplicate`,
     );
   }
 
   return {
     ok: true,
-    previewText: `Add question to "${resolved.match.name}": "${parsed.data.question}"`,
-    normalizedInput: { projectId: resolved.match.id, projectName: resolved.match.name, question: parsed.data.question },
-    warnings: [],
+    previewText: `Add question to "${project.name}": "${parsed.data.question}"`,
+    normalizedInput: { projectId: project.id, projectName: project.name, question: parsed.data.question },
+    warnings,
   };
 }
 
@@ -2183,23 +2726,32 @@ async function previewAddProjectBlocker(
   raw: unknown,
 ): Promise<PreviewResult> {
   const parsed = AddProjectBlockerInput.safeParse(raw);
-  if (!parsed.success) return err(parsed.error.issues[0]?.message ?? "Invalid input");
+  if (!parsed.success) return zodErr(parsed.error);
 
-  const resolved = await resolveProjectByName(userId, parsed.data.projectName);
-  if (!resolved.found) {
-    return errAmbiguous(
-      resolved.candidates.length === 0
-        ? `No project found matching "${parsed.data.projectName}"`
-        : `Ambiguous project match for "${parsed.data.projectName}"`,
-      resolved.candidates,
+  const ref = await resolveProjectRef(userId, {
+    projectName: parsed.data.projectName,
+    projectId: parsed.data.projectId,
+  });
+  if (!ref.ok) return errAmbiguous(ref.error, ref.candidates);
+  const project = ref.project;
+
+  const warnings: string[] = [];
+  const current = await getProjectPlan(userId, project.id);
+  if (
+    current?.blockers.some(
+      (b) => b.toLowerCase() === parsed.data.blocker.trim().toLowerCase(),
+    )
+  ) {
+    warnings.push(
+      `This blocker is already on "${project.name}"'s blockers list — adding it again will create a duplicate`,
     );
   }
 
   return {
     ok: true,
-    previewText: `Add blocker to "${resolved.match.name}": "${parsed.data.blocker}"`,
-    normalizedInput: { projectId: resolved.match.id, projectName: resolved.match.name, blocker: parsed.data.blocker },
-    warnings: [],
+    previewText: `Add blocker to "${project.name}": "${parsed.data.blocker}"`,
+    normalizedInput: { projectId: project.id, projectName: project.name, blocker: parsed.data.blocker },
+    warnings,
   };
 }
 
@@ -2216,24 +2768,21 @@ async function previewSetProjectNextAction(
   raw: unknown,
 ): Promise<PreviewResult> {
   const parsed = SetProjectNextActionInput.safeParse(raw);
-  if (!parsed.success) return err(parsed.error.issues[0]?.message ?? "Invalid input");
+  if (!parsed.success) return zodErr(parsed.error);
 
-  const resolved = await resolveProjectByName(userId, parsed.data.projectName);
-  if (!resolved.found) {
-    return errAmbiguous(
-      resolved.candidates.length === 0
-        ? `No project found matching "${parsed.data.projectName}"`
-        : `Ambiguous project match for "${parsed.data.projectName}"`,
-      resolved.candidates,
-    );
-  }
+  const ref = await resolveProjectRef(userId, {
+    projectName: parsed.data.projectName,
+    projectId: parsed.data.projectId,
+  });
+  if (!ref.ok) return errAmbiguous(ref.error, ref.candidates);
+  const project = ref.project;
 
-  const current = await getProjectPlan(userId, resolved.match.id);
+  const current = await getProjectPlan(userId, project.id);
   const before = current?.nextAction ?? null;
   return {
     ok: true,
-    previewText: `Set next action for "${resolved.match.name}": "${parsed.data.nextAction}"${before ? `\n(was: "${before}")` : ""}`,
-    normalizedInput: { projectId: resolved.match.id, projectName: resolved.match.name, nextAction: parsed.data.nextAction },
+    previewText: `Set next action for "${project.name}": "${parsed.data.nextAction}"${before ? `\n(was: "${before}")` : ""}`,
+    normalizedInput: { projectId: project.id, projectName: project.name, nextAction: parsed.data.nextAction },
     warnings: [],
   };
 }
@@ -2249,21 +2798,42 @@ async function executeSetProjectNextAction(
 // ── Rolodex preview/execute handlers ─────────────────────────────────────
 
 async function previewCreateRolodexPerson(
-  _userId: string,
+  userId: string,
   raw: unknown,
 ): Promise<PreviewResult> {
   const parsed = CreateRolodexPersonInput.safeParse(raw);
-  if (!parsed.success) return err(parsed.error.issues[0]?.message ?? "Invalid input");
+  if (!parsed.success) return zodErr(parsed.error);
 
-  const parts: string[] = [`Create contact: ${parsed.data.displayName}`];
+  if (
+    parsed.data.birthday &&
+    Number.isNaN(new Date(parsed.data.birthday).getTime())
+  ) {
+    return err(
+      `"birthday": "${parsed.data.birthday}" is not a real calendar date — use YYYY-MM-DD (e.g. 1990-05-14)`,
+    );
+  }
+
+  const warnings: string[] = [];
+  const displayName = parsed.data.displayName.trim();
+  const matches = await findPersonByName(userId, displayName);
+  const duplicate = matches.find(
+    (m) => m.displayName.toLowerCase() === displayName.toLowerCase(),
+  );
+  if (duplicate) {
+    warnings.push(
+      `A contact named "${duplicate.displayName}" already exists — creating another will duplicate it. Use update_rolodex_person to change the existing contact instead.`,
+    );
+  }
+
+  const parts: string[] = [`Create contact: ${displayName}`];
   if (parsed.data.relationshipType) parts.push(parsed.data.relationshipType);
   if (parsed.data.organization) parts.push(`@ ${parsed.data.organization}`);
 
   return {
     ok: true,
     previewText: parts.join(" · "),
-    normalizedInput: parsed.data,
-    warnings: [],
+    normalizedInput: { ...parsed.data, displayName },
+    warnings,
   };
 }
 
@@ -2288,17 +2858,16 @@ async function previewUpdateRolodexPerson(
   raw: unknown,
 ): Promise<PreviewResult> {
   const parsed = UpdateRolodexPersonInput.safeParse(raw);
-  if (!parsed.success) return err(parsed.error.issues[0]?.message ?? "Invalid input");
+  if (!parsed.success) return zodErr(parsed.error);
 
   const resolved = await resolvePersonByName(userId, parsed.data.personName);
   if (!resolved.found) {
     return errAmbiguous(
-      resolved.candidates.length === 0
-        ? `No contact found matching "${parsed.data.personName}"`
-        : `Ambiguous contact match for "${parsed.data.personName}"`,
+      personResolutionError(parsed.data.personName, resolved.candidates, resolved.suggestion),
       resolved.candidates,
     );
   }
+  const person = resolved.match;
 
   const changes: string[] = [];
   if (parsed.data.notes !== undefined) changes.push("notes");
@@ -2310,8 +2879,8 @@ async function previewUpdateRolodexPerson(
 
   return {
     ok: true,
-    previewText: `Update contact "${resolved.match.name}": ${changes.join(", ")}`,
-    normalizedInput: { ...parsed.data, personId: resolved.match.id, personName: resolved.match.name },
+    previewText: `Update contact "${person.name}": ${changes.join(", ")}`,
+    normalizedInput: { ...parsed.data, personId: person.id, personName: person.name },
     warnings: [],
   };
 }
@@ -2339,25 +2908,24 @@ async function previewAddRolodexInteraction(
   raw: unknown,
 ): Promise<PreviewResult> {
   const parsed = AddRolodexInteractionInput.safeParse(raw);
-  if (!parsed.success) return err(parsed.error.issues[0]?.message ?? "Invalid input");
+  if (!parsed.success) return zodErr(parsed.error);
 
   const resolved = await resolvePersonByName(userId, parsed.data.personName);
   if (!resolved.found) {
     return errAmbiguous(
-      resolved.candidates.length === 0
-        ? `No contact found matching "${parsed.data.personName}"`
-        : `Ambiguous contact match for "${parsed.data.personName}"`,
+      personResolutionError(parsed.data.personName, resolved.candidates, resolved.suggestion),
       resolved.candidates,
     );
   }
+  const person = resolved.match;
 
-  const lines = [`Log interaction with "${resolved.match.name}": "${parsed.data.title}"`];
+  const lines = [`Log interaction with "${person.name}": "${parsed.data.title}"`];
   if (parsed.data.followUpNeeded) lines.push(`Follow-up: ${parsed.data.followUpDate ?? "no date set"}`);
 
   return {
     ok: true,
     previewText: lines.join("\n"),
-    normalizedInput: { ...parsed.data, personId: resolved.match.id, personName: resolved.match.name },
+    normalizedInput: { ...parsed.data, personId: person.id, personName: person.name },
     warnings: [],
   };
 }
@@ -2381,22 +2949,21 @@ async function previewAddPersonFollowup(
   raw: unknown,
 ): Promise<PreviewResult> {
   const parsed = AddPersonFollowupInput.safeParse(raw);
-  if (!parsed.success) return err(parsed.error.issues[0]?.message ?? "Invalid input");
+  if (!parsed.success) return zodErr(parsed.error);
 
   const resolved = await resolvePersonByName(userId, parsed.data.personName);
   if (!resolved.found) {
     return errAmbiguous(
-      resolved.candidates.length === 0
-        ? `No contact found matching "${parsed.data.personName}"`
-        : `Ambiguous contact match for "${parsed.data.personName}"`,
+      personResolutionError(parsed.data.personName, resolved.candidates, resolved.suggestion),
       resolved.candidates,
     );
   }
+  const person = resolved.match;
 
   return {
     ok: true,
-    previewText: `Add follow-up with "${resolved.match.name}": "${parsed.data.title}"${parsed.data.followUpDate ? ` by ${parsed.data.followUpDate}` : ""}`,
-    normalizedInput: { ...parsed.data, personId: resolved.match.id, personName: resolved.match.name },
+    previewText: `Add follow-up with "${person.name}": "${parsed.data.title}"${parsed.data.followUpDate ? ` by ${parsed.data.followUpDate}` : ""}`,
+    normalizedInput: { ...parsed.data, personId: person.id, personName: person.name },
     warnings: [],
   };
 }
@@ -2419,23 +2986,34 @@ async function previewAddGiftIdea(
   raw: unknown,
 ): Promise<PreviewResult> {
   const parsed = AddGiftIdeaInput.safeParse(raw);
-  if (!parsed.success) return err(parsed.error.issues[0]?.message ?? "Invalid input");
+  if (!parsed.success) return zodErr(parsed.error);
 
   const resolved = await resolvePersonByName(userId, parsed.data.personName);
   if (!resolved.found) {
     return errAmbiguous(
-      resolved.candidates.length === 0
-        ? `No contact found matching "${parsed.data.personName}"`
-        : `Ambiguous contact match for "${parsed.data.personName}"`,
+      personResolutionError(parsed.data.personName, resolved.candidates, resolved.suggestion),
       resolved.candidates,
+    );
+  }
+  const person = resolved.match;
+
+  const warnings: string[] = [];
+  const existing = await getPerson(userId, person.id);
+  if (
+    existing?.giftIdeas.some(
+      (g) => g.toLowerCase() === parsed.data.idea.trim().toLowerCase(),
+    )
+  ) {
+    warnings.push(
+      `Gift idea "${parsed.data.idea.trim()}" is already saved for "${person.name}" — adding it again will create a duplicate`,
     );
   }
 
   return {
     ok: true,
-    previewText: `Add gift idea for "${resolved.match.name}": "${parsed.data.idea}"`,
-    normalizedInput: { ...parsed.data, personId: resolved.match.id, personName: resolved.match.name },
-    warnings: [],
+    previewText: `Add gift idea for "${person.name}": "${parsed.data.idea}"`,
+    normalizedInput: { ...parsed.data, personId: person.id, personName: person.name },
+    warnings,
   };
 }
 
@@ -2459,6 +3037,23 @@ function err(message: string): PreviewResult {
     normalizedInput: {},
     warnings: [],
   };
+}
+
+/**
+ * Turn a Zod validation failure into an actionable error: every issue names
+ * the offending field and what was wrong with it (including valid enum values
+ * and expected formats), so the caller knows exactly what to fix.
+ */
+function formatZodError(error: z.ZodError): string {
+  const parts = error.issues.map((issue) => {
+    const path = issue.path.length > 0 ? issue.path.join(".") : "input";
+    return `"${path}": ${issue.message}`;
+  });
+  return `Invalid input: ${parts.join("; ")}`;
+}
+
+function zodErr(error: z.ZodError): PreviewResult {
+  return err(formatZodError(error));
 }
 
 function errAmbiguous(message: string, candidates: AmbiguityCandidate[]): PreviewResult {

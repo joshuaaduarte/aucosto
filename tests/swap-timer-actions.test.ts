@@ -43,6 +43,12 @@ function mockRolodex(findPersonByName: (u: string, n: string) => unknown) {
   }));
 }
 
+function mockTimeCategories() {
+  vi.doMock("@/lib/services/time-categories", () => ({
+    listTimeCategories: vi.fn().mockResolvedValue([{ name: "Exercise" }]),
+  }));
+}
+
 function mockTimeService(running: unknown) {
   const stopRunning = vi.fn().mockResolvedValue(undefined);
   const updateEntry = vi.fn().mockResolvedValue({ id: "entry-1", label: "Commute" });
@@ -153,6 +159,7 @@ describe("swap_timer preview", () => {
     mockTimePeople();
     mockRolodex(() => [PERSON_ANA]);
     mockTimeService(RUNNING_ENTRY);
+    mockTimeCategories();
     const { previewAction } = await import("@/lib/assistant-action-executor");
     const result = await previewAction("user-1", "swap_timer", {
       title: "Tennis",
@@ -162,11 +169,12 @@ describe("swap_timer preview", () => {
 
     expect(result.ok).toBe(true);
     expect(result.previewText).toContain(
-      'Stop "Commute" (running 42m) and start "Tennis" [exercise] · with Ana',
+      'Stop "Commute" (running 42m) and start "Tennis" [Exercise] · with Ana',
     );
     const n = result.normalizedInput as Record<string, unknown>;
     expect(n.personIds).toEqual(["person-ana"]);
-    expect(n.category).toBe("exercise");
+    // Exact case-insensitive match normalizes to the stored category name.
+    expect(n.category).toBe("Exercise");
   });
 
   it("rejects an empty title", async () => {

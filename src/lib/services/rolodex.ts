@@ -443,6 +443,7 @@ export async function listPersons(
   opts: { search?: string; relationshipType?: string; contactKind?: string } = {},
 ): Promise<RolodexPersonSummary[]> {
   requireCan(userId, "rolodex", "read");
+  await ensureRolodexTables();
   try {
     const rows = await prisma.$queryRawUnsafe<(PersonRow & { lastInteractionAt: Date | null })[]>(
       `SELECT p.id, p."userId", p."displayName", p."firstName", p."lastName", p.aliases,
@@ -494,6 +495,7 @@ export async function getPerson(
   personId: string,
 ): Promise<RolodexPersonDetail | null> {
   requireCan(userId, "rolodex", "read");
+  await ensureRolodexTables();
   try {
     const rows = await prisma.$queryRawUnsafe<PersonRow[]>(
       `SELECT * FROM "RolodexPerson" WHERE "id" = $1 AND "userId" = $2 LIMIT 1`,
@@ -516,6 +518,7 @@ export async function createPerson(
   data: CreatePersonInput,
 ): Promise<string> {
   requireCan(userId, "rolodex", "write");
+  await ensureRolodexTables();
   const id = randomUUID();
   await prisma.$executeRawUnsafe(
     `INSERT INTO "RolodexPerson" (
@@ -567,6 +570,7 @@ export async function updatePerson(
   patch: Partial<CreatePersonInput>,
 ): Promise<void> {
   requireCan(userId, "rolodex", "write");
+  await ensureRolodexTables();
   const sets: string[] = [];
   const values: unknown[] = [];
   let idx = 1;
@@ -645,6 +649,7 @@ export async function addInteraction(
   data: AddInteractionInput,
 ): Promise<string> {
   requireCan(userId, "rolodex", "write");
+  await ensureRolodexTables();
   const id = randomUUID();
   const occurredAt = data.occurredAt ? new Date(data.occurredAt) : new Date();
   const followUpDate = data.followUpDate ? new Date(data.followUpDate) : null;

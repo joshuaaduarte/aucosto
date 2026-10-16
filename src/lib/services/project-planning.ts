@@ -111,6 +111,7 @@ export async function getProjectPlan(
   projectId: string,
 ): Promise<ProjectPlan | null> {
   requireCan(userId, "projects", "read");
+  await ensureProjectPlanningColumns();
   try {
     const rows = await prisma.$queryRawUnsafe<PlanRow[]>(
       `SELECT ${PLAN_SELECT} FROM "Project" WHERE "id" = $1 AND "userId" = $2 LIMIT 1`,
@@ -141,6 +142,7 @@ export async function updateProjectPlan(
   patch: ProjectPlanPatch,
 ): Promise<void> {
   requireCan(userId, "projects", "write");
+  await ensureProjectPlanningColumns();
 
   const sets: string[] = [];
   const values: unknown[] = [];

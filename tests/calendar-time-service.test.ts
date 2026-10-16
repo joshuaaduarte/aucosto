@@ -79,15 +79,19 @@ describe("resolveCalendarBlockByTitle", () => {
     expect(result.warnings).toHaveLength(0);
   });
 
-  it("accepts a single fuzzy match", async () => {
+  it("warns and suggests on a single fuzzy match instead of linking", async () => {
     listCalendarItems.mockResolvedValue([
       block("b1", "Morning gym session", "2026-10-15T14:00:00.000Z", "2026-10-15T15:00:00.000Z"),
       block("b2", "Lunch", "2026-10-15T19:00:00.000Z", "2026-10-15T19:30:00.000Z"),
     ]);
     const { resolveCalendarBlockByTitle } = await import("@/lib/services/time-calendar");
     const result = await resolveCalendarBlockByTitle("user-1", "gym");
-    expect(result.eventId).toBe("b1");
-    expect(result.warnings).toHaveLength(0);
+    expect(result.eventId).toBeNull();
+    expect(
+      result.warnings.some((w) =>
+        w.includes('"gym" is close to "Morning gym session" but not an exact match'),
+      ),
+    ).toBe(true);
   });
 
   it("warns and skips unknown titles", async () => {

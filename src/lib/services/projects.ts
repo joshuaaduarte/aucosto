@@ -577,6 +577,7 @@ export async function updateProject(
   input: Partial<SaveProjectInput>,
 ): Promise<ProjectSummary | null> {
   requireCan(userId, "projects", "write");
+  await ensureProjectBoardTables();
   const existing = await prisma.project.findFirst({ where: { userId, id } });
   if (!existing) return null;
 
@@ -675,7 +676,8 @@ export async function updateProject(
 /**
  * Delete a project. By default linked tasks survive as standalone Do items
  * (DoItem.projectId is SetNull); with deleteTasks they're removed too —
- * their time entries always survive (TimeEntry.doItemId is SetNull).
+ * project tasks (ProjectTask rows) are ALWAYS cascade-deleted with the project,
+ * and time entries survive but are unlinked (TimeEntry.projectId is SetNull).
  */
 export async function deleteProject(
   userId: string,
@@ -683,6 +685,7 @@ export async function deleteProject(
   options: { deleteTasks?: boolean } = {},
 ): Promise<void> {
   requireCan(userId, "projects", "write");
+  await ensureProjectBoardTables();
   let deletedTaskCount = 0;
   if (options.deleteTasks) {
     deletedTaskCount = await deleteDoItemsByProject(userId, id);
@@ -696,6 +699,46 @@ export async function deleteProject(
       refId: id,
       meta: { deletedTaskCount },
     });
+  }
+}
+
+export interface ProjectDeleteImpact {
+  /** ProjectTask rows — cascade-deleted with the project, always. */
+  projectTaskCount: number;
+  /** Do items — deleted only when deleteTasks is set, otherwise unlinked. */
+  doItemCount: number;
+  /** Time entries — kept, but unlinked from the project. */
+  timeEntryCount: number;
+}
+
+/**
+ * Counts what a project deletion will destroy or unlink. Read-only; used by
+ * the assistant delete_project preview so the blast radius is explicit.
+ */
+export async function getProjectDeleteImpact(
+  userId: string,
+  id: string,
+): Promise<ProjectDeleteImpact> {
+  requireCan(userId, "projects", "read");
+  await ensureProjectBoardTables();
+  try {
+    const rows = await prisma.$queryRaw<
+      Array<{ project_task_count: bigint; do_item_count: bigint; time_entry_count: bigint }>
+    >(Prisma.sql`
+      SELECT
+        (SELECT COUNT(*) FROM "ProjectTask" WHERE "userId" = ${userId} AND "projectId" = ${id}) AS project_task_count,
+        (SELECT COUNT(*) FROM "DoItem" WHERE "userId" = ${userId} AND "projectId" = ${id}) AS do_item_count,
+        (SELECT COUNT(*) FROM "TimeEntry" WHERE "userId" = ${userId} AND "projectId" = ${id}) AS time_entry_count
+    `);
+    const row = rows[0];
+    return {
+      projectTaskCount: Number(row?.project_task_count ?? 0),
+      doItemCount: Number(row?.do_item_count ?? 0),
+      timeEntryCount: Number(row?.time_entry_count ?? 0),
+    };
+  } catch (error) {
+    console.error("[projects] getProjectDeleteImpact failed", error);
+    return { projectTaskCount: 0, doItemCount: 0, timeEntryCount: 0 };
   }
 }
 
@@ -1000,6 +1043,7 @@ async function loadTaskCounts(userId: string): Promise<Map<string, { open: numbe
 
 export async function listBoardProjects(userId: string): Promise<BoardProjectCard[]> {
   requireCan(userId, "projects", "read");
+  await ensureProjectBoardTables();
   const now = new Date();
   try {
     const [projects, timeAgg, taskCounts] = await Promise.all([
@@ -1086,6 +1130,7 @@ export async function createBoardProject(
   input: SaveBoardProjectInput,
 ): Promise<string> {
   requireCan(userId, "projects", "write");
+  await ensureProjectBoardTables();
   const name = input.name.trim();
   if (!name) throw new Error("Project name is required.");
   const id = randomUUID();
@@ -1117,6 +1162,7 @@ export async function updateBoardProject(
   input: SaveBoardProjectInput,
 ): Promise<void> {
   requireCan(userId, "projects", "write");
+  await ensureProjectBoardTables();
   const name = input.name.trim();
   if (!name) throw new Error("Project name is required.");
   const status = normalizeBoardStatus(input.status);
@@ -1330,6 +1376,7 @@ export async function getBoardProject(
   id: string,
 ): Promise<BoardProjectDetail | null> {
   requireCan(userId, "projects", "read");
+  await ensureProjectBoardTables();
   const now = new Date();
   try {
     const rows = await prisma.$queryRaw<ProjectRowRaw[]>(Prisma.sql`

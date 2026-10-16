@@ -106,7 +106,7 @@ Validate and preview an action. **No mutation.** Records a `previewed` audit row
 ```json
 {
   "ok": false,
-  "error": "Ambiguous habit match for \"Read\"",
+  "error": "Ambiguous habit match for \"Read\" — pass the exact name: \"Read\", \"Read Bible\".",
   "candidates": [
     { "id": "h1", "name": "Read", "bucket": "reading" },
     { "id": "h2", "name": "Read Bible", "bucket": "spiritual" }
@@ -114,6 +114,18 @@ Validate and preview an action. **No mutation.** Records a `previewed` audit row
   "auditId": "uuid"
 }
 ```
+
+**Validation notes:**
+
+- Every schema violation is reported, not just the first — e.g.
+  `date: date must be YYYY-MM-DD (e.g. 2026-10-16); startTime: startTime must be HH:MM from 00:00 to 23:59`.
+- Calendar `date`/`startTime`/`endTime` are validated strictly: impossible
+  times (`24:00`) and impossible dates (`2026-02-30`) are rejected instead of
+  rolling over into a different day.
+- "Not found" errors name where valid ids come from, e.g.
+  `Task "abc" not found — list tasks via GET /api/assistant/tasks to get a valid task id`.
+- Execute always re-runs the full preview validation first; if the preview
+  fails, nothing is mutated.
 
 ---
 
@@ -360,8 +372,8 @@ through the same risk gating and audit trail as the REST routes. See
 | `high` | `true` | Always rejected — cannot execute via API |
 
 Current risk assignments:
-- `low`: `create_task`, `log_habit`, `create_habit`, `add_reflection`, `create_project`
-- `medium`: `complete_task`, `update_task`, `create_calendar_block`, `update_calendar_event`, `delete_calendar_event`, `delete_project`, `start_timer`, `stop_timer`, `swap_timer`, `edit_time_entry`, `log_time_entry`, `log_time_entries`, `delete_time_entry`, `update_project`
+- `low`: `add_gift_idea`, `add_person_followup`, `add_project_blocker`, `add_project_milestone`, `add_project_question`, `add_reflection`, `add_rolodex_interaction`, `create_habit`, `create_project`, `create_rolodex_person`, `create_task`, `log_habit`, `set_project_next_action`
+- `medium`: `complete_task`, `create_calendar_block`, `delete_calendar_event`, `delete_project`, `delete_time_entry`, `edit_time_entry`, `log_time_entries`, `log_time_entry`, `start_timer`, `stop_timer`, `swap_timer`, `update_calendar_event`, `update_project`, `update_project_plan`, `update_rolodex_person`, `update_task`
 - `high`: `finance_write` (also `supported: false`)
 
 ---
@@ -402,6 +414,16 @@ POST /api/assistant/actions/execute
   "source": { "actor": "openclaw" }
 }
 ```
+
+`status` must be one of `exploring`, `active`, `final_push`, `paused`, `done`;
+`energyType` must be one of `deep`, `light`, `creative`, `admin`. Unknown
+values are rejected (never silently normalized).
+
+### Delete project (medium risk — preview shows the blast radius)
+The preview lists exactly what deletion destroys: project tasks (always
+permanently deleted with the project), to-do items (deleted only with
+`deleteTasks: true`, otherwise kept but unlinked), and time entries (always
+kept but unlinked).
 
 ### Create habit (low risk, no confirmation needed)
 ```
@@ -456,6 +478,11 @@ Started: 8:55 AM · Running for 5h 20m
 Proposed end: 9:15 AM
 Final duration: 20m
 ```
+
+The optional `entryId` must match the currently running timer's id — a
+mismatch fails the preview (`entryId "x" does not match the running timer
+"Commute" (id "abc") — …`) instead of stopping the wrong timer. Omit it to
+stop whatever is running.
 
 Then execute:
 ```
@@ -516,6 +543,8 @@ Edit time entry: Commute
 Before: 8:55 AM–5:52 PM · 8h 56m
 After: 8:55 AM–9:15 AM · 20m
 ```
+
+The entry is looked up by id directly (any age — not limited to recent entries). The preview rejects an `endedAt` at or before `startedAt` and windows over 24 hours; passing no changes at all is an error, not a silent no-op.
 
 ### Delete time entry (medium risk)
 ```
@@ -621,13 +650,15 @@ the `assistant_list_people_time` MCP tool.
 `start_timer`, `log_time_entry`, and `log_time_entries` (per entry) accept an optional `calendarEventId`
 (explicit calendar block id — a virtual recurrence-occurrence id like
 `parentId::2026-10-15T14:00:00.000Z` also works and resolves to the parent row)
-or `calendarTitle` (fuzzy-matched against **today's** calendar blocks:
-exact title wins, a single fuzzy match is accepted, unknown/ambiguous names
-warn and skip — never fail, never guess). The event must exist and belong to
-the user; an unknown id warns and skips rather than failing the action. An
-explicit id always wins over a title. The link is stored as the backing
-`CalendarItem` id in `TimeEntry.calendarEventId`; deleting the calendar event
-clears the link (`ON DELETE SET NULL`) without touching the entry.
+or `calendarTitle` (fuzzy-matched against **today's** calendar blocks: an exact
+title (case-insensitive) wins; a single close match warns and skips with a
+suggestion instead of linking; unknown/ambiguous names warn and skip — never
+fail, never guess). The event must exist and belong to the user; an unknown id
+warns and skips rather than failing the action (the warning points at
+`GET /api/assistant/calendar` for valid ids). An explicit id always wins over
+a title. The link is stored as the backing `CalendarItem` id in
+`TimeEntry.calendarEventId`; deleting the calendar event clears the link
+(`ON DELETE SET NULL`) without touching the entry.
 
 **Auto-suggestion (never auto-applied):** when no link is given, the preview
 also returns `suggestedCalendarLink: { eventId, title }` — when `start_timer`
@@ -737,7 +768,35 @@ POST /api/assistant/actions/execute
 
 ## 7. Ambiguity Error Handling
 
-When a name lookup matches 0 or 2+ records, the preview returns `ok: false` with a `candidates` array.
+Every name lookup across actions follows one policy — **exact wins, never
+guess**:
+
+- **Exact (case-insensitive) match** → used, no warning.
+- **Single close (substring) match** → never picked silently.
+- **Zero or ambiguous matches** → never guessed.
+
+What "never picked silently" means depends on whether the name is required:
+
+**Required names** (`log_habit` → `habitName`, `update_project` and the
+project-planning actions → `projectName`, Rolodex actions → `personName`)
+fail the preview with `ok: false` and a `candidates` array:
+
+- single close match → `No habit exactly matching "morn" — did you mean "Morning Run"? Pass the exact name and retry.` (candidate included)
+- ambiguous → `Ambiguous habit match for "read" — pass the exact name: "Read Books", "Read Bible".`
+- no match → `No habit found matching "zzz". Known habits: "Morning Run", "Read". List habits via GET /api/assistant/habits.`
+
+**Optional names** (`personNames`, `projectName` on `create_task` /
+`update_task`, `habitName` on `start_timer` / `swap_timer`, `calendarTitle`,
+`categoryName`) warn-and-skip: the preview stays `ok: true`, the link is left
+out, and `warnings` explains what happened plus the suggestion, e.g.
+`"morn" is close to "Morning Run" but not an exact match — not linked. Timer will start without a habit link. Pass the exact name to link it.`
+
+**Categories** (`categoryName` on `start_timer`, `swap_timer`,
+`log_time_entry`, `edit_time_entry`) resolve against your time categories: an
+exact match normalizes to the stored name (`"deep work"` → `"Deep Work"`); a
+close or ambiguous match is not set (warning explains); a name matching
+nothing is saved as-is — categories are free text, so this creates a new one —
+with a warning naming the existing categories.
 
 **0 matches:**
 ```json
@@ -748,11 +807,20 @@ When a name lookup matches 0 or 2+ records, the preview returns `ok: false` with
 }
 ```
 
+**1 close match (never auto-picked):**
+```json
+{
+  "ok": false,
+  "error": "No exact project match for \"split\" — did you mean \"Split-Flap Display\"? Retry with the exact project name, or pass projectId to pick one.",
+  "candidates": [{ "id": "p1", "name": "Split-Flap Display" }]
+}
+```
+
 **2+ matches:**
 ```json
 {
   "ok": false,
-  "error": "Ambiguous habit match for \"Read\"",
+  "error": "Ambiguous habit match for \"Read\" — pass the exact name: \"Read\", \"Read Bible\".",
   "candidates": [
     { "id": "h1", "name": "Read", "bucket": "reading" },
     { "id": "h2", "name": "Read Bible", "bucket": "spiritual" }
@@ -762,7 +830,19 @@ When a name lookup matches 0 or 2+ records, the preview returns `ok: false` with
 
 The agent should show the candidates to Josh and ask for disambiguation, then retry with the exact name or ID.
 
-Applies to: `log_habit` (habitName), `update_project` (projectName).
+Applies to: `log_habit` (habitName), `update_project` / `delete_project` /
+`update_project_plan` / `add_project_milestone` / `add_project_question` /
+`add_project_blocker` / `set_project_next_action` (projectName, or projectId),
+and the Rolodex actions below (personName). Every project action accepts an
+explicit `projectId`, which wins over `projectName` when both are given.
+
+**Validation errors** name every offending field and what's wrong with it:
+```json
+{
+  "ok": false,
+  "error": "Invalid input: \"status\": status must be one of: exploring, active, final_push, paused, done; \"targetDate\": targetDate must be YYYY-MM-DD"
+}
+```
 
 ---
 
@@ -772,9 +852,16 @@ Applies to: `log_habit` (habitName), `update_project` (projectName).
 
 | Action | Risk | Description |
 |--------|------|-------------|
-| `create_person` | low | Create a new Rolodex contact |
-| `add_interaction` | low | Add an interaction note to an existing contact |
-| `resolve_person_mention` | low | Link an unresolved @mention to a contact |
+| `create_rolodex_person` | low | Create a new Rolodex contact. Warns (does not block) if a contact with the same display name already exists, pointing at `update_rolodex_person` instead. `birthday` must be `YYYY-MM-DD`. |
+| `update_rolodex_person` | medium | Update a contact's details (confirmation required). Fails with "No changes specified" when nothing is passed. |
+| `add_rolodex_interaction` | low | Log an interaction with a contact. `followUpDate` must be `YYYY-MM-DD`. |
+| `add_person_followup` | low | Add a follow-up reminder for a contact. `followUpDate` must be `YYYY-MM-DD`. |
+| `add_gift_idea` | low | Add a gift idea for a contact. Warns if the idea is already saved for them. |
+
+Person matching follows the same never-guess rules as projects (see §7):
+exact display-name match wins; a single close match returns a "did you mean"
+suggestion; zero matches point at `create_rolodex_person`; ambiguous matches
+list candidates.
 
 ### Unresolved mentions in the snapshot
 
