@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireCan } from "@/lib/auth/can";
 import type { DoStatus } from "@/lib/do";
 import { type DoItemSummary, summarize } from "./shared";
+import { ensureTimeEntryCalendarLinkColumn } from "@/lib/services/time-calendar";
 
 function laneRank(lane: string) {
   switch (lane) {
@@ -114,6 +115,12 @@ export async function listDoItems(
   options: { includeDone?: boolean; limit?: number } = {},
 ): Promise<DoItemSummary[]> {
   requireCan(userId, "do", "read");
+  // The timeEntries projection below selects TimeEntry.calendarEventId (added
+  // with the planned-vs-actual calendar link). The column is created via raw
+  // SQL rather than prisma migrate, so ensure it exists before querying —
+  // otherwise every caller of listDoItems (assistant snapshot, web pages)
+  // crashes on databases created before the column was introduced.
+  await ensureTimeEntryCalendarLinkColumn();
   const items = await prisma.doItem.findMany({
     where: {
       userId,
