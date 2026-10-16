@@ -12,6 +12,16 @@ model TimeEntry {
   endedAt   DateTime?
   notes     String?
   createdAt DateTime  @default(now())
+  // Optional link to the planned calendar block this entry realizes
+  // (planned vs actual). Like CalendarItem.categoryId, this column is created
+  // via raw SQL (`ensureTimeEntryCalendarLinkColumn` in
+  // src/lib/services/time-calendar.ts), NOT `prisma migrate` — the generated
+  // client predates it, so the service reads/writes it through $queryRaw /
+  // $executeRaw until the next `prisma generate`. Declared here so that
+  // generate eventually picks up the type and the raw queries can be retired.
+  // Stored as the backing CalendarItem id (recurring occurrences resolve to
+  // their parent row); deleting the calendar event clears the link (SET NULL).
+  calendarEventId String?
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   doItem    DoItem?   @relation(fields: [doItemId], references: [id], onDelete: SetNull)
   habit     Habit?    @relation(fields: [habitId], references: [id], onDelete: SetNull)

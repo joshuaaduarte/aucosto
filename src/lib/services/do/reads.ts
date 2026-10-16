@@ -140,6 +140,9 @@ export async function listDoItems(
           doItemId: true,
           habitId: true,
           projectId: true,
+          // Added with the planned-vs-actual calendar link (PR #17): keeps
+          // the projection assignable to TimeEntry after `prisma generate`.
+          calendarEventId: true,
         },
       },
     },

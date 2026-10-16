@@ -102,6 +102,7 @@ export async function POST(req: NextRequest) {
     summary: result.summary,
     recordId: result.recordId,
     recordType: result.recordType,
+    suggestedCalendarLink: result.suggestedCalendarLink ?? null,
     auditId,
   });
 }

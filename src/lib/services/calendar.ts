@@ -43,6 +43,14 @@ export function virtualCalendarItemId(parentId: string, originalStart: Date) {
   return `${parentId}${VIRTUAL_ID_SEPARATOR}${originalStart.toISOString()}`;
 }
 
+/**
+ * The canonical CalendarItem id for an occurrence id: recurring occurrences
+ * (virtual ids) resolve to their parent row; plain ids pass through.
+ */
+export function backingCalendarItemId(id: string): string {
+  return parseVirtualCalendarItemId(id)?.parentId ?? id;
+}
+
 function parseVirtualCalendarItemId(id: string) {
   const [parentId, originalStartIso] = id.split(VIRTUAL_ID_SEPARATOR);
   if (!parentId || !originalStartIso) return null;
