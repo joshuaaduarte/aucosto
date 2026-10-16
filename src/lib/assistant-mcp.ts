@@ -36,10 +36,12 @@ import {
   fetchAssistantCalendar,
   fetchAssistantHabits,
   fetchAssistantPeopleTime,
+  fetchAssistantPlannedVsActual,
   fetchAssistantProjects,
   fetchAssistantTasks,
   habitsQuerySchema,
   peopleTimeQuerySchema,
+  plannedVsActualQuerySchema,
   tasksQuerySchema,
 } from "@/lib/assistant-lists";
 
@@ -112,6 +114,12 @@ const peopleTimeToolInput = z.object({
     .string()
     .optional()
     .describe("ISO datetime with offset; defaults to now"),
+});
+const plannedVsActualToolInput = z.object({
+  date: z
+    .string()
+    .optional()
+    .describe("YYYY-MM-DD; defaults to today (server-local)"),
 });
 const historyToolInput = z.object({
   limit: z.number().int().min(1).max(100).optional(),
@@ -190,6 +198,12 @@ export function buildToolCatalog(): McpToolDef[] {
       description:
         "Per-person time totals for a date range (max 90 days, defaults to the last 7 days): minutes with each Rolodex person, broken down by category. Answers 'who am I spending time with?'",
       inputSchema: toJsonSchema(peopleTimeToolInput),
+    },
+    {
+      name: "assistant_list_planned_vs_actual",
+      description:
+        "Planned vs actual for one calendar day (defaults to today): each block with its planned window, linked time entries, duration delta, and start-time drift. Answers 'did I do what I planned?'",
+      inputSchema: toJsonSchema(plannedVsActualToolInput),
     },
     {
       name: "assistant_action_history",
@@ -372,6 +386,13 @@ async function callTool(
       });
       if (!parsed.success) return toolError(`Invalid arguments: ${parsed.error.message}`);
       return { content: toolText(await fetchAssistantPeopleTime(userId, parsed.data)) };
+    }
+    case "assistant_list_planned_vs_actual": {
+      const parsed = plannedVsActualQuerySchema.safeParse({
+        date: args.date,
+      });
+      if (!parsed.success) return toolError(`Invalid arguments: ${parsed.error.message}`);
+      return { content: toolText(await fetchAssistantPlannedVsActual(userId, parsed.data)) };
     }
     case "assistant_action_history": {
       const parsed = historyToolInput.safeParse(args);

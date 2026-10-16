@@ -13,12 +13,17 @@ import { listHabits, type HabitSummary } from "@/lib/services/habits";
 import { listBoardProjects, type BoardProjectCard } from "@/lib/services/projects";
 import {
   listCalendarItems,
+  backingCalendarItemId,
   type CalendarOccurrence,
 } from "@/lib/services/calendar";
 import {
   personTimeSummary,
   type PersonTimeSummary,
 } from "@/lib/services/time-people";
+import {
+  listEntriesForCalendarEvents,
+  localDayBounds,
+} from "@/lib/services/time-calendar";
 
 // ── Query schemas ───────────────────────────────────────────────────────────
 
@@ -288,4 +293,123 @@ export async function fetchAssistantPeopleTime(
     to: query.to,
   });
   return { items: summaries.map(serializePersonTime), count: summaries.length };
+}
+
+// ── Planned vs actual ───────────────────────────────────────────────────────
+
+export const plannedVsActualQuerySchema = z.object({
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD")
+    .optional(),
+});
+export type PlannedVsActualQuery = z.infer<typeof plannedVsActualQuerySchema>;
+
+export interface PlannedVsActualActualEntry {
+  entryId: string;
+  title: string;
+  actualStart: string;
+  actualEnd: string | null;
+}
+
+export interface PlannedVsActualBlock {
+  eventId: string;
+  title: string;
+  plannedStart: string;
+  plannedEnd: string;
+  plannedMinutes: number;
+  actualEntries: PlannedVsActualActualEntry[];
+  /** Sum of linked *completed* entry durations (running entries are listed but excluded). */
+  actualMinutes: number;
+  /** actualMinutes − plannedMinutes (negative = under plan). */
+  deltaMinutes: number;
+  /**
+   * First linked entry's start minus the block's planned start, in minutes
+   * (positive = started late). Null when no entries are linked.
+   */
+  startDriftMinutes: number | null;
+}
+
+function roundMinutes(ms: number): number {
+  return Math.round(ms / 60000);
+}
+
+/**
+ * Per-block planned-vs-actual for a calendar day. Blocks with no linked
+ * entries still appear (with empty actuals) so gaps are visible. Entries link
+ * via TimeEntry.calendarEventId (see time-calendar service); recurring
+ * occurrences match on their parent row id.
+ */
+export async function fetchAssistantPlannedVsActual(
+  userId: string,
+  query: PlannedVsActualQuery,
+): Promise<{
+  date: string;
+  blocks: PlannedVsActualBlock[];
+  count: number;
+}> {
+  const dayParam = query.date ?? localDatePartFor(new Date());
+  const [y, m, d] = dayParam.split("-").map(Number);
+  const { from, to } = localDayBounds(new Date(y!, m! - 1, d!));
+  const blocks = await listCalendarItems(userId, { from, to });
+
+  const backingIds = [...new Set(blocks.map((b) => backingCalendarItemId(b.id)))];
+  const linked = await listEntriesForCalendarEvents(userId, backingIds);
+  const byEvent = new Map<string, typeof linked>();
+  for (const row of linked) {
+    const key = row.calendarEventId ?? "";
+    const list = byEvent.get(key) ?? [];
+    list.push(row);
+    byEvent.set(key, list);
+  }
+
+  const out: PlannedVsActualBlock[] = blocks.map((block) => {
+    const entries = (byEvent.get(backingCalendarItemId(block.id)) ?? []).map(
+      (e) => ({
+        entryId: e.id,
+        title: e.label,
+        actualStart: e.startedAt.toISOString(),
+        actualEnd: e.endedAt ? e.endedAt.toISOString() : null,
+      }),
+    );
+    const actualMinutes = entries.reduce(
+      (sum, e) =>
+        e.actualEnd
+          ? sum +
+            roundMinutes(
+              new Date(e.actualEnd).getTime() - new Date(e.actualStart).getTime(),
+            )
+          : sum,
+      0,
+    );
+    const plannedMinutes = roundMinutes(
+      block.endsAt.getTime() - block.startsAt.getTime(),
+    );
+    const first = entries[0];
+    const startDriftMinutes = first
+      ? roundMinutes(
+          new Date(first.actualStart).getTime() - block.startsAt.getTime(),
+        )
+      : null;
+    return {
+      eventId: block.id,
+      title: block.title,
+      plannedStart: block.startsAt.toISOString(),
+      plannedEnd: block.endsAt.toISOString(),
+      plannedMinutes,
+      actualEntries: entries,
+      actualMinutes,
+      deltaMinutes: actualMinutes - plannedMinutes,
+      startDriftMinutes,
+    };
+  });
+
+  return { date: dayParam, blocks: out, count: out.length };
+}
+
+function localDatePartFor(d: Date): string {
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${mo}-${day}`;
 }
