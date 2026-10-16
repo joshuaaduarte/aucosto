@@ -85,6 +85,14 @@ describe("medium-risk confirmation gate logic", () => {
     expect(wouldRequireConfirmation("stop_timer", false)).toBe(true);
   });
 
+  it("swap_timer without confirmed:true requires confirmation", () => {
+    expect(wouldRequireConfirmation("swap_timer", undefined)).toBe(true);
+  });
+
+  it("swap_timer with confirmed:true does NOT require confirmation", () => {
+    expect(wouldRequireConfirmation("swap_timer", true)).toBe(false);
+  });
+
   it("create_task (low risk) never requires confirmation", () => {
     expect(wouldRequireConfirmation("create_task", undefined)).toBe(false);
   });
@@ -355,6 +363,12 @@ describe("new write actions: registry", () => {
     expect(ACTION_REGISTRY["log_time_entry"]!.risk).toBe("medium");
     expect(ACTION_REGISTRY["log_time_entry"]!.confirmationRequired).toBe(true);
     expect(ACTION_REGISTRY["log_time_entry"]!.supported).toBe(true);
+  });
+
+  it("swap_timer has medium risk and requires confirmation", () => {
+    expect(ACTION_REGISTRY["swap_timer"]!.risk).toBe("medium");
+    expect(ACTION_REGISTRY["swap_timer"]!.confirmationRequired).toBe(true);
+    expect(ACTION_REGISTRY["swap_timer"]!.supported).toBe(true);
   });
 });
 

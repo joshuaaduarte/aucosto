@@ -111,6 +111,14 @@ const StopTimerInput = z.object({
   note: z.string().optional(),
 });
 
+const SwapTimerInput = z.object({
+  title: z.string().min(1).max(200),
+  note: z.string().optional(), // saved onto the STOPPED entry
+  categoryName: z.string().optional(),
+  habitName: z.string().optional(),
+  personNames: z.array(z.string()).optional(), // linked to the NEW timer
+});
+
 const EditTimeEntryInput = z.object({
   entryId: z.string().min(1),
   title: z.string().min(1).max(200).optional(),
@@ -288,6 +296,7 @@ export const ACTION_INPUT_SCHEMAS: Record<string, z.ZodTypeAny> = {
   delete_calendar_event: DeleteCalendarEventInput,
   start_timer: StartTimerInput,
   stop_timer: StopTimerInput,
+  swap_timer: SwapTimerInput,
   edit_time_entry: EditTimeEntryInput,
   log_time_entry: LogTimeEntryInput,
   log_habit: LogHabitInput,
@@ -843,6 +852,88 @@ async function previewStopTimer(
   };
 }
 
+async function previewSwapTimer(
+  userId: string,
+  raw: unknown,
+): Promise<PreviewResult> {
+  const parsed = SwapTimerInput.safeParse(raw);
+  if (!parsed.success) {
+    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+  }
+  const { title, note, categoryName, habitName, personNames } = parsed.data;
+  const warnings: string[] = [];
+  let habitId: string | null = null;
+
+  if (habitName) {
+    const resolved = await resolveHabitByName(userId, habitName);
+    if (!resolved.found) {
+      warnings.push(`Habit "${habitName}" not found — timer will start without habit link`);
+    } else {
+      habitId = resolved.match.id;
+    }
+  }
+
+  let personIds: string[] = [];
+  let peopleNote = "";
+  if (personNames) {
+    const resolved = await resolvePeopleByNames(userId, personNames);
+    personIds = resolved.personIds;
+    warnings.push(...resolved.warnings);
+    peopleNote =
+      resolved.labels.length > 0 ? ` · with ${resolved.labels.join(", ")}` : "";
+  }
+
+  const running = await getRunningEntry(userId);
+
+  // No timer running: this is just a start; the note has nowhere to go.
+  if (!running) {
+    if (note !== undefined) {
+      warnings.push("No timer is currently running — the note will be ignored");
+    }
+    return {
+      ok: true,
+      previewText: `Start timer "${title}"${categoryName ? ` [${categoryName}]` : ""}${peopleNote}`,
+      normalizedInput: {
+        title,
+        category: categoryName ?? null,
+        habitId,
+        personIds,
+        note: null,
+        stoppedEntryId: null,
+        stoppedLabel: null,
+      },
+      warnings,
+    };
+  }
+
+  const elapsedMin = Math.round(
+    (Date.now() - running.startedAt.getTime()) / 60000,
+  );
+  const lines = [
+    `Stop "${running.label}" (running ${fmtMinutes(elapsedMin)}) and start "${title}"${categoryName ? ` [${categoryName}]` : ""}${peopleNote}`,
+  ];
+  if (note !== undefined) {
+    lines.push(
+      `Note saved on stopped entry: "${note.slice(0, 80)}${note.length > 80 ? "…" : ""}"`,
+    );
+  }
+
+  return {
+    ok: true,
+    previewText: lines.join("\n"),
+    normalizedInput: {
+      title,
+      category: categoryName ?? null,
+      habitId,
+      personIds,
+      note: note ?? null,
+      stoppedEntryId: running.id,
+      stoppedLabel: running.label,
+    },
+    warnings,
+  };
+}
+
 async function previewEditTimeEntry(
   userId: string,
   raw: unknown,
@@ -1257,6 +1348,51 @@ async function executeStopTimer(
     recordId: null,
     recordType: "TimeEntry",
     summary: "Stopped running timer",
+  };
+}
+
+// Stop the currently running timer (if any) and start a new one back-to-back.
+// The new timer starts at the exact instant the old one stopped — no gap, no
+// overlap. The `note` is saved onto the stopped entry.
+async function executeSwapTimer(
+  userId: string,
+  n: Record<string, unknown>,
+): Promise<ExecuteResult> {
+  // Re-resolve at execute time: whatever is running *now* is what gets stopped.
+  const now = new Date();
+  const running = await getRunningEntry(userId);
+
+  let stoppedLabel: string | null = null;
+  if (running) {
+    await stopRunning(userId, now);
+    if (typeof n.note === "string" && n.note.trim().length > 0) {
+      await updateEntry(userId, running.id, { notes: n.note });
+    }
+    stoppedLabel = running.label;
+  }
+
+  const entry = await startEntry(userId, {
+    label: String(n.title),
+    category: n.category ? String(n.category) : null,
+    habitId: n.habitId ? String(n.habitId) : null,
+    startedAt: now,
+  });
+  if (Array.isArray(n.personIds) && n.personIds.length > 0) {
+    await setEntryPeople(
+      userId,
+      entry.id,
+      n.personIds.filter((id): id is string => typeof id === "string"),
+    );
+  }
+
+  const summary = stoppedLabel
+    ? `Stopped "${stoppedLabel}" and started "${entry.label}"`
+    : `Started "${entry.label}" (no timer was running)`;
+  return {
+    ok: true,
+    recordId: entry.id,
+    recordType: "TimeEntry",
+    summary,
   };
 }
 
@@ -2040,6 +2176,7 @@ const PREVIEWS: Record<
   delete_calendar_event: previewDeleteCalendarEvent,
   start_timer: previewStartTimer,
   stop_timer: previewStopTimer,
+  swap_timer: previewSwapTimer,
   edit_time_entry: previewEditTimeEntry,
   log_time_entry: previewLogTimeEntry,
   log_habit: previewLogHabit,
@@ -2074,6 +2211,7 @@ const EXECUTES: Record<
   delete_calendar_event: executeDeleteCalendarEvent,
   start_timer: executeStartTimer,
   stop_timer: executeStopTimer,
+  swap_timer: executeSwapTimer,
   edit_time_entry: executeEditTimeEntry,
   log_time_entry: executeLogTimeEntry,
   log_habit: executeLogHabit,

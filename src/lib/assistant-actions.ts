@@ -67,6 +67,13 @@ export const ACTION_REGISTRY: Record<string, ActionDef> = {
     supported: true,
     description: "Stop the currently running timer",
   },
+  swap_timer: {
+    action: "swap_timer",
+    risk: "medium",
+    confirmationRequired: true,
+    supported: true,
+    description: "Stop the running timer and start a new one in one step. Optional note is saved on the stopped entry; supports categoryName, habitName, and personNames (linked to the new timer).",
+  },
   edit_time_entry: {
     action: "edit_time_entry",
     risk: "medium",
