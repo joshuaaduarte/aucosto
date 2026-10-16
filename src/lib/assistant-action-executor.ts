@@ -65,6 +65,20 @@ export interface ExecuteResult {
    * the execute path re-validates and the assistant still needs to decide.
    */
   suggestedCalendarLink?: CalendarLinkSuggestion | null;
+  /**
+   * For batch actions (e.g. log_time_entries): per-entry results in input
+   * order. Entries that failed mid-batch carry `error` and a null recordId —
+   * nothing is silently dropped.
+   */
+  entries?: LogTimeEntryBatchResult[];
+}
+
+/** Per-entry outcome for a batch time-entry write, in input order. */
+export interface LogTimeEntryBatchResult {
+  index: number;
+  title: string;
+  recordId: string | null;
+  error?: string;
 }
 
 // ── Input schemas ─────────────────────────────────────────────────────────
@@ -140,6 +154,20 @@ const LogTimeEntryInput = z.object({
   calendarEventId: z.string().min(1).optional(),
   /** Fuzzy-matched against today's calendar blocks (warn-and-skip). */
   calendarTitle: z.string().min(1).max(200).optional(),
+});
+
+/**
+ * Batch backfill: same per-entry shape as log_time_entry, 1–50 entries.
+ * Validated all-or-nothing — every entry is checked before any are written.
+ */
+const LogTimeEntriesInput = z.object({
+  entries: z
+    .array(LogTimeEntryInput)
+    .min(1, "entries must contain at least 1 time entry — nothing to log")
+    .max(
+      50,
+      "entries is limited to 50 per call — split larger backfills into multiple calls",
+    ),
 });
 
 const LogHabitInput = z.object({
@@ -304,6 +332,7 @@ export const ACTION_INPUT_SCHEMAS: Record<string, z.ZodTypeAny> = {
   swap_timer: SwapTimerInput,
   edit_time_entry: EditTimeEntryInput,
   log_time_entry: LogTimeEntryInput,
+  log_time_entries: LogTimeEntriesInput,
   delete_time_entry: DeleteTimeEntryInput,
   log_habit: LogHabitInput,
   create_habit: CreateHabitInput,
@@ -1429,21 +1458,51 @@ async function executeEditTimeEntry(
   };
 }
 
-async function previewLogTimeEntry(
+/**
+ * Per-item validation/normalization for log_time_entry and log_time_entries.
+ * Person/category/calendar resolution reuses the exact same warn-and-skip
+ * helpers every other timer action uses — never fails, never guesses.
+ * Hard validation errors are reported with the entry index and title so a
+ * batch caller knows exactly which item is broken.
+ */
+interface ValidatedLogTimeEntry {
+  title: string;
+  startedAt: string; // ISO
+  endedAt: string; // ISO
+  category: string | null;
+  notes: string | null;
+  personIds: string[];
+  calendarEventId: string | null;
+  suggestedCalendarLink: CalendarLinkSuggestion | null;
+  durationMinutes: number;
+  /** e.g. `6:00 PM–7:30 PM · 1h 30m · with Ana · for "Standup"` */
+  detailLine: string;
+}
+
+async function validateLogTimeEntryInput(
   userId: string,
   raw: unknown,
-): Promise<PreviewResult> {
+  index: number,
+  warnPrefix: string,
+): Promise<
+  | { ok: true; entry: ValidatedLogTimeEntry; warnings: string[] }
+  | { ok: false; error: string }
+> {
   const parsed = LogTimeEntryInput.safeParse(raw);
   if (!parsed.success) {
-    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+    return {
+      ok: false,
+      error: `entries[${index}]: ${parsed.error.issues[0]?.message ?? "Invalid input"}`,
+    };
   }
   const { title, startedAt, endedAt, categoryName, notes, personNames, calendarEventId, calendarTitle } = parsed.data;
+  const label = `entries[${index}] "${title}"`;
 
   const start = new Date(startedAt);
   const end = new Date(endedAt);
-  if (Number.isNaN(start.getTime())) return err("Invalid startedAt — must be an ISO datetime string");
-  if (Number.isNaN(end.getTime())) return err("Invalid endedAt — must be an ISO datetime string");
-  if (end <= start) return err("End time must be after start time.");
+  if (Number.isNaN(start.getTime())) return { ok: false, error: `${label}: Invalid startedAt — must be an ISO datetime string` };
+  if (Number.isNaN(end.getTime())) return { ok: false, error: `${label}: Invalid endedAt — must be an ISO datetime string` };
+  if (end <= start) return { ok: false, error: `${label}: End time must be after start time.` };
 
   const warnings: string[] = [];
   let personIds: string[] = [];
@@ -1451,7 +1510,7 @@ async function previewLogTimeEntry(
   if (personNames) {
     const resolved = await resolvePeopleByNames(userId, personNames);
     personIds = resolved.personIds;
-    warnings.push(...resolved.warnings);
+    warnings.push(...resolved.warnings.map((w) => `${warnPrefix}${w}`));
     peopleNote =
       resolved.labels.length > 0 ? ` · with ${resolved.labels.join(", ")}` : "";
   }
@@ -1460,7 +1519,7 @@ async function previewLogTimeEntry(
     calendarEventId,
     calendarTitle,
   });
-  warnings.push(...calendarLink.warnings);
+  warnings.push(...calendarLink.warnings.map((w) => `${warnPrefix}${w}`));
 
   // Suggest a block the logged window overlaps — suggested only, never linked
   // without the assistant's explicit confirmation. Best-effort: a calendar
@@ -1474,17 +1533,12 @@ async function previewLogTimeEntry(
     }
   }
 
-  const lines = [
-    `Log time entry "${title}"`,
-    `${fmtClock(start)}–${fmtClock(end)} · ${fmtMinutes(Math.round((end.getTime() - start.getTime()) / 60000))}${peopleNote}${calendarLink.linkedNote}`,
-  ];
-  if (categoryName) lines.push(`Category: ${categoryName}`);
-  if (notes) lines.push(`Notes: ${notes}`);
+  const durationMinutes = Math.round((end.getTime() - start.getTime()) / 60000);
+  const detailLine = `${fmtClock(start)}–${fmtClock(end)} · ${fmtMinutes(durationMinutes)}${peopleNote}${calendarLink.linkedNote}`;
 
   return {
     ok: true,
-    previewText: lines.join("\n"),
-    normalizedInput: {
+    entry: {
       title,
       startedAt: start.toISOString(),
       endedAt: end.toISOString(),
@@ -1493,10 +1547,74 @@ async function previewLogTimeEntry(
       personIds,
       calendarEventId: calendarLink.eventId,
       suggestedCalendarLink,
+      durationMinutes,
+      detailLine,
     },
     warnings,
-    suggestedCalendarLink,
   };
+}
+
+async function previewLogTimeEntry(
+  userId: string,
+  raw: unknown,
+): Promise<PreviewResult> {
+  const result = await validateLogTimeEntryInput(userId, raw, 0, "");
+  if (!result.ok) return err(result.error);
+  const { entry, warnings } = result;
+
+  const lines = [`Log time entry "${entry.title}"`, entry.detailLine];
+  if (entry.category) lines.push(`Category: ${entry.category}`);
+  if (entry.notes) lines.push(`Notes: ${entry.notes}`);
+
+  return {
+    ok: true,
+    previewText: lines.join("\n"),
+    normalizedInput: {
+      title: entry.title,
+      startedAt: entry.startedAt,
+      endedAt: entry.endedAt,
+      category: entry.category,
+      notes: entry.notes,
+      personIds: entry.personIds,
+      calendarEventId: entry.calendarEventId,
+      suggestedCalendarLink: entry.suggestedCalendarLink,
+    },
+    warnings,
+    suggestedCalendarLink: entry.suggestedCalendarLink,
+  };
+}
+
+/** The DB write (plus people/calendar links) for one normalized log entry. */
+async function writeValidatedLogTimeEntry(
+  userId: string,
+  entry: {
+    title: string;
+    category: string | null;
+    notes: string | null;
+    startedAt: string;
+    endedAt: string;
+    personIds: string[];
+    calendarEventId: string | null;
+  },
+) {
+  const created = await createPastEntry(userId, {
+    label: entry.title,
+    category: entry.category,
+    notes: entry.notes,
+    startedAt: new Date(entry.startedAt),
+    endedAt: new Date(entry.endedAt),
+  });
+  if (entry.personIds.length > 0) {
+    await setEntryPeople(
+      userId,
+      created.id,
+      entry.personIds.filter((id): id is string => typeof id === "string"),
+    );
+  }
+  if (entry.calendarEventId) {
+    await setEntryCalendarLink(userId, created.id, entry.calendarEventId);
+  }
+  return created;
 }
 
 async function executeLogTimeEntry(
@@ -1504,29 +1622,160 @@ async function executeLogTimeEntry(
   n: Record<string, unknown>,
 ): Promise<ExecuteResult> {
   // Input was validated and normalized by previewLogTimeEntry.
-  const entry = await createPastEntry(userId, {
-    label: String(n.title),
+  const entry = await writeValidatedLogTimeEntry(userId, {
+    title: String(n.title),
     category: typeof n.category === "string" ? n.category : null,
     notes: typeof n.notes === "string" ? n.notes : null,
-    startedAt: new Date(String(n.startedAt)),
-    endedAt: new Date(String(n.endedAt)),
+    startedAt: String(n.startedAt),
+    endedAt: String(n.endedAt),
+    personIds: Array.isArray(n.personIds) ? n.personIds : [],
+    calendarEventId:
+      typeof n.calendarEventId === "string" && n.calendarEventId
+        ? n.calendarEventId
+        : null,
   });
-  if (Array.isArray(n.personIds) && n.personIds.length > 0) {
-    await setEntryPeople(
-      userId,
-      entry.id,
-      n.personIds.filter((id): id is string => typeof id === "string"),
-    );
-  }
-  if (typeof n.calendarEventId === "string" && n.calendarEventId) {
-    await setEntryCalendarLink(userId, entry.id, n.calendarEventId);
-  }
   return {
     ok: true,
     recordId: entry.id,
     recordType: "TimeEntry",
     summary: `Logged time entry "${entry.label}"`,
     suggestedCalendarLink: coerceCalendarSuggestion(n.suggestedCalendarLink),
+  };
+}
+
+/**
+ * Validate EVERY entry before writing ANY (all-or-nothing): one bad entry
+ * rejects the whole batch with per-entry errors, so a confirmed batch can
+ * never half-apply from bad input.
+ */
+async function previewLogTimeEntries(
+  userId: string,
+  raw: unknown,
+): Promise<PreviewResult> {
+  const parsed = LogTimeEntriesInput.safeParse(raw);
+  if (!parsed.success) {
+    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+  }
+  const { entries } = parsed.data;
+
+  const normalized: ValidatedLogTimeEntry[] = [];
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  let totalMinutes = 0;
+  for (let i = 0; i < entries.length; i++) {
+    const result = await validateLogTimeEntryInput(userId, entries[i], i, `[${i}] `);
+    if (result.ok) {
+      normalized.push(result.entry);
+      warnings.push(...result.warnings);
+      totalMinutes += result.entry.durationMinutes;
+    } else {
+      errors.push(result.error);
+    }
+  }
+  if (errors.length > 0) {
+    return err(
+      `No entries logged — ${errors.length} of ${entries.length} failed validation:\n${errors.join("\n")}`,
+    );
+  }
+
+  const lines = [
+    `Log ${entries.length} time ${entries.length === 1 ? "entry" : "entries"} (${fmtMinutes(totalMinutes)} total)`,
+  ];
+  for (let i = 0; i < normalized.length; i++) {
+    const e = normalized[i]!;
+    lines.push(
+      `[${i}] "${e.title}" · ${e.detailLine}${e.category ? ` · ${e.category}` : ""}`,
+    );
+  }
+
+  return {
+    ok: true,
+    previewText: lines.join("\n"),
+    normalizedInput: {
+      entries: normalized.map((e) => ({
+        title: e.title,
+        startedAt: e.startedAt,
+        endedAt: e.endedAt,
+        category: e.category,
+        notes: e.notes,
+        personIds: e.personIds,
+        calendarEventId: e.calendarEventId,
+        suggestedCalendarLink: e.suggestedCalendarLink,
+      })),
+    },
+    warnings,
+  };
+}
+
+/**
+ * Write all entries in order. Validation already ran all-or-nothing in the
+ * preview step, so write failures here are exceptional (DB errors); each is
+ * reported with its index and title alongside the ones that succeeded —
+ * never silently dropped.
+ */
+async function executeLogTimeEntries(
+  userId: string,
+  n: Record<string, unknown>,
+): Promise<ExecuteResult> {
+  // Input was validated and normalized by previewLogTimeEntries.
+  const entries = (Array.isArray(n.entries) ? n.entries : []) as Array<{
+    title: string;
+    category: string | null;
+    notes: string | null;
+    startedAt: string;
+    endedAt: string;
+    personIds: string[];
+    calendarEventId: string | null;
+  }>;
+
+  const results: LogTimeEntryBatchResult[] = [];
+  let okCount = 0;
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i]!;
+    try {
+      const created = await writeValidatedLogTimeEntry(userId, e);
+      results.push({ index: i, title: e.title, recordId: created.id });
+      okCount++;
+    } catch (error) {
+      results.push({
+        index: i,
+        title: e.title,
+        recordId: null,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  const totalMinutes = entries.reduce(
+    (sum, e) =>
+      sum +
+      Math.round(
+        (new Date(e.endedAt).getTime() - new Date(e.startedAt).getTime()) / 60000,
+      ),
+    0,
+  );
+
+  if (okCount === entries.length) {
+    return {
+      ok: true,
+      recordId: null,
+      recordType: "TimeEntry",
+      summary: `Logged ${entries.length} time ${entries.length === 1 ? "entry" : "entries"} (${fmtMinutes(totalMinutes)} total)`,
+      entries: results,
+    };
+  }
+
+  const failures = results
+    .filter((r) => r.recordId === null)
+    .map((r) => `[${r.index}] "${r.title}": ${r.error}`)
+    .join("; ");
+  return {
+    ok: false,
+    error: `Logged ${okCount} of ${entries.length} time entries — ${entries.length - okCount} failed: ${failures}`,
+    recordId: null,
+    recordType: "TimeEntry",
+    summary: "",
+    entries: results,
   };
 }
 
@@ -1606,6 +1855,7 @@ async function executeDeleteTimeEntry(
     summary: `Deleted time entry "${n.beforeTitle}"`,
   };
 }
+
 
 async function executeLogHabit(
   userId: string,
@@ -2262,6 +2512,7 @@ const PREVIEWS: Record<
   swap_timer: previewSwapTimer,
   edit_time_entry: previewEditTimeEntry,
   log_time_entry: previewLogTimeEntry,
+  log_time_entries: previewLogTimeEntries,
   delete_time_entry: previewDeleteTimeEntry,
   log_habit: previewLogHabit,
   create_habit: previewCreateHabit,
@@ -2298,6 +2549,7 @@ const EXECUTES: Record<
   swap_timer: executeSwapTimer,
   edit_time_entry: executeEditTimeEntry,
   log_time_entry: executeLogTimeEntry,
+  log_time_entries: executeLogTimeEntries,
   delete_time_entry: executeDeleteTimeEntry,
   log_habit: executeLogHabit,
   create_habit: executeCreateHabit,

@@ -361,7 +361,7 @@ through the same risk gating and audit trail as the REST routes. See
 
 Current risk assignments:
 - `low`: `create_task`, `log_habit`, `create_habit`, `add_reflection`, `create_project`
-- `medium`: `complete_task`, `update_task`, `create_calendar_block`, `update_calendar_event`, `delete_calendar_event`, `delete_project`, `start_timer`, `stop_timer`, `swap_timer`, `edit_time_entry`, `log_time_entry`, `delete_time_entry`, `update_project`
+- `medium`: `complete_task`, `update_task`, `create_calendar_block`, `update_calendar_event`, `delete_calendar_event`, `delete_project`, `start_timer`, `stop_timer`, `swap_timer`, `edit_time_entry`, `log_time_entry`, `log_time_entries`, `delete_time_entry`, `update_project`
 - `high`: `finance_write` (also `supported: false`)
 
 ---
@@ -541,9 +541,48 @@ Linked people (links removed): Ana
 - `TimeEntryPerson` links for the deleted entry are cleared first, so no
   orphaned people-links remain.
 
+### Batch log time entries (medium risk)
+```
+POST /api/assistant/actions/preview
+{
+  "action": "log_time_entries",
+  "input": {
+    "entries": [
+      { "title": "Morning run", "startedAt": "2024-06-24T13:30:00.000Z", "endedAt": "2024-06-24T14:15:00.000Z", "categoryName": "run" },
+      { "title": "Deep work", "startedAt": "2024-06-24T16:00:00.000Z", "endedAt": "2024-06-24T18:30:00.000Z", "personNames": ["Ana"] }
+    ]
+  }
+}
+```
+
+Each entry accepts the same fields as `log_time_entry` (`title`,
+`startedAt`, `endedAt`, `categoryName`, `notes`, `personNames`,
+`calendarEventId` / `calendarTitle`). 1–50 entries per call; an empty array
+is rejected, and batches over 50 must be split into multiple calls.
+
+**All-or-nothing validation:** every entry is validated before any are
+written — one bad entry rejects the whole batch, with per-entry errors
+carrying the index and title (`entries[1] "Deep work": End time must be
+after start time.`). People/calendar resolution is the same warn-and-skip
+as `log_time_entry`, with warnings prefixed by the entry index (`[1] ...`)
+so the confirmer sees exactly which entry each warning belongs to.
+
+Preview text:
+```
+Log 2 time entries (3h 15m total)
+[0] "Morning run" · 6:30 AM–7:15 AM · 45m · run
+[1] "Deep work" · 9:00 AM–11:30 AM · 2h 30m · with Ana
+```
+
+Execute writes the entries in order and returns per-entry results (`entries`
+on the execute result: `{ index, title, recordId }` per entry, with `error`
+set instead of `recordId` for any write that failed mid-batch — nothing is
+silently dropped). Use `log_time_entries` instead of N `log_time_entry`
+calls when backfilling a day.
+
 ### Linking people to time entries (medium risk)
 
-`start_timer`, `swap_timer`, `log_time_entry`, and `edit_time_entry` accept an
+`start_timer`, `swap_timer`, `log_time_entry`, `log_time_entries`, and `edit_time_entry` accept an
 optional `personNames` array of Rolodex display names. Names resolve
 exact-first, then single fuzzy match; unknown or ambiguous names produce a
 warning and are skipped — the action never fails and never guesses.
@@ -579,7 +618,7 @@ the `assistant_list_people_time` MCP tool.
 
 ### Linking calendar blocks to time entries (medium risk)
 
-`start_timer` and `log_time_entry` accept an optional `calendarEventId`
+`start_timer`, `log_time_entry`, and `log_time_entries` (per entry) accept an optional `calendarEventId`
 (explicit calendar block id — a virtual recurrence-occurrence id like
 `parentId::2026-10-15T14:00:00.000Z` also works and resolves to the parent row)
 or `calendarTitle` (fuzzy-matched against **today's** calendar blocks:

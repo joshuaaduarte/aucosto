@@ -95,6 +95,13 @@ export const ACTION_REGISTRY: Record<string, ActionDef> = {
     supported: true,
     description: "Delete one completed time entry by id. Refuses running timers (stop_timer first); removes linked people (TimeEntryPerson).",
   },
+  log_time_entries: {
+    action: "log_time_entries",
+    risk: "medium",
+    confirmationRequired: true,
+    supported: true,
+    description: "Log multiple completed time entries in one call — backfill a day without N round trips. 1–50 entries, all-or-nothing validation; per-entry fields are the same as log_time_entry (categoryName, notes, personNames, calendarEventId / calendarTitle).",
+  },
   log_habit: {
     action: "log_habit",
     risk: "low",
