@@ -496,6 +496,85 @@ Links live in the `TimeEntryPerson` join table (many-to-many: one entry can
 involve several people). Query them via `GET /api/assistant/people-time` or
 the `assistant_list_people_time` MCP tool.
 
+### Linking calendar blocks to time entries (medium risk)
+
+`start_timer` and `log_time_entry` accept an optional `calendarEventId`
+(explicit calendar block id — a virtual recurrence-occurrence id like
+`parentId::2026-10-15T14:00:00.000Z` also works and resolves to the parent row)
+or `calendarTitle` (fuzzy-matched against **today's** calendar blocks:
+exact title wins, a single fuzzy match is accepted, unknown/ambiguous names
+warn and skip — never fail, never guess). The event must exist and belong to
+the user; an unknown id warns and skips rather than failing the action. An
+explicit id always wins over a title. The link is stored as the backing
+`CalendarItem` id in `TimeEntry.calendarEventId`; deleting the calendar event
+clears the link (`ON DELETE SET NULL`) without touching the entry.
+
+**Auto-suggestion (never auto-applied):** when no link is given, the preview
+also returns `suggestedCalendarLink: { eventId, title }` — when `start_timer`
+fires within 15 minutes of a block's start, or when a `log_time_entry` window
+overlaps a block's time range. It appears as a dedicated field on the preview
+and execute responses (and in `normalizedInput`), so the assistant can show it
+and confirm. Nothing is linked without an explicit `calendarEventId` /
+`calendarTitle` in a confirmed action.
+
+```json
+{
+  "action": "log_time_entry",
+  "input": {
+    "title": "Gym",
+    "startedAt": "2024-06-24T18:00:00.000Z",
+    "endedAt": "2024-06-24T19:00:00.000Z",
+    "calendarTitle": "gym"
+  }
+}
+```
+→ preview includes `"suggestedCalendarLink": { "eventId": "abc123", "title": "Gym" }` when the window overlaps the Gym block.
+
+### Planned vs actual
+
+```http
+GET /api/assistant/planned-vs-actual?date=2024-06-24
+```
+(date defaults to today, server-local). For each calendar block that day:
+planned window, linked time entries (id, title, actual start/end), and deltas:
+
+- `plannedMinutes` — rounded planned block duration
+- `actualMinutes` — sum of linked **completed** entry durations (running
+  entries are listed with `actualEnd: null` but excluded from the sum)
+- `deltaMinutes` = `actualMinutes − plannedMinutes` (negative = under plan)
+- `startDriftMinutes` — first linked entry's start minus the block's planned
+  start, in minutes (positive = started late; `null` when nothing is linked)
+
+Blocks with no linked entries still appear (empty `actualEntries`) so gaps are
+visible. Also available as the `assistant_list_planned_vs_actual` MCP tool.
+
+```json
+{
+  "date": "2024-06-24",
+  "blocks": [
+    {
+      "eventId": "abc123",
+      "title": "Gym",
+      "plannedStart": "2024-06-24T18:00:00.000Z",
+      "plannedEnd": "2024-06-24T19:00:00.000Z",
+      "plannedMinutes": 60,
+      "actualEntries": [
+        {
+          "entryId": "e1",
+          "title": "Gym",
+          "actualStart": "2024-06-24T18:05:00.000Z",
+          "actualEnd": "2024-06-24T18:50:00.000Z"
+        }
+      ],
+      "actualMinutes": 45,
+      "deltaMinutes": -15,
+      "startDriftMinutes": 5
+    }
+  ],
+  "count": 1
+}
+```
+
 ---
 
 ## 6. Stale Timer Repair — End-to-End Example

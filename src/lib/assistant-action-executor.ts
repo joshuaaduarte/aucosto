@@ -4,6 +4,13 @@ import { z } from "zod";
 import { createDoItem, updateDoItem, getDoItemSummary } from "@/lib/services/do";
 import { getRunningEntry, startEntry, stopRunning, updateEntry, listRecentEntries, createPastEntry } from "@/lib/services/time";
 import { setEntryPeople } from "@/lib/services/time-people";
+import {
+  setEntryCalendarLink,
+  resolveCalendarBlockByTitle,
+  suggestCalendarLinkForStart,
+  suggestCalendarLinkForRange,
+  type CalendarLinkSuggestion,
+} from "@/lib/services/time-calendar";
 import { listHabits, logHabitProgress, createHabit } from "@/lib/services/habits";
 import { createCalendarItem, getCalendarItem, updateCalendarItem, deleteCalendarItem } from "@/lib/services/calendar";
 import {
@@ -38,6 +45,12 @@ export interface PreviewResult {
   previewText: string;
   normalizedInput: Record<string, unknown>;
   warnings: string[];
+  /**
+   * A calendar block the assistant may want to link this entry to. Suggested
+   * only — the entry is never linked without an explicit calendarEventId /
+   * calendarTitle confirmed by the assistant.
+   */
+  suggestedCalendarLink?: CalendarLinkSuggestion | null;
 }
 
 export interface ExecuteResult {
@@ -46,6 +59,11 @@ export interface ExecuteResult {
   recordId: string | null;
   recordType: string | null;
   summary: string;
+  /**
+   * Same as PreviewResult.suggestedCalendarLink: surfaced here too because
+   * the execute path re-validates and the assistant still needs to decide.
+   */
+  suggestedCalendarLink?: CalendarLinkSuggestion | null;
 }
 
 // ── Input schemas ─────────────────────────────────────────────────────────
@@ -81,6 +99,10 @@ const StartTimerInput = z.object({
   categoryName: z.string().optional(),
   habitName: z.string().optional(),
   personNames: z.array(z.string()).optional(),
+  /** Explicit calendar block id (or virtual recurrence-occurrence id). */
+  calendarEventId: z.string().min(1).optional(),
+  /** Fuzzy-matched against today's calendar blocks (warn-and-skip). */
+  calendarTitle: z.string().min(1).max(200).optional(),
 });
 
 const StopTimerInput = z.object({
@@ -105,6 +127,10 @@ const LogTimeEntryInput = z.object({
   categoryName: z.string().optional(),
   notes: z.string().optional(),
   personNames: z.array(z.string()).optional(),
+  /** Explicit calendar block id (or virtual recurrence-occurrence id). */
+  calendarEventId: z.string().min(1).optional(),
+  /** Fuzzy-matched against today's calendar blocks (warn-and-skip). */
+  calendarTitle: z.string().min(1).max(200).optional(),
 });
 
 const LogHabitInput = z.object({
@@ -373,6 +399,82 @@ async function resolvePeopleByNames(
   };
 }
 
+// ── Calendar link resolution (planned vs actual) ────────────────────────────
+
+interface ResolvedCalendarLink {
+  /** Backing CalendarItem id, or null when no link was established. */
+  eventId: string | null;
+  title: string | null;
+  warnings: string[];
+  /** Suffix for the preview text, e.g. ` · for "Standup"`. */
+  linkedNote: string;
+}
+
+/**
+ * Resolve an explicit calendarEventId (validated against the user's calendar;
+ * virtual recurrence ids resolve to the parent row) or a fuzzy calendarTitle
+ * (matched against today's blocks, warn-and-skip). An explicit id always wins;
+ * an unknown id warns and skips — never fails, never guesses.
+ */
+async function resolveCalendarLinkInput(
+  userId: string,
+  input: { calendarEventId?: string; calendarTitle?: string },
+): Promise<ResolvedCalendarLink> {
+  const warnings: string[] = [];
+  const { calendarEventId, calendarTitle } = input;
+
+  if (calendarEventId) {
+    if (calendarTitle) {
+      warnings.push("calendarTitle ignored — explicit calendarEventId provided");
+    }
+    const item = await getCalendarItem(userId, calendarEventId);
+    if (!item) {
+      warnings.push(
+        `Calendar event "${calendarEventId}" not found — continuing without a calendar link`,
+      );
+      return { eventId: null, title: null, warnings, linkedNote: "" };
+    }
+    return {
+      eventId: item.id,
+      title: item.title,
+      warnings,
+      linkedNote: ` · for "${item.title}"`,
+    };
+  }
+
+  if (calendarTitle) {
+    const resolved = await resolveCalendarBlockByTitle(userId, calendarTitle);
+    warnings.push(...resolved.warnings);
+    if (resolved.eventId) {
+      return {
+        eventId: resolved.eventId,
+        title: resolved.title,
+        warnings,
+        linkedNote: ` · for "${resolved.title}"`,
+      };
+    }
+    return { eventId: null, title: null, warnings, linkedNote: "" };
+  }
+
+  return { eventId: null, title: null, warnings, linkedNote: "" };
+}
+
+/** Pass a suggestedCalendarLink through normalized input safely. */
+function coerceCalendarSuggestion(
+  value: unknown,
+): CalendarLinkSuggestion | null {
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as Record<string, unknown>).eventId === "string" &&
+    typeof (value as Record<string, unknown>).title === "string"
+  ) {
+    const v = value as { eventId: string; title: string };
+    return { eventId: v.eventId, title: v.title };
+  }
+  return null;
+}
+
 // ── Date helpers ──────────────────────────────────────────────────────────
 
 // Build a local Date from "YYYY-MM-DD" + "HH:MM". Node.js interprets date-time
@@ -630,7 +732,7 @@ async function previewStartTimer(
   if (!parsed.success) {
     return err(parsed.error.issues[0]?.message ?? "Invalid input");
   }
-  const { title, categoryName, habitName, personNames } = parsed.data;
+  const { title, categoryName, habitName, personNames, calendarEventId, calendarTitle } = parsed.data;
   const warnings: string[] = [];
   let habitId: string | null = null;
 
@@ -653,19 +755,40 @@ async function previewStartTimer(
       resolved.labels.length > 0 ? ` · with ${resolved.labels.join(", ")}` : "";
   }
 
+  const calendarLink = await resolveCalendarLinkInput(userId, {
+    calendarEventId,
+    calendarTitle,
+  });
+  warnings.push(...calendarLink.warnings);
+
+  // Suggest a block when starting near its start — suggested only, never
+  // linked without the assistant's explicit confirmation. Best-effort: a
+  // calendar read failure must never break starting the timer.
+  let suggestedCalendarLink: CalendarLinkSuggestion | null = null;
+  if (!calendarLink.eventId) {
+    try {
+      suggestedCalendarLink = await suggestCalendarLinkForStart(userId);
+    } catch (error) {
+      console.error("[assistant] calendar suggestion failed", error);
+    }
+  }
+
   const running = await getRunningEntry(userId);
   const stopNote = running ? ` (stops running timer: "${running.label}")` : "";
 
   return {
     ok: true,
-    previewText: `Start timer "${title}"${categoryName ? ` [${categoryName}]` : ""}${peopleNote}${stopNote}`,
+    previewText: `Start timer "${title}"${categoryName ? ` [${categoryName}]` : ""}${peopleNote}${calendarLink.linkedNote}${stopNote}`,
     normalizedInput: {
       title,
       category: categoryName ?? null,
       habitId,
       personIds,
+      calendarEventId: calendarLink.eventId,
+      suggestedCalendarLink,
     },
     warnings,
+    suggestedCalendarLink,
   };
 }
 
@@ -1111,11 +1234,15 @@ async function executeStartTimer(
       n.personIds.filter((id): id is string => typeof id === "string"),
     );
   }
+  if (typeof n.calendarEventId === "string" && n.calendarEventId) {
+    await setEntryCalendarLink(userId, entry.id, n.calendarEventId);
+  }
   return {
     ok: true,
     recordId: entry.id,
     recordType: "TimeEntry",
     summary: `Started timer "${entry.label}"`,
+    suggestedCalendarLink: coerceCalendarSuggestion(n.suggestedCalendarLink),
   };
 }
 
@@ -1168,7 +1295,7 @@ async function previewLogTimeEntry(
   if (!parsed.success) {
     return err(parsed.error.issues[0]?.message ?? "Invalid input");
   }
-  const { title, startedAt, endedAt, categoryName, notes, personNames } = parsed.data;
+  const { title, startedAt, endedAt, categoryName, notes, personNames, calendarEventId, calendarTitle } = parsed.data;
 
   const start = new Date(startedAt);
   const end = new Date(endedAt);
@@ -1187,9 +1314,27 @@ async function previewLogTimeEntry(
       resolved.labels.length > 0 ? ` · with ${resolved.labels.join(", ")}` : "";
   }
 
+  const calendarLink = await resolveCalendarLinkInput(userId, {
+    calendarEventId,
+    calendarTitle,
+  });
+  warnings.push(...calendarLink.warnings);
+
+  // Suggest a block the logged window overlaps — suggested only, never linked
+  // without the assistant's explicit confirmation. Best-effort: a calendar
+  // read failure must never break logging the entry.
+  let suggestedCalendarLink: CalendarLinkSuggestion | null = null;
+  if (!calendarLink.eventId) {
+    try {
+      suggestedCalendarLink = await suggestCalendarLinkForRange(userId, start, end);
+    } catch (error) {
+      console.error("[assistant] calendar suggestion failed", error);
+    }
+  }
+
   const lines = [
     `Log time entry "${title}"`,
-    `${fmtClock(start)}–${fmtClock(end)} · ${fmtMinutes(Math.round((end.getTime() - start.getTime()) / 60000))}${peopleNote}`,
+    `${fmtClock(start)}–${fmtClock(end)} · ${fmtMinutes(Math.round((end.getTime() - start.getTime()) / 60000))}${peopleNote}${calendarLink.linkedNote}`,
   ];
   if (categoryName) lines.push(`Category: ${categoryName}`);
   if (notes) lines.push(`Notes: ${notes}`);
@@ -1204,8 +1349,11 @@ async function previewLogTimeEntry(
       category: categoryName ?? null,
       notes: notes ?? null,
       personIds,
+      calendarEventId: calendarLink.eventId,
+      suggestedCalendarLink,
     },
     warnings,
+    suggestedCalendarLink,
   };
 }
 
@@ -1228,11 +1376,15 @@ async function executeLogTimeEntry(
       n.personIds.filter((id): id is string => typeof id === "string"),
     );
   }
+  if (typeof n.calendarEventId === "string" && n.calendarEventId) {
+    await setEntryCalendarLink(userId, entry.id, n.calendarEventId);
+  }
   return {
     ok: true,
     recordId: entry.id,
     recordType: "TimeEntry",
     summary: `Logged time entry "${entry.label}"`,
+    suggestedCalendarLink: coerceCalendarSuggestion(n.suggestedCalendarLink),
   };
 }
 
