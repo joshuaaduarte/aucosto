@@ -35,8 +35,8 @@ describe("summarizeJsonSchema", () => {
 describe("buildToolCatalog", () => {
   const tools = buildToolCatalog();
 
-  it("exposes eleven tools", () => {
-    expect(tools).toHaveLength(11);
+  it("exposes twelve tools", () => {
+    expect(tools).toHaveLength(12);
   });
 
   it("has unique names", () => {
@@ -65,6 +65,7 @@ describe("buildToolCatalog", () => {
       "assistant_list_calendar",
       "assistant_list_people_time",
       "assistant_list_planned_vs_actual",
+      "assistant_list_reflections",
       "assistant_action_history",
     ]);
   });
@@ -137,7 +138,7 @@ describe("handleMcpRequest", () => {
     });
     expect(status).toBe(200);
     const tools = (body as { result: { tools: unknown[] } }).result.tools;
-    expect(tools).toHaveLength(11);
+    expect(tools).toHaveLength(12);
   });
 
   it("accepts notifications without a response body", async () => {
