@@ -418,7 +418,6 @@ function localDatePartFor(d: Date): string {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${mo}-${day}`;
 }
-
 // ── Reflections trend ───────────────────────────────────────────────────────
 
 const MAX_REFLECTIONS_RANGE_DAYS = 90;
