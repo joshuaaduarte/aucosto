@@ -365,6 +365,12 @@ describe("new write actions: registry", () => {
     expect(ACTION_REGISTRY["log_time_entry"]!.supported).toBe(true);
   });
 
+  it("log_time_entries has medium risk and requires confirmation", () => {
+    expect(ACTION_REGISTRY["log_time_entries"]!.risk).toBe("medium");
+    expect(ACTION_REGISTRY["log_time_entries"]!.confirmationRequired).toBe(true);
+    expect(ACTION_REGISTRY["log_time_entries"]!.supported).toBe(true);
+  });
+
   it("swap_timer has medium risk and requires confirmation", () => {
     expect(ACTION_REGISTRY["swap_timer"]!.risk).toBe("medium");
     expect(ACTION_REGISTRY["swap_timer"]!.confirmationRequired).toBe(true);
