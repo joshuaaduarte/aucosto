@@ -335,7 +335,7 @@ through the same risk gating and audit trail as the REST routes. See
 
 Current risk assignments:
 - `low`: `create_task`, `log_habit`, `create_habit`, `add_reflection`, `create_project`
-- `medium`: `complete_task`, `update_task`, `create_calendar_block`, `update_calendar_event`, `delete_calendar_event`, `delete_project`, `start_timer`, `stop_timer`, `edit_time_entry`, `log_time_entry`, `update_project`
+- `medium`: `complete_task`, `update_task`, `create_calendar_block`, `update_calendar_event`, `delete_calendar_event`, `delete_project`, `start_timer`, `stop_timer`, `edit_time_entry`, `log_time_entry`, `delete_time_entry`, `update_project`
 - `high`: `finance_write` (also `supported: false`)
 
 ---
@@ -461,6 +461,30 @@ Edit time entry: Commute
 Before: 8:55 AM–5:52 PM · 8h 56m
 After: 8:55 AM–9:15 AM · 20m
 ```
+
+### Delete time entry (medium risk)
+```
+POST /api/assistant/actions/preview
+{
+  "action": "delete_time_entry",
+  "input": { "entryId": "abc123" }
+}
+```
+
+Preview text:
+```
+Delete time entry: Commute
+2024-06-24 8:55 AM–9:15 AM · 20m
+Category: commute
+Linked people (links removed): Ana
+```
+
+- Deletes exactly one **completed** time entry by id.
+- Entry not found → clean error, no-op.
+- A currently **running** timer is refused with an error telling the caller to
+  `stop_timer` first (this also gates `execute`, which re-validates via preview).
+- `TimeEntryPerson` links for the deleted entry are cleared first, so no
+  orphaned people-links remain.
 
 ### Linking people to time entries (medium risk)
 
@@ -623,9 +647,9 @@ If a mention matches 0 or 2+ existing contacts, treat it as ambiguous — do not
 ## 9. What's Explicitly NOT Supported
 
 - **Finance writes** — `finance_write` is in the registry as `supported: false`, `risk: "high"`. Any attempt returns a 400.
-- **Deletes** — `delete_project` and `delete_calendar_event` are supported
-  (both medium risk, confirmation required). No `delete_task`,
-  `delete_time_entry`, etc.
+- **Deletes** — `delete_project`, `delete_calendar_event`, and
+  `delete_time_entry` are supported (all medium risk, confirmation required).
+  No `delete_task`, etc.
 - **Bulk operations** — no "complete all tasks in lane" or "delete all today's entries."
 - **Task lookup by name** — `complete_task` and `update_task` require a `taskId`. There is no name-based task lookup (task names are non-unique).
 - **Running timer edits by name** — `edit_time_entry` requires an `entryId`. Use the snapshot to find the running timer's ID first.

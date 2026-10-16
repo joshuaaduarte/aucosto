@@ -2,8 +2,8 @@ import "server-only";
 import { z } from "zod";
 
 import { createDoItem, updateDoItem, getDoItemSummary } from "@/lib/services/do";
-import { getRunningEntry, startEntry, stopRunning, updateEntry, listRecentEntries, createPastEntry } from "@/lib/services/time";
-import { setEntryPeople } from "@/lib/services/time-people";
+import { getRunningEntry, startEntry, stopRunning, updateEntry, listRecentEntries, createPastEntry, deleteEntry } from "@/lib/services/time";
+import { setEntryPeople, listEntryPeople, clearEntryPeople } from "@/lib/services/time-people";
 import { listHabits, logHabitProgress, createHabit } from "@/lib/services/habits";
 import { createCalendarItem, getCalendarItem, updateCalendarItem, deleteCalendarItem } from "@/lib/services/calendar";
 import {
@@ -24,6 +24,7 @@ import {
   updatePerson,
   addInteraction,
   getPerson,
+  listPersons,
 } from "@/lib/services/rolodex";
 import { dayKey } from "@/lib/reflect";
 
@@ -182,6 +183,10 @@ const DeleteCalendarEventInput = z.object({
   eventId: z.string().min(1),
 });
 
+const DeleteTimeEntryInput = z.object({
+  entryId: z.string().min(1),
+});
+
 const UpdateProjectPlanInput = z.object({
   projectName: z.string().min(1),
   goal: z.string().max(1000).optional(),
@@ -264,6 +269,7 @@ export const ACTION_INPUT_SCHEMAS: Record<string, z.ZodTypeAny> = {
   stop_timer: StopTimerInput,
   edit_time_entry: EditTimeEntryInput,
   log_time_entry: LogTimeEntryInput,
+  delete_time_entry: DeleteTimeEntryInput,
   log_habit: LogHabitInput,
   create_habit: CreateHabitInput,
   add_reflection: AddReflectionInput,
@@ -1236,6 +1242,83 @@ async function executeLogTimeEntry(
   };
 }
 
+async function previewDeleteTimeEntry(
+  userId: string,
+  raw: unknown,
+): Promise<PreviewResult> {
+  const parsed = DeleteTimeEntryInput.safeParse(raw);
+  if (!parsed.success) {
+    return err(parsed.error.issues[0]?.message ?? "Invalid input");
+  }
+  const { entryId } = parsed.data;
+
+  // Same recent-window lookup as previewEditTimeEntry — only completed
+  // entries are visible there, so a missing row means "not found" here too.
+  const recent = await listRecentEntries(userId, { limit: 200 });
+  const existing = recent.find((e) => e.id === entryId);
+  if (!existing) {
+    return err(`Time entry "${entryId}" not found`);
+  }
+  if (!existing.endedAt) {
+    return err(
+      `Time entry "${existing.label}" is a running timer — stop it with stop_timer before deleting`,
+    );
+  }
+
+  const durationMin = Math.max(
+    0,
+    Math.round(
+      (existing.endedAt.getTime() - existing.startedAt.getTime()) / 60000,
+    ),
+  );
+  const lines = [
+    `Delete time entry: ${existing.label}`,
+    `${localDatePart(existing.startedAt)} ${fmtClock(existing.startedAt)}–${fmtClock(existing.endedAt)} · ${fmtMinutes(durationMin)}`,
+    `Category: ${existing.category?.trim() || "uncategorized"}`,
+  ];
+
+  // Deleting the entry also destroys its people links — name them so the
+  // confirmer knows exactly what will be destroyed.
+  const personIds = await listEntryPeople(userId, entryId);
+  if (personIds.length > 0) {
+    let nameById = new Map<string, string>();
+    try {
+      const persons = await listPersons(userId);
+      nameById = new Map(persons.map((p) => [p.id, p.displayName]));
+    } catch {
+      // Rolodex unavailable — fall back to raw person IDs below.
+    }
+    lines.push(
+      `Linked people (links removed): ${personIds.map((id) => nameById.get(id) ?? id).join(", ")}`,
+    );
+  }
+
+  return {
+    ok: true,
+    previewText: lines.join("\n"),
+    normalizedInput: { entryId, beforeTitle: existing.label },
+    warnings: [],
+  };
+}
+
+async function executeDeleteTimeEntry(
+  userId: string,
+  n: Record<string, unknown>,
+): Promise<ExecuteResult> {
+  // Input was validated and normalized by previewDeleteTimeEntry, which
+  // refuses missing entries and running timers.
+  const entryId = String(n.entryId);
+  // Clear people links first so no orphaned rows remain in TimeEntryPerson.
+  await clearEntryPeople(userId, entryId);
+  await deleteEntry(userId, entryId);
+  return {
+    ok: true,
+    recordId: entryId,
+    recordType: "TimeEntry",
+    summary: `Deleted time entry "${n.beforeTitle}"`,
+  };
+}
+
 async function executeLogHabit(
   userId: string,
   n: Record<string, unknown>,
@@ -1890,6 +1973,7 @@ const PREVIEWS: Record<
   stop_timer: previewStopTimer,
   edit_time_entry: previewEditTimeEntry,
   log_time_entry: previewLogTimeEntry,
+  delete_time_entry: previewDeleteTimeEntry,
   log_habit: previewLogHabit,
   create_habit: previewCreateHabit,
   add_reflection: previewAddReflection,
@@ -1924,6 +2008,7 @@ const EXECUTES: Record<
   stop_timer: executeStopTimer,
   edit_time_entry: executeEditTimeEntry,
   log_time_entry: executeLogTimeEntry,
+  delete_time_entry: executeDeleteTimeEntry,
   log_habit: executeLogHabit,
   create_habit: executeCreateHabit,
   add_reflection: executeAddReflection,
