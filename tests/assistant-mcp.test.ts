@@ -64,7 +64,7 @@ describe("buildToolCatalog", () => {
       "assistant_list_projects",
       "assistant_list_calendar",
       "assistant_list_people_time",
-      "assistant_list_planned_vs_actual",
+      "assistant_list_reflections",
       "assistant_action_history",
     ]);
   });
@@ -73,15 +73,6 @@ describe("buildToolCatalog", () => {
     const preview = tools.find((t) => t.name === "assistant_preview_action")!;
     expect(preview.description).toContain("create_task");
     expect(preview.description).toContain("title* (string)");
-  });
-
-  it("gives assistant_list_planned_vs_actual an optional date input", () => {
-    const tool = tools.find((t) => t.name === "assistant_list_planned_vs_actual")!;
-    expect(tool.description).toContain("Planned vs actual");
-    const schema = tool.inputSchema as {
-      properties: Record<string, unknown>;
-    };
-    expect(Object.keys(schema.properties)).toContain("date");
   });
 });
 

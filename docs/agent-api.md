@@ -18,12 +18,18 @@ This doc covers deploying and using it. For the action protocol itself, see
    - `GET /api/assistant/projects`
    - `GET /api/assistant/calendar?from=<ISO>&to=<ISO>` — defaults to the next
      7 days; max 90-day range.
+   - `GET /api/assistant/people-time?from=<ISO>&to=<ISO>` — per-person time
+     totals; defaults to the last 7 days; max 90-day range.
+   - `GET /api/assistant/reflections?from=<YYYY-MM-DD>&to=<YYYY-MM-DD>` —
+     daily mood/reflection series (one row per day with a reflection);
+     defaults to the last 30 days; max 90-day range.
 3. **MCP server** at `POST /api/assistant/mcp` (same auth) — stateless
-   Streamable HTTP (JSON-RPC 2.0, no SSE). Nine tools: `assistant_snapshot`,
+   Streamable HTTP (JSON-RPC 2.0, no SSE). Eleven tools: `assistant_snapshot`,
    `assistant_capabilities`, `assistant_preview_action`,
    `assistant_execute_action`, `assistant_list_tasks`,
    `assistant_list_habits`, `assistant_list_projects`,
-   `assistant_list_calendar`, `assistant_action_history`. Tool input
+   `assistant_list_calendar`, `assistant_list_people_time`,
+   `assistant_list_reflections`, `assistant_action_history`. Tool input
    contracts reuse the executor's zod schemas; preview/execute go through the
    same risk gating and audit trail as the REST routes.
 

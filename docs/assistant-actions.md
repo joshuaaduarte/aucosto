@@ -311,12 +311,38 @@ Defaults: `to` = now, `from` = to − 7 days.
 
 ---
 
+### `GET /api/assistant/reflections`
+Daily mood/reflection series for a date range (max 90 days) — the data behind
+mood/energy trend views and correlations like "do table-tennis days score
+higher?" One row per day **that has a reflection record**; days without a
+reflection are omitted (not returned as nulls).
+
+**Query params:** `?from=<YYYY-MM-DD>` `?to=<YYYY-MM-DD>`.
+Defaults: `to` = today, `from` = to − 30 days.
+
+**Response shape:**
+```json
+{
+  "items": [
+    { "date": "2026-10-10", "mood": 4, "note": "Went well: Shipped the PR\nTired by evening" },
+    { "date": "2026-10-12", "mood": 5, "note": null }
+  ],
+  "count": 2
+}
+```
+
+The `note` combines the reflection's prose fields (`wentWell`, `carryForward`,
+`freeNotes`) into a single string, or is `null` when all are empty.
+
+---
+
 ### `POST /api/assistant/mcp`
 Minimal MCP server (stateless Streamable HTTP, JSON-RPC 2.0 over POST; no
-SSE). Same auth as above. Nine tools: `assistant_snapshot`,
+SSE). Same auth as above. Eleven tools: `assistant_snapshot`,
 `assistant_capabilities`, `assistant_preview_action`,
 `assistant_execute_action`, `assistant_list_tasks`, `assistant_list_habits`,
 `assistant_list_projects`, `assistant_list_calendar`,
+`assistant_list_people_time`, `assistant_list_reflections`,
 `assistant_action_history`.
 
 Tool input contracts reuse the executor's zod schemas; preview/execute go
@@ -335,7 +361,7 @@ through the same risk gating and audit trail as the REST routes. See
 
 Current risk assignments:
 - `low`: `create_task`, `log_habit`, `create_habit`, `add_reflection`, `create_project`
-- `medium`: `complete_task`, `update_task`, `create_calendar_block`, `update_calendar_event`, `delete_calendar_event`, `delete_project`, `start_timer`, `stop_timer`, `swap_timer`, `edit_time_entry`, `log_time_entry`, `update_project`
+- `medium`: `complete_task`, `update_task`, `create_calendar_block`, `update_calendar_event`, `delete_calendar_event`, `delete_project`, `start_timer`, `stop_timer`, `edit_time_entry`, `log_time_entry`, `update_project`
 - `high`: `finance_write` (also `supported: false`)
 
 ---
@@ -442,35 +468,6 @@ POST /api/assistant/actions/execute
 }
 ```
 
-### Swap timer (medium risk — preview first, then confirm)
-
-Atomically stops the currently running timer and starts a new one in a
-single action, replacing the stop → find → edit → start dance. The optional
-`note` is saved onto the stopped entry (e.g. what was accomplished);
-`categoryName`, `habitName`, and `personNames` apply to the *new* timer.
-If no timer is running, it just starts the new one and the note is ignored.
-```
-POST /api/assistant/actions/preview
-{
-  "action": "swap_timer",
-  "input": {
-    "title": "Deep work",
-    "note": "Finished the repair dashboard",
-    "categoryName": "work",
-    "personNames": ["Ana"]
-  },
-  "source": { "actor": "openclaw" }
-}
-```
-
-Preview text:
-```
-Stop "Commute" (running 42m) and start "Deep work" [work] · with Ana
-Note saved on stopped entry: "Finished the repair dashboard"
-```
-
-Then execute with `"confirmed": true` as usual.
-
 ### Edit time entry (medium risk)
 ```
 POST /api/assistant/actions/preview
@@ -493,14 +490,12 @@ After: 8:55 AM–9:15 AM · 20m
 
 ### Linking people to time entries (medium risk)
 
-`start_timer`, `swap_timer`, `log_time_entry`, and `edit_time_entry` accept an
-optional `personNames` array of Rolodex display names. Names resolve
-exact-first, then single fuzzy match; unknown or ambiguous names produce a
-warning and are skipped — the action never fails and never guesses.
+`start_timer`, `log_time_entry`, and `edit_time_entry` accept an optional
+`personNames` array of Rolodex display names. Names resolve exact-first, then
+single fuzzy match; unknown or ambiguous names produce a warning and are
+skipped — the action never fails and never guesses.
 
-- On `start_timer` / `swap_timer` / `log_time_entry`, resolved people are
-  linked to the new entry (`swap_timer` links them to the newly started timer,
-  not the stopped one).
+- On `start_timer` / `log_time_entry`, resolved people are linked to the new entry.
 - On `edit_time_entry`, `personNames` uses **replace semantics**: the provided
   list becomes the full linked set. Pass `[]` to clear links; omit the field
   to leave links untouched.
@@ -526,85 +521,6 @@ Log time entry "Tennis"
 Links live in the `TimeEntryPerson` join table (many-to-many: one entry can
 involve several people). Query them via `GET /api/assistant/people-time` or
 the `assistant_list_people_time` MCP tool.
-
-### Linking calendar blocks to time entries (medium risk)
-
-`start_timer` and `log_time_entry` accept an optional `calendarEventId`
-(explicit calendar block id — a virtual recurrence-occurrence id like
-`parentId::2026-10-15T14:00:00.000Z` also works and resolves to the parent row)
-or `calendarTitle` (fuzzy-matched against **today's** calendar blocks:
-exact title wins, a single fuzzy match is accepted, unknown/ambiguous names
-warn and skip — never fail, never guess). The event must exist and belong to
-the user; an unknown id warns and skips rather than failing the action. An
-explicit id always wins over a title. The link is stored as the backing
-`CalendarItem` id in `TimeEntry.calendarEventId`; deleting the calendar event
-clears the link (`ON DELETE SET NULL`) without touching the entry.
-
-**Auto-suggestion (never auto-applied):** when no link is given, the preview
-also returns `suggestedCalendarLink: { eventId, title }` — when `start_timer`
-fires within 15 minutes of a block's start, or when a `log_time_entry` window
-overlaps a block's time range. It appears as a dedicated field on the preview
-and execute responses (and in `normalizedInput`), so the assistant can show it
-and confirm. Nothing is linked without an explicit `calendarEventId` /
-`calendarTitle` in a confirmed action.
-
-```json
-{
-  "action": "log_time_entry",
-  "input": {
-    "title": "Gym",
-    "startedAt": "2024-06-24T18:00:00.000Z",
-    "endedAt": "2024-06-24T19:00:00.000Z",
-    "calendarTitle": "gym"
-  }
-}
-```
-→ preview includes `"suggestedCalendarLink": { "eventId": "abc123", "title": "Gym" }` when the window overlaps the Gym block.
-
-### Planned vs actual
-
-```http
-GET /api/assistant/planned-vs-actual?date=2024-06-24
-```
-(date defaults to today, server-local). For each calendar block that day:
-planned window, linked time entries (id, title, actual start/end), and deltas:
-
-- `plannedMinutes` — rounded planned block duration
-- `actualMinutes` — sum of linked **completed** entry durations (running
-  entries are listed with `actualEnd: null` but excluded from the sum)
-- `deltaMinutes` = `actualMinutes − plannedMinutes` (negative = under plan)
-- `startDriftMinutes` — first linked entry's start minus the block's planned
-  start, in minutes (positive = started late; `null` when nothing is linked)
-
-Blocks with no linked entries still appear (empty `actualEntries`) so gaps are
-visible. Also available as the `assistant_list_planned_vs_actual` MCP tool.
-
-```json
-{
-  "date": "2024-06-24",
-  "blocks": [
-    {
-      "eventId": "abc123",
-      "title": "Gym",
-      "plannedStart": "2024-06-24T18:00:00.000Z",
-      "plannedEnd": "2024-06-24T19:00:00.000Z",
-      "plannedMinutes": 60,
-      "actualEntries": [
-        {
-          "entryId": "e1",
-          "title": "Gym",
-          "actualStart": "2024-06-24T18:05:00.000Z",
-          "actualEnd": "2024-06-24T18:50:00.000Z"
-        }
-      ],
-      "actualMinutes": 45,
-      "deltaMinutes": -15,
-      "startDriftMinutes": 5
-    }
-  ],
-  "count": 1
-}
-```
 
 ---
 

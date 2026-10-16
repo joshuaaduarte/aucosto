@@ -138,6 +138,36 @@ export async function listReflections(
   }
 }
 
+/**
+ * Reflections in an inclusive date range, oldest first — the series behind
+ * mood/energy trend views and correlation queries ("do table-tennis days
+ * score higher?"). Days without a reflection are simply absent from the
+ * result; callers document that.
+ */
+export async function listReflectionsBetween(
+  userId: string,
+  options: { fromKey: string; toKey: string },
+): Promise<DailyReflectionRecord[]> {
+  requireCan(userId, "reflect", "read");
+  try {
+    const rows = await prisma.$queryRaw<Row[]>(Prisma.sql`
+      SELECT ${SELECT_FIELDS}
+      FROM "DailyReflection"
+      WHERE "userId" = ${userId}
+        AND "date" >= ${options.fromKey}::date
+        AND "date" <= ${options.toKey}::date
+      ORDER BY "date" ASC
+    `);
+    return rows.map(toRecord);
+  } catch (error) {
+    // Reads degrade to empty: a reflection lookup must never 500 a page.
+    if (!isMissingTableError(error)) {
+      console.error("[reflect] listReflectionsBetween failed", error);
+    }
+    return [];
+  }
+}
+
 export type SaveReflectionInput = {
   dateKey: string;
   mood: number;

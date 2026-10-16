@@ -13,7 +13,6 @@ import { listHabits, type HabitSummary } from "@/lib/services/habits";
 import { listBoardProjects, type BoardProjectCard } from "@/lib/services/projects";
 import {
   listCalendarItems,
-  backingCalendarItemId,
   type CalendarOccurrence,
 } from "@/lib/services/calendar";
 import {
@@ -21,9 +20,10 @@ import {
   type PersonTimeSummary,
 } from "@/lib/services/time-people";
 import {
-  listEntriesForCalendarEvents,
-  localDayBounds,
-} from "@/lib/services/time-calendar";
+  listReflectionsBetween,
+  type DailyReflectionRecord,
+} from "@/lib/services/reflect";
+import { dayKey } from "@/lib/reflect";
 
 // ── Query schemas ───────────────────────────────────────────────────────────
 
@@ -295,121 +295,108 @@ export async function fetchAssistantPeopleTime(
   return { items: summaries.map(serializePersonTime), count: summaries.length };
 }
 
-// ── Planned vs actual ───────────────────────────────────────────────────────
+// ── Reflections trend ───────────────────────────────────────────────────────
 
-export const plannedVsActualQuerySchema = z.object({
-  date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD")
-    .optional(),
-});
-export type PlannedVsActualQuery = z.infer<typeof plannedVsActualQuerySchema>;
+const MAX_REFLECTIONS_RANGE_DAYS = 90;
+const DEFAULT_REFLECTIONS_RANGE_DAYS = 30;
 
-export interface PlannedVsActualActualEntry {
-  entryId: string;
-  title: string;
-  actualStart: string;
-  actualEnd: string | null;
-}
-
-export interface PlannedVsActualBlock {
-  eventId: string;
-  title: string;
-  plannedStart: string;
-  plannedEnd: string;
-  plannedMinutes: number;
-  actualEntries: PlannedVsActualActualEntry[];
-  /** Sum of linked *completed* entry durations (running entries are listed but excluded). */
-  actualMinutes: number;
-  /** actualMinutes − plannedMinutes (negative = under plan). */
-  deltaMinutes: number;
-  /**
-   * First linked entry's start minus the block's planned start, in minutes
-   * (positive = started late). Null when no entries are linked.
-   */
-  startDriftMinutes: number | null;
-}
-
-function roundMinutes(ms: number): number {
-  return Math.round(ms / 60000);
-}
-
-/**
- * Per-block planned-vs-actual for a calendar day. Blocks with no linked
- * entries still appear (with empty actuals) so gaps are visible. Entries link
- * via TimeEntry.calendarEventId (see time-calendar service); recurring
- * occurrences match on their parent row id.
- */
-export async function fetchAssistantPlannedVsActual(
-  userId: string,
-  query: PlannedVsActualQuery,
-): Promise<{
-  date: string;
-  blocks: PlannedVsActualBlock[];
-  count: number;
-}> {
-  const dayParam = query.date ?? localDatePartFor(new Date());
-  const [y, m, d] = dayParam.split("-").map(Number);
-  const { from, to } = localDayBounds(new Date(y!, m! - 1, d!));
-  const blocks = await listCalendarItems(userId, { from, to });
-
-  const backingIds = [...new Set(blocks.map((b) => backingCalendarItemId(b.id)))];
-  const linked = await listEntriesForCalendarEvents(userId, backingIds);
-  const byEvent = new Map<string, typeof linked>();
-  for (const row of linked) {
-    const key = row.calendarEventId ?? "";
-    const list = byEvent.get(key) ?? [];
-    list.push(row);
-    byEvent.set(key, list);
+function isValidDateKey(value: string): boolean {
+  const parts = value.split("-").map(Number);
+  if (parts.length !== 3) return false;
+  const [year, month, day] = parts;
+  if (
+    year === undefined ||
+    month === undefined ||
+    day === undefined ||
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day)
+  ) {
+    return false;
   }
-
-  const out: PlannedVsActualBlock[] = blocks.map((block) => {
-    const entries = (byEvent.get(backingCalendarItemId(block.id)) ?? []).map(
-      (e) => ({
-        entryId: e.id,
-        title: e.label,
-        actualStart: e.startedAt.toISOString(),
-        actualEnd: e.endedAt ? e.endedAt.toISOString() : null,
-      }),
-    );
-    const actualMinutes = entries.reduce(
-      (sum, e) =>
-        e.actualEnd
-          ? sum +
-            roundMinutes(
-              new Date(e.actualEnd).getTime() - new Date(e.actualStart).getTime(),
-            )
-          : sum,
-      0,
-    );
-    const plannedMinutes = roundMinutes(
-      block.endsAt.getTime() - block.startsAt.getTime(),
-    );
-    const first = entries[0];
-    const startDriftMinutes = first
-      ? roundMinutes(
-          new Date(first.actualStart).getTime() - block.startsAt.getTime(),
-        )
-      : null;
-    return {
-      eventId: block.id,
-      title: block.title,
-      plannedStart: block.startsAt.toISOString(),
-      plannedEnd: block.endsAt.toISOString(),
-      plannedMinutes,
-      actualEntries: entries,
-      actualMinutes,
-      deltaMinutes: actualMinutes - plannedMinutes,
-      startDriftMinutes,
-    };
-  });
-
-  return { date: dayParam, blocks: out, count: out.length };
+  // Round-trip through a real calendar: rejects 2026-13-40, 2026-02-30, …
+  const dt = new Date(Date.UTC(year, month - 1, day));
+  return (
+    dt.getUTCFullYear() === year &&
+    dt.getUTCMonth() === month - 1 &&
+    dt.getUTCDate() === day
+  );
 }
 
-function localDatePartFor(d: Date): string {
-  const y = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${mo}-${day}`;
+/** Shift a YYYY-MM-DD key by whole days, staying on UTC midnight. */
+function shiftDateKey(key: string, days: number): string {
+  const dt = new Date(`${key}T00:00:00.000Z`);
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return dt.toISOString().slice(0, 10);
+}
+
+/** Whole days between two YYYY-MM-DD keys (to − from). */
+function daysBetweenKeys(from: string, to: string): number {
+  const fromMs = Date.parse(`${from}T00:00:00.000Z`);
+  const toMs = Date.parse(`${to}T00:00:00.000Z`);
+  return Math.round((toMs - fromMs) / (24 * 60 * 60 * 1000));
+}
+
+const dateKeyString = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD")
+  .refine(isValidDateKey, "not a real calendar date");
+
+export const reflectionsQuerySchema = z
+  .object({
+    from: dateKeyString.optional(),
+    to: dateKeyString.optional(),
+  })
+  .transform(({ from, to }) => {
+    // dayKey uses the server's pinned (owner) timezone, matching the
+    // date-key semantics of the DailyReflection rows.
+    const toKey = to ?? dayKey(new Date());
+    const fromKey = from ?? shiftDateKey(toKey, -DEFAULT_REFLECTIONS_RANGE_DAYS);
+    return { from: fromKey, to: toKey };
+  })
+  .refine(({ from, to }) => to >= from, {
+    message: '"to" must be on or after "from"',
+  })
+  .refine(
+    ({ from, to }) =>
+      daysBetweenKeys(from, to) <= MAX_REFLECTIONS_RANGE_DAYS,
+    { message: `Date range cannot exceed ${MAX_REFLECTIONS_RANGE_DAYS} days` },
+  );
+export type ReflectionsQuery = z.infer<typeof reflectionsQuerySchema>;
+
+export interface AssistantReflectionRow {
+  date: string;
+  mood: number | null;
+  note: string | null;
+}
+
+export function serializeReflection(
+  record: DailyReflectionRecord,
+): AssistantReflectionRow {
+  const parts: string[] = [];
+  if (record.wentWell?.trim()) {
+    parts.push(`Went well: ${record.wentWell.trim()}`);
+  }
+  if (record.carryForward?.trim()) {
+    parts.push(`Carry forward: ${record.carryForward.trim()}`);
+  }
+  if (record.freeNotes?.trim()) {
+    parts.push(record.freeNotes.trim());
+  }
+  return {
+    date: record.dateKey,
+    mood: record.mood ?? null,
+    note: parts.length > 0 ? parts.join("\n") : null,
+  };
+}
+
+export async function fetchAssistantReflections(
+  userId: string,
+  query: ReflectionsQuery,
+): Promise<{ items: AssistantReflectionRow[]; count: number }> {
+  const records = await listReflectionsBetween(userId, {
+    fromKey: query.from,
+    toKey: query.to,
+  });
+  return { items: records.map(serializeReflection), count: records.length };
 }
