@@ -13,11 +13,9 @@ const initialState: PrivacyState = undefined;
 
 export function PrivacyPanel({
   financeVisible,
-  appLockEnabled,
   isDemoMode,
 }: {
   financeVisible: boolean;
-  appLockEnabled: boolean;
   isDemoMode: boolean;
 }) {
   const [settingsState, settingsAction, settingsPending] = useActionState(
@@ -35,7 +33,7 @@ export function PrivacyPanel({
             ❦ The Editorial Office ❦
           </p>
           <h2 className="mt-2 font-display text-3xl font-medium italic tracking-[-0.02em] text-ink">
-            Privacy, locks, and the demonstration edition.
+            Privacy and the demonstration edition.
           </h2>
         </div>
         {isDemoMode ? (
@@ -64,46 +62,6 @@ export function PrivacyPanel({
               </span>
             </span>
           </label>
-        </div>
-
-        <div className="rule-t border-ink/30 pt-5">
-          <label className="flex items-baseline gap-4">
-            <input
-              type="checkbox"
-              name="appLockEnabled"
-              defaultChecked={appLockEnabled}
-              className="mt-1 accent-oxblood"
-            />
-            <span>
-              <span className="block font-display text-lg italic text-ink">
-                Require a cipher to release the edition
-              </span>
-              <span className="mt-1 block font-serif text-sm italic leading-relaxed text-ink-fade">
-                Useful if aucosto is left open in a public place — the press
-                will be locked until the cipher is presented.
-              </span>
-            </span>
-          </label>
-          <div className="ml-7 mt-4 max-w-xs">
-            <label
-              htmlFor="pin"
-              className="block font-mono text-[0.625rem] uppercase tracking-[0.22em] text-ink-fade"
-            >
-              New cipher
-            </label>
-            <input
-              id="pin"
-              name="pin"
-              type="password"
-              inputMode="numeric"
-              placeholder={
-                appLockEnabled
-                  ? "leave blank to keep current"
-                  : "4 to 8 digits"
-              }
-              className="field font-mono text-lg tracking-[0.3em] tabular"
-            />
-          </div>
         </div>
 
         <div className="rule-t border-ink/30 pt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

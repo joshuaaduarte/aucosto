@@ -27,8 +27,8 @@ All endpoints accept **either** of:
    unavailable and session-cookie access keeps working unchanged.
 
 Security note: the bearer key is **owner-equivalent**. Like a logged-in
-session, it bypasses viewer context — demo mode, the app privacy lock, and
-the finance visibility gate are not enforced on assistant routes. Treat the
+session, it bypasses viewer context — demo mode and the finance visibility gate
+are not enforced on assistant routes. Treat the
 secret like a password (server env only, never logged or committed). See
 `docs/agent-api.md` for deploy, rotation, and MCP client setup.
 

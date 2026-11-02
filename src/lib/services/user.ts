@@ -4,21 +4,12 @@
 // for the User model too.
 
 import "server-only";
-import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { recordEvent } from "@/lib/services/events";
 
 export type UpdatePrivacySettingsInput = {
   financeVisible: boolean;
-  appLockEnabled: boolean;
-  pin?: string;
 };
-
-export type UpdatePrivacySettingsResult = {
-  appLockEnabled: boolean;
-};
-
-export class PrivacyValidationError extends Error {}
 
 /** Display name + finance visibility, for read surfaces like the assistant snapshot. */
 export async function getUserProfile(
@@ -33,62 +24,16 @@ export async function getUserProfile(
 export async function updatePrivacySettings(
   userId: string,
   input: UpdatePrivacySettingsInput,
-): Promise<UpdatePrivacySettingsResult> {
-  const existing = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { appLockPinHash: true },
-  });
-  if (!existing) throw new PrivacyValidationError("User not found.");
-
-  let appLockPinHash = existing.appLockPinHash;
-  if (input.appLockEnabled) {
-    const pin = input.pin?.trim();
-    if (pin) {
-      if (!/^\d{4,8}$/.test(pin)) {
-        throw new PrivacyValidationError("PIN must be 4 to 8 digits.");
-      }
-      appLockPinHash = await bcrypt.hash(pin, 10);
-    } else if (!appLockPinHash) {
-      throw new PrivacyValidationError("Set a PIN before enabling the app lock.");
-    }
-  } else {
-    appLockPinHash = null;
-  }
-
+): Promise<void> {
   await prisma.user.update({
     where: { id: userId },
-    data: {
-      financeVisible: input.financeVisible,
-      appLockEnabled: input.appLockEnabled,
-      appLockPinHash,
-    },
+    data: { financeVisible: input.financeVisible },
   });
 
   await recordEvent({
     userId,
     tool: "events",
     type: "user.privacy_updated",
-    meta: {
-      financeVisible: input.financeVisible,
-      appLockEnabled: input.appLockEnabled,
-    },
+    meta: { financeVisible: input.financeVisible },
   });
-
-  return { appLockEnabled: input.appLockEnabled };
-}
-
-export async function verifyAppLockPin(
-  userId: string,
-  pin: string,
-): Promise<{ ok: true } | { ok: false; reason: "disabled" | "bad_pin" }> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { appLockEnabled: true, appLockPinHash: true },
-  });
-  if (!user?.appLockEnabled || !user.appLockPinHash) {
-    return { ok: false, reason: "disabled" };
-  }
-  const ok = await bcrypt.compare(pin, user.appLockPinHash);
-  if (!ok) return { ok: false, reason: "bad_pin" };
-  return { ok: true };
 }

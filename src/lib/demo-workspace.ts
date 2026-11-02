@@ -1,6 +1,5 @@
 import "server-only";
 
-import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
 function daysAgo(days: number, hour = 12, minute = 0) {
@@ -27,13 +26,14 @@ export async function ensureDemoWorkspace(ownerUserId: string): Promise<string> 
 
   const [local] = owner.email.split("@");
   const demoEmail = `${local}+demo@aucosto.local`;
-  const demoPassword = await bcrypt.hash(`demo-${owner.id}`, 10);
 
   const demoUser = await prisma.user.create({
     data: {
       name: `${owner.name ?? "Aucosto"} Demo`,
       email: demoEmail,
-      password: demoPassword,
+      // No password: the demo workspace is entered via the demo-mode cookie,
+      // never by logging in (the credentials provider rejects null passwords).
+      password: null,
       timezone: owner.timezone,
       financeVisible: true,
       isDemo: true,

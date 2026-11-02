@@ -9,7 +9,7 @@
 //     -d '{"place":"Gym","kind":"arrive"}'
 
 import { NextResponse } from "next/server";
-import { timingSafeEqual } from "node:crypto";
+import { bearerMatches } from "@/lib/bearer";
 import { z } from "zod";
 import { resolveOwnerUserId } from "@/lib/owner";
 import { recordLocationEvent } from "@/lib/services/location";
@@ -23,13 +23,6 @@ const bodySchema = z.object({
   longitude: z.number().min(-180).max(180).optional(),
   occurredAt: z.string().datetime({ offset: true }).optional(),
 });
-
-function bearerMatches(header: string | null, secret: string): boolean {
-  const token = header?.startsWith("Bearer ") ? header.slice(7) : "";
-  const a = Buffer.from(token);
-  const b = Buffer.from(secret);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
 
 export async function POST(request: Request) {
   const secret = process.env.LOCATION_WEBHOOK_SECRET?.trim();

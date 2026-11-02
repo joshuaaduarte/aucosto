@@ -126,6 +126,7 @@ const EVENT_LABELS: Record<string, string> = {
 
   // user
   "user.privacy_updated": "updated privacy settings",
+  "user.login_failed": "had a failed sign-in attempt",
 };
 
 export function describeEventType(type: string): string {

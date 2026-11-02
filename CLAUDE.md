@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-aucosto is a personal day-to-day dashboard / hub of tools. Single-user (Josh); partner may get scoped finance access later. External agents read/write through the **assistant surface** (`/api/assistant/*` — snapshot read + preview/execute action API, session-cookie authed, audited; see `docs/assistant-actions.md`). Keep that surface narrow — new write actions need a risk level and an audit trail, and finance writes/deletes/bulk ops stay excluded.
+aucosto is a personal day-to-day dashboard / hub of tools. Single-user (Josh); partner may get scoped finance access later. External agents read/write through the **assistant surface** (`/api/assistant/*` — snapshot read + preview/execute action API + MCP endpoint, authed by session cookie or the owner-equivalent `ASSISTANT_API_SECRET` bearer, audited; see `docs/assistant-actions.md`). Keep that surface narrow — new write actions need a risk level and an audit trail, and finance writes/deletes/bulk ops stay excluded.
 
 **Current branch state: `main` IS the live Next.js app.** (The old CRA scaffold is history; `origin/nextjs-rewrite` is a stale remnant of the rewrite.)
 
@@ -29,7 +29,7 @@ One row per tool. Every tool follows the same shape: schema → service → page
 | insights | — (reads everything) | — (queries via other services) | `insights/` | — (hub `InsightOfTheDayCard`) | `insights/` (shared buckets, trends, patterns, daily — all pure + tested) |
 | rolodex (contacts) | `rolodex.prisma` (RolodexPerson, RolodexInteraction, RolodexMention, RolodexRelation) | `rolodex.ts` (⚠️ raw SQL + runtime `ensureRolodexTables()`) + `rolodex-mentions.ts` | `rolodex/` (list, `new/`, `[id]/`, `[id]/edit/`) | — (no widget) | `rolodex.ts` (shared types), `mention-parser.ts` (@Name / @[Full Name] / @insight parsing) |
 | captured insights (@insight notes) | `insights-capture.prisma` (CapturedInsight, CapturedInsightPerson) | `captured-insights.ts` (⚠️ raw SQL + runtime `ensureInsightTables()`) | — (surfaces on `time/captured-today.tsx`, rolodex person pages) | — | `mention-processor.ts` (cross-tool orchestrator: text → mentions + insights via the rolodex/captured-insights services) |
-| assistant (agent surface) | — (audit table via runtime DDL) | `assistant-audit.ts` | `assistant/` (snapshot control panel) + `src/app/api/assistant/*` routes | — | `assistant-snapshot.ts` (aggregates every service, no DB), `assistant-signals.ts`, `assistant-actions.ts` (action registry), `assistant-action-executor.ts` (zod-validated, service-delegating) |
+| assistant (agent surface) | — (audit table via runtime DDL) | `assistant-audit.ts` | `assistant/` (snapshot control panel) + `src/app/api/assistant/*` routes | — | `assistant-snapshot.ts` (aggregates every service, no DB), `assistant-signals.ts`, `assistant-actions.ts` (action registry), `assistant-action-executor/` (zod-validated, service-delegating handlers split per tool; dispatch in `index.ts`), `assistant-execute.ts` (the one risk/confirmation gate + audit write shared by REST and MCP), `assistant-mcp.ts` |
 | work (job hub) | `work.prisma` (WorkWorkspace, WorkArea, WorkProject, WorkPerson, WorkMeeting, WorkTask, WorkNote, WorkReview) — **a context layer, not a silo**: WorkTask.doItemId → DoItem, WorkMeeting.calendarItemId → CalendarItem, WorkPerson.rolodexPersonId → RolodexPerson, WorkProject.projectId → Project; reads LEFT JOIN the canonical rows | `work/` (split: `shared` ⚠️ raw SQL + runtime `ensureWorkTables()`, `reads`, `mutations`, `integrations` — orchestrators that create/sync through the do/calendar/rolodex/projects services + cross-surface reads for /app/do chips, rolodex work context, project work chips, assistant summary — barrel `index.ts`) | `work/` (single page, `?tab=` sections: today/projects/areas/people/meetings/notes/review; forms in `_components/`; empty workspace shows `setup-section.tsx`) | `work.tsx` (today's meetings + must-do tasks) | `work.ts` (day/week keys, meeting recurrence-on-day, today task grouping, due labels, linked-status resolution, coworker-candidate filter, task-lane + calendar-window mapping) |
 | events (activity log) | `events.prisma` (Event) | `events.ts` (`recordEvent`) | — | `activity.tsx` | `event-types.ts` (label map) |
 | push (notifications) | `push.prisma` (PushSubscription) | `push.ts` (subscriptions + `web-push` sends) | `settings/notifications-panel.tsx` + `/api/push` + `/api/cron/nudges` (vercel.json crons, CRON_SECRET) + `public/sw.js` (push-only SW, **no caching**) | — | — |
@@ -53,7 +53,8 @@ Other key entry points:
 - Viewer context: `src/lib/viewer-context.ts` — **read this before touching auth-adjacent code** (see below).
 - Teller bank linking: `src/lib/teller.ts` (API client), `src/lib/services/finance/teller-sync.ts`, webhook at `src/app/api/teller/webhook/route.ts` (verified via `src/lib/teller-webhooks.ts`).
 - Statement import: `src/lib/statement-import/` (CSV + PDF parsers; `pdf-text.ts` extracts text).
-- Privacy/lock UI: `src/app/app/privacy-panel.tsx`, `privacy-actions.ts`, `unlock-screen.tsx`, `lock-now-button.tsx`, `finance/widget-lock-screen.tsx`.
+- Privacy UI: `src/app/app/privacy-panel.tsx` + `privacy-actions.ts` (finance visibility + demo workspace). The old PIN app lock was removed (2026-11) — it never actually gated pages.
+- Token-authenticated routes (assistant bearer, location ingest, cron) share the constant-time `bearerMatches` in `src/lib/bearer.ts`.
 - Assistant surface: `src/app/app/assistant/page.tsx` (human-readable snapshot) + `/api/assistant/{snapshot,capabilities,actions/preview,actions/execute,actions/history}` route handlers — every route re-checks `auth()` itself (the proxy matcher excludes `/api`); audit trail lives in `src/lib/services/assistant-audit.ts`.
 - @mention / @insight capture: `src/lib/mention-parser.ts` (pure) → `src/lib/mention-processor.ts` (orchestrator), called from time/calendar/reflect/do/projects actions; suggestions API at `src/app/api/rolodex/mention-suggestions/route.ts`.
 - PiP mini timer: `src/components/pip-timer-widget.tsx` (Document Picture-in-Picture, desktop Chrome only), launched from the timer bar.
@@ -120,12 +121,14 @@ To reset the dev DB: `prisma migrate reset` (truncates the Supabase DB and repla
 
 `session.user.id` is set by the JWT/session callbacks and typed via `src/types/next-auth.d.ts`. Every server-side data access path filters by userId — never trust a `userId` from form data.
 
-### Viewer context, demo mode, and the privacy lock
+### Viewer context, demo mode, and finance visibility
 
-`src/lib/viewer-context.ts` wraps `auth()` and is the entry point app pages should use for "who is looking at this". It returns `{ ownerUserId, effectiveUserId, financeVisible, appLockEnabled, isUnlocked, isDemoMode, ... }`:
+`src/lib/viewer-context.ts` wraps `auth()` and is the entry point app pages should use for "who is looking at this". It returns `{ ownerUserId, effectiveUserId, financeVisible, isDemoMode, ... }`:
 
 - **Demo mode**: the owner has an optional shadow "demo workspace" user (`src/lib/demo-workspace.ts`, populated by `smoke:demo`). When the `aucosto_demo_mode` cookie is set, `effectiveUserId` becomes the demo workspace's id — all services then read/write demo data. **Pass `effectiveUserId` (not the session id) to services from app code.**
-- **Privacy lock**: `User.appLockEnabled` + the `aucosto_app_unlock` cookie gate the app behind `unlock-screen.tsx`; `User.financeVisible` hides finance independently (`widget-lock-screen.tsx`). Mutations live in `src/app/app/privacy-actions.ts`.
+- **Finance visibility**: `User.financeVisible` hides finance from nav, hub, and routes. Mutations live in `src/app/app/privacy-actions.ts`.
+- **Session routes must use `effectiveUserId` too** — an API route that reads `session.user.id` directly leaks real data into demo mode.
+- **Sign-in throttle**: `src/auth.ts` refuses credentials after 10 failed attempts in 15 minutes, counted from `user.login_failed` events.
 
 `src/lib/server-action.ts` exports `withViewer(handler)` (any tool) and `withFinanceUser(handler)` (adds the `assertFinanceVisible()` privacy gate) — wrappers that resolve the viewer and translate thrown errors into `{ ok: false, error }`. Actions using the `useActionState` `{ error?: string }` contract instead call `resolveActiveUserId()` directly — don't add per-file `requireUserId()` helpers.
 
@@ -137,7 +140,7 @@ The Prisma schema is **split per tool** under `prisma/schema/`: `core.prisma` ho
 
 ### Service layer (the chokepoint)
 
-**Tool data access goes through `src/lib/services/<tool>.ts`, never directly through `prisma.<model>.*`** outside the service. (Exceptions: `viewer-context.ts` reads the User row, `auth.ts` does the credentials lookup, `demo-workspace.ts` manages the shadow demo user, and the health probe pings the DB — all infra, not tool data.) This is the single most important architectural rule for keeping tools decoupled. Cross-tool orchestrators (`mention-processor.ts`, `assistant-snapshot.ts`, `assistant-action-executor.ts`) live in `src/lib/` but compose **only service functions** — no direct prisma there either.
+**Tool data access goes through `src/lib/services/<tool>.ts`, never directly through `prisma.<model>.*`** outside the service. (Exceptions: `viewer-context.ts` reads the User row, `auth.ts` does the credentials lookup, `demo-workspace.ts` manages the shadow demo user, and the health probe pings the DB — all infra, not tool data.) This is the single most important architectural rule for keeping tools decoupled. Cross-tool orchestrators (`mention-processor.ts`, `assistant-snapshot.ts`, `assistant-action-executor/`) live in `src/lib/` but compose **only service functions** — no direct prisma there either.
 
 What lives in a service:
 - Typed functions that take `userId` as first arg and call `requireCan(userId, "<tool>", "read"|"write")` at the top.
@@ -230,6 +233,7 @@ The pattern, learned the hard way (two production outages — `docs/lessons.md` 
 ### Known technical debt
 
 - **Reflect service uses `$queryRaw`** (`src/lib/services/reflect.ts`): the DailyReflection model was authored in an environment that couldn't run `prisma generate`, so the generated client predates it. Once `npm run db:generate` has run with the current schema, the raw queries can be swapped for `prisma.dailyReflection.*` without changing callers. Until then: every date parameter needs an explicit `::date` cast, and **never** do parameterized date arithmetic (lessons #2).
+- **Runtime DDL**: ~11 services still create/alter tables lazily through memoized `ensure*()` helpers. Every one of those statements is collected in `scripts/consolidate-runtime-ddl.sql`; once it has been applied to production the helpers are dead weight and should be deleted, and migrations re-baselined (lessons #11). Don't add new `ensure*()` helpers — put new DDL in an idempotent `scripts/*.sql` file instead.
 - `origin/nextjs-rewrite` is a stale branch; `User.timezone` column exists but is unused (the runtime TZ pin supersedes it for now).
 
 ### Per-request DB client

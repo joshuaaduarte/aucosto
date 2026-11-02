@@ -1,9 +1,10 @@
-import { auth } from "@/auth";
+import { getViewerContext } from "@/lib/viewer-context";
 import { ensureRolodexTables, listPersons } from "@/lib/services/rolodex";
 
 export async function GET() {
-  const session = await auth();
-  const userId = session?.user?.id;
+  // effectiveUserId, not the session id, so demo mode suggests demo people.
+  const context = await getViewerContext();
+  const userId = context?.effectiveUserId;
   if (!userId) {
     return Response.json({ people: [] }, { status: 401 });
   }

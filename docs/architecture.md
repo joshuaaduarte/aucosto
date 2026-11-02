@@ -187,9 +187,12 @@ human-readable control panel at `/app/assistant`. Full API reference:
   (no direct DB) into facts; `assistant-signals.ts` derives binary flags,
   drift risk, and briefing seeds (pure, tested).
 - **Actions:** `src/lib/assistant-actions.ts` (registry with risk levels)
-  + `assistant-action-executor.ts` (zod-validated handlers that delegate
-  to services). Preview → execute two-step; medium risk requires
-  `confirmed: true`; high risk rejected; no finance writes or deletes.
+  + `assistant-action-executor/` (zod-validated handlers that delegate
+  to services, one file per tool, dispatch tables in `index.ts`). Preview →
+  execute two-step; medium risk requires `confirmed: true` (asserted by the
+  agent, not a human approval); high risk rejected; no finance writes or
+  deletes. REST and MCP both execute through `assistant-execute.ts`, the
+  single gate + audit write — don't re-implement the checks per surface.
 - **Audit:** `src/lib/services/assistant-audit.ts` — every preview/execute
   writes `assistant_action_audits` (runtime-ensured table).
 - **Routes:** `/api/assistant/{snapshot,capabilities,actions/preview,

@@ -15,7 +15,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireCan } from "@/lib/auth/can";
-import { listPersons } from "@/lib/services/rolodex";
+import { getPerson, listPersons } from "@/lib/services/rolodex";
 
 export interface PersonTimeSummary {
   personId: string;
@@ -94,21 +94,31 @@ export async function setEntryPeople(
   });
   if (!entry) throw new Error(`Time entry "${timeEntryId}" not found`);
   const unique = [...new Set(personIds.filter((id) => id && id.trim()))];
-  await prisma.$executeRawUnsafe(
-    'DELETE FROM "TimeEntryPerson" WHERE "userId" = $1 AND "timeEntryId" = $2',
-    userId,
-    timeEntryId,
-  );
-  for (const personId of unique) {
-    await prisma.$executeRawUnsafe(
-      'INSERT INTO "TimeEntryPerson" ("id", "userId", "timeEntryId", "personId") ' +
-        "VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
-      randomUUID(),
+  // Only link people this user owns (ids arrive from forms and the assistant
+  // API). Ownership is checked through the rolodex service, not its tables.
+  const owned = await Promise.all(unique.map((id) => getPerson(userId, id)));
+  const missing = unique.filter((_, i) => !owned[i]);
+  if (missing.length > 0) {
+    throw new Error(`Unknown person id(s): ${missing.join(", ")}`);
+  }
+  // Replace atomically so a failed insert can't leave the entry with no people.
+  await prisma.$transaction([
+    prisma.$executeRawUnsafe(
+      'DELETE FROM "TimeEntryPerson" WHERE "userId" = $1 AND "timeEntryId" = $2',
       userId,
       timeEntryId,
-      personId,
-    );
-  }
+    ),
+    ...unique.map((personId) =>
+      prisma.$executeRawUnsafe(
+        'INSERT INTO "TimeEntryPerson" ("id", "userId", "timeEntryId", "personId") ' +
+          "VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
+        randomUUID(),
+        userId,
+        timeEntryId,
+        personId,
+      ),
+    ),
+  ]);
 }
 
 /**

@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 // the pure bearer-matching logic.
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
 
-import { bearerMatches } from "@/lib/assistant-auth";
+import { bearerMatches } from "@/lib/bearer";
 
 describe("bearerMatches", () => {
   const secret = "test-secret-value-123";

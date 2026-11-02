@@ -66,14 +66,6 @@ function diffCalendarMonths(a: Date, b: Date) {
   return (a.getFullYear() - b.getFullYear()) * 12 + (a.getMonth() - b.getMonth());
 }
 
-function occurrenceFromStart(start: Date, durationMs: number): RecurrenceOccurrence {
-  return {
-    startsAt: start,
-    endsAt: new Date(start.getTime() + durationMs),
-    originalStart: start,
-  };
-}
-
 export function expandRecurrence(
   seriesStart: Date,
   seriesEnd: Date,

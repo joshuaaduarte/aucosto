@@ -4,7 +4,6 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
-export const APP_UNLOCK_COOKIE = "aucosto_app_unlock";
 export const DEMO_MODE_COOKIE = "aucosto_demo_mode";
 
 export type ViewerContext = {
@@ -13,8 +12,6 @@ export type ViewerContext = {
   displayName: string;
   timezone: string;
   financeVisible: boolean;
-  appLockEnabled: boolean;
-  isUnlocked: boolean;
   isDemoMode: boolean;
   hasDemoWorkspace: boolean;
 };
@@ -32,7 +29,6 @@ export async function getViewerContext(): Promise<ViewerContext | null> {
       email: true,
       timezone: true,
       financeVisible: true,
-      appLockEnabled: true,
       demoWorkspace: { select: { id: true } },
     },
   });
@@ -48,8 +44,6 @@ export async function getViewerContext(): Promise<ViewerContext | null> {
     displayName: owner.name ?? owner.email,
     timezone: owner.timezone,
     financeVisible: owner.financeVisible,
-    appLockEnabled: owner.appLockEnabled,
-    isUnlocked: !owner.appLockEnabled || cookieStore.get(APP_UNLOCK_COOKIE)?.value === "1",
     isDemoMode: effectiveUserId !== owner.id,
     hasDemoWorkspace: Boolean(owner.demoWorkspace?.id),
   };
