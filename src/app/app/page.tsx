@@ -64,6 +64,7 @@ export default async function HubPage() {
   const timezone = resolveViewerTimeZone(context?.timezone);
 
   const userId = context?.effectiveUserId;
+  const financeUserId = context?.financeUserId ?? userId;
   const financeVisible = context?.financeVisible ?? false;
 
   const [
@@ -86,13 +87,13 @@ export default async function HubPage() {
         getRunningEntry(userId),
         listCompletedSince(userId, startOfWeek()),
         financeVisible
-          ? listAccounts(userId)
+          ? listAccounts(financeUserId ?? userId)
           : Promise.resolve([]),
         financeVisible
-          ? listTransactions(userId, { since: startOfMonth(), limit: 1000 })
+          ? listTransactions(financeUserId ?? userId, { since: startOfMonth(), limit: 1000 })
           : Promise.resolve([]),
         financeVisible
-          ? listTransactions(userId, {
+          ? listTransactions(financeUserId ?? userId, {
               since: startOfPreviousMonth(),
               limit: 1000,
             })

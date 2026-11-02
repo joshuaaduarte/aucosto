@@ -1,0 +1,50 @@
+// Household: shared space for a second person (partner) without exposing the
+// owner's personal tools.
+//
+// The shared data lives on a shadow, non-login User row (Household.dataUserId)
+// — the same trick the demo workspace uses. Every service already scopes by
+// userId, so finance (accounts, Teller sync, webhooks, unique constraints) and
+// the home tool work on the household with no service rewrite. Viewer context
+// decides, per tool, whether a page reads the household's userId or the
+// viewer's own.
+//
+// No columns were added to User on purpose: if these tables are missing
+// (SQL not applied yet) login and every personal tool keep working.
+
+model Household {
+  id         String            @id @default(cuid())
+  name       String            @default("Our home")
+  dataUserId String            @unique
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  dataUser   User              @relation("HouseholdData", fields: [dataUserId], references: [id], onDelete: Cascade)
+  members    HouseholdMember[]
+  invites    HouseholdInvite[]
+}
+
+model HouseholdMember {
+  id          String    @id @default(cuid())
+  householdId String
+  userId      String    @unique
+  role        String    // "owner" | "partner"
+  removedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user        User      @relation("HouseholdMembership", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([householdId])
+}
+
+model HouseholdInvite {
+  id              String    @id @default(cuid())
+  householdId     String
+  email           String
+  tokenHash       String    @unique
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  createdByUserId String
+  createdAt       DateTime  @default(now())
+  household       Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@index([householdId, email])
+}

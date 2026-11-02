@@ -19,7 +19,7 @@ function fmt(cents: number) {
 }
 
 export async function FinanceWidget() {
-  const { effectiveUserId: userId } = await assertFinanceVisible();
+  const { financeUserId: userId } = await assertFinanceVisible();
   const monthStart = startOfMonth();
 
   const [accounts, count, thisMonth] = await Promise.all([

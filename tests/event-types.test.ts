@@ -12,6 +12,7 @@ const SERVICE_PATHS = [
   "src/lib/services",
   "src/app/app",
   "src/lib/demo-workspace.ts",
+  "src/lib/household.ts",
 ];
 
 function collectEventTypes(): Set<string> {
@@ -28,7 +29,7 @@ function collectEventTypes(): Set<string> {
     }
     if (!/\.(ts|tsx)$/.test(path)) return;
     const text = readFileSync(path, "utf8");
-    for (const match of text.matchAll(/type:\s*"((?:time|finance|user|events)\.[a-z_]+)"/g)) {
+    for (const match of text.matchAll(/type:\s*"((?:time|finance|user|events|home|household)\.[a-z_]+)"/g)) {
       types.add(match[1]!);
     }
   }

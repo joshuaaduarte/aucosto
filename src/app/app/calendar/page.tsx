@@ -128,7 +128,7 @@ export default async function CalendarPage({
     listRhythmSessionsBetween(userId, { from: panelRangeStart, to: panelRangeEnd }),
     listCalendarItems(userId, { from: sevenDaysAgo, to: todayEnd }),
     listEntriesBetween(userId, { from: sevenDaysAgo, to: todayEnd }),
-    context.financeVisible ? listAccounts(userId) : Promise.resolve([]),
+    context.financeVisible ? listAccounts(context.financeUserId) : Promise.resolve([]),
     listSuggestedDoItems(userId, { limit: 5 }),
     listSuggestedHabits(userId, { limit: 4 }),
     listDoItems(userId, { includeDone: false }),

@@ -25,3 +25,7 @@ export async function login(
     throw err;
   }
 }
+
+export async function loginWithGoogle(): Promise<void> {
+  await signIn("google", { redirectTo: "/app" });
+}

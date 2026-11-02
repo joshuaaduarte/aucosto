@@ -6,7 +6,7 @@ import {
   buildAssistantSnapshot,
   type AssistantSnapshot,
 } from "@/lib/assistant-snapshot";
-import { resolveActiveUserId } from "@/lib/viewer-context";
+import { requireViewerContext } from "@/lib/viewer-context";
 import {
   getRecentAudits,
   type AssistantActionAudit,
@@ -20,8 +20,11 @@ const RED = "#ef4444";
 const NEUTRAL = "#9ca3af";
 
 export default async function AssistantPage() {
-  const userId = await resolveActiveUserId();
-  const snapshot = await buildAssistantSnapshot(userId);
+  const context = await requireViewerContext();
+  const userId = context.effectiveUserId;
+  const snapshot = await buildAssistantSnapshot(userId, {
+    financeUserId: context.financeUserId,
+  });
 
   let recentAudits: AssistantActionAudit[] = [];
   try {

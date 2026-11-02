@@ -10,6 +10,8 @@ import type {
 } from "@/lib/finance-goals";
 import { parseTransactionsCsv } from "@/lib/csv";
 import { withFinanceUser } from "@/lib/server-action";
+import { parseCurrencyToCents } from "@/lib/finance-accounts";
+import { setFinanceScope } from "../settings/household-actions";
 import * as financeService from "@/lib/services/finance";
 
 export type UploadState =
@@ -233,4 +235,87 @@ export async function disconnectLinkedFinanceConnection(
       message: "Disconnected linked bank sync. Imported data was left in place.",
     };
   }, "Could not disconnect linked account.");
+}
+
+// ── Budgets, bills, money date ───────────────────────────────────────────
+
+export type PlanningState = { ok: true; message?: string } | { ok: false; error: string } | undefined;
+
+/** "YYYY-MM-DD" → local noon (server TZ is pinned to the owner's zone). */
+function parseDateOnly(value: string): Date {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return new Date(Number.NaN);
+  return new Date(`${value}T12:00:00`);
+}
+
+export async function saveFinanceBudget(
+  _prev: PlanningState,
+  formData: FormData,
+): Promise<PlanningState> {
+  return withFinanceUser<PlanningState>(async (userId) => {
+    await financeService.saveBudget(userId, {
+      category: String(formData.get("category") ?? ""),
+      monthlyLimitCents: parseCurrencyToCents(String(formData.get("limit") ?? "")),
+    });
+    revalidateFinance();
+    return { ok: true, message: "Budget saved." };
+  }, "Could not save budget.");
+}
+
+export async function deleteFinanceBudget(id: string): Promise<PlanningState> {
+  return withFinanceUser<PlanningState>(async (userId) => {
+    await financeService.deleteBudget(userId, id);
+    revalidateFinance();
+    return { ok: true };
+  }, "Could not remove budget.");
+}
+
+export async function saveFinanceBill(
+  _prev: PlanningState,
+  formData: FormData,
+): Promise<PlanningState> {
+  return withFinanceUser<PlanningState>(async (userId) => {
+    const amount = String(formData.get("amount") ?? "").trim();
+    await financeService.saveBill(userId, {
+      id: String(formData.get("id") ?? "").trim() || undefined,
+      name: String(formData.get("name") ?? ""),
+      amountCents: amount ? parseCurrencyToCents(amount) : null,
+      cadence: String(formData.get("cadence") ?? "monthly"),
+      nextDueAt: parseDateOnly(String(formData.get("nextDueAt") ?? "")),
+      category: String(formData.get("category") ?? "") || null,
+      autopay: formData.get("autopay") === "on",
+      notes: String(formData.get("notes") ?? ""),
+    });
+    revalidateFinance();
+    return { ok: true, message: "Bill saved." };
+  }, "Could not save bill.");
+}
+
+export async function markFinanceBillPaid(id: string): Promise<PlanningState> {
+  return withFinanceUser<PlanningState>(async (userId) => {
+    await financeService.markBillPaid(userId, id);
+    revalidateFinance();
+    return { ok: true };
+  }, "Could not mark the bill paid.");
+}
+
+export async function archiveFinanceBill(id: string): Promise<PlanningState> {
+  return withFinanceUser<PlanningState>(async (userId) => {
+    await financeService.archiveBill(userId, id);
+    revalidateFinance();
+    return { ok: true };
+  }, "Could not remove the bill.");
+}
+
+export async function completeMoneyDate(weekKey: string): Promise<PlanningState> {
+  return withFinanceUser<PlanningState>(async (userId) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(weekKey)) throw new Error("Bad week.");
+    await financeService.markMoneyDateDone(userId, weekKey);
+    revalidateFinance();
+    return { ok: true };
+  }, "Could not save.");
+}
+
+export async function switchFinanceScope(scope: "household" | "personal"): Promise<void> {
+  await setFinanceScope(scope);
+  revalidateFinance();
 }

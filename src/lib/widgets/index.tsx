@@ -5,6 +5,7 @@ import { HabitsWidget } from "./habits";
 import { TimeTrackerWidget } from "./time-tracker";
 import { FinanceWidget } from "./finance";
 import { WorkWidget } from "./work";
+import { HomeWidget } from "./home";
 
 export type WidgetDescriptor = {
   id: string;
@@ -43,6 +44,12 @@ export const widgets: WidgetDescriptor[] = [
     name: "Habits",
     href: "/app/habits",
     Widget: HabitsWidget,
+  },
+  {
+    id: "home",
+    name: "Home",
+    href: "/app/home",
+    Widget: HomeWidget,
   },
   {
     id: "finance",

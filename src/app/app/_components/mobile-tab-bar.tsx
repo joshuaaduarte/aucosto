@@ -78,7 +78,20 @@ type MoreTool = {
   finance?: boolean;
 };
 
+const HOME_TOOL: MoreTool = {
+  href: "/app/home",
+  label: "Home",
+  icon: (
+    <svg {...ip}>
+      <path d="M1.75 7 7.5 2.25 13.25 7" />
+      <path d="M3.25 6v6.75h8.5V6" />
+      <rect x="6" y="9" width="3" height="3.75" />
+    </svg>
+  ),
+};
+
 const MORE_TOOLS: MoreTool[] = [
+  HOME_TOOL,
   {
     href: "/app/plan",
     label: "Plan",
@@ -191,13 +204,55 @@ const MORE_TOOLS: MoreTool[] = [
 // all the reflect dot needs.
 const emptySubscribe = () => () => {};
 
+/** Household partner: Home, Finance, Settings — no More sheet. */
+function PartnerTabBar({ showFinance }: { showFinance: boolean }) {
+  const pathname = usePathname();
+  const finance = MORE_TOOLS.find((tool) => tool.href === "/app/finance");
+  const settings = MORE_TOOLS.find((tool) => tool.href === "/app/settings");
+  const tabs = [HOME_TOOL, showFinance ? finance : undefined, settings].filter(
+    (tab): tab is MoreTool => Boolean(tab),
+  );
+  return (
+    <nav className="mobile-tabbar lg:hidden" aria-label="Primary">
+      {tabs.map((tab) => {
+        const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
+        return (
+          <Link
+            key={tab.href}
+            href={tab.href}
+            aria-current={active ? "page" : undefined}
+            className="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-1.5"
+            style={{ color: active ? "var(--text)" : "var(--text-faint)" }}
+          >
+            {tab.icon}
+            <span className="text-[0.625rem] font-medium">{tab.label}</span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
 export function MobileTabBar({
   showFinance,
   needsReflect = false,
+  isPartner = false,
 }: {
   showFinance: boolean;
   /** Today has no saved reflection yet — show a subtle dot on More. */
   needsReflect?: boolean;
+  isPartner?: boolean;
+}) {
+  if (isPartner) return <PartnerTabBar showFinance={showFinance} />;
+  return <OwnerTabBar showFinance={showFinance} needsReflect={needsReflect} />;
+}
+
+function OwnerTabBar({
+  showFinance,
+  needsReflect,
+}: {
+  showFinance: boolean;
+  needsReflect: boolean;
 }) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);

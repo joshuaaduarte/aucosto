@@ -23,7 +23,9 @@ export type Tool =
   | "push"
   | "whoop"
   | "location"
-  | "work";
+  | "work"
+  | "home"
+  | "household";
 export type Action = "read" | "write";
 
 export function can(

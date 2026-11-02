@@ -45,6 +45,12 @@ model User {
   pushSubscriptions   PushSubscription[]
   whoopConnection     WhoopConnection?
   locationEvents      LocationEvent[]
+  financeBudgets      FinanceBudget[]
+  financeBills        FinanceBill[]
+  homeLists           HomeList[]
+  homeTasks           HomeTask[]
+  householdData       Household?           @relation("HouseholdData")
+  householdMembership HouseholdMember?     @relation("HouseholdMembership")
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 }

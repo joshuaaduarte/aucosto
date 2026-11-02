@@ -14,7 +14,12 @@
 // resolveActiveUserId() directly. Don't add per-file requireUserId() helpers.
 
 import "server-only";
-import { assertFinanceVisible, resolveActiveUserId } from "@/lib/viewer-context";
+import { runAsActor } from "@/lib/actor";
+import {
+  assertFinanceVisible,
+  requireHomeViewer,
+  resolveActiveUserId,
+} from "@/lib/viewer-context";
 
 export type ActionError = { ok: false; error: string };
 export type ActionOk<T = void> = T extends void ? { ok: true } : { ok: true } & T;
@@ -49,16 +54,39 @@ export async function withViewer<T>(
   return runWithUser(resolveActiveUserId, handler, fallbackMessage);
 }
 
+/**
+ * Finance actions get the finance scope (household or "Just me"), and run as
+ * the viewer so household events record who acted.
+ */
 export async function withFinanceUser<T>(
   handler: (userId: string) => Promise<T>,
   fallbackMessage = "Could not complete the request.",
 ): Promise<T | ActionError> {
+  let actorUserId = "";
   return runWithUser(
     async () => {
       const context = await assertFinanceVisible();
-      return context.effectiveUserId;
+      actorUserId = context.ownerUserId;
+      return context.financeUserId;
     },
-    handler,
+    (userId) => runAsActor(actorUserId, () => handler(userId)),
+    fallbackMessage,
+  );
+}
+
+/** Home-tool actions: household scope + the acting person's id. */
+export async function withHomeUser<T>(
+  handler: (scope: { userId: string; actorUserId: string }) => Promise<T>,
+  fallbackMessage = "Could not complete the request.",
+): Promise<T | ActionError> {
+  let actorUserId = "";
+  return runWithUser(
+    async () => {
+      const context = await requireHomeViewer();
+      actorUserId = context.ownerUserId;
+      return context.homeUserId;
+    },
+    (userId) => runAsActor(actorUserId, () => handler({ userId, actorUserId })),
     fallbackMessage,
   );
 }

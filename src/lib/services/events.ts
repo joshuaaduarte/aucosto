@@ -15,6 +15,7 @@ import { logger } from "@/lib/logger";
 import { requireCan } from "@/lib/auth/can";
 import type { Event, Prisma } from "@/generated/prisma/client";
 import type { Tool } from "@/lib/auth/can";
+import { currentActorUserId } from "@/lib/actor";
 
 export type EventInput = {
   userId: string;
@@ -46,6 +47,50 @@ export async function countEventsSince(
   return prisma.event.count({ where: { userId, type, at: { gte: since } } });
 }
 
+/** Most recent event of one type (optionally for one refId), or null. */
+export async function findLatestEvent(
+  userId: string,
+  type: string,
+  refId?: string,
+): Promise<Event | null> {
+  requireCan(userId, "events", "read");
+  return prisma.event.findFirst({
+    where: { userId, type, ...(refId ? { refId } : {}) },
+    orderBy: { at: "desc" },
+  });
+}
+
+/** Recent events across several types (household activity feed). */
+export async function listEventsByTool(
+  userId: string,
+  tools: string[],
+  options: { limit?: number } = {},
+): Promise<Event[]> {
+  requireCan(userId, "events", "read");
+  return prisma.event.findMany({
+    where: { userId, tool: { in: tools } },
+    orderBy: { at: "desc" },
+    take: options.limit ?? 10,
+  });
+}
+
+/**
+ * Stamp meta.actorUserId when someone other than the scope owner acted
+ * (household data). Pure so it can be tested; object metas only.
+ */
+export function withActorMeta(
+  meta: Prisma.InputJsonValue | null | undefined,
+  scopeUserId: string,
+  actorUserId: string | null,
+): Prisma.InputJsonValue | undefined {
+  if (!actorUserId || actorUserId === scopeUserId) return meta ?? undefined;
+  if (meta == null) return { actorUserId };
+  if (typeof meta === "object" && !Array.isArray(meta)) {
+    return { ...(meta as Record<string, Prisma.InputJsonValue>), actorUserId };
+  }
+  return meta;
+}
+
 export async function recordEvent(input: EventInput): Promise<void> {
   await prisma.event.create({
     data: {
@@ -53,7 +98,7 @@ export async function recordEvent(input: EventInput): Promise<void> {
       tool: input.tool,
       type: input.type,
       refId: input.refId ?? null,
-      meta: input.meta ?? undefined,
+      meta: withActorMeta(input.meta, input.userId, currentActorUserId()),
     },
   });
   logger.info(

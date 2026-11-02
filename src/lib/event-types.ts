@@ -39,6 +39,35 @@ const EVENT_LABELS: Record<string, string> = {
   "finance.connection_disconnected": "disconnected a linked bank",
   "finance.webhook_transactions_processed": "new linked transactions",
 
+  // finance — household sharing + planning
+  "finance.moved_in": "moved accounts into this space",
+  "finance.moved_out": "moved accounts out of this space",
+  "finance.budget_saved": "set a monthly budget",
+  "finance.budget_deleted": "removed a budget",
+  "finance.bill_created": "added a bill",
+  "finance.bill_updated": "updated a bill",
+  "finance.bill_paid": "marked a bill paid",
+  "finance.bill_archived": "removed a bill",
+  "finance.money_date_done": "finished the weekly money date",
+
+  // account
+  "user.password_changed": "changed their password",
+
+  // household
+  "household.created": "set up the household",
+  "household.invited": "invited someone to the household",
+  "household.joined": "joined the household",
+  "household.member_removed": "removed someone from the household",
+
+  // home
+  "home.list_created": "made a list",
+  "home.list_deleted": "deleted a list",
+  "home.items_added": "added to a list",
+  "home.task_created": "added a home task",
+  "home.task_updated": "edited a home task",
+  "home.task_done": "finished a home task",
+  "home.task_archived": "removed a home task",
+
   // calendar
   "calendar.created": "added a calendar block",
   "calendar.updated": "updated a calendar block",

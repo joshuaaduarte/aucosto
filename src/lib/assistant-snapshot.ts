@@ -216,7 +216,10 @@ function calendarItemType(sourceTool: string | null): string {
 
 export async function buildAssistantSnapshot(
   userId: string,
+  options: { financeUserId?: string } = {},
 ): Promise<AssistantSnapshot> {
+  // Finance may live on the household's shared data user (see household.ts).
+  const financeUserId = options.financeUserId ?? userId;
   const now = new Date();
   const todayStart = startOfToday();
   const tomorrowStart = new Date(todayStart);
@@ -302,7 +305,7 @@ export async function buildAssistantSnapshot(
     section("rhythms.wake", null, () => getTodayWakeStatus(userId)),
     section("reflect.yesterday", null, () => getReflection(userId, yesterdayKey)),
     section("user.profile", null, () => getUserProfile(userId)),
-    section("finance.accounts", [], () => listAccounts(userId)),
+    section("finance.accounts", [], () => listAccounts(financeUserId)),
     section("projects.plans", [], () => listProjectPlanSummaries(userId)),
     section("rolodex.birthdays", [], () => getUpcomingBirthdays(userId)),
     section("rolodex.followUps", [], () => getDueFollowUps(userId)),

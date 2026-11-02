@@ -97,3 +97,38 @@ model FinanceTransaction {
   @@index([financeAccountId, date])
   @@unique([userId, externalId])
 }
+
+// Monthly spend limit for one category. Scope userId is the household data
+// user once a household exists (or the person's own id for "Just me").
+model FinanceBudget {
+  id                String   @id @default(cuid())
+  userId            String
+  category          String
+  monthlyLimitCents Int
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category])
+}
+
+// Recurring bill or renewal (rent, insurance, car registration). nextDueAt
+// advances by cadence when marked paid.
+model FinanceBill {
+  id             String    @id @default(cuid())
+  userId         String
+  name           String
+  amountCents    Int?
+  cadence        String    @default("monthly") // "weekly" | "monthly" | "quarterly" | "yearly" | "once"
+  nextDueAt      DateTime
+  category       String?
+  autopay        Boolean   @default(false)
+  notes          String?
+  lastPaidAt     DateTime?
+  archivedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, archivedAt, nextDueAt])
+}

@@ -15,6 +15,7 @@ import "server-only";
 
 import { auth } from "@/auth";
 import { bearerMatches } from "@/lib/bearer";
+import { isPartnerUser } from "@/lib/household";
 import { resolveOwnerUserId } from "@/lib/owner";
 
 // Re-exported for existing callers/tests.
@@ -40,6 +41,9 @@ export async function resolveAssistantAuth(
 ): Promise<AssistantAuth | null> {
   const session = await auth();
   if (session?.user?.id) {
+    // The assistant surface is owner-only: a household partner's session
+    // never authenticates here (finance writes stay excluded regardless).
+    if (await isPartnerUser(session.user.id)) return null;
     return { userId: session.user.id, via: "session" };
   }
 

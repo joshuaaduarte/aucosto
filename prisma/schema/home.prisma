@@ -1,0 +1,56 @@
+// Home tool: shared lists (grocery, Costco, packing), recurring chores and
+// home maintenance. Rows are owned by the household's data user (see
+// household.prisma); *ByUserId columns record which person did what. They
+// are plain ids, not FKs, so removing a person never deletes household rows.
+
+model HomeList {
+  id        String         @id @default(cuid())
+  userId    String
+  name      String
+  emoji     String?
+  sortOrder Int            @default(0)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     HomeListItem[]
+
+  @@unique([userId, name])
+  @@index([userId, sortOrder])
+}
+
+model HomeListItem {
+  id              String    @id @default(cuid())
+  userId          String
+  listId          String
+  title           String
+  note            String?
+  checkedAt       DateTime?
+  addedByUserId   String?
+  checkedByUserId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  list            HomeList  @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  @@index([listId, checkedAt])
+  @@index([userId])
+}
+
+model HomeTask {
+  id               String    @id @default(cuid())
+  userId           String
+  kind             String    @default("chore") // "chore" | "maintenance"
+  title            String
+  notes            String?
+  cadenceDays      Int
+  assigneeUserId   String?
+  rotate           Boolean   @default(false)
+  lastDoneAt       DateTime?
+  lastDoneByUserId String?
+  nextDueAt        DateTime
+  archivedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, archivedAt, nextDueAt])
+}

@@ -30,6 +30,15 @@ function HomeIcon() {
     </svg>
   );
 }
+function HouseIcon() {
+  return (
+    <svg {...ip}>
+      <path d="M1.75 7 7.5 2.25 13.25 7" />
+      <path d="M3.25 6v6.75h8.5V6" />
+      <rect x="6" y="9" width="3" height="3.75" />
+    </svg>
+  );
+}
 function CalendarIcon() {
   return (
     <svg {...ip}>
@@ -181,6 +190,8 @@ interface NavItem {
   match: (p: string) => boolean;
   finance: boolean;
   icon: React.ReactNode;
+  /** Shown to household partners (Home + Finance only). */
+  partner?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -195,7 +206,8 @@ const navItems: NavItem[] = [
   { href: "/app/rolodex", label: "Rolodex", match: (p) => p.startsWith("/app/rolodex"), finance: false, icon: <RolodexIcon /> },
   { href: "/app/reflect", label: "Reflect", match: (p) => p.startsWith("/app/reflect"), finance: false, icon: <ReflectIcon /> },
   { href: "/app/insights", label: "Insights", match: (p) => p.startsWith("/app/insights"), finance: false, icon: <TrendIcon /> },
-  { href: "/app/finance", label: "Finance", match: (p) => p.startsWith("/app/finance"), finance: true, icon: <WalletIcon /> },
+  { href: "/app/home", label: "Home", match: (p) => p.startsWith("/app/home"), finance: false, icon: <HouseIcon />, partner: true },
+  { href: "/app/finance", label: "Finance", match: (p) => p.startsWith("/app/finance"), finance: true, icon: <WalletIcon />, partner: true },
   { href: "/app/assistant", label: "Assistant", match: (p) => p.startsWith("/app/assistant"), finance: false, icon: <AssistantIcon /> },
 ];
 
@@ -271,15 +283,21 @@ function GroupHeader({
 interface NavProps {
   showFinance: boolean;
   isDemoMode: boolean;
+  isPartner?: boolean;
+  workspaceLabel?: string;
 }
 
 function SidebarContents({
   showFinance,
   isDemoMode,
+  isPartner = false,
+  workspaceLabel = "Your workspace",
   onNavigate,
 }: NavProps & { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const items = navItems.filter((i) => showFinance || !i.finance);
+  const items = navItems
+    .filter((i) => showFinance || !i.finance)
+    .filter((i) => !isPartner || i.partner);
 
   const [soonOpen, setSoonOpen] = useState(false);
 
@@ -302,7 +320,7 @@ function SidebarContents({
             className="truncate text-[0.8125rem] font-semibold tracking-tight"
             style={{ color: "var(--text)" }}
           >
-            Joshua&apos;s workspace
+            {workspaceLabel}
           </p>
         </div>
         {isDemoMode && (
@@ -319,6 +337,7 @@ function SidebarContents({
       </div>
 
       {/* Search affordance — opens the global command palette */}
+      {isPartner ? null : (
       <button
         type="button"
         onClick={() => openCommandPalette()}
@@ -337,6 +356,7 @@ function SidebarContents({
           ⌘K
         </span>
       </button>
+      )}
 
       {/* Workspace group */}
       <p
@@ -357,6 +377,7 @@ function SidebarContents({
       </nav>
 
       {/* Coming soon group — collapsible */}
+      {isPartner ? null : (
       <div className="mt-3">
         <GroupHeader
           label="Coming soon"
@@ -379,6 +400,7 @@ function SidebarContents({
           </div>
         )}
       </div>
+      )}
 
       {/* Footer */}
       <div className="mt-auto pt-3" style={{ borderTop: "1px solid var(--border-faint)" }}>
@@ -406,7 +428,7 @@ function SidebarContents({
    Public components
    ────────────────────────────────────────────────────────────────── */
 
-export function AppSidebar({ showFinance, isDemoMode }: NavProps) {
+export function AppSidebar(props: NavProps) {
   return (
     <aside
       className="hidden lg:flex shrink-0 flex-col"
@@ -421,12 +443,13 @@ export function AppSidebar({ showFinance, isDemoMode }: NavProps) {
         padding: "0.875rem 0.625rem",
       }}
     >
-      <SidebarContents showFinance={showFinance} isDemoMode={isDemoMode} />
+      <SidebarContents {...props} />
     </aside>
   );
 }
 
-export function MobileNav({ showFinance, isDemoMode }: NavProps) {
+export function MobileNav(props: NavProps) {
+  const { isDemoMode } = props;
   const [open, setOpen] = useState(false);
 
   return (
@@ -513,11 +536,7 @@ export function MobileNav({ showFinance, isDemoMode }: NavProps) {
                 <path d="M2 2l10 10M12 2L2 12" />
               </svg>
             </button>
-            <SidebarContents
-              showFinance={showFinance}
-              isDemoMode={isDemoMode}
-              onNavigate={() => setOpen(false)}
-            />
+            <SidebarContents {...props} onNavigate={() => setOpen(false)} />
           </div>
         </>
       )}
