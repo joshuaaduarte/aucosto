@@ -7,6 +7,8 @@ export default {
   trustHost: true,
   pages: {
     signIn: "/login",
+    // Refused OAuth sign-ins (not invited) land back on /login?error=AccessDenied.
+    error: "/login",
   },
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {

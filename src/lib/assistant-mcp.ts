@@ -30,6 +30,7 @@ import {
 import { executeGatedAction, resolveActor } from "@/lib/assistant-execute";
 import { getRecentAudits, recordAudit } from "@/lib/services/assistant-audit";
 import { buildAssistantSnapshot } from "@/lib/assistant-snapshot";
+import { resolveFinanceScopeUserId } from "@/lib/household";
 import {
   calendarQuerySchema,
   fetchAssistantCalendar,
@@ -327,7 +328,13 @@ async function callTool(
 ): Promise<{ content: { type: string; text: string }[]; isError?: true }> {
   switch (name) {
     case "assistant_snapshot":
-      return { content: toolText(await buildAssistantSnapshot(userId)) };
+      return {
+        content: toolText(
+          await buildAssistantSnapshot(userId, {
+            financeUserId: await resolveFinanceScopeUserId(userId),
+          }),
+        ),
+      };
     case "assistant_capabilities":
       return {
         content: toolText({

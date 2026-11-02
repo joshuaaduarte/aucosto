@@ -6,9 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-aucosto is a personal day-to-day dashboard / hub of tools. Single-user (Josh); partner may get scoped finance access later. External agents read/write through the **assistant surface** (`/api/assistant/*` — snapshot read + preview/execute action API + MCP endpoint, authed by session cookie or the owner-equivalent `ASSISTANT_API_SECRET` bearer, audited; see `docs/assistant-actions.md`). Keep that surface narrow — new write actions need a risk level and an audit trail, and finance writes/deletes/bulk ops stay excluded.
+aucosto is a personal day-to-day dashboard / hub of tools. Owner (Josh) plus an optional household partner limited to Finance + Home (`docs/household.md`). External agents read/write through the **assistant surface** (`/api/assistant/*` — snapshot read + preview/execute action API + MCP endpoint, authed by session cookie or the owner-equivalent `ASSISTANT_API_SECRET` bearer, audited; see `docs/assistant-actions.md`). Keep that surface narrow — new write actions need a risk level and an audit trail, and finance writes/deletes/bulk ops stay excluded.
 
 **Current branch state: `main` IS the live Next.js app.** (The old CRA scaffold is history; `origin/nextjs-rewrite` is a stale remnant of the rewrite.)
+
+**Household:** a partner can get their own login limited to Finance + Home (`docs/household.md`). Viewer context now exposes `financeUserId` / `homeUserId` scopes — **pass `financeUserId` to finance services, never `effectiveUserId`.**
 
 **Deeper docs:** `docs/architecture.md` (per-tool file map and gotchas), `docs/lessons.md` (hard-won debugging lessons — read before touching raw SQL, migrations, mobile layout, or modals), and `docs/assistant-actions.md` (agent-facing snapshot + action API). Deployed on **Vercel** (auto-deploy from `main`); `/api/health` reports the live commit sha + DB reachability.
 
@@ -31,6 +33,8 @@ One row per tool. Every tool follows the same shape: schema → service → page
 | captured insights (@insight notes) | `insights-capture.prisma` (CapturedInsight, CapturedInsightPerson) | `captured-insights.ts` (⚠️ raw SQL + runtime `ensureInsightTables()`) | — (surfaces on `time/captured-today.tsx`, rolodex person pages) | — | `mention-processor.ts` (cross-tool orchestrator: text → mentions + insights via the rolodex/captured-insights services) |
 | assistant (agent surface) | — (audit table via runtime DDL) | `assistant-audit.ts` | `assistant/` (snapshot control panel) + `src/app/api/assistant/*` routes | — | `assistant-snapshot.ts` (aggregates every service, no DB), `assistant-signals.ts`, `assistant-actions.ts` (action registry), `assistant-action-executor/` (zod-validated, service-delegating handlers split per tool; dispatch in `index.ts`), `assistant-execute.ts` (the one risk/confirmation gate + audit write shared by REST and MCP), `assistant-mcp.ts` |
 | work (job hub) | `work.prisma` (WorkWorkspace, WorkArea, WorkProject, WorkPerson, WorkMeeting, WorkTask, WorkNote, WorkReview) — **a context layer, not a silo**: WorkTask.doItemId → DoItem, WorkMeeting.calendarItemId → CalendarItem, WorkPerson.rolodexPersonId → RolodexPerson, WorkProject.projectId → Project; reads LEFT JOIN the canonical rows | `work/` (split: `shared` ⚠️ raw SQL + runtime `ensureWorkTables()`, `reads`, `mutations`, `integrations` — orchestrators that create/sync through the do/calendar/rolodex/projects services + cross-surface reads for /app/do chips, rolodex work context, project work chips, assistant summary — barrel `index.ts`) | `work/` (single page, `?tab=` sections: today/projects/areas/people/meetings/notes/review; forms in `_components/`; empty workspace shows `setup-section.tsx`) | `work.tsx` (today's meetings + must-do tasks) | `work.ts` (day/week keys, meeting recurrence-on-day, today task grouping, due labels, linked-status resolution, coworker-candidate filter, task-lane + calendar-window mapping) |
+| home (household lists, chores, maintenance) | `home.prisma` (HomeList, HomeListItem, HomeTask) — rows owned by the household data user | `home.ts` | `home/` (partner landing page) | `home.tsx` | `home.ts` (cadence/due labels, rotation, list-input parsing, household nudge text) |
+| household (shared access) | `household.prisma` (Household, HouseholdMember, HouseholdInvite) | — infra: `src/lib/household.ts` (membership, invites, shadow data user; guarded reads) | `settings/household-panel.tsx`, `src/app/join/[token]/` | — | `household-access.ts` (partner path rules, invite status, finance scope cookie) — see `docs/household.md` |
 | events (activity log) | `events.prisma` (Event) | `events.ts` (`recordEvent`) | — | `activity.tsx` | `event-types.ts` (label map) |
 | push (notifications) | `push.prisma` (PushSubscription) | `push.ts` (subscriptions + `web-push` sends) | `settings/notifications-panel.tsx` + `/api/push` + `/api/cron/nudges` (vercel.json crons, CRON_SECRET) + `public/sw.js` (push-only SW, **no caching**) | — | — |
 | whoop (integration) | `whoop.prisma` (WhoopConnection, tokens encrypted via `secrets.ts`) | `whoop.ts` (connect/status/`getWhoopMorningPrefill`) | `settings/whoop-panel.tsx` + `/api/whoop/{connect,callback,disconnect}` | — (feeds the hub morning card) | `whoop.ts` (OAuth + v2 API client), `whoop-morning.ts` (pure sleep→prefill mapping, tested) |
@@ -155,7 +159,7 @@ Why: when Tool B needs Tool A's data, it imports from `@/lib/services/<a>` — n
 
 `can(userId, tool, action)` is the single permission check. V1 returns true for any authenticated user. Services call `requireCan(...)` which asserts the userId is a string or throws `AuthorizationError`.
 
-The `Tool` union currently covers `time`, `finance`, `calendar`, `events`, `do`, `habit`, `projects`, `reflect`, `rhythm`, `rolodex`, and `insight` — see `src/lib/auth/can.ts` for the authoritative list. New tools must be added to the union before their service can call `requireCan`; never borrow another tool's name (that's how partner-scoped permissions would leak later).
+The `Tool` union currently covers `time`, `finance`, `calendar`, `events`, `do`, `habit`, `projects`, `reflect`, `rhythm`, `rolodex`, `insight`, `home`, `household` and the integrations — see `src/lib/auth/can.ts` for the authoritative list. New tools must be added to the union before their service can call `requireCan`; never borrow another tool's name (that's how partner-scoped permissions would leak later).
 
 Adding partner-with-finance-read-only later is **one edit to `can.ts`** — service callsites don't change.
 
@@ -283,6 +287,8 @@ Arrive/leave events at named places via `/api/location/ingest` — see `docs/loc
 `.env` (gitignored) holds `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, the `SEED_USER_*` triplet, and (optional) Teller credentials: `TELLER_ENV`, `TELLER_APPLICATION_ID`, `TELLER_WEBHOOK_SIGNING_SECRETS`, `TELLER_CERT_PEM`, `TELLER_PRIVATE_KEY_PEM`. Linked-account access tokens are encrypted at rest using `AUTH_SECRET` (`src/lib/secrets.ts`). Changing the seed password requires re-running `npm run db:seed`.
 
 Optional: `LOG_LEVEL` overrides the Pino level (defaults to `debug` in dev, `info` in prod). `APP_TIMEZONE` overrides the server timezone pin (defaults to `America/Los_Angeles`; set **unconditionally** in `src/instrumentation.ts` because Vercel presets `TZ=UTC`).
+
+Sign-in: email + password always; Google when `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` are set (invite-only, see `docs/household.md`).
 
 Integration env (all optional — each feature degrades cleanly when unset, but **production needs them in Vercel too**): `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` (Web Push), `CRON_SECRET` (authenticates `/api/cron/nudges`; Vercel sends it as the Bearer token automatically), `LOCATION_WEBHOOK_SECRET` (location ingest bearer token), `WHOOP_CLIENT_ID` / `WHOOP_CLIENT_SECRET` (Whoop OAuth).
 

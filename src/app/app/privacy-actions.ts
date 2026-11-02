@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { ensureDemoWorkspace, seedDemoWorkspaceData } from "@/lib/demo-workspace";
 import { updatePrivacySettings } from "@/lib/services/user";
+import { isPartnerUser } from "@/lib/household";
 import { DEMO_MODE_COOKIE } from "@/lib/viewer-context";
 
 export type PrivacyState =
@@ -30,6 +31,11 @@ async function requireOwnerUser() {
   const session = await auth();
   if (!session?.user?.id) {
     throw new Error("Not signed in.");
+  }
+  // Demo workspace and privacy controls are the owner's; partners never
+  // get a demo workspace of their own.
+  if (await isPartnerUser(session.user.id)) {
+    throw new Error("Only the household owner can do that.");
   }
   return session.user.id;
 }

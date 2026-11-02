@@ -1,5 +1,6 @@
 import { resolveAssistantAuth } from "@/lib/assistant-auth";
 import { buildAssistantSnapshot } from "@/lib/assistant-snapshot";
+import { resolveFinanceScopeUserId } from "@/lib/household";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,8 @@ export async function GET(req: Request) {
   if (!authed) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const snapshot = await buildAssistantSnapshot(authed.userId);
+  const snapshot = await buildAssistantSnapshot(authed.userId, {
+    financeUserId: await resolveFinanceScopeUserId(authed.userId),
+  });
   return NextResponse.json(snapshot);
 }

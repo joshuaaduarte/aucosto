@@ -1,4 +1,14 @@
 import { getViewerContext } from "@/lib/viewer-context";
+import {
+  getHouseholdMembership,
+  listHouseholdInvites,
+  listHouseholdMembers,
+} from "@/lib/household";
+import { isHomeReady } from "@/lib/services/home";
+import { summarizeMovableFinance } from "@/lib/services/finance";
+import { hasPassword } from "@/lib/services/user";
+import { HouseholdPanel, type HouseholdPanelData } from "./household-panel";
+import { PasswordPanel } from "./password-panel";
 import { getWhoopConfig } from "@/lib/whoop";
 import { getWhoopStatus } from "@/lib/services/whoop";
 import { PrivacyPanel } from "../privacy-panel";
@@ -16,11 +26,15 @@ export default async function SettingsPage({
   const context = await getViewerContext();
   const { whoop: whoopFlag } = await searchParams;
 
-  const whoopConfigured = getWhoopConfig().enabled;
+  const isPartner = context?.role === "partner";
+  const whoopConfigured = !isPartner && getWhoopConfig().enabled;
   const whoopStatus =
     context && whoopConfigured
       ? await getWhoopStatus(context.effectiveUserId)
       : { connected: false, lastSyncedAt: null, since: null };
+
+  const household = context ? await loadHouseholdPanel(context) : null;
+  const passwordSet = context ? await hasPassword(context.ownerUserId) : true;
 
   return (
     <div className="space-y-10">
@@ -43,10 +57,23 @@ export default async function SettingsPage({
           className="text-[0.8125rem] sm:max-w-[38rem] sm:text-right"
           style={{ color: "var(--text-muted)" }}
         >
-          Privacy and demo workspace controls live here now.
+          {isPartner
+            ? "Your household, sign-in and notifications."
+            : "Household, sign-in, privacy and demo workspace controls."}
         </p>
       </header>
 
+      {household ? (
+        <Section id="household" eyebrow="Household" title="Who shares Finance and Home with you.">
+          <HouseholdPanel data={household} />
+        </Section>
+      ) : null}
+
+      <Section id="password" eyebrow="Sign-in" title="Your password.">
+        <PasswordPanel hasPassword={passwordSet} />
+      </Section>
+
+      {isPartner ? null : (
       <section
         id="finance"
         className="rounded-md border p-5"
@@ -74,6 +101,7 @@ export default async function SettingsPage({
           />
         </div>
       </section>
+      )}
 
       <section
         id="notifications"
@@ -100,6 +128,8 @@ export default async function SettingsPage({
         </div>
       </section>
 
+      {isPartner ? null : (
+      <>
       <section
         id="location"
         className="rounded-md border p-5"
@@ -154,6 +184,71 @@ export default async function SettingsPage({
           />
         </div>
       </section>
+      </>
+      )}
     </div>
   );
+}
+
+function Section({
+  id,
+  eyebrow,
+  title,
+  children,
+}: {
+  id: string;
+  eyebrow: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      id={id}
+      className="rounded-md border p-5"
+      style={{ borderColor: "var(--border-soft)", background: "var(--bg-page)" }}
+    >
+      <p
+        className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+        style={{ color: "var(--text-faint)" }}
+      >
+        {eyebrow}
+      </p>
+      <h2 className="mt-1 text-[1rem] font-semibold tracking-tight" style={{ color: "var(--text)" }}>
+        {title}
+      </h2>
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}
+
+async function loadHouseholdPanel(
+  context: NonNullable<Awaited<ReturnType<typeof getViewerContext>>>,
+): Promise<HouseholdPanelData> {
+  const ready = await isHomeReady(context.ownerUserId).catch(() => false);
+  const membership = ready ? await getHouseholdMembership(context.ownerUserId) : null;
+  const active = membership && !membership.removed ? membership : null;
+  const [members, invites, personal, shared] = active
+    ? await Promise.all([
+        listHouseholdMembers(active.householdId),
+        context.role === "owner" ? listHouseholdInvites(active.householdId) : Promise.resolve([]),
+        context.financeVisible ? summarizeMovableFinance(context.ownerUserId) : Promise.resolve(null),
+        context.financeVisible ? summarizeMovableFinance(active.dataUserId) : Promise.resolve(null),
+      ])
+    : [[], [], null, null];
+  return {
+    ready,
+    role: context.role,
+    isDemoMode: context.isDemoMode,
+    household: active ? { name: active.householdName } : null,
+    members: members.map((m) => ({ ...m, joinedAt: undefined })),
+    invites: invites.map((invite) => ({
+      id: invite.id,
+      email: invite.email,
+      expiresAt: invite.expiresAt.toISOString(),
+      status: invite.status,
+    })),
+    viewerUserId: context.ownerUserId,
+    personal,
+    shared,
+  };
 }

@@ -24,6 +24,11 @@ import { bearerMatches } from "@/lib/bearer";
 import { slotDueAt, type NudgeSlot } from "@/lib/nudge-timing";
 import { resolveNudge } from "@/lib/nudge-resolver";
 import { listSubscribedUserIds, sendPushToUser } from "@/lib/services/push";
+import { listActiveHouseholds, listPartnerUserIds } from "@/lib/household";
+import { billsDueWithin } from "@/lib/finance-planning";
+import { homeDaysUntil, householdNudgeText } from "@/lib/home";
+import { listBills } from "@/lib/services/finance";
+import { listHomeTasks } from "@/lib/services/home";
 
 export const dynamic = "force-dynamic";
 
@@ -42,9 +47,17 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: true, slot: null, hour: now.getHours() });
   }
 
-  const userIds = await listSubscribedUserIds();
+  const subscribed = await listSubscribedUserIds();
+  // Personal nudges (morning check-in, reflection) are about the owner's own
+  // tools; household partners only get the household nudge below.
+  const partners = new Set(await listPartnerUserIds());
+  const userIds = subscribed.filter((id) => !partners.has(id));
   let sent = 0;
   let skipped = 0;
+
+  if (slot === "morning") {
+    sent += await sendHouseholdNudges(new Set(subscribed), now);
+  }
 
   for (const userId of userIds) {
     try {
@@ -61,4 +74,36 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({ ok: true, slot, users: userIds.length, sent, skipped });
+}
+
+/** Morning "Home today": due chores/maintenance + non-autopay bills due within 3 days. */
+async function sendHouseholdNudges(subscribed: Set<string>, now: Date): Promise<number> {
+  let sent = 0;
+  for (const household of await listActiveHouseholds()) {
+    const recipients = household.memberUserIds.filter((id) => subscribed.has(id));
+    if (recipients.length === 0) continue;
+    try {
+      const [tasks, bills] = await Promise.all([
+        listHomeTasks(household.dataUserId),
+        listBills(household.dataUserId),
+      ]);
+      const text = householdNudgeText({
+        dueTaskTitles: tasks
+          .filter((task) => homeDaysUntil(task.nextDueAt, now) <= 0)
+          .map((task) => task.title),
+        bills: billsDueWithin(
+          bills.filter((bill) => !bill.autopay),
+          now,
+          3,
+        ),
+      });
+      if (!text) continue;
+      for (const userId of recipients) {
+        sent += await sendPushToUser(userId, { ...text, url: "/app/home" });
+      }
+    } catch (error) {
+      console.error("[cron/nudges] household nudge failed", household.householdId, error);
+    }
+  }
+  return sent;
 }

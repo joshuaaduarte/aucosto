@@ -76,7 +76,7 @@ export default async function InsightsPage({
     listDoItems(userId, { includeDone: true }),
     listCalendarItems(userId, { from, to }),
     context.financeVisible
-      ? listTransactions(userId, { since: from, limit: 5000 })
+      ? listTransactions(context.financeUserId, { since: from, limit: 5000 })
       : Promise.resolve([]),
     listRecentRhythms(userId, { sinceKey, limit: 2000 }),
   ]);

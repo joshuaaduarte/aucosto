@@ -1,7 +1,18 @@
 import Link from "next/link";
+import { isGoogleSignInConfigured } from "@/lib/auth-providers";
+import { loginWithGoogle } from "./actions";
+import { GoogleButton } from "./google-button";
 import { LoginForm } from "./login-form";
 
-export default function LoginPage() {
+export const dynamic = "force-dynamic";
+
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
+  const google = isGoogleSignInConfigured();
   return (
     <div
       className="flex min-h-screen flex-col"
@@ -65,7 +76,32 @@ export default function LoginPage() {
             </p>
           </div>
 
-          <div className="mt-6">
+          {error === "AccessDenied" ? (
+            <p
+              className="mt-6 rounded-md px-3 py-2 text-[0.8125rem]"
+              style={{
+                background: "var(--accent-tint)",
+                color: "var(--accent-strong)",
+                border: "1px solid var(--accent-tint-strong)",
+              }}
+            >
+              That Google account isn&apos;t invited. Ask for an invite link, or
+              use the Google account it was sent to.
+            </p>
+          ) : null}
+
+          {google ? (
+            <div className="mt-6 space-y-4">
+              <form action={loginWithGoogle}>
+                <GoogleButton />
+              </form>
+              <p className="text-center text-[0.6875rem]" style={{ color: "var(--text-faint)" }}>
+                or with email and password
+              </p>
+            </div>
+          ) : null}
+
+          <div className={google ? "mt-4" : "mt-6"}>
             <LoginForm />
           </div>
 
@@ -73,7 +109,7 @@ export default function LoginPage() {
             className="mt-8 text-center text-[0.6875rem]"
             style={{ color: "var(--text-faint)" }}
           >
-            Private · No tracking · One user
+            Private · No tracking · Invite only
           </p>
         </div>
       </main>

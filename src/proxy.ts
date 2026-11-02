@@ -12,6 +12,9 @@ export default auth((req) => {
   const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-request-id", requestId);
+  // Always overwritten (never trusted from the client): the app layout reads
+  // it to keep household partners on the tools they were given.
+  requestHeaders.set("x-pathname", req.nextUrl.pathname);
   const response = NextResponse.next({
     request: { headers: requestHeaders },
   });
