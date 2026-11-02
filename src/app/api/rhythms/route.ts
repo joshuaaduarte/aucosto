@@ -201,7 +201,8 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Rhythm action failed.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Log the detail server-side; don't leak internals (SQL, stack hints) to the client.
+    console.error("[api/rhythms] action failed", { action: payload.action }, error);
+    return NextResponse.json({ error: "Rhythm action failed." }, { status: 500 });
   }
 }

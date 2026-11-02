@@ -25,11 +25,10 @@ import {
 } from "@/lib/assistant-actions";
 import {
   ACTION_INPUT_SCHEMAS,
-  executeAction,
   previewAction,
 } from "@/lib/assistant-action-executor";
-import { recordAudit } from "@/lib/services/assistant-audit";
-import { getRecentAudits } from "@/lib/services/assistant-audit";
+import { executeGatedAction, resolveActor } from "@/lib/assistant-execute";
+import { getRecentAudits, recordAudit } from "@/lib/services/assistant-audit";
 import { buildAssistantSnapshot } from "@/lib/assistant-snapshot";
 import {
   calendarQuerySchema,
@@ -246,14 +245,6 @@ function toolError(message: string) {
   };
 }
 
-function resolveActor(source: unknown): string {
-  if (typeof source === "object" && source !== null && "actor" in source) {
-    const actor = (source as Record<string, unknown>).actor;
-    if (typeof actor === "string" && actor) return actor;
-  }
-  return "mcp";
-}
-
 async function callPreviewAction(userId: string, args: ToolArgs) {
   const parsed = previewToolInput.safeParse(args);
   if (!parsed.success) return toolError(`Invalid arguments: ${parsed.error.message}`);
@@ -267,7 +258,7 @@ async function callPreviewAction(userId: string, args: ToolArgs) {
   await recordAudit({
     userId,
     action,
-    actor: resolveActor(source),
+    actor: resolveActor(source, "mcp"),
     riskLevel: def.risk,
     confirmed: false,
     status: "previewed",
@@ -302,35 +293,22 @@ async function callExecuteAction(userId: string, args: ToolArgs) {
   if (!parsed.success) return toolError(`Invalid arguments: ${parsed.error.message}`);
   const { action, input, confirmed, source } = parsed.data;
 
-  const def: ActionDef | undefined = ACTION_REGISTRY[action];
-  if (!def) return toolError(`Unknown action: ${action}`);
-  if (!def.supported) return toolError(`Action "${action}" is not supported`);
-  if (def.risk === "high") {
-    return toolError(`High-risk action "${action}" requires manual execution`);
-  }
-  if (def.confirmationRequired && confirmed !== true) {
-    return toolError(
-      `Confirmation required for this action — re-call with confirmed: true`,
-    );
-  }
-
-  const result = await executeAction(userId, action, input);
-  await recordAudit({
-    userId,
+  const outcome = await executeGatedAction(userId, {
     action,
-    actor: resolveActor(source),
-    riskLevel: def.risk,
-    confirmed: confirmed === true,
-    status: result.ok ? "executed" : "rejected",
+    input,
+    confirmed,
     source: (source ?? null) as Record<string, unknown> | null,
-    normalizedInput: input,
-    previewText: result.summary,
-    resultRecordId: result.recordId,
-    resultRecordType: result.recordType,
-    beforeState: null,
+    defaultActor: "mcp",
   });
-
-  if (!result.ok) return toolError(`Execution failed: ${result.error}`);
+  if (!outcome.ok) {
+    if (outcome.refused === "needs_confirmation") {
+      return toolError(
+        `Confirmation required for this action — re-call with confirmed: true`,
+      );
+    }
+    return toolError(outcome.refused ? outcome.error : `Execution failed: ${outcome.error}`);
+  }
+  const { result } = outcome;
   return {
     content: toolText({
       ok: true,

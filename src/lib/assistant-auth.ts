@@ -13,24 +13,18 @@
 
 import "server-only";
 
-import { timingSafeEqual } from "node:crypto";
-
 import { auth } from "@/auth";
+import { bearerMatches } from "@/lib/bearer";
 import { resolveOwnerUserId } from "@/lib/owner";
+
+// Re-exported for existing callers/tests.
+export { bearerMatches };
 
 export type AssistantAuthVia = "session" | "bearer";
 
 export interface AssistantAuth {
   userId: string;
   via: AssistantAuthVia;
-}
-
-/** Constant-time bearer comparison. Pure — exported for unit tests. */
-export function bearerMatches(header: string | null, secret: string): boolean {
-  const token = header?.startsWith("Bearer ") ? header.slice(7) : "";
-  const a = Buffer.from(token);
-  const b = Buffer.from(secret);
-  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 /**

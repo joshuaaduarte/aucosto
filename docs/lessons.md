@@ -126,3 +126,24 @@ time was stored 7–8 hours off. The server timezone pin
 `TZ=UTC`, so a "set only if unset" guard silently does nothing) keeps
 server-side *rendering* and day-boundary math correct, but data entry must
 not depend on it.
+
+## 11. Re-baselining migrations after runtime DDL
+
+The DB's recorded migration history diverged from `prisma/migrations/`
+(a remotely-applied migration was never checked in), and many tables and
+columns were then added by services at request time. To bring it back:
+
+1. Apply `scripts/consolidate-runtime-ddl.sql` (idempotent) over
+   `DIRECT_URL` with `scripts/apply-sql.ts`, **after** the code that no
+   longer reads the dropped `User.appLock*` columns is deployed.
+2. Diff the live DB against the schema:
+   `npx prisma migrate diff --from-url "$DIRECT_URL" --to-schema-datamodel prisma/schema --script`.
+   Fold any real differences into `prisma/schema/*.prisma` (or the SQL).
+3. Create a single baseline migration from the schema
+   (`prisma migrate diff --from-empty --to-schema-datamodel prisma/schema --script > prisma/migrations/<ts>_baseline/migration.sql`),
+   move the old migration folders aside, and mark the baseline applied with
+   `npx prisma migrate resolve --applied <ts>_baseline`. Never accept a
+   `migrate dev` reset — it truncates live data.
+4. Delete the `ensure*()` helpers and swap raw SQL for the typed client
+   tool by tool, now that the generated client knows every model.
+

@@ -43,7 +43,7 @@ export default async function SettingsPage({
           className="text-[0.8125rem] sm:max-w-[38rem] sm:text-right"
           style={{ color: "var(--text-muted)" }}
         >
-          Privacy, app lock, and demo workspace controls live here now.
+          Privacy and demo workspace controls live here now.
         </p>
       </header>
 
@@ -70,7 +70,6 @@ export default async function SettingsPage({
         <div className="mt-4">
           <PrivacyPanel
             financeVisible={context?.financeVisible ?? false}
-            appLockEnabled={context?.appLockEnabled ?? false}
             isDemoMode={context?.isDemoMode ?? false}
           />
         </div>

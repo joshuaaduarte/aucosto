@@ -30,7 +30,7 @@ export default async function AppLayout({
   // Belt-and-braces try/catch: a cosmetic badge read must never be able to
   // take down every page in the app.
   let todayReflection = null;
-  if (context && context.isUnlocked) {
+  if (context) {
     try {
       todayReflection = await getReflection(
         context.effectiveUserId,
@@ -62,8 +62,8 @@ export default async function AppLayout({
         </main>
       </div>
 
-      {/* Mobile bottom tabs + global running-timer bar — not on the lock screen. */}
-      {context && context.isUnlocked ? (
+      {/* Mobile bottom tabs + global running-timer bar. */}
+      {context ? (
         <>
           <MobileTabBar
             showFinance={navProps.showFinance}

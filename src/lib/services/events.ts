@@ -36,6 +36,16 @@ export async function listRecentEvents(
   });
 }
 
+/** How many events of one type this user logged since `since` (rate limits). */
+export async function countEventsSince(
+  userId: string,
+  type: string,
+  since: Date,
+): Promise<number> {
+  requireCan(userId, "events", "read");
+  return prisma.event.count({ where: { userId, type, at: { gte: since } } });
+}
+
 export async function recordEvent(input: EventInput): Promise<void> {
   await prisma.event.create({
     data: {

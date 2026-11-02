@@ -20,6 +20,7 @@
 // so they stay testable without sending to real devices.
 
 import { NextResponse } from "next/server";
+import { bearerMatches } from "@/lib/bearer";
 import { slotDueAt, type NudgeSlot } from "@/lib/nudge-timing";
 import { resolveNudge } from "@/lib/nudge-resolver";
 import { listSubscribedUserIds, sendPushToUser } from "@/lib/services/push";
@@ -28,8 +29,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET?.trim();
-  const authorization = request.headers.get("authorization");
-  if (!secret || authorization !== `Bearer ${secret}`) {
+  if (!secret || !bearerMatches(request.headers.get("authorization"), secret)) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 

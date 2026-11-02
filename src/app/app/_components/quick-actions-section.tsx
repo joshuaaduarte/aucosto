@@ -3,7 +3,6 @@ import type { CalendarItem } from "@/generated/prisma/client";
 import type { DoItemSummary } from "@/lib/services/do";
 import type { HabitSummary } from "@/lib/services/habits";
 import type { RunningTimeEntry } from "@/lib/services/time";
-import { CardMenu } from "../card-menu";
 import {
   formatCents,
   formatHoursMs,
@@ -16,8 +15,6 @@ export function QuickActionsSection({
   runningEntry,
   weekTotalMs,
   financeVisible,
-  financeLocked,
-  financeHasPin,
   thisMonthSpentCents,
   lastMonthSpentCents,
   upcomingCalendar,
@@ -27,8 +24,6 @@ export function QuickActionsSection({
   runningEntry: RunningTimeEntry | null;
   weekTotalMs: number;
   financeVisible: boolean;
-  financeLocked: boolean;
-  financeHasPin: boolean;
   thisMonthSpentCents: number;
   lastMonthSpentCents: number;
   upcomingCalendar: CalendarItem[];
@@ -81,23 +76,14 @@ export function QuickActionsSection({
             href="/app/finance"
             icon={<WalletIcon />}
             label="Finance"
-            value={financeLocked ? "Locked" : formatCents(thisMonthSpentCents)}
+            value={formatCents(thisMonthSpentCents)}
             meta={
-              financeLocked
-                ? "tap to unlock"
-                : lastMonthSpentCents > 0
-                  ? `vs ${formatCents(lastMonthSpentCents)} last month`
-                  : "spent this month"
+              lastMonthSpentCents > 0
+                ? `vs ${formatCents(lastMonthSpentCents)} last month`
+                : "spent this month"
             }
             actionLabel="Review finance"
             actionHref="/app/finance"
-            menu={
-              <CardMenu
-                widgetId="finance"
-                hasPin={financeHasPin}
-                isLocked={financeLocked}
-              />
-            }
           />
         ) : (
           <QuickCard

@@ -17,6 +17,34 @@ export type RunningTimeEntry = TimeEntry & {
   habit: Pick<Habit, "id" | "title" | "goalUnit" | "targetCount"> | null;
 };
 
+type PrismaTx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+/**
+ * Linked task/habit ids come from forms and the assistant API — make sure
+ * they belong to this user before writing them onto an entry, so a guessed
+ * id can never attach someone else's row.
+ */
+async function assertOwnedLinks(
+  db: PrismaTx | typeof prisma,
+  userId: string,
+  links: { doItemId?: string | null; habitId?: string | null },
+): Promise<void> {
+  if (links.doItemId) {
+    const doItem = await db.doItem.findFirst({
+      where: { id: links.doItemId, userId },
+      select: { id: true },
+    });
+    if (!doItem) throw new Error("Linked task not found.");
+  }
+  if (links.habitId) {
+    const habit = await db.habit.findFirst({
+      where: { id: links.habitId, userId },
+      select: { id: true },
+    });
+    if (!habit) throw new Error("Linked habit not found.");
+  }
+}
+
 export async function getRunningEntry(
   userId: string,
 ): Promise<RunningTimeEntry | null> {
@@ -146,6 +174,7 @@ export async function createPastEntry(
   if (input.endedAt.getTime() - input.startedAt.getTime() > 24 * 60 * 60 * 1000) {
     throw new Error("Backfilled entries are capped at 24 hours.");
   }
+  await assertOwnedLinks(prisma, userId, input);
   const entry = await prisma.timeEntry.create({
     data: {
       userId,
@@ -194,19 +223,34 @@ export async function startEntry(
   if (now.getTime() - startedAt.getTime() > 24 * 60 * 60 * 1000) {
     throw new Error("A running timer can't be backdated more than 24 hours.");
   }
-  await prisma.timeEntry.updateMany({
-    where: { userId, endedAt: null },
-    data: { endedAt: now },
-  });
-  const entry = await prisma.timeEntry.create({
-    data: {
-      userId,
-      label: input.label,
-      category: input.category ?? null,
-      doItemId: input.doItemId ?? null,
-      habitId: input.habitId ?? null,
-      startedAt,
-    },
+  // One transaction, serialized per user with an advisory lock, so two quick
+  // taps can't each stop "the" running timer and both create a new one.
+  const entry = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${"time:" + userId}))`;
+    await assertOwnedLinks(tx, userId, input);
+    // Stop whatever is running. A backdated start ends the previous entry at
+    // the new start (not "now") so the two don't overlap — but never before
+    // the previous entry's own start.
+    const running = await tx.timeEntry.findMany({
+      where: { userId, endedAt: null },
+      select: { id: true, startedAt: true },
+    });
+    for (const prev of running) {
+      const endedAt = new Date(
+        Math.max(prev.startedAt.getTime(), Math.min(startedAt.getTime(), now.getTime())),
+      );
+      await tx.timeEntry.update({ where: { id: prev.id }, data: { endedAt } });
+    }
+    return tx.timeEntry.create({
+      data: {
+        userId,
+        label: input.label,
+        category: input.category ?? null,
+        doItemId: input.doItemId ?? null,
+        habitId: input.habitId ?? null,
+        startedAt,
+      },
+    });
   });
   await recordEvent({
     userId,
@@ -247,6 +291,7 @@ export async function updateEntry(
   if (endedAt && endedAt.getTime() - startedAt.getTime() > 24 * 60 * 60 * 1000) {
     throw new Error("Entries are capped at 24 hours.");
   }
+  await assertOwnedLinks(prisma, userId, { doItemId: input.doItemId });
 
   const entry = await prisma.timeEntry.update({
     where: { id },

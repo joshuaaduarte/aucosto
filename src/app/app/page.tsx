@@ -65,8 +65,6 @@ export default async function HubPage() {
 
   const userId = context?.effectiveUserId;
   const financeVisible = context?.financeVisible ?? false;
-  const financeHasPin = false;
-  const financeLocked = false;
 
   const [
     runningEntry,
@@ -87,13 +85,13 @@ export default async function HubPage() {
     ? await Promise.all([
         getRunningEntry(userId),
         listCompletedSince(userId, startOfWeek()),
-        financeVisible && !financeLocked
+        financeVisible
           ? listAccounts(userId)
           : Promise.resolve([]),
-        financeVisible && !financeLocked
+        financeVisible
           ? listTransactions(userId, { since: startOfMonth(), limit: 1000 })
           : Promise.resolve([]),
-        financeVisible && !financeLocked
+        financeVisible
           ? listTransactions(userId, {
               since: startOfPreviousMonth(),
               limit: 1000,
@@ -207,7 +205,7 @@ export default async function HubPage() {
     runningEntry: runningEntry ? { startedAt: runningEntry.startedAt } : null,
     habits: allHabits,
     finance:
-      financeVisible && !financeLocked
+      financeVisible
         ? { monthTransactions: thisMonthTx.filter((t) => t.date >= monthStart) }
         : null,
   });
@@ -215,11 +213,11 @@ export default async function HubPage() {
   const prompts = deriveHubPrompts({
     runningEntry,
     weekTotalMs,
-    accounts: financeVisible && !financeLocked ? accounts : undefined,
+    accounts: financeVisible ? accounts : undefined,
     thisMonthSpentCents:
-      financeVisible && !financeLocked ? thisMonthSpentCents : undefined,
+      financeVisible ? thisMonthSpentCents : undefined,
     lastMonthSpentCents:
-      financeVisible && !financeLocked ? lastMonthSpentCents : undefined,
+      financeVisible ? lastMonthSpentCents : undefined,
   });
 
   const topActions = deriveTopActions({
@@ -338,7 +336,6 @@ export default async function HubPage() {
     runningEntry,
     weekTotalMs,
     financeVisible,
-    financeLocked,
     thisMonthSpentCents,
   });
 
@@ -454,7 +451,7 @@ export default async function HubPage() {
       <CrossToolCallout
         runningEntry={runningEntry}
         weekTotalMs={weekTotalMs}
-        financeVisible={financeVisible && !financeLocked}
+        financeVisible={financeVisible}
         thisMonthSpentCents={thisMonthSpentCents}
       />
 
@@ -463,8 +460,6 @@ export default async function HubPage() {
           runningEntry={runningEntry}
           weekTotalMs={weekTotalMs}
           financeVisible={financeVisible}
-          financeLocked={financeLocked}
-          financeHasPin={financeHasPin}
           thisMonthSpentCents={thisMonthSpentCents}
           lastMonthSpentCents={lastMonthSpentCents}
           upcomingCalendar={upcomingCalendar}

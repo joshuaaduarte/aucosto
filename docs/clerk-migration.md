@@ -39,9 +39,8 @@ How the rest of the app consumes identity (this is the important part for the mi
 
 - **`src/lib/viewer-context.ts`** wraps `auth()` and is the single entry point app code
   uses for "who is looking". It returns
-  `{ ownerUserId, effectiveUserId, financeVisible, appLockEnabled, isUnlocked, isDemoMode, ... }`.
+  `{ ownerUserId, effectiveUserId, financeVisible, isDemoMode, ... }`.
 - **Demo mode** swaps `effectiveUserId` to a shadow demo user via a cookie.
-- **Privacy lock** gates the app behind an unlock screen.
 - **Every service-layer function takes `userId` as its first argument and filters all
   queries by it.** `userId` is the Prisma `User.id` (a cuid). This is threaded through the
   entire codebase.
@@ -303,7 +302,7 @@ async function resolveOwnerUserId(): Promise<string | null> {
 
 Demo mode and the privacy lock keep working unchanged: they layer on top of
 `ownerUserId`/`effectiveUserId`, which still resolve to the same cuids. The demo-mode cookie
-swap, `financeVisible`, `appLockEnabled`, `isUnlocked` logic is all downstream of
+swap, `financeVisible` logic is all downstream of
 `resolveOwnerUserId()` and doesn't care that the upstream provider changed.
 
 **Option B — rekey every table's `userId` to the Clerk id. REJECTED.** This means a data

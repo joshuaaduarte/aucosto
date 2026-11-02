@@ -296,19 +296,17 @@ export function composeSubline({
   runningEntry,
   weekTotalMs,
   financeVisible,
-  financeLocked,
   thisMonthSpentCents,
 }: {
   runningEntry: unknown;
   weekTotalMs: number;
   financeVisible: boolean;
-  financeLocked: boolean;
   thisMonthSpentCents: number;
 }): string {
   const bits: string[] = [];
   if (runningEntry) bits.push("a session is running");
   if (weekTotalMs > 0) bits.push(`${formatHoursMs(weekTotalMs)} logged this week`);
-  if (financeVisible && !financeLocked && thisMonthSpentCents > 0)
+  if (financeVisible && thisMonthSpentCents > 0)
     bits.push(`${formatCents(thisMonthSpentCents)} spent this month`);
 
   if (bits.length === 0) return "Quiet so far. Use the first move below to give the day a shape.";
