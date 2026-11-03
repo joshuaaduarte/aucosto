@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  addMinutesToClock,
   applyKeypadKey,
+  habitsToOffer,
+  hourCaptureMode,
+  nextHalfHour,
+  peopleToOffer,
   captureEntries,
   choresToOffer,
   financeCategoryLook,
@@ -98,6 +103,60 @@ describe("suggestCaptureModes", () => {
     const recent = Array.from({ length: 12 }, () => "list");
     expect(rememberCaptureMode(recent, "task")).toHaveLength(12);
     expect(rememberCaptureMode(recent, "task")[0]).toBe("task");
+  });
+});
+
+describe("Josh's full menu", () => {
+  it("covers every tool with an entry, and a partner still only gets Home + Money", () => {
+    const all = captureEntries(["/app", "/app/calendar", "/app/do", "/app/time", "/app/habits", "/app/reflect", "/app/home", "/app/finance", "/app/work", "/app/rolodex"]);
+    expect(all.map((e) => e.mode)).toEqual(expect.arrayContaining(["event", "habit", "reflect", "person", "work-note"]));
+    expect(captureEntries(["/app/home", "/app/finance"]).every((e) => e.tool === "/app/home" || e.tool === "/app/finance")).toBe(true);
+  });
+});
+
+describe("hourCaptureMode", () => {
+  it("suggests the reflection in the evening until it's done, habits in the morning", () => {
+    expect(hourCaptureMode(20, false)).toBe("reflect");
+    expect(hourCaptureMode(20, true)).toBeUndefined();
+    expect(hourCaptureMode(7, false)).toBe("habit");
+    expect(hourCaptureMode(14, false)).toBeUndefined();
+  });
+  it("comes after the page's entry and before recent picks", () => {
+    const available = ["task", "timer", "reflect", "event"] as const;
+    expect(
+      suggestCaptureModes({ available, pathname: "/app/calendar", recent: ["timer"], hourMode: "reflect" }),
+    ).toEqual(["event", "reflect", "timer"]);
+  });
+});
+
+describe("habitsToOffer", () => {
+  const h = (title: string, dayPart: string, dueToday = true, completedToday = false) => ({ title, dayPart, dueToday, completedToday });
+  it("keeps due, unfinished habits, the current part of the day first", () => {
+    const habits = [h("Read", "evening"), h("Walk", "anytime"), h("Stretch", "morning"), h("Gym", "morning", false), h("Meds", "morning", true, true)];
+    expect(habitsToOffer(habits, 8).map((x) => x.title)).toEqual(["Stretch", "Walk", "Read"]);
+    expect(habitsToOffer(habits, 20).map((x) => x.title)).toEqual(["Read", "Walk", "Stretch"]);
+  });
+});
+
+describe("peopleToOffer", () => {
+  const people = [
+    { name: "Sam Lee", lastAt: "2026-10-01" },
+    { name: "Ana", lastAt: "2026-11-01" },
+    { name: "Bea Samson", lastAt: null },
+  ];
+  it("shows recent contacts with no search, name matches (starts-with first) with one", () => {
+    expect(peopleToOffer(people, "").map((p) => p.name)).toEqual(["Ana", "Sam Lee", "Bea Samson"]);
+    expect(peopleToOffer(people, "sam").map((p) => p.name)).toEqual(["Sam Lee", "Bea Samson"]);
+  });
+});
+
+describe("event clock helpers", () => {
+  it("rounds up to the next half hour and adds durations across midnight", () => {
+    expect(nextHalfHour(new Date(2026, 10, 3, 14, 10))).toBe("14:30");
+    expect(nextHalfHour(new Date(2026, 10, 3, 14, 40))).toBe("15:00");
+    expect(nextHalfHour(new Date(2026, 10, 3, 23, 45))).toBe("00:00");
+    expect(addMinutesToClock("23:30", 60)).toBe("00:30");
+    expect(addMinutesToClock("09:00", 30)).toBe("09:30");
   });
 });
 

@@ -1,5 +1,6 @@
 // Work domain service — barrel. Reads degrade to empty; writes throw.
 export {
+  getDefaultWorkspace,
   getOrCreateDefaultWorkspace,
   listAreas,
   listProjects,

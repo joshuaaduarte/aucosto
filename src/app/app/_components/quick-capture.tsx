@@ -20,10 +20,14 @@ import { inferCategory } from "@/lib/finance-categories";
 import { usePathname } from "next/navigation";
 import { HOME_TASK_PRESETS, type HomeTaskKind } from "@/lib/home";
 import {
+  addMinutesToClock,
   applyKeypadKey,
   captureEntries,
   financeCategoryLook,
   formatTypedAmount,
+  hourCaptureMode,
+  nextHalfHour,
+  peopleToOffer,
   rememberCaptureMode,
   suggestCaptureModes,
   type CaptureEntry,
@@ -35,6 +39,13 @@ import { UndoToast, type UndoToastState } from "../finance/_components/undo-toas
 import { addItems, completeTask, saveTask } from "../home/actions";
 import { createDoItemAction } from "../do/actions";
 import { startEntry } from "../time/actions";
+import { createCalendarBlockAction } from "../calendar/actions";
+import { logHabitDone } from "../habits/actions";
+import { saveReflectionAction } from "../reflect/actions";
+import { addInteractionAction } from "../rolodex/actions";
+import { createNoteAction } from "../work/actions";
+import { MOOD_SCALE, RATING_FIELDS, type ReflectionRatingField } from "@/lib/reflect";
+import { wallClockWindow } from "@/lib/wall-clock";
 import { categoryColor } from "@/lib/time-categories";
 import { NAV_GROUPS, NAV_TOOLS, visibleTools } from "./nav-model";
 import { loadQuickCapture, type QuickCaptureData } from "./quick-capture-actions";
@@ -79,7 +90,16 @@ function readRecent(): string[] {
   }
 }
 
-const EMPTY_DATA: QuickCaptureData = { finance: null, lists: [], chores: [], timers: [] };
+const EMPTY_DATA: QuickCaptureData = {
+  finance: null,
+  lists: [],
+  chores: [],
+  timers: [],
+  habits: [],
+  reflectedToday: false,
+  people: [],
+  work: null,
+};
 
 export function QuickCaptureHost({
   financeVisible,
@@ -91,16 +111,22 @@ export function QuickCaptureHost({
   const pathname = usePathname();
   // Same rule as the menu: an entry shows only if its tool is in this
   // person's menu (a partner's menu is Home + Money).
-  const entries = useMemo(
+  const allEntries = useMemo(
     () => captureEntries(visibleTools({ showFinance: financeVisible, isPartner }).map((tool) => tool.href)),
     [financeVisible, isPartner],
   );
   const [open, setOpen] = useState(false);
+  const [hour, setHour] = useState(12);
   /** null = the chooser. */
   const [mode, setMode] = useState<CaptureMode | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const [data, setData] = useState<QuickCaptureData | null>(null);
   const [toast, setToast] = useState<UndoToastState>(null);
+  // "Work note" needs a set-up Work hub; until the data says so it stays hidden.
+  const entries = useMemo(
+    () => allEntries.filter((entry) => entry.mode !== "work-note" || data?.work),
+    [allEntries, data?.work],
+  );
   const closeToast = useCallback(() => setToast(null), []);
   useBodyScrollLock(open);
 
@@ -113,13 +139,14 @@ export function QuickCaptureHost({
   const show = useCallback(
     (wanted?: CaptureMode) => {
       // One entry only: skip the chooser.
-      const direct = wanted ?? (entries.length === 1 ? entries[0]!.mode : undefined);
-      setMode(direct && entries.some((entry) => entry.mode === direct) ? direct : null);
+      const direct = wanted ?? (allEntries.length === 1 ? allEntries[0]!.mode : undefined);
+      setMode(direct && allEntries.some((entry) => entry.mode === direct) ? direct : null);
       setRecent(readRecent());
+      setHour(new Date().getHours());
       setOpen(true);
       refresh();
     },
-    [entries, refresh],
+    [allEntries, refresh],
   );
 
   useEffect(() => {
@@ -182,7 +209,13 @@ export function QuickCaptureHost({
             <div className="mx-auto mb-3 h-1 w-9 rounded-full sm:hidden" style={{ background: "var(--text-ghost)" }} aria-hidden />
 
             {entry === null ? (
-              <Chooser entries={entries} pathname={pathname} recent={recent} onPick={pick} />
+              <Chooser
+                entries={entries}
+                pathname={pathname}
+                recent={recent}
+                hourMode={hourCaptureMode(hour, data?.reflectedToday ?? false)}
+                onPick={pick}
+              />
             ) : (
               <>
                 <div className="mb-3 flex items-center gap-2">
@@ -226,6 +259,15 @@ export function QuickCaptureHost({
                 {entry.mode === "chore-new" ? <ChoreNewPanel onDone={done} /> : null}
                 {entry.mode === "task" ? <TaskPanel onDone={done} /> : null}
                 {entry.mode === "timer" ? <TimerPanel timers={data?.timers ?? []} onDone={done} /> : null}
+                {entry.mode === "event" ? <EventPanel onDone={done} /> : null}
+                {entry.mode === "habit" ? data ? <HabitPanel habits={data.habits} onDone={done} /> : <PanelLoading /> : null}
+                {entry.mode === "reflect" ? (
+                  data ? <ReflectPanel reflectedToday={data.reflectedToday} onDone={done} /> : <PanelLoading />
+                ) : null}
+                {entry.mode === "person" ? data ? <PersonPanel people={data.people} onDone={done} /> : <PanelLoading /> : null}
+                {entry.mode === "work-note" ? (
+                  data?.work ? <WorkNotePanel work={data.work} onDone={done} /> : <PanelLoading empty={data !== null} emptyText="Set up Work first." />
+                ) : null}
               </>
             )}
           </div>
@@ -244,14 +286,16 @@ function Chooser({
   entries,
   pathname,
   recent,
+  hourMode,
   onPick,
 }: {
   entries: CaptureEntry[];
   pathname: string;
   recent: string[];
+  hourMode?: CaptureMode;
   onPick: (mode: CaptureMode) => void;
 }) {
-  const suggested = suggestCaptureModes({ available: entries.map((e) => e.mode), pathname, recent })
+  const suggested = suggestCaptureModes({ available: entries.map((e) => e.mode), pathname, recent, hourMode })
     .map((mode) => entries.find((e) => e.mode === mode)!)
     .filter(Boolean);
   // A short menu (a partner's four entries) is one grid, page's pick first.
@@ -1142,6 +1186,499 @@ function ChoreNewPanel({ onDone }: { onDone: (toast: UndoToastState) => void }) 
         </p>
         <button type="submit" disabled={pending || !title.trim()} className="btn-ink shrink-0">
           {pending ? "Saving…" : "Track it"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ── Calendar: event ──────────────────────────────────────────────────────
+
+const DURATIONS: Array<[minutes: number, label: string]> = [
+  [30, "30 min"],
+  [60, "1 hour"],
+  [120, "2 hours"],
+];
+
+function EventPanel({ onDone }: { onDone: (toast: UndoToastState) => void }) {
+  const [title, setTitle] = useState("");
+  const [date, setDate] = useState(() => localDateKey());
+  const [start, setStart] = useState(() => nextHalfHour(new Date()));
+  const [minutes, setMinutes] = useState(60);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, run] = useTransition();
+  const today = localDateKey();
+  const tomorrow = localDateKey(1);
+
+  const submit = () => {
+    if (!title.trim()) return;
+    const end = addMinutesToClock(start, minutes);
+    // Wall-clock → absolute time here, in the browser's timezone (lessons #10).
+    const span = wallClockWindow(date, start, end);
+    if (!span) {
+      setError("Pick a day and a start time.");
+      return;
+    }
+    setError(null);
+    run(async () => {
+      const form = new FormData();
+      form.set("title", title.trim());
+      form.set("date", date);
+      form.set("start", start);
+      form.set("end", end);
+      form.set("startsAtIso", span.startsAt.toISOString());
+      form.set("endsAtIso", span.endsAt.toISOString());
+      try {
+        await createCalendarBlockAction(form);
+      } catch {
+        setError("Couldn't add the event. Try again.");
+        return;
+      }
+      const when = date === today ? "today" : date === tomorrow ? "tomorrow" : date;
+      const at = span.startsAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      onDone({ id: Date.now(), message: `Added “${title.trim()}” ${when} at ${at}` });
+    });
+  };
+
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        submit();
+      }}
+      className="space-y-3"
+    >
+      <input
+        autoFocus
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Dinner with Sam"
+        aria-label="Event"
+        enterKeyHint="done"
+        className="field w-full"
+      />
+      <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Day">
+        {(
+          [
+            [today, "Today"],
+            [tomorrow, "Tomorrow"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={label}
+            type="button"
+            role="radio"
+            aria-checked={date === value}
+            className="chip"
+            data-on={date === value || undefined}
+            onClick={() => setDate(value)}
+          >
+            {label}
+          </button>
+        ))}
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          aria-label="Date"
+          className="field ml-auto w-auto"
+        />
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <input
+          type="time"
+          value={start}
+          onChange={(e) => setStart(e.target.value)}
+          aria-label="Start time"
+          className="field w-auto"
+        />
+        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="How long">
+          {DURATIONS.map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={minutes === value}
+              className="chip"
+              data-on={minutes === value || undefined}
+              onClick={() => setMinutes(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-center justify-between gap-2 pt-1">
+        <p className="text-[0.75rem]" style={{ color: error ? "var(--attention)" : "var(--text-faint)" }} role={error ? "alert" : undefined}>
+          {error ?? (
+            <Link href="/app/calendar" className="underline underline-offset-4">
+              More options in Calendar
+            </Link>
+          )}
+        </p>
+        <button type="submit" disabled={pending || !title.trim() || !start} className="btn-ink shrink-0">
+          {pending ? "Adding…" : "Add event"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ── Habits: done ─────────────────────────────────────────────────────────
+
+function HabitPanel({ habits, onDone }: { habits: QuickCaptureData["habits"]; onDone: (toast: UndoToastState) => void }) {
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [, run] = useTransition();
+
+  if (habits.length === 0) {
+    return (
+      <div className="space-y-2 py-6 text-center">
+        <p className="text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
+          Nothing left for today. Nice.
+        </p>
+        <Link href="/app/habits" className="text-[0.8125rem] underline underline-offset-4" style={{ color: "var(--text-faint)" }}>
+          Open Habits
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <ul className="rounded-lg border" style={{ borderColor: "var(--border-soft)" }}>
+        {habits.map((habit) => (
+          <li key={habit.id} className="border-t first:border-t-0" style={{ borderColor: "var(--border-faint)" }}>
+            <button
+              type="button"
+              disabled={pendingId !== null}
+              onClick={() => {
+                setPendingId(habit.id);
+                setError(null);
+                run(async () => {
+                  try {
+                    await logHabitDone(habit.id);
+                  } catch {
+                    setPendingId(null);
+                    setError("Couldn't log it. Try again.");
+                    return;
+                  }
+                  setPendingId(null);
+                  onDone({ id: Date.now(), message: `Logged “${habit.title}”` });
+                });
+              }}
+              className="flex w-full items-center gap-3 px-3 py-3 text-left hover:bg-bg-hover"
+            >
+              <span className="list-check" aria-hidden data-checked={pendingId === habit.id || undefined} />
+              <span className="min-w-0 flex-1 truncate text-[0.9375rem]" style={{ color: "var(--text)" }}>
+                {habit.title}
+              </span>
+              <span className="shrink-0 text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+                {habit.targetLabel}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="text-[0.75rem]" style={{ color: error ? "var(--attention)" : "var(--text-faint)" }} role={error ? "alert" : undefined}>
+        {error ?? "Due today and not done yet. Tap one to log it."}
+      </p>
+    </div>
+  );
+}
+
+// ── Reflect: how was today ───────────────────────────────────────────────
+
+function ReflectPanel({ reflectedToday, onDone }: { reflectedToday: boolean; onDone: (toast: UndoToastState) => void }) {
+  const [ratings, setRatings] = useState<Partial<Record<ReflectionRatingField, number>>>({});
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, run] = useTransition();
+
+  if (reflectedToday) {
+    return (
+      <div className="space-y-2 py-6 text-center">
+        <p className="text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
+          You already reflected on today.
+        </p>
+        <Link href="/app/reflect" className="text-[0.8125rem] underline underline-offset-4" style={{ color: "var(--text-faint)" }}>
+          Open Reflect to change it
+        </Link>
+      </div>
+    );
+  }
+
+  const complete = RATING_FIELDS.every(({ field }) => ratings[field]);
+  const submit = () => {
+    if (!complete) return;
+    setError(null);
+    run(async () => {
+      const form = new FormData();
+      for (const { field } of RATING_FIELDS) form.set(field, String(ratings[field]));
+      if (note.trim()) form.set("wentWell", note.trim());
+      const result = await saveReflectionAction(undefined, form);
+      if (result && "error" in result && result.error) {
+        setError(result.error);
+        return;
+      }
+      onDone({ id: Date.now(), message: "Saved today's reflection" });
+    });
+  };
+
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        submit();
+      }}
+      className="space-y-3"
+    >
+      {RATING_FIELDS.map(({ field, label }) => (
+        <div key={field} className="flex items-center gap-2">
+          <p className="w-24 shrink-0 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
+            {label}
+          </p>
+          <div className="grid flex-1 grid-cols-5 gap-1" role="radiogroup" aria-label={label}>
+            {MOOD_SCALE.map((step) => {
+              const on = ratings[field] === step.value;
+              return (
+                <button
+                  key={step.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  aria-label={`${step.value}, ${step.label}`}
+                  title={step.label}
+                  onClick={() => setRatings((r) => ({ ...r, [field]: step.value }))}
+                  className="rounded-lg border py-1.5 text-center text-[1rem] leading-none transition-colors"
+                  style={{
+                    borderColor: on ? step.color : "var(--border-faint)",
+                    background: on ? `color-mix(in srgb, ${step.color} 16%, transparent)` : "var(--bg-page)",
+                  }}
+                >
+                  {field === "mood" ? step.emoji : <span className="text-[0.8125rem] font-medium" style={{ color: "var(--text)" }}>{step.value}</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      <textarea
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="One thing that went well (optional)"
+        aria-label="One thing that went well"
+        rows={2}
+        className="field w-full resize-none"
+      />
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[0.75rem]" style={{ color: error ? "var(--attention)" : "var(--text-faint)" }} role={error ? "alert" : undefined}>
+          {error ?? (complete ? "Today's tracked time and tasks are saved with it." : "Pick 1 to 5 for each.")}
+        </p>
+        <button type="submit" disabled={pending || !complete} className="btn-ink shrink-0">
+          {pending ? "Saving…" : "Save"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ── Rolodex: note about someone ──────────────────────────────────────────
+
+function PersonPanel({ people, onDone }: { people: QuickCaptureData["people"]; onDone: (toast: UndoToastState) => void }) {
+  const [query, setQuery] = useState("");
+  const [person, setPerson] = useState<{ id: string; name: string } | null>(null);
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, run] = useTransition();
+  const matches = peopleToOffer(people, query);
+
+  if (people.length === 0) {
+    return (
+      <div className="space-y-2 py-6 text-center">
+        <p className="text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
+          No one in your Rolodex yet.
+        </p>
+        <Link href="/app/rolodex/new" className="text-[0.8125rem] underline underline-offset-4" style={{ color: "var(--text-faint)" }}>
+          Add someone
+        </Link>
+      </div>
+    );
+  }
+
+  if (!person) {
+    return (
+      <div className="space-y-2">
+        <input
+          autoFocus
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Who is it about?"
+          aria-label="Search people"
+          className="field w-full"
+        />
+        <ul className="rounded-lg border" style={{ borderColor: "var(--border-soft)" }}>
+          {matches.map((match) => (
+            <li key={match.id} className="border-t first:border-t-0" style={{ borderColor: "var(--border-faint)" }}>
+              <button
+                type="button"
+                onClick={() => setPerson(match)}
+                className="flex w-full items-center px-3 py-2.5 text-left text-[0.9375rem] hover:bg-bg-hover"
+                style={{ color: "var(--text)" }}
+              >
+                {match.name}
+              </button>
+            </li>
+          ))}
+          {matches.length === 0 ? (
+            <li className="px-3 py-2.5 text-[0.8125rem]" style={{ color: "var(--text-faint)" }}>
+              No one called “{query.trim()}”.
+            </li>
+          ) : null}
+        </ul>
+      </div>
+    );
+  }
+
+  const submit = () => {
+    const text = note.trim();
+    if (!text) return;
+    setError(null);
+    // The first line is the interaction's title; a longer note keeps the full text as its body.
+    const firstLine = text.split("\n")[0]!.trim();
+    const title = firstLine.length > 120 ? `${firstLine.slice(0, 117)}…` : firstLine;
+    run(async () => {
+      const result = await addInteractionAction(person.id, title, text === title ? undefined : text);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      onDone({ id: Date.now(), message: `Noted for ${person.name}` });
+    });
+  };
+
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        submit();
+      }}
+      className="space-y-3"
+    >
+      <div className="flex items-center gap-2">
+        <span className="chip" data-on>
+          {person.name}
+        </span>
+        <button type="button" className="text-[0.75rem] underline underline-offset-4" style={{ color: "var(--text-faint)" }} onClick={() => setPerson(null)}>
+          Change
+        </button>
+      </div>
+      <textarea
+        autoFocus
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="Caught up over coffee. Starting a new job in March."
+        aria-label="Note"
+        rows={3}
+        className="field w-full resize-none"
+      />
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[0.75rem]" style={{ color: error ? "var(--attention)" : "var(--text-faint)" }} role={error ? "alert" : undefined}>
+          {error ?? "Saved on their timeline as of today."}
+        </p>
+        <button type="submit" disabled={pending || !note.trim()} className="btn-ink shrink-0">
+          {pending ? "Saving…" : "Save note"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ── Work: note ───────────────────────────────────────────────────────────
+
+function WorkNotePanel({
+  work,
+  onDone,
+}: {
+  work: NonNullable<QuickCaptureData["work"]>;
+  onDone: (toast: UndoToastState) => void;
+}) {
+  const [kind, setKind] = useState<"note" | "decision">("note");
+  const [body, setBody] = useState("");
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, run] = useTransition();
+
+  const submit = () => {
+    if (!body.trim()) return;
+    setError(null);
+    run(async () => {
+      const form = new FormData();
+      form.set("workspaceId", work.workspaceId);
+      form.set("kind", kind);
+      form.set("body", body.trim());
+      if (projectId) form.set("projectId", projectId);
+      const result = await createNoteAction(undefined, form);
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
+      onDone({ id: Date.now(), message: kind === "decision" ? "Decision saved to Work" : "Note saved to Work" });
+    });
+  };
+
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        submit();
+      }}
+      className="space-y-3"
+    >
+      <div className="seg" role="radiogroup" aria-label="Kind">
+        {(
+          [
+            ["note", "Note"],
+            ["decision", "Decision"],
+          ] as const
+        ).map(([value, label]) => (
+          <button key={value} type="button" role="radio" aria-checked={kind === value} className="seg-item" onClick={() => setKind(value)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <textarea
+        autoFocus
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        placeholder={kind === "decision" ? "We're shipping the beta on the 14th." : "What's on your mind?"}
+        aria-label={kind === "decision" ? "Decision" : "Note"}
+        rows={3}
+        className="field w-full resize-none"
+      />
+      {work.projects.length ? (
+        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Project">
+          {work.projects.map((project) => (
+            <button
+              key={project.id}
+              type="button"
+              role="radio"
+              aria-checked={projectId === project.id}
+              className="chip"
+              data-on={projectId === project.id || undefined}
+              onClick={() => setProjectId((current) => (current === project.id ? null : project.id))}
+            >
+              {project.name}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[0.75rem]" style={{ color: error ? "var(--attention)" : "var(--text-faint)" }} role={error ? "alert" : undefined}>
+          {error ?? (work.projects.length ? "Tag a project if it belongs to one." : "Shows up under Work → Notes.")}
+        </p>
+        <button type="submit" disabled={pending || !body.trim()} className="btn-ink shrink-0">
+          {pending ? "Saving…" : "Save"}
         </button>
       </div>
     </form>
