@@ -453,49 +453,6 @@ body > * {
   border-top: 1px solid var(--border-faint);
 }
 
-.calendar-fab {
-  position: fixed;
-  right: calc(1rem + var(--safe-area-right));
-  /* Stack: tab bar (z40) → timer bar (z41) → FAB (z42) → modals (z50). */
-  bottom: calc(var(--bottom-inset) + 1rem);
-  z-index: 42;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  min-height: 3.25rem;
-  padding: 0 1rem 0 0.875rem;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  background: var(--text);
-  color: var(--bg-page);
-  box-shadow: var(--shadow-pop);
-  font-size: 0.9375rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  cursor: pointer;
-  transition: transform 0.12s ease, opacity 0.12s ease;
-}
-
-.calendar-fab:hover {
-  opacity: 0.92;
-}
-
-.calendar-fab:active {
-  transform: translateY(1px);
-}
-
-.calendar-fab__plus {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.6rem;
-  height: 1.6rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.16);
-  font-size: 1.15rem;
-  line-height: 1;
-}
-
 .calendar-modal-backdrop {
   position: fixed;
   inset: 0;

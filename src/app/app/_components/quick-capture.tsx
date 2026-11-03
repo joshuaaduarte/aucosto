@@ -25,12 +25,14 @@ import {
   captureEntries,
   financeCategoryLook,
   formatTypedAmount,
+  guessCapture,
   hourCaptureMode,
   nextHalfHour,
   peopleToOffer,
   rememberCaptureMode,
   suggestCaptureModes,
   type CaptureEntry,
+  type CaptureGuess,
   type CaptureMode,
   type KeypadKey,
 } from "@/lib/quick-capture";
@@ -58,6 +60,11 @@ const LIST_KEY = "aucosto.quickCapture.list";
 /** Open the sheet from anywhere on the client: on the chooser, or straight on one form. */
 export function openQuickCapture(mode?: CaptureMode) {
   window.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: { mode } }));
+}
+
+/** Press-and-hold on "+": straight back to the last thing you added (the chooser if there's none). */
+export function openLastQuickCapture() {
+  openQuickCapture(readRecent()[0] as CaptureMode | undefined);
 }
 
 function readStore(key: string): string | null {
@@ -118,7 +125,13 @@ export function QuickCaptureHost({
   const [open, setOpen] = useState(false);
   const [hour, setHour] = useState(12);
   /** null = the chooser. */
-  const [mode, setMode] = useState<CaptureMode | null>(null);
+  const [mode, setModeState] = useState<CaptureMode | null>(null);
+  /** What the "type anything" box filled in for the form it opened. */
+  const [prefill, setPrefill] = useState<CaptureGuess | null>(null);
+  const setMode = useCallback((next: CaptureMode | null) => {
+    setModeState(next);
+    setPrefill(null);
+  }, []);
   const [recent, setRecent] = useState<string[]>([]);
   const [data, setData] = useState<QuickCaptureData | null>(null);
   const [toast, setToast] = useState<UndoToastState>(null);
@@ -146,7 +159,7 @@ export function QuickCaptureHost({
       setOpen(true);
       refresh();
     },
-    [allEntries, refresh],
+    [allEntries, refresh, setMode],
   );
 
   useEffect(() => {
@@ -179,7 +192,7 @@ export function QuickCaptureHost({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, mode, entries.length]);
+  }, [open, mode, entries.length, setMode]);
 
   const pick = (next: CaptureMode) => {
     setMode(next);
@@ -215,6 +228,10 @@ export function QuickCaptureHost({
                 recent={recent}
                 hourMode={hourCaptureMode(hour, data?.reflectedToday ?? false)}
                 onPick={pick}
+                onGuess={(guess) => {
+                  pick(guess.mode);
+                  setPrefill(guess);
+                }}
               />
             ) : (
               <>
@@ -241,13 +258,13 @@ export function QuickCaptureHost({
 
                 {entry.mode === "spend" ? (
                   data?.finance ? (
-                    <SpendPanel finance={data.finance} onDone={done} />
+                    <SpendPanel finance={data.finance} prefill={prefill} onDone={done} />
                   ) : (
                     <PanelLoading empty={data !== null} emptyText="Money isn't set up yet." />
                   )
                 ) : null}
                 {entry.mode === "list" ? (
-                  data ? <ListPanel lists={data.lists} onAdded={refresh} onClose={() => setOpen(false)} /> : <PanelLoading />
+                  data ? <ListPanel lists={data.lists} initialText={prefill?.text} onAdded={refresh} onClose={() => setOpen(false)} /> : <PanelLoading />
                 ) : null}
                 {entry.mode === "chore-done" ? (
                   data ? (
@@ -257,7 +274,7 @@ export function QuickCaptureHost({
                   )
                 ) : null}
                 {entry.mode === "chore-new" ? <ChoreNewPanel onDone={done} /> : null}
-                {entry.mode === "task" ? <TaskPanel onDone={done} /> : null}
+                {entry.mode === "task" ? <TaskPanel initialTitle={prefill?.text} onDone={done} /> : null}
                 {entry.mode === "timer" ? <TimerPanel timers={data?.timers ?? []} onDone={done} /> : null}
                 {entry.mode === "event" ? <EventPanel onDone={done} /> : null}
                 {entry.mode === "habit" ? data ? <HabitPanel habits={data.habits} onDone={done} /> : <PanelLoading /> : null}
@@ -288,13 +305,21 @@ function Chooser({
   recent,
   hourMode,
   onPick,
+  onGuess,
 }: {
   entries: CaptureEntry[];
   pathname: string;
   recent: string[];
   hourMode?: CaptureMode;
   onPick: (mode: CaptureMode) => void;
+  onGuess: (guess: CaptureGuess) => void;
 }) {
+  const [typed, setTyped] = useState("");
+  const guess = guessCapture(
+    typed,
+    entries.map((e) => e.mode),
+  );
+  const guessEntry = guess ? entries.find((e) => e.mode === guess.mode) : undefined;
   const suggested = suggestCaptureModes({ available: entries.map((e) => e.mode), pathname, recent, hourMode })
     .map((mode) => entries.find((e) => e.mode === mode)!)
     .filter(Boolean);
@@ -311,6 +336,40 @@ function Chooser({
       <p className="text-[0.9375rem] font-semibold" style={{ color: "var(--text)" }}>
         What are you adding?
       </p>
+      {entries.some((e) => e.mode === "task" || e.mode === "list") ? (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (guess) onGuess(guess);
+          }}
+        >
+          <input
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            placeholder={entries.some((e) => e.mode === "task") ? "Type anything: $12 coffee, milk, eggs, call mum" : "Type anything: $12 coffee, milk, eggs"}
+            aria-label="Type anything"
+            enterKeyHint="next"
+            className="field w-full"
+          />
+          {guess && guessEntry ? (
+            <button
+              type="submit"
+              className="mt-1.5 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[0.8125rem] hover:bg-bg-hover"
+              style={{ color: "var(--text-muted)" }}
+            >
+              <span aria-hidden>{guessEntry.emoji}</span>
+              <span className="min-w-0 flex-1 truncate">
+                {guessEntry.label}
+                {guess.amount ? ` · $${guess.amount}` : ""}
+                {guess.text ? ` · ${guess.text}` : ""}
+              </span>
+              <span aria-hidden style={{ color: "var(--text-faint)" }}>
+                Check and save →
+              </span>
+            </button>
+          ) : null}
+        </form>
+      ) : null}
       {short ? (
         <div className="grid grid-cols-2 gap-2">
           {ordered.map((e) => (
@@ -376,16 +435,18 @@ type Direction = "out" | "in" | "move";
 
 function SpendPanel({
   finance,
+  prefill,
   onDone,
 }: {
   finance: NonNullable<QuickCaptureData["finance"]>;
+  prefill?: CaptureGuess | null;
   onDone: (toast: UndoToastState) => void;
 }) {
   const { accounts, merchants, categories } = finance;
   const amountRef = useRef<HTMLInputElement>(null);
   const [direction, setDirection] = useState<Direction>("out");
-  const [amount, setAmount] = useState("");
-  const [description, setDescription] = useState("");
+  const [amount, setAmount] = useState(prefill?.amount ?? "");
+  const [description, setDescription] = useState(prefill?.text ?? "");
   const [category, setCategory] = useState<string | null>(null);
   const [accountId, setAccountId] = useState(finance.defaultAccountId ?? "");
   const checkingId = accounts.find((a) => a.kind === "checking")?.id ?? accounts[0]?.id ?? "";
@@ -750,10 +811,12 @@ function Keypad({ onPress }: { onPress: (key: KeypadKey) => void }) {
 
 function ListPanel({
   lists,
+  initialText,
   onAdded,
   onClose,
 }: {
   lists: QuickCaptureData["lists"];
+  initialText?: string;
   onAdded: () => void;
   onClose: () => void;
 }) {
@@ -761,7 +824,7 @@ function ListPanel({
     const remembered = readStore(LIST_KEY);
     return lists.find((l) => l.id === remembered)?.id ?? lists[0]?.id ?? "";
   });
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText ?? "");
   const [added, setAdded] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -859,8 +922,8 @@ function ListPanel({
 
 // ── Task ─────────────────────────────────────────────────────────────────
 
-function TaskPanel({ onDone }: { onDone: (toast: UndoToastState) => void }) {
-  const [title, setTitle] = useState("");
+function TaskPanel({ initialTitle, onDone }: { initialTitle?: string; onDone: (toast: UndoToastState) => void }) {
+  const [title, setTitle] = useState(initialTitle ?? "");
   const [lane, setLane] = useState<"today" | "next">("today");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();

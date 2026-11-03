@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   addMinutesToClock,
   applyKeypadKey,
+  guessCapture,
   habitsToOffer,
   hourCaptureMode,
   nextHalfHour,
@@ -157,6 +158,26 @@ describe("event clock helpers", () => {
     expect(nextHalfHour(new Date(2026, 10, 3, 23, 45))).toBe("00:00");
     expect(addMinutesToClock("23:30", 60)).toBe("00:30");
     expect(addMinutesToClock("09:00", 30)).toBe("09:30");
+  });
+});
+
+describe("guessCapture", () => {
+  const all = ["spend", "list", "task", "timer"] as const;
+  it("reads money with a dollar sign or cents, either side", () => {
+    expect(guessCapture("$12 coffee", all)).toEqual({ mode: "spend", amount: "12", text: "coffee" });
+    expect(guessCapture("coffee $4.50", all)).toEqual({ mode: "spend", amount: "4.50", text: "coffee" });
+    expect(guessCapture("lunch 8.50", all)).toEqual({ mode: "spend", amount: "8.50", text: "lunch" });
+    expect(guessCapture("$30 at Trader Joe's", all)).toEqual({ mode: "spend", amount: "30", text: "Trader Joe's" });
+  });
+  it("reads lists from commas or 'buy'", () => {
+    expect(guessCapture("milk, eggs", all)).toEqual({ mode: "list", text: "milk, eggs" });
+    expect(guessCapture("buy paper towels", all)).toEqual({ mode: "list", text: "paper towels" });
+  });
+  it("treats anything else as a task, and respects what the viewer has", () => {
+    expect(guessCapture("2 hours of reading", all)).toEqual({ mode: "task", text: "2 hours of reading" });
+    expect(guessCapture("call the dentist", ["spend", "list"])).toEqual({ mode: "list", text: "call the dentist" });
+    expect(guessCapture("$12 coffee", ["list", "task"])?.mode).toBe("task");
+    expect(guessCapture("   ", all)).toBeNull();
   });
 });
 

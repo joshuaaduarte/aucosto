@@ -3,6 +3,7 @@ import { HABIT_DAY_PARTS, HABIT_DAY_PART_LABELS, type HabitDayPart } from "@/lib
 import { listHabits, type HabitSummary } from "@/lib/services/habits";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import { HabitCreateForm } from "./create-form";
+import { PageAddButton } from "../_components/page-add-button";
 import { DoneHabitChip, HabitCard } from "./habit-card";
 import { TemplatePicker } from "./_components/template-picker";
 
@@ -53,6 +54,7 @@ export default async function HabitsPage() {
   return (
     <div className="space-y-8">
       <header className="fade-in flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex items-end justify-between gap-3">
         <div>
           <p
             className="text-[0.75rem] font-medium uppercase tracking-wider"
@@ -68,6 +70,8 @@ export default async function HabitsPage() {
               ? `${doneToday.length} of ${dueToday.length} today`
               : "Habits"}
           </h1>
+        </div>
+        <PageAddButton target="habit" label="New habit" />
         </div>
         <p
           className="text-[0.8125rem] sm:text-right"
