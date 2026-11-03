@@ -1,5 +1,6 @@
-// Pure helpers for the "+" quick-capture sheet (log a purchase, add to a
-// list, add a task, start a timer). No DB, importable from client code.
+// Pure helpers for the "+" quick-capture sheet: which entries each viewer
+// gets, which to suggest, plus the money keypad and category looks. No DB,
+// importable from client code.
 
 import { categoryColor } from "./time-categories";
 
@@ -78,26 +79,81 @@ export function financeCategoryLook(category: string | null | undefined): {
   return { emoji: CATEGORY_EMOJI[name.toLowerCase()] ?? null, label: name, color: categoryColor(name) };
 }
 
-// ── Capture modes ────────────────────────────────────────────────────────
+// ── Capture entries ──────────────────────────────────────────────────────
+//
+// Everything the "+" sheet can add, each tied to the tool (nav href) it
+// belongs to. The sheet shows an entry only when that tool is in the
+// viewer's menu (see nav-model's visibleTools), so a household partner,
+// whose menu is Home + Money, can only ever get Home and Money entries.
 
-export type CaptureMode = "spend" | "list" | "task" | "timer";
+export type CaptureMode = "spend" | "list" | "chore-done" | "chore-new" | "task" | "timer";
 
-/** Which tabs the sheet offers: partners only get money and lists. */
-export function captureModes(input: {
-  financeVisible: boolean;
-  isPartner: boolean;
-}): CaptureMode[] {
-  const modes: CaptureMode[] = [];
-  if (input.financeVisible) modes.push("spend");
-  modes.push("list");
-  if (!input.isPartner) modes.push("task", "timer");
-  return modes;
+export type CaptureEntry = {
+  mode: CaptureMode;
+  label: string;
+  emoji: string;
+  /** The nav href of the tool this entry writes to. */
+  tool: string;
+};
+
+export const CAPTURE_ENTRIES: CaptureEntry[] = [
+  { mode: "spend", label: "Money", emoji: "💳", tool: "/app/finance" },
+  { mode: "list", label: "Add to a list", emoji: "🛒", tool: "/app/home" },
+  { mode: "chore-done", label: "Chore done", emoji: "✅", tool: "/app/home" },
+  { mode: "chore-new", label: "New chore", emoji: "🧹", tool: "/app/home" },
+  { mode: "task", label: "Task", emoji: "📝", tool: "/app/do" },
+  { mode: "timer", label: "Timer", emoji: "⏱️", tool: "/app/time" },
+];
+
+/** The entries a viewer can use: only those whose tool is in their menu. */
+export function captureEntries(visibleToolHrefs: readonly string[]): CaptureEntry[] {
+  const visible = new Set(visibleToolHrefs);
+  return CAPTURE_ENTRIES.filter((entry) => visible.has(entry.tool));
 }
 
-/** The remembered mode if it's still offered, else the first one. */
-export function initialCaptureMode(modes: CaptureMode[], remembered: string | null): CaptureMode {
-  const found = modes.find((m) => m === remembered);
-  return found ?? modes[0] ?? "list";
+/** Which entry each page puts first ("Add to a list" on Home, and so on). */
+const PAGE_MODE: Array<[prefix: string, mode: CaptureMode]> = [
+  ["/app/finance", "spend"],
+  ["/app/home", "list"],
+  ["/app/do", "task"],
+  ["/app/time", "timer"],
+];
+
+/**
+ * Up to three entries to put on top: the one that fits the current page,
+ * then the ones used most in the recent history (newest first), then the
+ * built-in order. Only entries in `available` are returned, without repeats.
+ */
+export function suggestCaptureModes(input: {
+  available: readonly CaptureMode[];
+  pathname: string;
+  recent: readonly string[];
+  limit?: number;
+}): CaptureMode[] {
+  const { available, pathname, recent, limit = 3 } = input;
+  const ok = new Set(available);
+  const out: CaptureMode[] = [];
+  const push = (mode: string | undefined) => {
+    if (mode && ok.has(mode as CaptureMode) && !out.includes(mode as CaptureMode)) out.push(mode as CaptureMode);
+  };
+  push(PAGE_MODE.find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`))?.[1]);
+  const counts = new Map<string, number>();
+  recent.forEach((mode) => counts.set(mode, (counts.get(mode) ?? 0) + 1));
+  [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || recent.indexOf(a[0]) - recent.indexOf(b[0]))
+    .forEach(([mode]) => push(mode));
+  available.forEach(push);
+  return out.slice(0, limit);
+}
+
+/** Add a used mode to the front of the recent history (kept to 12). */
+export function rememberCaptureMode(recent: readonly string[], mode: CaptureMode): string[] {
+  return [mode, ...recent].slice(0, 12);
+}
+
+/** Chores worth offering under "Chore done": due soonest first, at most six. */
+export function choresToOffer<T extends { daysUntil: number; title: string }>(tasks: readonly T[], limit = 6): T[] {
+  return [...tasks].sort((a, b) => a.daysUntil - b.daysUntil || a.title.localeCompare(b.title)).slice(0, limit);
 }
 
 /** Recent timer labels, newest first, without repeats (case-insensitive). */

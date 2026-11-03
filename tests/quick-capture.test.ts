@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   applyKeypadKey,
-  captureModes,
+  captureEntries,
+  choresToOffer,
   financeCategoryLook,
   formatTypedAmount,
-  initialCaptureMode,
   rankCategories,
+  rememberCaptureMode,
+  suggestCaptureModes,
   recentTimerLabels,
   type KeypadKey,
 } from "@/lib/quick-capture";
@@ -63,16 +65,50 @@ describe("financeCategoryLook", () => {
   });
 });
 
-describe("captureModes", () => {
-  it("gives partners money and lists only", () => {
-    expect(captureModes({ financeVisible: true, isPartner: true })).toEqual(["spend", "list"]);
+describe("captureEntries", () => {
+  it("gives a Home + Money menu only Home and Money entries", () => {
+    const modes = captureEntries(["/app/home", "/app/finance"]).map((e) => e.mode);
+    expect(modes).toEqual(["spend", "list", "chore-done", "chore-new"]);
   });
-  it("hides money when finance is hidden", () => {
-    expect(captureModes({ financeVisible: false, isPartner: false })).toEqual(["list", "task", "timer"]);
+  it("drops money when Money is hidden", () => {
+    const modes = captureEntries(["/app", "/app/do", "/app/time", "/app/home"]).map((e) => e.mode);
+    expect(modes).not.toContain("spend");
+    expect(modes).toContain("task");
   });
-  it("falls back to the first mode", () => {
-    expect(initialCaptureMode(["spend", "list"], "timer")).toBe("spend");
-    expect(initialCaptureMode(["spend", "list"], "list")).toBe("list");
+});
+
+describe("suggestCaptureModes", () => {
+  const available = ["spend", "list", "chore-done", "chore-new", "task", "timer"] as const;
+  it("puts the page's own entry first", () => {
+    expect(suggestCaptureModes({ available, pathname: "/app/home", recent: [] })[0]).toBe("list");
+    expect(suggestCaptureModes({ available, pathname: "/app/do/x", recent: [] })[0]).toBe("task");
+  });
+  it("then the most used, then the built-in order", () => {
+    expect(
+      suggestCaptureModes({ available, pathname: "/app", recent: ["timer", "task", "timer", "chore-done"] }),
+    ).toEqual(["timer", "task", "chore-done"]);
+    expect(suggestCaptureModes({ available, pathname: "/app", recent: [] })).toEqual(["spend", "list", "chore-done"]);
+  });
+  it("never suggests what the viewer can't use", () => {
+    expect(
+      suggestCaptureModes({ available: ["spend", "list"], pathname: "/app/do", recent: ["timer"] }),
+    ).toEqual(["spend", "list"]);
+  });
+  it("remembers newest first, capped", () => {
+    const recent = Array.from({ length: 12 }, () => "list");
+    expect(rememberCaptureMode(recent, "task")).toHaveLength(12);
+    expect(rememberCaptureMode(recent, "task")[0]).toBe("task");
+  });
+});
+
+describe("choresToOffer", () => {
+  it("lists the most overdue first", () => {
+    const out = choresToOffer([
+      { title: "Vacuum", daysUntil: 2 },
+      { title: "Trash", daysUntil: -1 },
+      { title: "Dishes", daysUntil: 0 },
+    ]);
+    expect(out.map((t) => t.title)).toEqual(["Trash", "Dishes", "Vacuum"]);
   });
 });
 
