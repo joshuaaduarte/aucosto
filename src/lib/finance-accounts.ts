@@ -18,6 +18,7 @@ export const FINANCE_ACCOUNT_KINDS = [
   "cash",
   "investment",
   "retirement",
+  "property",
   "loan",
 ] as const;
 
@@ -27,6 +28,8 @@ export type BalanceSnapshot = {
   cashCents: number;
   investmentCents: number;
   retirementCents: number;
+  /** Home, car, other things you own (kind "property"). */
+  propertyCents: number;
   cardsOwedCents: number;
   loansOwedCents: number;
   netPositionCents: number;
@@ -50,6 +53,8 @@ export function formatAccountKind(kind: string): string {
       return "Investment";
     case "retirement":
       return "Retirement";
+    case "property":
+      return "Home, car or other asset";
     case "loan":
       return "Loan";
     default:
@@ -113,6 +118,7 @@ export function summarizeBalances(
   let cashCents = 0;
   let investmentCents = 0;
   let retirementCents = 0;
+  let propertyCents = 0;
   let cardsOwedCents = 0;
   let loansOwedCents = 0;
   let cashAccountCount = 0;
@@ -149,6 +155,11 @@ export function summarizeBalances(
       retirementCents += account.currentBalanceCents;
       continue;
     }
+
+    if (account.kind === "property") {
+      propertyCents += account.currentBalanceCents;
+      continue;
+    }
   }
 
   const netPositionCents = cashCents - cardsOwedCents - loansOwedCents;
@@ -156,10 +167,11 @@ export function summarizeBalances(
     cashCents,
     investmentCents,
     retirementCents,
+    propertyCents,
     cardsOwedCents,
     loansOwedCents,
     netPositionCents,
-    netWorthCents: cashCents + investmentCents + retirementCents - cardsOwedCents - loansOwedCents,
+    netWorthCents: cashCents + investmentCents + retirementCents + propertyCents - cardsOwedCents - loansOwedCents,
     cashAccountCount,
     netWorthAccountCount,
     debtAccountCount,

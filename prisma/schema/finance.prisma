@@ -46,6 +46,9 @@ model FinanceAccount {
   user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   connection            FinanceConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
   transactions          FinanceTransaction[]
+  balanceSnapshots      FinanceBalanceSnapshot[]
+  statementChecks       FinanceStatementCheck[]
+  plan                  FinanceAccountPlan?
 
   @@index([userId, kind])
   @@index([connectionId])
@@ -131,4 +134,58 @@ model FinanceBill {
   user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, archivedAt, nextDueAt])
+}
+
+// Dated balance of one account, recorded on every balance update and every
+// finished statement check. Net worth history is rebuilt from these.
+// Balance is in the account's own terms (owed, for cards and loans).
+model FinanceBalanceSnapshot {
+  id               String         @id @default(cuid())
+  userId           String
+  financeAccountId String
+  balanceCents     Int
+  asOf             DateTime
+  source           String         @default("manual") // "manual" | "statement"
+  createdAt        DateTime       @default(now())
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account          FinanceAccount @relation(fields: [financeAccountId], references: [id], onDelete: Cascade)
+
+  @@index([userId, asOf])
+  @@index([financeAccountId, asOf])
+}
+
+// A finished statement check ("reconcile"): the statement's period and
+// balances, and what it took to make them match.
+model FinanceStatementCheck {
+  id                    String         @id @default(cuid())
+  userId                String
+  financeAccountId      String
+  periodStart           DateTime
+  periodEnd             DateTime
+  openingBalanceCents   Int
+  closingBalanceCents   Int
+  adjustmentCents       Int            @default(0)
+  matchedCount          Int            @default(0)
+  addedCount            Int            @default(0)
+  checkedByUserId       String?
+  createdAt             DateTime       @default(now())
+  user                  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account               FinanceAccount @relation(fields: [financeAccountId], references: [id], onDelete: Cascade)
+
+  @@index([financeAccountId, periodEnd])
+  @@index([userId, createdAt])
+}
+
+// Projection settings for one account: how much goes in (or gets paid off)
+// each month, and the yearly growth (or interest) rate in basis points.
+model FinanceAccountPlan {
+  financeAccountId         String         @id
+  userId                   String
+  monthlyContributionCents Int            @default(0)
+  annualGrowthBps          Int            @default(0)
+  updatedAt                DateTime       @updatedAt
+  user                     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account                  FinanceAccount @relation(fields: [financeAccountId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
