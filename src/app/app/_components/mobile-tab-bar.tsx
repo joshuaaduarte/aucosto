@@ -90,7 +90,21 @@ const HOME_TOOL: MoreTool = {
   ),
 };
 
+/** Quick add: opens Money with the amount box focused. */
+const SPEND_TOOL: MoreTool = {
+  href: "/app/finance?add=1",
+  label: "Log spend",
+  finance: true,
+  icon: (
+    <svg {...ip}>
+      <circle cx="7.5" cy="7.5" r="5.5" />
+      <path d="M7.5 4.75v5.5M4.75 7.5h5.5" />
+    </svg>
+  ),
+};
+
 const MORE_TOOLS: MoreTool[] = [
+  SPEND_TOOL,
   HOME_TOOL,
   {
     href: "/app/plan",
@@ -209,7 +223,12 @@ function PartnerTabBar({ showFinance }: { showFinance: boolean }) {
   const pathname = usePathname();
   const finance = MORE_TOOLS.find((tool) => tool.href === "/app/finance");
   const settings = MORE_TOOLS.find((tool) => tool.href === "/app/settings");
-  const tabs = [HOME_TOOL, showFinance ? finance : undefined, settings].filter(
+  const tabs = [
+    HOME_TOOL,
+    showFinance ? finance : undefined,
+    showFinance ? SPEND_TOOL : undefined,
+    settings,
+  ].filter(
     (tab): tab is MoreTool => Boolean(tab),
   );
   return (

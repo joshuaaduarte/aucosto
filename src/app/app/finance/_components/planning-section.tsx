@@ -4,7 +4,14 @@ import { formatSignedUSDFromCents, formatUSDFromCents } from "@/lib/money";
 import type { FinanceDashboard } from "../_lib/derive";
 import { ProgressBar, SectionCard, SummaryCard } from "./ui";
 
-export function PlanningSection({ data }: { data: FinanceDashboard }) {
+export function PlanningSection({
+  data,
+  showOutlook = true,
+}: {
+  data: FinanceDashboard;
+  /** The month-vs-last-month card; the Plan tab leaves it out. */
+  showOutlook?: boolean;
+}) {
   const {
     goals,
     activeGoals,
@@ -29,23 +36,23 @@ export function PlanningSection({ data }: { data: FinanceDashboard }) {
           className="text-[0.6875rem] font-semibold uppercase tracking-wider"
           style={{ color: "var(--text-faint)" }}
         >
-          Planning
+          Goals
         </p>
         <h2
           className="mt-1 text-[1.25rem] font-semibold tracking-tight"
           style={{ color: "var(--text)" }}
         >
-          The figures, looking forward.
+          {showOutlook ? "Goals and this month vs last" : "Savings goals"}
         </h2>
       </header>
 
       <div className="grid gap-12 xl:grid-cols-[1fr_1fr] xl:gap-14">
         <SectionCard
-          title="The Goals"
+          title="Goals"
           subtitle={
             goals.length > 0
-              ? "Buckets are kept in view, but not in noise."
-              : "Set aside buckets for the wedding, the trip, the cushion."
+              ? "Savings goals and how far along each one is."
+              : "Save toward something: a trip, a cushion, a house."
           }
         >
           {goals.length > 0 ? (
@@ -147,12 +154,13 @@ export function PlanningSection({ data }: { data: FinanceDashboard }) {
           )}
         </SectionCard>
 
+        {showOutlook ? (
         <SectionCard
-          title="The Monthly Outlook"
+          title="This month vs last month"
           subtitle={
             count > 0
-              ? "Projection first; comparison against the prior month after."
-              : "Outlook sharpens once entries are imported."
+              ? "Where this month is heading, compared with last month."
+              : "Shows up once you have a few weeks of entries."
           }
         >
           {count > 0 ? (
@@ -281,6 +289,7 @@ export function PlanningSection({ data }: { data: FinanceDashboard }) {
             </p>
           )}
         </SectionCard>
+        ) : null}
       </div>
     </section>
   );

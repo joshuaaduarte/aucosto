@@ -10,6 +10,7 @@ import { findLatestEvent, recordEvent } from "@/lib/services/events";
 import { isMissingHouseholdTable } from "@/lib/household";
 import { advanceDueDate, isBillCadence } from "@/lib/finance-planning";
 import { FINANCE_CATEGORIES } from "@/lib/finance-categories";
+import { FLEXIBLE_BUDGET_KEY } from "@/lib/finance-pacing";
 import type { FinanceBill, FinanceBudget } from "@/generated/prisma/client";
 
 function degrade<T>(label: string, fallback: T) {
@@ -31,7 +32,10 @@ export async function saveBudget(
   input: { category: string; monthlyLimitCents: number },
 ): Promise<void> {
   requireCan(userId, "finance", "write");
-  if (!(FINANCE_CATEGORIES as readonly string[]).includes(input.category)) {
+  if (
+    input.category !== FLEXIBLE_BUDGET_KEY &&
+    !(FINANCE_CATEGORIES as readonly string[]).includes(input.category)
+  ) {
     throw new Error("Pick a category.");
   }
   if (!Number.isFinite(input.monthlyLimitCents) || input.monthlyLimitCents <= 0) {

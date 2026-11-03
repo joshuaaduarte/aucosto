@@ -27,7 +27,9 @@ import { listSubscribedUserIds, sendPushToUser } from "@/lib/services/push";
 import { listActiveHouseholds, listPartnerUserIds } from "@/lib/household";
 import { billsDueWithin } from "@/lib/finance-planning";
 import { homeDaysUntil, householdNudgeText } from "@/lib/home";
-import { listBills } from "@/lib/services/finance";
+import { countEntriesSince, listBills } from "@/lib/services/finance";
+import { resolveFinanceScopeUserId } from "@/lib/household";
+import { LOG_NUDGE, shouldNudgeToLog, thirtyDaysBefore } from "@/lib/finance-entries";
 import { listHomeTasks } from "@/lib/services/home";
 
 export const dynamic = "force-dynamic";
@@ -59,9 +61,26 @@ export async function GET(request: Request) {
     sent += await sendHouseholdNudges(new Set(subscribed), now);
   }
 
+  // Evening "anything to log today?" for people who log spending by hand.
+  // Rides inside the owner's evening nudge when there is one (volume cap);
+  // household partners get it on its own.
+  const logNudge = slot === "evening" ? await findLogNudgeUsers(subscribed, now) : new Set<string>();
+  for (const partnerId of subscribed.filter((id) => partners.has(id) && logNudge.has(id))) {
+    try {
+      sent += await sendPushToUser(partnerId, { title: LOG_NUDGE.title, body: LOG_NUDGE.body, url: LOG_NUDGE.url });
+    } catch (error) {
+      console.error("[cron/nudges] log nudge failed", { userId: partnerId }, error);
+    }
+  }
+
   for (const userId of userIds) {
     try {
-      const payload = await resolveNudge(userId, slot, now);
+      const resolved = await resolveNudge(userId, slot, now);
+      const payload = logNudge.has(userId)
+        ? resolved
+          ? { ...resolved, body: `${resolved.body} ${LOG_NUDGE.line}` }
+          : { title: LOG_NUDGE.title, body: LOG_NUDGE.body, url: LOG_NUDGE.url }
+        : resolved;
       if (!payload) {
         skipped += 1;
         continue;
@@ -106,4 +125,29 @@ async function sendHouseholdNudges(subscribed: Set<string>, now: Date): Promise<
     }
   }
   return sent;
+}
+
+/** Subscribed people whose finance space has hand-logged entries recently but none today. */
+async function findLogNudgeUsers(subscribed: string[], now: Date): Promise<Set<string>> {
+  const out = new Set<string>();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const byScope = new Map<string, boolean>();
+  for (const userId of subscribed) {
+    try {
+      const scope = await resolveFinanceScopeUserId(userId);
+      let nudge = byScope.get(scope);
+      if (nudge === undefined) {
+        const [loggedLast30Days, loggedToday] = await Promise.all([
+          countEntriesSince(scope, thirtyDaysBefore(now)),
+          countEntriesSince(scope, startOfToday),
+        ]);
+        nudge = shouldNudgeToLog({ loggedLast30Days, loggedToday });
+        byScope.set(scope, nudge);
+      }
+      if (nudge) out.add(userId);
+    } catch (error) {
+      console.error("[cron/nudges] log nudge check failed", { userId }, error);
+    }
+  }
+  return out;
 }

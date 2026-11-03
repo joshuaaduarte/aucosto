@@ -43,3 +43,23 @@ export {
   type MoveFinanceInput,
   type MoveFinanceResult,
 } from "./transfer";
+export {
+  addEntry,
+  commitStatementCheck,
+  countEntriesSince,
+  deleteEntry,
+  isTrackingSetupError,
+  listAccountPlans,
+  listBalanceSnapshots,
+  listStatementChecks,
+  previewStatementCheck,
+  saveAccountPlan,
+  updateAccountBalance,
+  updateEntry,
+  type AddEntryInput,
+  type CommitStatementInput,
+  type StatementLineInput,
+  type StatementPreview,
+  type UpdateEntryInput,
+} from "./tracking";
+export { createShortcutKey, hasShortcutKey, verifyShortcutKey } from "./shortcut";

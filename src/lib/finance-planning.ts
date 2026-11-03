@@ -59,8 +59,14 @@ export function budgetProgress(
       const spentCents = spent.get(budget.category) ?? 0;
       const projectedCents = Math.round((spentCents / daysElapsed) * daysInMonth);
       const limitCents = Math.max(0, budget.monthlyLimitCents);
+      // A straight-line projection in the first week mostly measures when
+      // the big shop happened, so only warn on pace from day 7.
       const status: BudgetStatus =
-        spentCents > limitCents ? "over" : projectedCents > limitCents ? "at_risk" : "on_track";
+        spentCents > limitCents
+          ? "over"
+          : daysElapsed >= 7 && projectedCents > limitCents
+            ? "at_risk"
+            : "on_track";
       return {
         category: budget.category,
         limitCents,

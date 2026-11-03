@@ -206,7 +206,38 @@ before fetching; `withFinanceUser` wraps actions). Money is **integer
 cents**, negative = outflow. Service split under
 `src/lib/services/finance/`; Teller bank sync in `src/lib/teller.ts` +
 webhook route; CSV/PDF statement import under `src/lib/statement-import/`.
-Largely untouched by recent work except insights consumption.
+
+Built around **manual day-to-day entry, confirmed by monthly statements**
+(the household can't link banks). The page is four `?tab=` sections:
+Overview (quick add, pace card, weekly check-in), Spending (entry list +
+patterns + iPhone Shortcut setup), Accounts (net worth history, statement
+checks, balances), Plan (spending money, category limits, bills,
+projection, goals). View model: `_lib/derive.ts` (older dashboard) +
+`_lib/derive-tracking.ts` (tracking).
+
+- **Entries** (`src/lib/finance-entries.ts`, service `tracking.ts`): quick
+  add writes a `FinanceTransaction` with `postedStatus = "pending"`; a
+  finished statement check sets `"reconciled"` (locked except category);
+  `null` = imported, treated as confirmed. Who logged it rides in `raw` as
+  `{"aucosto":1,"by":…}` — no new columns on existing tables.
+- **Pacing** (`src/lib/finance-pacing.ts`): fixed bills / occasional
+  (yearly, quarterly) / flexible. The flexible monthly number is a
+  `FinanceBudget` row with category `"Flexible"`; weekly allowance =
+  what's left at week start spread over the remaining days.
+- **Statement check** (`src/lib/finance-statement-match.ts`,
+  `check/[accountId]/`): same amount within 5 days = match; similar name
+  within 30% = near miss; balances must add up or get a labelled
+  adjustment.
+- **Net worth / projection** (`src/lib/finance-networth.ts`):
+  `FinanceBalanceSnapshot` rows (every balance update + statement check)
+  rebuild month-ends; `FinanceAccountPlan` holds monthly contribution +
+  yearly rate per account. Tables come from
+  `scripts/create-finance-tracking.sql`; reads degrade until it runs.
+- **Shortcut** (`/api/finance/entries`, `src/lib/finance-shortcut.ts`):
+  personal HMAC keys versioned by the latest
+  `finance.shortcut_key_created` event — see `docs/finance-shortcut.md`.
+- **Nudge:** the evening cron adds "Anything to log today?" for spaces
+  with hand-logged entries in the last 30 days and none today.
 
 ## Reflect (`/app/reflect`)
 

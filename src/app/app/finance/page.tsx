@@ -1,14 +1,20 @@
+import Link from "next/link";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getTellerConnectConfig } from "@/lib/teller";
 import {
   countTransactions,
   getMoneyDateDone,
+  listAccountPlans,
   listAccounts,
+  listBalanceSnapshots,
   listBills,
   listBudgets,
   listGoals,
   listLinkedConnections,
+  listStatementChecks,
   listTransactions,
+  hasShortcutKey,
 } from "@/lib/services/finance";
 import { householdMemberNames } from "@/lib/household";
 import { findRecurringCandidates } from "@/lib/finance-summary";
@@ -19,81 +25,491 @@ import {
   moneyDateWeekKey,
   suggestBillsFromRecurring,
 } from "@/lib/finance-planning";
+import { formatUSDFromCents } from "@/lib/money";
+import { requireViewerContext } from "@/lib/viewer-context";
 import {
   HouseholdPlanningSection,
   type HouseholdPlanningData,
 } from "./_components/household-planning-section";
 import { FinanceScopeSwitcher } from "./_components/scope-switcher";
-import { requireViewerContext } from "@/lib/viewer-context";
 import { InsightsSection } from "./_components/insights-section";
-import { ManageSection } from "./_components/manage-section";
-import { OverviewSection } from "./_components/overview-section";
 import { PlanningSection } from "./_components/planning-section";
-import { TransactionsSection } from "./_components/transactions-section";
+import { QuickAdd } from "./_components/quick-add";
+import { PaceCard, paceHeadline } from "./_components/pace-card";
+import { EntryList } from "./_components/entry-list";
+import { WeeklyCheckIn } from "./_components/weekly-check-in";
+import {
+  AccountList,
+  GoalMarkerList,
+  NetWorthSummary,
+  ProjectionCard,
+} from "./_components/net-worth";
+import { FlexibleLimitForm } from "./_components/tracking-forms";
+import { ShortcutPanel } from "./_components/shortcut-panel";
+import { SectionCard } from "./_components/ui";
+import { AccountsPanel } from "./accounts-panel";
+import { GoalsPanel } from "./goals-panel";
+import { LinkedConnectionsPanel } from "./linked-connections-panel";
+import { UploadForm } from "./upload-form";
+import { ClearButton } from "./clear-button";
 import { deriveFinanceDashboard } from "./_lib/derive";
+import { deriveTracking, type TrackingView } from "./_lib/derive-tracking";
 
 export const dynamic = "force-dynamic";
 
-export default async function FinancePage() {
+const TABS = [
+  { key: "overview", label: "Overview" },
+  { key: "spending", label: "Spending" },
+  { key: "accounts", label: "Accounts" },
+  { key: "plan", label: "Plan" },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
+
+function fmt(cents: number) {
+  return formatUSDFromCents(cents, { maximumFractionDigits: 0 });
+}
+
+export default async function FinancePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string; add?: string; filter?: string }>;
+}) {
   const context = await requireViewerContext();
   if (!context.financeVisible) {
     redirect("/app");
   }
+  const params = await searchParams;
+  const tab: TabKey = TABS.some((t) => t.key === params.tab) ? (params.tab as TabKey) : "overview";
   const userId = context.financeUserId;
 
   const now = new Date();
   const weekKey = moneyDateWeekKey(now);
-  const [accounts, goals, linkedConnections, count, history, budgets, bills, moneyDateDone, names] =
-    await Promise.all([
-      listAccounts(userId),
-      listGoals(userId),
-      listLinkedConnections(userId),
-      countTransactions(userId),
-      listTransactions(userId, { limit: 1000 }),
-      listBudgets(userId),
-      listBills(userId),
-      getMoneyDateDone(userId, weekKey).catch(() => null),
-      context.householdId ? householdMemberNames(context.householdId) : Promise.resolve({}),
-    ]);
+  const [
+    accounts,
+    goals,
+    linkedConnections,
+    count,
+    history,
+    budgets,
+    bills,
+    moneyDateDone,
+    names,
+    snapshots,
+    plans,
+    checks,
+  ] = await Promise.all([
+    listAccounts(userId),
+    listGoals(userId),
+    listLinkedConnections(userId),
+    countTransactions(userId),
+    listTransactions(userId, { limit: 2000 }),
+    listBudgets(userId),
+    listBills(userId),
+    getMoneyDateDone(userId, weekKey).catch(() => null),
+    context.householdId
+      ? householdMemberNames(context.householdId).catch(() => ({}) as Record<string, string>)
+      : Promise.resolve({} as Record<string, string>),
+    listBalanceSnapshots(userId),
+    listAccountPlans(userId),
+    listStatementChecks(userId),
+  ]);
 
-  const tellerConfig = getTellerConnectConfig();
   const data = deriveFinanceDashboard({ accounts, goals, history, count });
-  const planning = derivePlanning({ budgets, bills, history, now, weekKey, moneyDateDone, names });
+  const tracking = deriveTracking({
+    accounts,
+    history,
+    budgets,
+    bills,
+    goals,
+    snapshots: snapshots.snapshots,
+    plans: plans.plans,
+    checks: checks.checks,
+    names,
+    viewerUserId: context.ownerUserId,
+    now,
+  });
+  const planning = derivePlanning({
+    budgets: tracking.categoryBudgets,
+    bills,
+    history,
+    now,
+    weekKey,
+    moneyDateDone,
+    names,
+  });
   planning.sharedWith = context.financeScope === "household" ? context.householdName : null;
+  const setupReady = snapshots.ready && plans.ready && checks.ready;
+  let shortcut: { endpoint: string; hasKey: boolean } | null = null;
+  if (tab === "spending") {
+    const h = await headers();
+    const host = h.get("x-forwarded-host") ?? h.get("host") ?? "aucosto.com";
+    const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+    shortcut = {
+      endpoint: `${proto}://${host}/api/finance/entries`,
+      hasKey: await hasShortcutKey(context.ownerUserId),
+    };
+  }
 
   return (
-    <div className="space-y-12 pb-6">
-      {context.householdUserId && !context.isDemoMode ? (
-        <FinanceScopeSwitcher
-          scope={context.financeScope}
-          householdName={context.householdName ?? "Household"}
+    <div className="space-y-8 pb-6">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1
+            className="text-[1.5rem] font-bold tracking-tight sm:text-[1.875rem]"
+            style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
+          >
+            Finance
+          </h1>
+          <p className="mt-0.5 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
+            {planning.sharedWith ? `Shared with ${planning.sharedWith}` : "Just you"}
+          </p>
+        </div>
+        {context.householdUserId && !context.isDemoMode ? (
+          <FinanceScopeSwitcher
+            scope={context.financeScope}
+            householdName={context.householdName ?? "Household"}
+          />
+        ) : null}
+      </header>
+
+      <nav
+        className="sticky top-0 z-20 -mx-2 flex gap-1 overflow-x-auto px-2 py-2 sm:mx-0 sm:px-0"
+        style={{
+          background: "color-mix(in oklab, var(--bg-page) 92%, transparent)",
+          backdropFilter: "blur(6px)",
+          borderBottom: "1px solid var(--border-faint)",
+        }}
+        aria-label="Finance sections"
+      >
+        {TABS.map((t) => {
+          const active = t.key === tab;
+          const badge =
+            t.key === "spending" && tracking.toSortCount
+              ? tracking.toSortCount
+              : t.key === "accounts" && tracking.statementsDue.length
+                ? tracking.statementsDue.length
+                : null;
+          return (
+            <Link
+              key={t.key}
+              href={t.key === "overview" ? "/app/finance" : `/app/finance?tab=${t.key}`}
+              aria-current={active ? "page" : undefined}
+              className="shrink-0 rounded px-3 py-1.5 text-[0.875rem] font-medium transition-colors"
+              style={{
+                background: active ? "var(--bg-tint-strong)" : "transparent",
+                color: active ? "var(--text)" : "var(--text-muted)",
+              }}
+            >
+              {t.label}
+              {badge ? (
+                <span
+                  className="ml-1.5 rounded-full px-1.5 text-[0.6875rem] tabular"
+                  style={{ background: "var(--accent-tint-strong)", color: "var(--text)" }}
+                >
+                  {badge}
+                </span>
+              ) : null}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {tab === "overview" ? (
+        <OverviewTab
+          tracking={tracking}
+          planning={planning}
+          accounts={accounts}
+          autoFocusAdd={params.add === "1"}
         />
       ) : null}
-      <OverviewSection data={data} />
-      <Divider />
-      <HouseholdPlanningSection data={planning} />
-      <Divider />
-      <TransactionsSection data={data} />
-      <Divider />
-      <PlanningSection data={data} />
-      <Divider />
-      <InsightsSection data={data} />
-      <Divider />
-      <ManageSection
-        data={data}
-        tellerConfig={tellerConfig}
-        linkedConnections={linkedConnections}
+
+      {tab === "spending" ? (
+        <div className="space-y-12">
+          <QuickAdd
+            accounts={accounts.map((a) => ({ id: a.id, name: a.name }))}
+            merchants={tracking.merchants}
+            defaultAccountId={tracking.defaultAccountId}
+          />
+          <EntryList
+            entries={tracking.entries}
+            accounts={accounts.map((a) => ({ id: a.id, name: a.name }))}
+            initialFilter={params.filter === "to_sort" ? "to_sort" : params.filter === "pending" ? "pending" : "all"}
+          />
+          {count > history.length ? (
+            <p className="text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+              Showing the latest {history.length} of {count} entries.
+            </p>
+          ) : null}
+          {shortcut && !context.isDemoMode ? (
+            <Collapsible title="Log from your iPhone">
+              <ShortcutPanel endpoint={shortcut.endpoint} hasKey={shortcut.hasKey} />
+            </Collapsible>
+          ) : null}
+          {count > 0 ? <InsightsSection data={data} /> : null}
+        </div>
+      ) : null}
+
+      {tab === "accounts" ? (
+        <div className="space-y-10">
+          <NetWorthSummary points={tracking.netWorthPoints} ready={snapshots.ready} />
+          <SectionCard
+            title="Accounts"
+            subtitle="Check card and bank statements once a month. For everything else, just update the balance."
+          >
+            <AccountList accounts={tracking.accountRows} />
+          </SectionCard>
+          <div className="space-y-3">
+            <Collapsible
+              title={accounts.length ? "Add or edit accounts" : "Add your first account"}
+              defaultOpen={accounts.length === 0}
+            >
+              <AccountsPanel
+                accounts={accounts.map((account) => ({
+                  id: account.id,
+                  name: account.name,
+                  kind: account.kind,
+                  syncSource: account.syncSource,
+                  includeInNetWorth: account.includeInNetWorth,
+                  includeInCashPosition: account.includeInCashPosition,
+                  currentBalanceCents: account.currentBalanceCents,
+                  statementBalanceCents: account.statementBalanceCents,
+                  balanceUpdatedAt: account.balanceUpdatedAt.toISOString(),
+                  dueDate: account.dueDate?.toISOString() ?? null,
+                  creditLimitCents: account.creditLimitCents,
+                }))}
+              />
+            </Collapsible>
+            <Collapsible title="Import past transactions (CSV or PDF)">
+              <p className="mb-3 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
+                For loading history you never logged. To confirm this month&rsquo;s entries, use
+                &ldquo;Check a statement&rdquo; on the account instead.
+              </p>
+              <UploadForm />
+            </Collapsible>
+            {linkedConnections.length > 0 ? (
+              <Collapsible title="Linked banks">
+                <LinkedConnectionsPanel {...getTellerConnectConfig()} connections={linkedConnections} />
+              </Collapsible>
+            ) : null}
+            {count > 0 ? (
+              <Collapsible title="Danger zone">
+                <ClearButton />
+              </Collapsible>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {tab === "plan" ? (
+        <div className="space-y-12">
+          <SectionCard
+            title="Monthly spending money"
+            subtitle="The everyday money: groceries, eating out, shopping, fun. Each week gets a fair share of what's left."
+          >
+            <FlexibleLimitForm
+              currentCents={tracking.flexibleLimitCents}
+              suggestedCents={tracking.suggestedLimitCents}
+              label={tracking.flexibleLimitCents ? "Update" : "Save"}
+            />
+            <dl className="mt-4 grid grid-cols-2 gap-3 text-[0.8125rem] sm:grid-cols-3">
+              <div>
+                <dt style={{ color: "var(--text-faint)" }}>Fixed bills</dt>
+                <dd className="tabular" style={{ color: "var(--text)" }}>
+                  {fmt(tracking.pacing.fixedMonthlyCents)}/mo
+                </dd>
+              </div>
+              <div>
+                <dt style={{ color: "var(--text-faint)" }}>Yearly costs, set aside</dt>
+                <dd className="tabular" style={{ color: "var(--text)" }}>
+                  {fmt(tracking.pacing.occasionalMonthlyCents)}/mo
+                </dd>
+              </div>
+              {tracking.suggestedLimitCents ? (
+                <div>
+                  <dt style={{ color: "var(--text-faint)" }}>Your recent average</dt>
+                  <dd className="tabular" style={{ color: "var(--text)" }}>
+                    {fmt(tracking.suggestedLimitCents)}/mo
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+          </SectionCard>
+
+          <HouseholdPlanningSection data={planning} />
+
+          <SectionCard
+            title="Where net worth is heading"
+            subtitle="Today's balances carried forward with what goes in each month."
+          >
+            <ProjectionCard
+              points={tracking.projection}
+              ready={plans.ready}
+              accounts={accounts
+                .filter((a) => a.includeInNetWorth)
+                .map((a) => ({
+                  id: a.id,
+                  name: a.name,
+                  kind: a.kind,
+                  monthlyContributionCents: tracking.planByAccount.get(a.id)?.monthlyContributionCents ?? 0,
+                  annualGrowthBps: tracking.planByAccount.get(a.id)?.annualGrowthBps ?? 0,
+                }))}
+              extraMonthlySavingsCents={tracking.extraMonthlySavingsCents}
+              goalMarkers={tracking.goalMarkers
+                .filter((g) => g.at !== null)
+                .map((g) => ({ name: g.name, at: g.at!, monthIndex: g.monthIndex }))}
+            />
+            <div className="mt-3">
+              <GoalMarkerList markers={tracking.goalMarkers} />
+            </div>
+          </SectionCard>
+
+          <PlanningSection data={data} showOutlook={false} />
+
+          <Collapsible title={goals.length ? `Edit goals (${goals.length})` : "Add a goal"} defaultOpen={goals.length === 0}>
+            <GoalsPanel
+              goals={goals.map((goal) => ({
+                id: goal.id,
+                name: goal.name,
+                owner: goal.owner,
+                category: goal.category,
+                targetAmountCents: goal.targetAmountCents,
+                currentAmountCents: goal.currentAmountCents,
+                targetDate: goal.targetDate?.toISOString() ?? null,
+                monthlyContributionCents: goal.monthlyContributionCents,
+                status: goal.status,
+                notes: goal.notes,
+              }))}
+            />
+          </Collapsible>
+        </div>
+      ) : null}
+
+      {!setupReady ? (
+        <p className="text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+          Net worth history, statement checks and projection settings turn on after a one-time
+          database update (scripts/create-finance-tracking.sql).
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function OverviewTab({
+  tracking,
+  planning,
+  accounts,
+  autoFocusAdd,
+}: {
+  tracking: TrackingView;
+  planning: HouseholdPlanningData;
+  accounts: Array<{ id: string; name: string }>;
+  autoFocusAdd: boolean;
+}) {
+  const nw = tracking.netWorthPoints;
+  const today = nw.at(-1) ?? null;
+  const previous = nw.length >= 2 ? nw[nw.length - 2]! : null;
+  const billsDue = planning.bills.filter((b) => b.daysUntil <= 7);
+  return (
+    <div className="space-y-6">
+      <QuickAdd
+        accounts={accounts.map((a) => ({ id: a.id, name: a.name }))}
+        merchants={tracking.merchants}
+        defaultAccountId={tracking.defaultAccountId}
+        autoFocus={autoFocusAdd}
+      />
+      <PaceCard pacing={tracking.pacing} suggestedLimitCents={tracking.suggestedLimitCents} />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <OverviewTile
+          href="/app/finance?tab=accounts"
+          label="Net worth"
+          value={today ? fmt(today.totalCents) : "Add accounts"}
+          hint={
+            today && previous
+              ? `${netChangeLabel(today.totalCents - previous.totalCents)} since ${previous.at.toLocaleDateString([], { month: "short", day: "numeric" })}`
+              : "See accounts"
+          }
+        />
+        <OverviewTile
+          href="/app/finance?tab=spending&filter=to_sort"
+          label="To sort"
+          value={String(tracking.toSortCount)}
+          hint={tracking.toSortCount ? "entries need a category" : "all sorted"}
+        />
+        <OverviewTile
+          href="/app/finance?tab=accounts"
+          label="Statements"
+          value={tracking.statementsDue.length ? `${tracking.statementsDue.length} to check` : "Up to date"}
+          hint={
+            tracking.pendingCount
+              ? `${tracking.pendingCount} logged ${tracking.pendingCount === 1 ? "entry" : "entries"} waiting`
+              : "nothing waiting"
+          }
+        />
+      </div>
+      <WeeklyCheckIn
+        moneyDate={planning.moneyDate}
+        done={planning.moneyDateDone}
+        shared={Boolean(planning.sharedWith)}
+        toSortCount={tracking.toSortCount}
+        pendingCount={tracking.pendingCount}
+        paceLine={paceHeadline(tracking.pacing)}
+        statementsDue={tracking.statementsDue}
+        staleBalances={tracking.staleBalances}
+        billsDue={billsDue}
       />
     </div>
   );
 }
 
-function Divider() {
+function netChangeLabel(cents: number): string {
+  if (cents === 0) return "No change";
+  return `${cents > 0 ? "+" : "−"}${fmt(Math.abs(cents))}`;
+}
+
+function OverviewTile({ href, label, value, hint }: { href: string; label: string; value: string; hint: string }) {
   return (
-    <div
-      style={{ height: 1, background: "var(--border-faint)" }}
-      aria-hidden
-    />
+    <Link
+      href={href}
+      className="block rounded-md border px-4 py-3 transition-colors hover:bg-bg-hover"
+      style={{ borderColor: "var(--border-soft)" }}
+    >
+      <p className="text-[0.6875rem] font-semibold uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>
+        {label}
+      </p>
+      <p className="mt-1 text-[1.25rem] font-semibold tabular" style={{ color: "var(--text)" }}>
+        {value}
+      </p>
+      <p className="text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+        {hint}
+      </p>
+    </Link>
+  );
+}
+
+function Collapsible({
+  title,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="group rounded-md" style={{ border: "1px solid var(--border-soft)" }} open={defaultOpen}>
+      <summary
+        className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-[0.875rem] font-medium transition-colors hover:bg-bg-hover"
+        style={{ color: "var(--text)" }}
+      >
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="transition-transform group-open:rotate-90">
+          <path d="m4 3 2.5 2.5L4 8" />
+        </svg>
+        {title}
+      </summary>
+      <div className="px-3 py-3" style={{ borderTop: "1px solid var(--border-faint)" }}>
+        {children}
+      </div>
+    </details>
   );
 }
 

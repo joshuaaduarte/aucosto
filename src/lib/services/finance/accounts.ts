@@ -4,6 +4,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { requireCan } from "@/lib/auth/can";
 import { recordEvent } from "@/lib/services/events";
+import { recordBalanceSnapshot } from "./tracking";
 import {
   defaultAccountInclusion,
   parseCurrencyToCents,
@@ -66,6 +67,10 @@ export async function saveAccount(
   };
 
   if (input.id) {
+    const before = await prisma.financeAccount.findFirst({
+      where: { id: input.id, userId },
+      select: { currentBalanceCents: true, balanceUpdatedAt: true },
+    });
     const updated = await prisma.financeAccount.updateMany({
       where: { id: input.id, userId },
       data,
@@ -78,6 +83,13 @@ export async function saveAccount(
         refId: input.id,
         meta: { name, kind: input.kind },
       });
+      if (
+        before &&
+        (before.currentBalanceCents !== currentBalanceCents ||
+          before.balanceUpdatedAt.getTime() !== data.balanceUpdatedAt.getTime())
+      ) {
+        await recordBalanceSnapshot(userId, input.id, currentBalanceCents, data.balanceUpdatedAt);
+      }
     }
     return;
   }
@@ -96,4 +108,5 @@ export async function saveAccount(
     refId: created.id,
     meta: { name, kind: input.kind },
   });
+  await recordBalanceSnapshot(userId, created.id, currentBalanceCents, data.balanceUpdatedAt);
 }

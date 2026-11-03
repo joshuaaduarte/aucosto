@@ -9,10 +9,18 @@ import { startOfMonth, formatUSDFromCents as formatUSD } from "@/lib/money";
 import {
   countTransactions,
   listAccounts,
+  listBills,
+  listBudgets,
   listTransactions,
 } from "@/lib/services/finance";
+import { FLEXIBLE_BUDGET_KEY, buildPacing } from "@/lib/finance-pacing";
 import { assertFinanceVisible } from "@/lib/viewer-context";
 import { WidgetCard } from "./widget-card";
+
+// Read outside the component body (react-hooks/purity).
+function currentTime(): Date {
+  return new Date();
+}
 
 function fmt(cents: number) {
   return formatUSD(cents, { maximumFractionDigits: 0 });
@@ -22,11 +30,34 @@ export async function FinanceWidget() {
   const { financeUserId: userId } = await assertFinanceVisible();
   const monthStart = startOfMonth();
 
-  const [accounts, count, thisMonth] = await Promise.all([
+  const [accounts, count, thisMonth, budgets, bills] = await Promise.all([
     listAccounts(userId),
     countTransactions(userId),
-    listTransactions(userId, { since: monthStart, limit: 500 }),
+    listTransactions(userId, { since: monthStart, limit: 1000 }),
+    listBudgets(userId),
+    listBills(userId),
   ]);
+  const flexible = budgets.find((b) => b.category === FLEXIBLE_BUDGET_KEY);
+  const pace = flexible
+    ? buildPacing({
+        flexibleLimitCents: flexible.monthlyLimitCents,
+        transactions: thisMonth,
+        bills,
+        now: currentTime(),
+      })
+    : null;
+  const paceLine = pace ? (
+    <div className="pb-2" style={{ borderBottom: "1px solid var(--border-faint)" }}>
+      <p className="text-[1.125rem] font-semibold tracking-tight tabular" style={{ color: "var(--text)" }}>
+        {pace.week.leftCents >= 0
+          ? `${fmt(pace.week.leftCents)} left this week`
+          : `${fmt(-pace.week.leftCents)} over this week`}
+      </p>
+      <p className="text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+        {fmt(pace.month.spentCents)} of {fmt(pace.limitCents ?? 0)} this month · tap to log spending
+      </p>
+    </div>
+  ) : null;
 
   /* ── With connected accounts ─────────────────────────── */
   if (accounts.length > 0) {
@@ -34,6 +65,7 @@ export async function FinanceWidget() {
     return (
       <WidgetCard name="Finance" href="/app/finance">
         <div className="space-y-3">
+          {paceLine}
           <div>
             <p
               className="text-[0.6875rem] font-medium uppercase tracking-wider"
