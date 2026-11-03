@@ -345,7 +345,7 @@ unsorted entries one card at a time (`src/lib/finance-sort.ts`). View model: `_l
 - `running-timer-bar.tsx` / `timer-bar-client.tsx` — global timer bar
   (layout-rendered; publishes `--timer-bar-height` while visible).
 - `mobile-tab-bar.tsx` — bottom tabs (Today/Do/**+**/Calendar/More; partners get Home/Finance/+/Me) + More sheet
-- `quick-capture.tsx` + `quick-capture-actions.ts` — the "+" sheet (log money with a number pad, add to a shared list, add a task, start a timer). Opened by the centre tab, the sidebar's New button, the `N` key, or `openQuickCapture(mode)`. Data loads when it opens, not per page. Pure helpers (keypad, category emoji/colour, modes) in `src/lib/quick-capture.ts`
+- `quick-capture.tsx` + `quick-capture-actions.ts` — the "+" sheet. Opens on a chooser of everything the viewer can add, filtered by the tools they can see (`visibleTools` in `nav-model.tsx`, so a household partner only gets Money + Home entries): log money with a number pad, add to a shared list, mark a chore done, start tracking a chore, add a task, start a timer. The top row suggests entries from the current page and the person's recent picks (localStorage). Opened by the centre tab, the sidebar's New button, the `N` key, or `openQuickCapture(mode)` (skips the chooser). Data loads when it opens, not per page. Pure helpers (keypad, category emoji/colour, `CAPTURE_ENTRIES`, `captureEntries`, `suggestCaptureModes`) in `src/lib/quick-capture.ts`; new entries are added there and get a panel in `quick-capture.tsx`
   (Habits/Projects/Finance/Insights/Reflect/Settings, theme, sign-out).
 - `use-body-scroll-lock.ts` — reference-counted body scroll lock; every
   modal uses it.

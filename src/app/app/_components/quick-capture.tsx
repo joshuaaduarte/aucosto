@@ -1,8 +1,9 @@
 "use client";
 
-// The "+" quick-capture sheet. One place to log a purchase, add to a shared
-// list, jot a task or start a timer, from any page, without loading the full
-// tool page. Opened by the centre "+" in the phone tab bar, the sidebar's
+// The "+" quick-capture sheet: one way in to adding anything, from any page,
+// without loading the full tool page. It opens on a "What are you adding?"
+// chooser built from the tools in the viewer's menu (a partner gets only
+// Home and Money entries), with the current page's entry suggested first. Opened by the centre "+" in the phone tab bar, the sidebar's
 // "New" button, or `openQuickCapture()` from anywhere on the client.
 //
 // Data (accounts, shops, categories, lists, recent timers) is fetched when
@@ -16,29 +17,34 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { filterMerchants, parseAmountInput, type MerchantSuggestion } from "@/lib/finance-entries";
 import { inferCategory } from "@/lib/finance-categories";
+import { usePathname } from "next/navigation";
+import { HOME_TASK_PRESETS, type HomeTaskKind } from "@/lib/home";
 import {
   applyKeypadKey,
-  captureModes,
+  captureEntries,
   financeCategoryLook,
   formatTypedAmount,
-  initialCaptureMode,
+  rememberCaptureMode,
+  suggestCaptureModes,
+  type CaptureEntry,
   type CaptureMode,
   type KeypadKey,
 } from "@/lib/quick-capture";
 import { addFinanceEntry, addFinanceMove, deleteFinanceEntry } from "../finance/actions";
 import { UndoToast, type UndoToastState } from "../finance/_components/undo-toast";
-import { addItems } from "../home/actions";
+import { addItems, completeTask, saveTask } from "../home/actions";
 import { createDoItemAction } from "../do/actions";
 import { startEntry } from "../time/actions";
 import { categoryColor } from "@/lib/time-categories";
+import { NAV_GROUPS, NAV_TOOLS, visibleTools } from "./nav-model";
 import { loadQuickCapture, type QuickCaptureData } from "./quick-capture-actions";
 import { useBodyScrollLock } from "./use-body-scroll-lock";
 
 const OPEN_EVENT = "aucosto:quick-capture";
-const MODE_KEY = "aucosto.quickCapture.mode";
+const RECENT_KEY = "aucosto.quickCapture.recent";
 const LIST_KEY = "aucosto.quickCapture.list";
 
-/** Open the sheet from anywhere on the client, optionally on one tab. */
+/** Open the sheet from anywhere on the client: on the chooser, or straight on one form. */
 export function openQuickCapture(mode?: CaptureMode) {
   window.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: { mode } }));
 }
@@ -64,12 +70,16 @@ function localDateKey(offsetDays = 0): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-const MODE_LABEL: Record<CaptureMode, string> = {
-  spend: "Money",
-  list: "List",
-  task: "Task",
-  timer: "Timer",
-};
+function readRecent(): string[] {
+  try {
+    const parsed: unknown = JSON.parse(readStore(RECENT_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter((m): m is string => typeof m === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+const EMPTY_DATA: QuickCaptureData = { finance: null, lists: [], chores: [], timers: [] };
 
 export function QuickCaptureHost({
   financeVisible,
@@ -78,9 +88,17 @@ export function QuickCaptureHost({
   financeVisible: boolean;
   isPartner: boolean;
 }) {
-  const modes = useMemo(() => captureModes({ financeVisible, isPartner }), [financeVisible, isPartner]);
+  const pathname = usePathname();
+  // Same rule as the menu: an entry shows only if its tool is in this
+  // person's menu (a partner's menu is Home + Money).
+  const entries = useMemo(
+    () => captureEntries(visibleTools({ showFinance: financeVisible, isPartner }).map((tool) => tool.href)),
+    [financeVisible, isPartner],
+  );
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<CaptureMode>(modes[0] ?? "list");
+  /** null = the chooser. */
+  const [mode, setMode] = useState<CaptureMode | null>(null);
+  const [recent, setRecent] = useState<string[]>([]);
   const [data, setData] = useState<QuickCaptureData | null>(null);
   const [toast, setToast] = useState<UndoToastState>(null);
   const closeToast = useCallback(() => setToast(null), []);
@@ -89,19 +107,26 @@ export function QuickCaptureHost({
   const refresh = useCallback(() => {
     loadQuickCapture()
       .then(setData)
-      .catch(() => setData((d) => d ?? { finance: null, lists: [], timers: [] }));
+      .catch(() => setData((d) => d ?? EMPTY_DATA));
   }, []);
 
-  useEffect(() => {
-    const onOpen = (event: Event) => {
-      const wanted = (event as CustomEvent<{ mode?: CaptureMode }>).detail?.mode;
-      setMode(initialCaptureMode(modes, wanted ?? readStore(MODE_KEY)));
+  const show = useCallback(
+    (wanted?: CaptureMode) => {
+      // One entry only: skip the chooser.
+      const direct = wanted ?? (entries.length === 1 ? entries[0]!.mode : undefined);
+      setMode(direct && entries.some((entry) => entry.mode === direct) ? direct : null);
+      setRecent(readRecent());
       setOpen(true);
       refresh();
-    };
+    },
+    [entries, refresh],
+  );
+
+  useEffect(() => {
+    const onOpen = (event: Event) => show((event as CustomEvent<{ mode?: CaptureMode }>).detail?.mode);
     window.addEventListener(OPEN_EVENT, onOpen);
     return () => window.removeEventListener(OPEN_EVENT, onOpen);
-  }, [modes, refresh]);
+  }, [show]);
 
   // "N" anywhere (outside a text field) opens the sheet on desktop.
   useEffect(() => {
@@ -111,32 +136,37 @@ export function QuickCaptureHost({
       if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
       if (document.querySelector('[aria-modal="true"]')) return;
       event.preventDefault();
-      setMode(initialCaptureMode(modes, readStore(MODE_KEY)));
-      setOpen(true);
-      refresh();
+      show();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, modes, refresh]);
+  }, [open, show]);
 
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key !== "Escape") return;
+      // Escape steps back to the chooser first, then closes.
+      if (mode && entries.length > 1) setMode(null);
+      else setOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+  }, [open, mode, entries.length]);
 
-  const pickMode = (next: CaptureMode) => {
+  const pick = (next: CaptureMode) => {
     setMode(next);
-    writeStore(MODE_KEY, next);
+    const updated = rememberCaptureMode(recent, next);
+    setRecent(updated);
+    writeStore(RECENT_KEY, JSON.stringify(updated));
   };
 
   const done = (next: UndoToastState) => {
     setOpen(false);
     if (next) setToast(next);
   };
+
+  const entry = entries.find((e) => e.mode === mode) ?? null;
 
   return (
     <>
@@ -145,45 +175,146 @@ export function QuickCaptureHost({
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="Add something"
+            aria-label={entry ? entry.label : "Add something"}
             className="calendar-modal quick-capture"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="mx-auto mb-3 h-1 w-9 rounded-full sm:hidden" style={{ background: "var(--text-ghost)" }} aria-hidden />
-            {modes.length > 1 ? (
-              <div className="seg mb-4" role="tablist" aria-label="What to add">
-                {modes.map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    role="tab"
-                    aria-selected={mode === m}
-                    onClick={() => pickMode(m)}
-                    className="seg-item"
-                  >
-                    {MODE_LABEL[m]}
-                  </button>
-                ))}
-              </div>
-            ) : null}
 
-            {mode === "spend" ? (
-              data?.finance ? (
-                <SpendPanel finance={data.finance} onDone={done} />
-              ) : (
-                <PanelLoading empty={data !== null} emptyText="Money isn't set up yet." />
-              )
-            ) : null}
-            {mode === "list" ? (
-              data ? <ListPanel lists={data.lists} onAdded={refresh} onClose={() => setOpen(false)} /> : <PanelLoading />
-            ) : null}
-            {mode === "task" ? <TaskPanel onDone={done} /> : null}
-            {mode === "timer" ? <TimerPanel timers={data?.timers ?? []} onDone={done} /> : null}
+            {entry === null ? (
+              <Chooser entries={entries} pathname={pathname} recent={recent} onPick={pick} />
+            ) : (
+              <>
+                <div className="mb-3 flex items-center gap-2">
+                  {entries.length > 1 ? (
+                    <button
+                      type="button"
+                      className="btn-icon -ml-1.5"
+                      onClick={() => setMode(null)}
+                      aria-label="Back to everything you can add"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <path d="M8.5 3 4.5 7l4 4" />
+                      </svg>
+                    </button>
+                  ) : null}
+                  <p className="text-[0.9375rem] font-semibold" style={{ color: "var(--text)" }}>
+                    <span aria-hidden className="mr-1.5">
+                      {entry.emoji}
+                    </span>
+                    {entry.label}
+                  </p>
+                </div>
+
+                {entry.mode === "spend" ? (
+                  data?.finance ? (
+                    <SpendPanel finance={data.finance} onDone={done} />
+                  ) : (
+                    <PanelLoading empty={data !== null} emptyText="Money isn't set up yet." />
+                  )
+                ) : null}
+                {entry.mode === "list" ? (
+                  data ? <ListPanel lists={data.lists} onAdded={refresh} onClose={() => setOpen(false)} /> : <PanelLoading />
+                ) : null}
+                {entry.mode === "chore-done" ? (
+                  data ? (
+                    <ChoreDonePanel chores={data.chores} onDone={done} onAddChore={() => pick("chore-new")} />
+                  ) : (
+                    <PanelLoading />
+                  )
+                ) : null}
+                {entry.mode === "chore-new" ? <ChoreNewPanel onDone={done} /> : null}
+                {entry.mode === "task" ? <TaskPanel onDone={done} /> : null}
+                {entry.mode === "timer" ? <TimerPanel timers={data?.timers ?? []} onDone={done} /> : null}
+              </>
+            )}
           </div>
         </div>
       ) : null}
       <UndoToast toast={toast} onClose={closeToast} />
     </>
+  );
+}
+
+// ── Chooser ──────────────────────────────────────────────────────────────
+
+const GROUP_OF_TOOL = new Map(NAV_TOOLS.map((tool) => [tool.href, tool.group]));
+
+function Chooser({
+  entries,
+  pathname,
+  recent,
+  onPick,
+}: {
+  entries: CaptureEntry[];
+  pathname: string;
+  recent: string[];
+  onPick: (mode: CaptureMode) => void;
+}) {
+  const suggested = suggestCaptureModes({ available: entries.map((e) => e.mode), pathname, recent })
+    .map((mode) => entries.find((e) => e.mode === mode)!)
+    .filter(Boolean);
+  // A short menu (a partner's four entries) is one grid, page's pick first.
+  const short = entries.length <= 4;
+  const ordered = short ? [...suggested, ...entries.filter((e) => !suggested.includes(e))] : entries;
+  const groups = NAV_GROUPS.map((group) => ({
+    ...group,
+    entries: entries.filter((e) => GROUP_OF_TOOL.get(e.tool) === group.id),
+  })).filter((group) => group.entries.length > 0);
+
+  return (
+    <div className="space-y-4">
+      <p className="text-[0.9375rem] font-semibold" style={{ color: "var(--text)" }}>
+        What are you adding?
+      </p>
+      {short ? (
+        <div className="grid grid-cols-2 gap-2">
+          {ordered.map((e) => (
+            <ChooserTile key={e.mode} entry={e} big onPick={onPick} />
+          ))}
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-2" aria-label="Suggested">
+            {suggested.map((e) => (
+              <ChooserTile key={e.mode} entry={e} big onPick={onPick} />
+            ))}
+          </div>
+          {groups.map((group) => (
+            <section key={group.id}>
+              <p className="text-[0.6875rem] font-semibold uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>
+                {group.label}
+              </p>
+              <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                {group.entries.map((e) => (
+                  <ChooserTile key={e.mode} entry={e} onPick={onPick} />
+                ))}
+              </div>
+            </section>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
+function ChooserTile({ entry, big = false, onPick }: { entry: CaptureEntry; big?: boolean; onPick: (mode: CaptureMode) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onPick(entry.mode)}
+      className={
+        big
+          ? "flex flex-col items-start gap-1.5 rounded-xl border px-3 py-3 text-left text-[0.875rem] font-semibold transition-colors hover:bg-bg-hover active:opacity-70"
+          : "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-[0.8125rem] font-medium transition-colors hover:bg-bg-hover active:opacity-70"
+      }
+      style={{ borderColor: "var(--border-faint)", background: big ? "var(--bg-tint)" : "var(--bg-page)", color: "var(--text)" }}
+    >
+      <span aria-hidden className={big ? "text-[1.375rem] leading-none" : "text-[1rem] leading-none"}>
+        {entry.emoji}
+      </span>
+      {entry.label}
+    </button>
   );
 }
 
@@ -818,6 +949,201 @@ function TimerPanel({
           </Link>
         ) : null}
       </p>
+    </form>
+  );
+}
+
+// ── Home: chore done ─────────────────────────────────────────────────────
+
+function ChoreDonePanel({
+  chores,
+  onDone,
+  onAddChore,
+}: {
+  chores: QuickCaptureData["chores"];
+  onDone: (toast: UndoToastState) => void;
+  onAddChore: () => void;
+}) {
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [, start] = useTransition();
+
+  if (chores.length === 0) {
+    return (
+      <div className="space-y-3 py-6 text-center">
+        <p className="text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
+          No chores tracked yet.
+        </p>
+        <button type="button" onClick={onAddChore} className="btn-ink inline-flex">
+          Add a chore
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <ul className="rounded-lg border" style={{ borderColor: "var(--border-soft)" }}>
+        {chores.map((chore) => {
+          const due = chore.daysUntil <= 0;
+          return (
+            <li key={chore.id} className="border-t first:border-t-0" style={{ borderColor: "var(--border-faint)" }}>
+              <button
+                type="button"
+                disabled={pendingId !== null}
+                onClick={() => {
+                  setPendingId(chore.id);
+                  setError(null);
+                  start(async () => {
+                    const result = await completeTask(chore.id);
+                    setPendingId(null);
+                    if (result && !result.ok) {
+                      setError(result.error);
+                      return;
+                    }
+                    onDone({ id: Date.now(), message: `Marked “${chore.title}” done` });
+                  });
+                }}
+                className="flex w-full items-center gap-3 px-3 py-3 text-left hover:bg-bg-hover"
+              >
+                <span className="list-check" aria-hidden data-checked={pendingId === chore.id || undefined} />
+                <span className="min-w-0 flex-1 truncate text-[0.9375rem]" style={{ color: "var(--text)", fontWeight: due ? 600 : 400 }}>
+                  {chore.title}
+                </span>
+                <span className="shrink-0 text-[0.75rem]" style={{ color: due ? "var(--attention)" : "var(--text-faint)" }}>
+                  {chore.dueLabel}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="text-[0.75rem]" style={{ color: error ? "var(--attention)" : "var(--text-faint)" }} role={error ? "alert" : undefined}>
+        {error ?? "Tap one to mark it done. It comes back when it's due again."}
+      </p>
+    </div>
+  );
+}
+
+// ── Home: new chore ──────────────────────────────────────────────────────
+
+const CADENCES: Array<[days: number, label: string]> = [
+  [7, "Weekly"],
+  [14, "Every 2 weeks"],
+  [30, "Monthly"],
+  [90, "Every 3 months"],
+  [365, "Yearly"],
+];
+
+function ChoreNewPanel({ onDone }: { onDone: (toast: UndoToastState) => void }) {
+  const [kind, setKind] = useState<HomeTaskKind>("chore");
+  const [title, setTitle] = useState("");
+  const [cadence, setCadence] = useState(7);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const presets = HOME_TASK_PRESETS.filter((preset) => preset.kind === kind).slice(0, 4);
+
+  const submit = () => {
+    if (!title.trim()) return;
+    setError(null);
+    start(async () => {
+      const form = new FormData();
+      form.set("kind", kind);
+      form.set("title", title.trim());
+      form.set("cadenceDays", String(cadence));
+      form.set("nextDueAt", localDateKey(cadence));
+      const result = await saveTask(undefined, form);
+      if (result && !result.ok) {
+        setError(result.error);
+        return;
+      }
+      onDone({ id: Date.now(), message: `Tracking “${title.trim()}”` });
+    });
+  };
+
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        submit();
+      }}
+      className="space-y-3"
+    >
+      <div className="seg" role="radiogroup" aria-label="Kind">
+        {(
+          [
+            ["chore", "Chore"],
+            ["maintenance", "Upkeep"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={kind === value}
+            className="seg-item"
+            onClick={() => {
+              setKind(value);
+              setCadence(value === "chore" ? 7 : 90);
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <input
+        autoFocus
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder={kind === "chore" ? "Water the plants" : "Replace HVAC filter"}
+        aria-label="Name"
+        enterKeyHint="done"
+        className="field w-full"
+      />
+      <div className="flex flex-wrap gap-1.5">
+        {presets.map((preset) => (
+          <button
+            key={preset.title}
+            type="button"
+            className="chip"
+            data-on={title === preset.title || undefined}
+            onClick={() => {
+              setTitle(preset.title);
+              setCadence(preset.cadenceDays);
+            }}
+          >
+            {preset.title}
+          </button>
+        ))}
+      </div>
+      <div>
+        <p className="mb-1.5 text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
+          How often
+        </p>
+        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="How often">
+          {CADENCES.map(([days, label]) => (
+            <button
+              key={days}
+              type="button"
+              role="radio"
+              aria-checked={cadence === days}
+              className="chip"
+              data-on={cadence === days || undefined}
+              onClick={() => setCadence(days)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-center justify-between gap-2 pt-1">
+        <p className="text-[0.75rem]" style={{ color: error ? "var(--attention)" : "var(--text-faint)" }} role={error ? "alert" : undefined}>
+          {error ?? "First due one cycle from today."}
+        </p>
+        <button type="submit" disabled={pending || !title.trim()} className="btn-ink shrink-0">
+          {pending ? "Saving…" : "Track it"}
+        </button>
+      </div>
     </form>
   );
 }
