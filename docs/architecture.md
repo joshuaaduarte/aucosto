@@ -11,11 +11,19 @@ map. Paths are relative to repo root.
 The daily command center, composed from every other tool.
 
 - **Page:** `src/app/app/page.tsx` — fetches in one `Promise.all`, derives,
-  renders sections in priority order: header → `FocusModuleCard` (hero
-  recommendation) → `InsightOfTheDayCard` → `DailyDigestSection` (stat
-  tiles with progress ring/bars) → `ReflectSection` (mood dots + evening
-  nudge) → `CrossToolCallout` → quick actions → decision prompts →
-  connections → workspace.
+  renders: header → **Now slot** (only the cards that fit the hour, chosen by
+  `pickNowCards` in `_lib/hub-now.ts`: sleep while asleep; sleep + morning
+  check-in 05–11 until done; reflection then "going to bed" from 18:00;
+  otherwise `FocusModuleCard`) → yesterday's reflection (mornings) →
+  `TodayPlanCard` (plan blocks + today's calendar events as one timeline,
+  `buildTodayTimeline`) → `DailyDigestSection` (stat strip) →
+  `InsightOfTheDayCard` (renders nothing without an insight) → `HubMore`
+  (`<details>`: reflection strip, sleep card, projects, quick actions,
+  decision prompts, connections, workspace).
+- **Navigation:** `_components/nav-model.tsx` is the one tool list (groups:
+  Day / Life / Household / Work and people) shared by the sidebar and the
+  phone's More sheet. Finance is labelled "Money" in the UI; the Assistant
+  panel is linked from Settings and the command palette, not the nav.
 - **Derives:** `_components/hub-derive.ts` (focus module, top actions,
   connections), `_lib/daily-digest.ts` (stat tiles — exposes
   `progress`/`subtle` per line), `_lib/hub-prompts.ts` (decision prompts).

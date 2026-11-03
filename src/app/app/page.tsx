@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { startOfMonth, startOfPreviousMonth } from "@/lib/money";
-import { listUpcomingCalendarItems } from "@/lib/services/calendar";
+import { listCalendarItems, listUpcomingCalendarItems } from "@/lib/services/calendar";
 import { listDoItems, listSuggestedDoItems } from "@/lib/services/do";
 import { listAccounts, listTransactions } from "@/lib/services/finance";
 import { listHabits, listSuggestedHabits } from "@/lib/services/habits";
@@ -29,7 +29,6 @@ import { startOfToday, startOfWeek } from "@/lib/time";
 import { sumDurations } from "@/lib/time-summary";
 import { getViewerContext } from "@/lib/viewer-context";
 import { ConnectionsSection } from "./_components/connections-section";
-import { CrossToolCallout } from "./_components/cross-tool-callout";
 import { DailyDigestSection } from "./_components/daily-digest-section";
 import { DecisionPromptsSection } from "./_components/decision-prompts-section";
 import { FocusModuleCard } from "./_components/focus-module-card";
@@ -56,6 +55,7 @@ import { TodayPlanCard, type HubPlanBlock } from "./_components/today-plan-card"
 import { WorkspaceSection } from "./_components/workspace-section";
 import { deriveDailyDigest } from "./_lib/daily-digest";
 import { deriveHubPrompts } from "./_lib/hub-prompts";
+import { buildTodayTimeline, pickNowCards } from "./_lib/hub-now";
 
 export default async function HubPage() {
   const session = await auth();
@@ -306,31 +306,34 @@ export default async function HubPage() {
 
   // Re-entry after a gap. Both reads are cosmetic — a failure here must never
   // take down the hub, so each falls back to the "not returning" shape.
-  const [lastActivityAt, todayPlan] = userId
+  const [lastActivityAt, todayPlan, todayEvents] = userId
     ? await Promise.all([
         getLastActivityBefore(userId, startOfPlanDay(now)).catch(() => null),
         listPlannedBlocks(userId, startOfPlanDay(now)).catch(() => []),
+        listCalendarItems(userId, { from: startOfPlanDay(now), to: startOfPlanDay(now, 1) }).catch(() => []),
       ])
-    : [null, []];
-  const hubPlanBlocks: HubPlanBlock[] = todayPlan
-    .slice()
-    .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())
-    .map((block) => ({
-      id: block.id,
-      title: block.title,
-      timeLabel: block.startsAt.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        timeZone: timezone,
-      }),
-      past: block.endsAt < now,
-    }));
+    : [null, [], []];
+  const hubPlanBlocks: HubPlanBlock[] = buildTodayTimeline({
+    planBlocks: todayPlan,
+    events: todayEvents,
+    now,
+    formatTime: (date) =>
+      date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: timezone }),
+  });
   const canPlanToday = now.getHours() < PLAN_TODAY_CUTOFF_HOUR;
 
   const returnState = deriveReturnState({
     lastActiveAt: lastActivityAt,
     now,
     defaultWindowStart: todayStart,
+  });
+
+  // One "Now" slot instead of a stack of contextual cards (see _lib/hub-now).
+  const nowCards = pickNowCards({
+    hour: nowHour,
+    sleepState: sleepCardState,
+    morningCompleted: wakeStatus?.morning?.completed ?? false,
+    reflectedToday,
   });
 
   const subline = composeSubline({
@@ -340,14 +343,88 @@ export default async function HubPage() {
     thisMonthSpentCents,
   });
 
+  const sleepCard = (
+    <SleepStatusCard
+      key="sleep"
+      state={sleepCardState}
+      mode={sleepCardMode}
+      startedAtMs={cycleSleep?.startedAt.getTime() ?? null}
+      endedAtMs={cycleSleep?.endedAt?.getTime() ?? null}
+      sleepMinutes={cycleSleep?.durationMinutes ?? null}
+      sessionId={cycleSleep?.id ?? null}
+    />
+  );
+  const morningCard = (
+    <RhythmHubCard
+      key="morning"
+      morning={
+        // Skip the "what time did you wake up?" prompt whenever a wake
+        // time is already known — from a morning check-in OR a sleep
+        // session that ended today. A real check-in carries its own
+        // completed state; a sleep-derived wake shows the in-progress
+        // flow (habits + "Done with morning") instead of re-prompting.
+        wakeStatus?.morning
+          ? {
+              started: true,
+              completed: wakeStatus.morning.completed,
+              wakeTime: wakeStatus.wakeTime,
+              sleepMinutes: wakeStatus.sleepMinutes,
+              // A real check-in has an editable wakeup session.
+              wakeSessionId: wakeStatus.morning.id,
+            }
+          : wakeStatus?.captured
+            ? {
+                started: true,
+                completed: false,
+                wakeTime: wakeStatus.wakeTime,
+                sleepMinutes: wakeStatus.sleepMinutes,
+                // Sleep-derived wake — no wakeup row to edit.
+                wakeSessionId: null,
+              }
+            : null
+      }
+      morningHabits={allHabits
+        .filter((habit) => habit.dayPart === "morning")
+        .map((habit) => ({
+          id: habit.id,
+          title: habit.title,
+          completedToday: habit.completedToday,
+        }))}
+      sleepBackfillShowing={sleepBackfillShowing}
+      whoop={whoopPrefill}
+    />
+  );
+  const reflectToday = (
+    <ReflectSection
+      key="reflect"
+      days={reflectDays}
+      moodsByDay={moodsByDay}
+      reflectedToday={reflectedToday}
+      isEvening={isEvening}
+      streak={reflectStreak}
+      isReturning={returnState.isReturning}
+    />
+  );
+  const nowSlot = nowCards.map((card) =>
+    card === "sleep" ? (
+      sleepCard
+    ) : card === "morning" ? (
+      morningCard
+    ) : card === "reflect-today" ? (
+      reflectToday
+    ) : (
+      <FocusModuleCard key="focus" focus={focus} />
+    ),
+  );
+
   return (
-    <div className="space-y-7 sm:space-y-8">
+    <div className="space-y-6 sm:space-y-7">
       <HubHeader
         todayLong={todayLong}
         greeting={greeting}
         firstName={firstName}
         subline={subline}
-        actions={topActions}
+        actions={[]}
         placeLine={
           currentPlace
             ? `At ${currentPlace.place} since ${currentPlace.since.toLocaleTimeString(
@@ -365,8 +442,19 @@ export default async function HubPage() {
         />
       ) : null}
 
-      {/* The plan outranks a generated recommendation: it's what the morning
-          nudge asked about, and it's the user's own answer. */}
+      {/* Now: only what fits this hour (focus, sleep, morning or reflection). */}
+      {userId ? <div className="space-y-3">{nowSlot}</div> : <FocusModuleCard focus={focus} />}
+
+      {userId && beforeNoon ? (
+        <ReflectionPromptCard
+          reflectedYesterday={reflectedYesterday}
+          prominent
+          yesterdayKey={yesterdayKey}
+          yesterdayLabel={yesterdayLabel}
+        />
+      ) : null}
+
+      {/* Today: plan blocks and calendar events as one timeline. */}
       {userId ? (
         <TodayPlanCard
           blocks={hubPlanBlocks}
@@ -375,88 +463,26 @@ export default async function HubPage() {
         />
       ) : null}
 
-      {/* Then the one generated recommendation. Stat tiles support it below. */}
-      <FocusModuleCard focus={focus} />
-
-      {userId ? (
-        <>
-          <SleepStatusCard
-            state={sleepCardState}
-            mode={sleepCardMode}
-            startedAtMs={cycleSleep?.startedAt.getTime() ?? null}
-            endedAtMs={cycleSleep?.endedAt?.getTime() ?? null}
-            sleepMinutes={cycleSleep?.durationMinutes ?? null}
-            sessionId={cycleSleep?.id ?? null}
-          />
-          <ReflectionPromptCard
-            reflectedYesterday={reflectedYesterday}
-            prominent={beforeNoon}
-            yesterdayKey={yesterdayKey}
-            yesterdayLabel={yesterdayLabel}
-          />
-          <RhythmHubCard
-            morning={
-              // Skip the "what time did you wake up?" prompt whenever a wake
-              // time is already known — from a morning check-in OR a sleep
-              // session that ended today. A real check-in carries its own
-              // completed state; a sleep-derived wake shows the in-progress
-              // flow (habits + "Done with morning") instead of re-prompting.
-              wakeStatus?.morning
-                ? {
-                    started: true,
-                    completed: wakeStatus.morning.completed,
-                    wakeTime: wakeStatus.wakeTime,
-                    sleepMinutes: wakeStatus.sleepMinutes,
-                    // A real check-in has an editable wakeup session.
-                    wakeSessionId: wakeStatus.morning.id,
-                  }
-                : wakeStatus?.captured
-                  ? {
-                      started: true,
-                      completed: false,
-                      wakeTime: wakeStatus.wakeTime,
-                      sleepMinutes: wakeStatus.sleepMinutes,
-                      // Sleep-derived wake — no wakeup row to edit.
-                      wakeSessionId: null,
-                    }
-                  : null
-            }
-            morningHabits={allHabits
-              .filter((habit) => habit.dayPart === "morning")
-              .map((habit) => ({
-                id: habit.id,
-                title: habit.title,
-                completedToday: habit.completedToday,
-              }))}
-            sleepBackfillShowing={sleepBackfillShowing}
-            whoop={whoopPrefill}
-          />
-        </>
-      ) : null}
+      <DailyDigestSection digest={digest} />
 
       <InsightOfTheDayCard insight={insightOfTheDay} />
 
-      <DailyDigestSection digest={digest} />
-
-      <ProjectsProgressSection projects={projects} />
-
-      <ReflectSection
-        days={reflectDays}
-        moodsByDay={moodsByDay}
-        reflectedToday={reflectedToday}
-        isEvening={isEvening}
-        streak={reflectStreak}
-        isReturning={returnState.isReturning}
-      />
-
-      <CrossToolCallout
-        runningEntry={runningEntry}
-        weekTotalMs={weekTotalMs}
-        financeVisible={financeVisible}
-        thisMonthSpentCents={thisMonthSpentCents}
-      />
-
       <HubMore>
+        {nowCards.includes("reflect-today") ? null : reflectToday}
+
+        {userId && !nowCards.includes("sleep") && sleepCardState !== "none" ? sleepCard : null}
+
+        {userId && !beforeNoon ? (
+          <ReflectionPromptCard
+            reflectedYesterday={reflectedYesterday}
+            prominent={false}
+            yesterdayKey={yesterdayKey}
+            yesterdayLabel={yesterdayLabel}
+          />
+        ) : null}
+
+        <ProjectsProgressSection projects={projects} />
+
         <QuickActionsSection
           runningEntry={runningEntry}
           weekTotalMs={weekTotalMs}

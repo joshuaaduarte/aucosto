@@ -1,6 +1,6 @@
 "use client";
 
-// The day's plan, on the hub.
+// The day's plan and calendar, on the hub, as one timeline.
 //
 // The plan is the one thing that should be readable without scrolling or
 // navigating: it's what the morning nudge asked about, and each block is a
@@ -12,13 +12,10 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { startPlannedBlockAction } from "../plan/actions";
 
-export type HubPlanBlock = {
-  id: string;
-  title: string;
-  timeLabel: string;
-  /** Block's end has passed. */
-  past: boolean;
-};
+import type { TimelineItem } from "../_lib/hub-now";
+
+/** A plan block or a calendar event on today's timeline. */
+export type HubPlanBlock = TimelineItem;
 
 export function TodayPlanCard({
   blocks,
@@ -42,7 +39,8 @@ export function TodayPlanCard({
     });
   }
 
-  if (blocks.length === 0) {
+  // Nothing planned, or the day is over: offer to shape the next one.
+  if (blocks.length === 0 || (!canPlanToday && blocks.every((block) => block.past))) {
     return (
       <section
         className="fade-in flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3"
@@ -89,7 +87,7 @@ export function TodayPlanCard({
           className="text-[0.6875rem] font-semibold uppercase tracking-wider"
           style={{ color: "var(--text-faint)" }}
         >
-          Today&apos;s plan
+          Today
         </p>
         <Link
           href="/app/plan"
@@ -102,12 +100,13 @@ export function TodayPlanCard({
 
       <ul className="mt-2 space-y-1">
         {blocks.map((block) => {
-          const running = runningLabel === block.title;
+          const running = block.kind === "plan" && runningLabel === block.title;
+          const isNext = !block.past && blocks.find((b) => !b.past)?.id === block.id;
           return (
             <li key={block.id} className="flex items-center gap-3 py-1">
               <span
                 className="w-[4.5rem] shrink-0 text-[0.8125rem] tabular"
-                style={{ color: "var(--text-faint)" }}
+                style={{ color: isNext ? "var(--text)" : "var(--text-faint)", fontWeight: isNext ? 600 : 400 }}
               >
                 {block.timeLabel}
               </span>
@@ -120,7 +119,15 @@ export function TodayPlanCard({
               >
                 {block.title}
               </span>
-              {running ? (
+              {block.kind === "event" ? (
+                <Link
+                  href="/app/calendar"
+                  className="shrink-0 rounded-full px-2 py-0.5 text-[0.6875rem]"
+                  style={{ background: "var(--bg-tint)", color: "var(--text-faint)" }}
+                >
+                  Calendar
+                </Link>
+              ) : block.past ? null : running ? (
                 <span
                   className="shrink-0 text-[0.75rem] font-medium"
                   style={{ color: "var(--accent-strong)" }}

@@ -188,7 +188,7 @@ Pattern for adding a new tool, e.g. `meals`:
 3. Create `src/lib/services/meals.ts` (`import "server-only"`, every fn calls `requireCan`, mutations call `recordEvent`); add event labels to `src/lib/event-types.ts`.
 4. Create `src/app/app/meals/` with `page.tsx`, `actions.ts` (all `"use server"`, gated by viewer context / `auth()`, delegating DB ops to the service), and any client components.
 5. Create `src/lib/widgets/meals.tsx` exporting an async Server Component using `<WidgetCard name="..." href="/app/meals">`. Read via the service.
-6. Register it in `src/lib/widgets/index.tsx`. Add it to the sidebar (`src/app/app/sidebar.tsx`).
+6. Register it in `src/lib/widgets/index.tsx`. Add it to the nav model (`src/app/app/_components/nav-model.tsx`, shared by the sidebar and the phone's More sheet).
 7. Add `tests/meals.test.ts` for any meaningful pure logic.
 
 ### Server Actions pattern

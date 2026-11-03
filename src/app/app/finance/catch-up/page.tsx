@@ -71,7 +71,7 @@ export default async function CatchUpPage({
     <div className="mx-auto max-w-2xl space-y-6 pb-10">
       <div>
         <Link href="/app/finance" className="text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
-          ← Finance
+          ← Money
         </Link>
         <h1 className="mt-2 text-[1.5rem] font-bold tracking-tight" style={{ color: "var(--text)" }}>
           {mode === "monthly" ? "Monthly balance check-in" : "Catch up"}

@@ -3,281 +3,29 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { NAV_GROUPS, NavIcon, navActive, SETTINGS_PATHS, visibleTools, type NavTool } from "./_components/nav-model";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { openCommandPalette } from "./_components/command-palette";
 import { openQuickCapture } from "./_components/quick-capture";
 import { SignOutButton } from "./sign-out-button";
 
-/* ──────────────────────────────────────────────────────────────────
-   Monoline icons
-   ────────────────────────────────────────────────────────────────── */
-const ip = {
-  width: 15,
-  height: 15,
-  viewBox: "0 0 15 15",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 1.25,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-  "aria-hidden": true,
-};
-
-function HomeIcon() {
-  return (
-    <svg {...ip}>
-      <path d="M2 6.5 7.5 2l5.5 4.5V13H2V6.5Z" />
-      <path d="M6 13V9h3v4" />
-    </svg>
-  );
-}
-function HouseIcon() {
-  return (
-    <svg {...ip}>
-      <path d="M1.75 7 7.5 2.25 13.25 7" />
-      <path d="M3.25 6v6.75h8.5V6" />
-      <rect x="6" y="9" width="3" height="3.75" />
-    </svg>
-  );
-}
-function CalendarIcon() {
-  return (
-    <svg {...ip}>
-      <rect x="2" y="3" width="11" height="10" rx="1.5" />
-      <path d="M2 6h11M5 1.75v2.5M10 1.75v2.5" />
-    </svg>
-  );
-}
-function PlanIcon() {
-  return (
-    <svg {...ip}>
-      <rect x="2" y="3" width="11" height="10" rx="1.5" />
-      <path d="M5 6.5h5M5 9.5h3" />
-    </svg>
-  );
-}
-function ClockIcon() {
-  return (
-    <svg {...ip}>
-      <circle cx="7.5" cy="7.5" r="5.5" />
-      <path d="M7.5 4.5V7.5l2 1.25" />
-    </svg>
-  );
-}
-function ListIcon() {
-  return (
-    <svg {...ip}>
-      <path d="M5 4h8M5 7.5h8M5 11h5" />
-      <circle cx="2.5" cy="4" r="0.6" fill="currentColor" />
-      <circle cx="2.5" cy="7.5" r="0.6" fill="currentColor" />
-      <circle cx="2.5" cy="11" r="0.6" fill="currentColor" />
-    </svg>
-  );
-}
-function RepeatIcon() {
-  return (
-    <svg {...ip}>
-      <path d="M3 4.5h6.5a2.5 2.5 0 0 1 0 5H8.5" />
-      <path d="M9.5 2.75 11.25 4.5 9.5 6.25" />
-      <path d="M6.5 10.5H4a2.5 2.5 0 0 1 0-5h1" />
-      <path d="M3.5 8.75 1.75 10.5 3.5 12.25" />
-    </svg>
-  );
-}
-function WalletIcon() {
-  return (
-    <svg {...ip}>
-      <path d="M2 5.5C2 4.67 2.67 4 3.5 4H12a1 1 0 0 1 1 1v6.5c0 .83-.67 1.5-1.5 1.5h-8A1.5 1.5 0 0 1 2 11.5V5.5Z" />
-      <path d="M10 8.25h2.5" />
-    </svg>
-  );
-}
-function PlateIcon() {
-  return (
-    <svg {...ip}>
-      <circle cx="7.5" cy="7.5" r="5.5" />
-      <circle cx="7.5" cy="7.5" r="2.5" />
-    </svg>
-  );
-}
-function PulseIcon() {
-  return (
-    <svg {...ip}>
-      <path d="M1.5 8h2.25l1.5-4 2 8 1.75-4h4.5" />
-    </svg>
-  );
-}
-function ProjectsIcon() {
-  return (
-    <svg {...ip}>
-      <rect x="2" y="3" width="11" height="3" rx="0.75" />
-      <rect x="2" y="8.5" width="7.5" height="3" rx="0.75" />
-    </svg>
-  );
-}
-function BriefcaseIcon() {
-  return (
-    <svg {...ip}>
-      <rect x="1.75" y="4.5" width="11.5" height="8" rx="1.25" />
-      <path d="M5.5 4.5V3.25c0-.55.45-1 1-1h2c.55 0 1 .45 1 1V4.5" />
-      <path d="M1.75 7.75h11.5" />
-    </svg>
-  );
-}
-function RolodexIcon() {
-  return (
-    <svg {...ip}>
-      <circle cx="6" cy="6" r="3" />
-      <path d="M1.5 13c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4" />
-      <path d="M10.5 4h3M10.5 7.5h3M10.5 11h2" />
-    </svg>
-  );
-}
-function TrendIcon() {
-  return (
-    <svg {...ip}>
-      <path d="M1.5 12 5.5 7.5l2.5 2L13.5 3" />
-      <path d="M10 3h3.5v3.5" />
-    </svg>
-  );
-}
-function ReflectIcon() {
-  return (
-    <svg {...ip}>
-      <path d="M7.5 13.5c3.3 0 6-2.46 6-5.5 0-3.04-2.7-5.5-6-5.5s-6 2.46-6 5.5c0 1.27.47 2.44 1.26 3.37L2.2 13.4l3.06-.6c.7.45 1.46.7 2.24.7Z" />
-      <path d="M5 6.75h5M5 9h3" />
-    </svg>
-  );
-}
-function AssistantIcon() {
-  return (
-    <svg {...ip}>
-      <rect x="2.5" y="3.5" width="10" height="8" rx="1.5" />
-      <path d="M5.5 6.25h.01M9.5 6.25h.01M5 9h5" />
-      <path d="M7.5 1.5v2" />
-    </svg>
-  );
-}
-function GearIcon() {
-  return (
-    <svg {...ip}>
-      <circle cx="7.5" cy="7.5" r="2" />
-      <path d="M7.5 1.5v1.5M7.5 12v1.5M1.5 7.5H3M12 7.5h1.5M3 3l1 1M11 11l1 1M12 3l-1 1M4 11l-1 1" />
-    </svg>
-  );
-}
-function ChevronDown() {
-  return (
-    <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="m3 4 2.5 2.5L8 4" />
-    </svg>
-  );
-}
-function ChevronRight() {
-  return (
-    <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="m4 3 2.5 2.5L4 8" />
-    </svg>
-  );
-}
-
-/* ──────────────────────────────────────────────────────────────────
-   Nav model
-   ────────────────────────────────────────────────────────────────── */
-
-interface NavItem {
-  href: string;
-  label: string;
-  match: (p: string) => boolean;
-  finance: boolean;
-  icon: React.ReactNode;
-  /** Shown to household partners (Home + Finance only). */
-  partner?: boolean;
-}
-
-const navItems: NavItem[] = [
-  { href: "/app", label: "Today", match: (p) => p === "/app", finance: false, icon: <HomeIcon /> },
-  { href: "/app/plan", label: "Plan", match: (p) => p.startsWith("/app/plan"), finance: false, icon: <PlanIcon /> },
-  { href: "/app/calendar", label: "Calendar", match: (p) => p.startsWith("/app/calendar"), finance: false, icon: <CalendarIcon /> },
-  { href: "/app/do", label: "Do List", match: (p) => p.startsWith("/app/do"), finance: false, icon: <ListIcon /> },
-  { href: "/app/habits", label: "Habits", match: (p) => p.startsWith("/app/habits"), finance: false, icon: <RepeatIcon /> },
-  { href: "/app/time", label: "Time", match: (p) => p.startsWith("/app/time"), finance: false, icon: <ClockIcon /> },
-  { href: "/app/projects", label: "Projects", match: (p) => p.startsWith("/app/projects"), finance: false, icon: <ProjectsIcon /> },
-  { href: "/app/work", label: "Work", match: (p) => p.startsWith("/app/work"), finance: false, icon: <BriefcaseIcon /> },
-  { href: "/app/rolodex", label: "Rolodex", match: (p) => p.startsWith("/app/rolodex"), finance: false, icon: <RolodexIcon /> },
-  { href: "/app/reflect", label: "Reflect", match: (p) => p.startsWith("/app/reflect"), finance: false, icon: <ReflectIcon /> },
-  { href: "/app/insights", label: "Insights", match: (p) => p.startsWith("/app/insights"), finance: false, icon: <TrendIcon /> },
-  { href: "/app/home", label: "Home", match: (p) => p.startsWith("/app/home"), finance: false, icon: <HouseIcon />, partner: true },
-  { href: "/app/finance", label: "Finance", match: (p) => p.startsWith("/app/finance"), finance: true, icon: <WalletIcon />, partner: true },
-  { href: "/app/assistant", label: "Assistant", match: (p) => p.startsWith("/app/assistant"), finance: false, icon: <AssistantIcon /> },
-];
-
-const comingSoon: Array<{ label: string; icon: React.ReactNode }> = [
-  { label: "Calories", icon: <PlateIcon /> },
-  { label: "Fitness", icon: <PulseIcon /> },
-];
-
-/* ──────────────────────────────────────────────────────────────────
-   Sidebar pieces
-   ────────────────────────────────────────────────────────────────── */
-
 function NavLink({
-  item,
+  tool,
   pathname,
   onNavigate,
 }: {
-  item: NavItem;
+  tool: NavTool;
   pathname: string;
   onNavigate?: () => void;
 }) {
-  const active = item.match(pathname);
+  const active = navActive(tool.href, pathname);
   return (
-    <Link
-      href={item.href}
-      onClick={onNavigate}
-      aria-current={active ? "page" : undefined}
-      className="nav-item group"
-    >
-      <span
-        className="shrink-0"
-        style={{
-          color: active ? "var(--text)" : "var(--text-faint)",
-        }}
-      >
-        {item.icon}
+    <Link href={tool.href} onClick={onNavigate} aria-current={active ? "page" : undefined} className="nav-item group">
+      <span className="shrink-0" style={{ color: active ? "var(--text)" : "var(--text-faint)" }}>
+        <NavIcon paths={tool.paths} />
       </span>
-      <span className="truncate">{item.label}</span>
+      <span className="truncate">{tool.label}</span>
     </Link>
-  );
-}
-
-function GroupHeader({
-  label,
-  open,
-  onToggle,
-}: {
-  label: string;
-  open: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="flex w-full items-center gap-1 rounded px-2 py-1 text-left text-[0.6875rem] font-semibold uppercase tracking-wider transition-colors hover:bg-bg-hover"
-      style={{ color: "var(--text-faint)" }}
-    >
-      <span
-        style={{
-          display: "inline-flex",
-          width: "11px",
-          color: "var(--text-faint)",
-        }}
-      >
-        {open ? <ChevronDown /> : <ChevronRight />}
-      </span>
-      <span>{label}</span>
-    </button>
   );
 }
 
@@ -296,11 +44,10 @@ function SidebarContents({
   onNavigate,
 }: NavProps & { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const items = navItems
-    .filter((i) => showFinance || !i.finance)
-    .filter((i) => !isPartner || i.partner);
-
-  const [soonOpen, setSoonOpen] = useState(false);
+  const tools = visibleTools({ showFinance, isPartner });
+  const groups = NAV_GROUPS.map((group) => ({ ...group, tools: tools.filter((t) => t.group === group.id) })).filter(
+    (group) => group.tools.length > 0,
+  );
 
   return (
     <>
@@ -381,49 +128,25 @@ function SidebarContents({
       </button>
       )}
 
-      {/* Workspace group */}
-      <p
-        className="mb-1 px-2 text-[0.6875rem] font-semibold uppercase tracking-wider"
-        style={{ color: "var(--text-faint)" }}
-      >
-        Workspace
-      </p>
-      <nav className="mb-2 flex flex-col gap-0.5" aria-label="Tools">
-        {items.map((item) => (
-          <NavLink
-            key={item.href}
-            item={item}
-            pathname={pathname}
-            onNavigate={onNavigate}
-          />
+      <nav className="mb-2 flex flex-col gap-4" aria-label="Tools">
+        {groups.map((group) => (
+          <div key={group.id}>
+            {isPartner ? null : (
+              <p
+                className="mb-1 px-2 text-[0.6875rem] font-semibold uppercase tracking-wider"
+                style={{ color: "var(--text-faint)" }}
+              >
+                {group.label}
+              </p>
+            )}
+            <div className="flex flex-col gap-0.5">
+              {group.tools.map((tool) => (
+                <NavLink key={tool.href} tool={tool} pathname={pathname} onNavigate={onNavigate} />
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
-
-      {/* Coming soon group — collapsible */}
-      {isPartner ? null : (
-      <div className="mt-3">
-        <GroupHeader
-          label="Coming soon"
-          open={soonOpen}
-          onToggle={() => setSoonOpen((v) => !v)}
-        />
-        {soonOpen && (
-          <div className="mt-0.5 flex flex-col gap-0.5">
-            {comingSoon.map((item) => (
-              <div
-                key={item.label}
-                className="nav-item cursor-default"
-                style={{ color: "var(--text-faint)" }}
-                title="Not built yet"
-              >
-                <span style={{ color: "var(--text-ghost)" }}>{item.icon}</span>
-                <span className="truncate">{item.label}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-      )}
 
       {/* Footer */}
       <div className="mt-auto pt-3" style={{ borderTop: "1px solid var(--border-faint)" }}>
@@ -434,7 +157,7 @@ function SidebarContents({
           className="nav-item"
         >
           <span style={{ color: "var(--text-faint)" }}>
-            <GearIcon />
+            <NavIcon paths={SETTINGS_PATHS} />
           </span>
           Settings
         </Link>

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getViewerContext } from "@/lib/viewer-context";
 import {
   getHouseholdMembership,
@@ -64,7 +65,7 @@ export default async function SettingsPage({
       </header>
 
       {household ? (
-        <Section id="household" eyebrow="Household" title="Who shares Finance and Home with you.">
+        <Section id="household" eyebrow="Household" title="Who shares Money and Home with you.">
           <HouseholdPanel data={household} />
         </Section>
       ) : null}
@@ -184,6 +185,15 @@ export default async function SettingsPage({
           />
         </div>
       </section>
+
+      <Section id="assistant" eyebrow="Assistant" title="What connected agents can see and do.">
+        <p className="text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
+          The snapshot agents read, the actions they can take, and a log of everything they did.
+        </p>
+        <Link href="/app/assistant" className="btn-ghost mt-3 inline-flex">
+          Open the assistant panel →
+        </Link>
+      </Section>
       </>
       )}
     </div>

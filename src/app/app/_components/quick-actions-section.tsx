@@ -75,7 +75,7 @@ export function QuickActionsSection({
           <QuickCard
             href="/app/finance"
             icon={<WalletIcon />}
-            label="Finance"
+            label="Money"
             value={formatCents(thisMonthSpentCents)}
             meta={
               lastMonthSpentCents > 0

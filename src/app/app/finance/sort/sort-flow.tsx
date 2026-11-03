@@ -58,7 +58,7 @@ export function SortFlow({ initialQueue, categories }: { initialQueue: SortItem[
             </button>
           ) : null}
           <Link href="/app/finance" className="btn-ink">
-            Back to Finance
+            Back to Money
           </Link>
         </div>
       </div>
