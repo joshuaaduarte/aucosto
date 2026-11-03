@@ -34,7 +34,7 @@ export default async function SortPage() {
   return (
     <div className="mx-auto max-w-md space-y-5 pb-10">
       <Link href="/app/finance" className="text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
-        ← Finance
+        ← Money
       </Link>
       <SortFlow initialQueue={queue} categories={categories} />
     </div>

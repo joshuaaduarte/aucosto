@@ -21,13 +21,16 @@ type PaletteItem = {
   label: string;
   section: PaletteSection;
   href: string;
+  /** Extra words that should find this item (old names, synonyms). */
+  keywords?: string;
 };
 
-const NAVIGATE_ITEMS: Array<{ label: string; href: string }> = [
-  { label: "Hub", href: "/app" },
+const NAVIGATE_ITEMS: Array<{ label: string; href: string; keywords?: string }> = [
+  { label: "Today", href: "/app", keywords: "hub home dashboard" },
   { label: "Plan the day", href: "/app/plan" },
   { label: "Time", href: "/app/time" },
-  { label: "Finance", href: "/app/finance" },
+  { label: "Money", href: "/app/finance", keywords: "finance budget spending accounts" },
+  { label: "Home", href: "/app/home", keywords: "household chores lists groceries" },
   { label: "Calendar", href: "/app/calendar" },
   { label: "Tasks", href: "/app/do" },
   { label: "Habits", href: "/app/habits" },
@@ -35,11 +38,14 @@ const NAVIGATE_ITEMS: Array<{ label: string; href: string }> = [
   { label: "Work", href: "/app/work" },
   { label: "Reflect", href: "/app/reflect" },
   { label: "Insights", href: "/app/insights" },
-  { label: "Rolodex", href: "/app/rolodex" },
+  { label: "Rolodex", href: "/app/rolodex", keywords: "people contacts" },
+  { label: "Settings", href: "/app/settings" },
+  { label: "Assistant", href: "/app/assistant", keywords: "agent api mcp" },
 ];
 
-const QUICK_ACTION_ITEMS: Array<{ label: string; href: string }> = [
+const QUICK_ACTION_ITEMS: Array<{ label: string; href: string; keywords?: string }> = [
   { label: "Plan tomorrow", href: "/app/plan" },
+  { label: "Log a purchase", href: "/app/finance?add=1", keywords: "spend expense money" },
   { label: "New task", href: "/app/do" },
   { label: "Start timer", href: "/app/time" },
   { label: "Log habit", href: "/app/habits" },
@@ -104,7 +110,11 @@ export function CommandPalette() {
   }, [open]);
 
   const filtered = useMemo(
-    () => ALL_ITEMS.filter((item) => fuzzyMatch(query, item.label)),
+    () => ALL_ITEMS.filter(
+        (item) =>
+          fuzzyMatch(query, item.label) ||
+          (query.length > 1 && (item.keywords ?? "").split(" ").some((word) => word.startsWith(query.toLowerCase()))),
+      ),
     [query],
   );
 

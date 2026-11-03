@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { DailyInsight } from "@/lib/insights";
 
 // One rotating data-backed observation between the focus hero and the stat
-// tiles. Quiet placeholder while the data is still too sparse to say
+// tiles. Renders nothing while the data is still too sparse to say
 // anything meaningful.
 
 export function InsightOfTheDayCard({
@@ -10,21 +10,8 @@ export function InsightOfTheDayCard({
 }: {
   insight: DailyInsight | null;
 }) {
-  if (!insight) {
-    return (
-      <p
-        className="fade-in-delay-1 rounded-lg border px-4 py-2.5 text-[0.8rem]"
-        style={{
-          borderColor: "var(--border-faint)",
-          color: "var(--text-faint)",
-          borderStyle: "dashed",
-        }}
-      >
-        Keep building your data — insights will appear here.
-      </p>
-    );
-  }
-
+  // Nothing worth saying yet: stay out of the way.
+  if (!insight) return null;
   return (
     <Link
       href={insight.href}

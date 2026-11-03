@@ -2,7 +2,8 @@
 
 // Bottom tab bar for phones: Today, Do, a centre "+" (quick capture: money,
 // list item, task, timer), Calendar, and More, a half-sheet with the other
-// tools and theme/sign-out. Partners get Home, Finance, +, Me.
+// tools and theme/sign-out. Partners get Home, Money, +, Me.
+// Tool list and grouping come from nav-model.tsx (shared with the sidebar).
 // Hidden on lg+ where the sidebar takes over. Its height is published as
 // --mobile-tabbar-height (globals.css) so the running-timer bar and FABs
 // stack above it.
@@ -12,6 +13,7 @@ import { usePathname } from "next/navigation";
 import { Fragment, useState, useSyncExternalStore } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SignOutButton } from "../sign-out-button";
+import { NAV_GROUPS, NavIcon, navActive, SETTINGS_PATHS, toolByHref, visibleTools } from "./nav-model";
 import { openQuickCapture } from "./quick-capture";
 import { useBodyScrollLock } from "./use-body-scroll-lock";
 
@@ -27,62 +29,19 @@ const ip = {
   "aria-hidden": true,
 };
 
-const TABS = [
-  {
-    href: "/app",
-    label: "Today",
-    icon: (
-      <svg {...ip}>
-        <path d="M2 6.5 7.5 2l5.5 4.5V13H2V6.5Z" />
-        <path d="M6 13V9h3v4" />
-      </svg>
-    ),
-  },
-  {
-    href: "/app/do",
-    label: "Do",
-    icon: (
-      <svg {...ip}>
-        <path d="M5 4h8M5 7.5h8M5 11h5" />
-        <circle cx="2.5" cy="4" r="0.6" fill="currentColor" />
-        <circle cx="2.5" cy="7.5" r="0.6" fill="currentColor" />
-        <circle cx="2.5" cy="11" r="0.6" fill="currentColor" />
-      </svg>
-    ),
-  },
-  {
-    href: "/app/calendar",
-    label: "Calendar",
-    icon: (
-      <svg {...ip}>
-        <rect x="2" y="3" width="11" height="10" rx="1.5" />
-        <path d="M2 6h11M5 1.75v2.5M10 1.75v2.5" />
-      </svg>
-    ),
-  },
-];
+const TAB_HREFS = ["/app", "/app/do", "/app/calendar"] as const;
 
-type MoreTool = {
-  href: string;
-  label: string;
-  icon: React.ReactNode;
-  finance?: boolean;
-};
+type TabTool = { href: string; label: string; icon: React.ReactNode };
 
-const HOME_TOOL: MoreTool = {
-  href: "/app/home",
-  label: "Home",
-  icon: (
-    <svg {...ip}>
-      <path d="M1.75 7 7.5 2.25 13.25 7" />
-      <path d="M3.25 6v6.75h8.5V6" />
-      <rect x="6" y="9" width="3" height="3.75" />
-    </svg>
-  ),
-};
+function tabTool(href: string, label?: string): TabTool {
+  const tool = toolByHref(href);
+  return { href, label: label ?? tool.label, icon: <NavIcon paths={tool.paths} size={18} /> };
+}
+
+const TABS: TabTool[] = [tabTool("/app"), tabTool("/app/do", "Do"), tabTool("/app/calendar")];
 
 /** Partner's "Me" tab: their settings (sign-in, theme, notifications). */
-const ME_TOOL: MoreTool = {
+const ME_TOOL: TabTool = {
   href: "/app/settings",
   label: "Me",
   icon: (
@@ -125,139 +84,26 @@ function TabLink({ tool, active }: { tool: { href: string; label: string; icon: 
   );
 }
 
-const MORE_TOOLS: MoreTool[] = [
-  {
-    href: "/app/time",
-    label: "Time",
-    icon: (
-      <svg {...ip}>
-        <circle cx="7.5" cy="7.5" r="5.5" />
-        <path d="M7.5 4.5V7.5l2 1.25" />
-      </svg>
-    ),
-  },
-  HOME_TOOL,
-  {
-    href: "/app/plan",
-    label: "Plan",
-    icon: (
-      <svg {...ip}>
-        <rect x="2" y="3" width="11" height="10" rx="1.5" />
-        <path d="M5 6.5h5M5 9.5h3" />
-      </svg>
-    ),
-  },
-  {
-    href: "/app/habits",
-    label: "Habits",
-    icon: (
-      <svg {...ip}>
-        <path d="M3 4.5h6.5a2.5 2.5 0 0 1 0 5H8.5" />
-        <path d="M9.5 2.75 11.25 4.5 9.5 6.25" />
-        <path d="M6.5 10.5H4a2.5 2.5 0 0 1 0-5h1" />
-        <path d="M3.5 8.75 1.75 10.5 3.5 12.25" />
-      </svg>
-    ),
-  },
-  {
-    href: "/app/projects",
-    label: "Projects",
-    icon: (
-      <svg {...ip}>
-        <rect x="2" y="3" width="11" height="3" rx="0.75" />
-        <rect x="2" y="8.5" width="7.5" height="3" rx="0.75" />
-      </svg>
-    ),
-  },
-  {
-    href: "/app/work",
-    label: "Work",
-    icon: (
-      <svg {...ip}>
-        <rect x="1.75" y="4.5" width="11.5" height="8" rx="1.25" />
-        <path d="M5.5 4.5V3.25c0-.55.45-1 1-1h2c.55 0 1 .45 1 1V4.5" />
-        <path d="M1.75 7.75h11.5" />
-      </svg>
-    ),
-  },
-  {
-    href: "/app/rolodex",
-    label: "Rolodex",
-    icon: (
-      <svg {...ip}>
-        <circle cx="6" cy="6" r="3" />
-        <path d="M1.5 13c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4" />
-        <path d="M10.5 4h3M10.5 7.5h3M10.5 11h2" />
-      </svg>
-    ),
-  },
-  {
-    href: "/app/finance",
-    label: "Finance",
-    finance: true,
-    icon: (
-      <svg {...ip}>
-        <path d="M2 5.5C2 4.67 2.67 4 3.5 4H12a1 1 0 0 1 1 1v6.5c0 .83-.67 1.5-1.5 1.5h-8A1.5 1.5 0 0 1 2 11.5V5.5Z" />
-        <path d="M10 8.25h2.5" />
-      </svg>
-    ),
-  },
-  {
-    href: "/app/insights",
-    label: "Insights",
-    icon: (
-      <svg {...ip}>
-        <path d="M1.5 12 5.5 7.5l2.5 2L13.5 3" />
-        <path d="M10 3h3.5v3.5" />
-      </svg>
-    ),
-  },
-  {
-    href: "/app/reflect",
-    label: "Reflect",
-    icon: (
-      <svg {...ip}>
-        <path d="M7.5 13.5c3.3 0 6-2.46 6-5.5 0-3.04-2.7-5.5-6-5.5s-6 2.46-6 5.5c0 1.27.47 2.44 1.26 3.37L2.2 13.4l3.06-.6c.7.45 1.46.7 2.24.7Z" />
-        <path d="M5 6.75h5M5 9h3" />
-      </svg>
-    ),
-  },
-  {
-    href: "/app/assistant",
-    label: "Assistant",
-    icon: (
-      <svg {...ip}>
-        <rect x="2.5" y="3.5" width="10" height="8" rx="1.5" />
-        <path d="M5.5 6.25h.01M9.5 6.25h.01M5 9h5" />
-        <path d="M7.5 1.5v2" />
-      </svg>
-    ),
-  },
-  {
-    href: "/app/settings",
-    label: "Settings",
-    icon: (
-      <svg {...ip}>
-        <circle cx="7.5" cy="7.5" r="2" />
-        <path d="M7.5 1.5v1.5M7.5 12v1.5M1.5 7.5H3M12 7.5h1.5M3 3l1 1M11 11l1 1M12 3l-1 1M4 11l-1 1" />
-      </svg>
-    ),
-  },
-];
+const SETTINGS_TOOL: TabTool = {
+  href: "/app/settings",
+  label: "Settings",
+  icon: <NavIcon paths={SETTINGS_PATHS} size={18} />,
+};
 
 // No store to subscribe to — the hour is only re-read on re-render, which is
 // all the reflect dot needs.
 const emptySubscribe = () => () => {};
 
-/** Household partner: Home, Finance, +, Me — no More sheet. */
+/** Household partner: Home, Money, +, Me — no More sheet. */
 function PartnerTabBar({ showFinance }: { showFinance: boolean }) {
   const pathname = usePathname();
-  const finance = MORE_TOOLS.find((tool) => tool.href === "/app/finance");
-  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const home = tabTool("/app/home");
+  const money = tabTool("/app/finance");
+  const isActive = (href: string) => navActive(href, pathname);
   return (
     <nav className="mobile-tabbar lg:hidden" aria-label="Primary">
-      <TabLink tool={HOME_TOOL} active={isActive(HOME_TOOL.href)} />
-      {showFinance && finance ? <TabLink tool={finance} active={isActive(finance.href)} /> : null}
+      <TabLink tool={home} active={isActive(home.href)} />
+      {showFinance ? <TabLink tool={money} active={isActive(money.href)} /> : null}
       <PlusTab />
       <TabLink tool={ME_TOOL} active={isActive(ME_TOOL.href)} />
     </nav>
@@ -301,19 +147,20 @@ function OwnerTabBar({
   );
   const showReflectDot = needsReflect && isEvening;
 
-  const moreTools = MORE_TOOLS.filter((tool) => showFinance || !tool.finance);
-  const moreActive = moreTools.some(
-    (tool) => pathname === tool.href || pathname.startsWith(`${tool.href}/`),
+  const moreTools = visibleTools({ showFinance, isPartner: false }).filter(
+    (tool) => !(TAB_HREFS as readonly string[]).includes(tool.href),
   );
+  const moreGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    tools: moreTools.filter((tool) => tool.group === group.id),
+  })).filter((group) => group.tools.length > 0);
+  const moreActive = [...moreTools, SETTINGS_TOOL].some((tool) => navActive(tool.href, pathname));
 
   return (
     <>
       <nav className="mobile-tabbar lg:hidden" aria-label="Primary">
         {TABS.map((tab, index) => {
-          const active =
-            tab.href === "/app"
-              ? pathname === "/app"
-              : pathname === tab.href || pathname.startsWith(`${tab.href}/`);
+          const active = navActive(tab.href, pathname);
           return (
             <Fragment key={tab.href}>
               {index === 2 ? <PlusTab /> : null}
@@ -360,52 +207,82 @@ function OwnerTabBar({
             className="calendar-modal"
             onClick={(event) => event.stopPropagation()}
           >
-            <p
-              className="text-[0.6875rem] font-semibold uppercase tracking-wider"
-              style={{ color: "var(--text-faint)" }}
-            >
-              More tools
-            </p>
-
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              {moreTools.map((tool) => {
-                const active =
-                  pathname === tool.href ||
-                  pathname.startsWith(`${tool.href}/`);
-                return (
-                  <Link
-                    key={tool.href}
-                    href={tool.href}
-                    onClick={() => setMoreOpen(false)}
-                    aria-current={active ? "page" : undefined}
-                    className="flex items-center gap-2.5 rounded-md border px-3 py-3 text-[0.875rem] font-medium"
-                    style={{
-                      borderColor: active
-                        ? "var(--border)"
-                        : "var(--border-faint)",
-                      background: active ? "var(--bg-tint)" : "var(--bg-page)",
-                      color: "var(--text)",
-                    }}
+            <div className="space-y-4">
+              {moreGroups.map((group) => (
+                <section key={group.id}>
+                  <p
+                    className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+                    style={{ color: "var(--text-faint)" }}
                   >
-                    <span style={{ color: "var(--text-muted)" }}>
-                      {tool.icon}
-                    </span>
-                    {tool.label}
-                  </Link>
-                );
-              })}
+                    {group.label}
+                  </p>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    {group.tools.map((tool) => (
+                      <MoreLink
+                        key={tool.href}
+                        href={tool.href}
+                        label={tool.label}
+                        icon={<NavIcon paths={tool.paths} size={18} />}
+                        active={navActive(tool.href, pathname)}
+                        onNavigate={() => setMoreOpen(false)}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))}
             </div>
 
             <div
               className="mt-4 flex items-center justify-between border-t pt-3"
               style={{ borderColor: "var(--border-faint)" }}
             >
-              <ThemeToggle />
-              <SignOutButton />
+              <Link
+                href={SETTINGS_TOOL.href}
+                onClick={() => setMoreOpen(false)}
+                className="btn-ghost inline-flex items-center gap-1.5"
+              >
+                {SETTINGS_TOOL.icon}
+                Settings
+              </Link>
+              <div className="flex items-center gap-1">
+                <ThemeToggle />
+                <SignOutButton />
+              </div>
             </div>
           </div>
         </div>
       ) : null}
     </>
+  );
+}
+
+function MoreLink({
+  href,
+  label,
+  icon,
+  active,
+  onNavigate,
+}: {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  active: boolean;
+  onNavigate: () => void;
+}) {
+  return (
+    <Link
+      href={href}
+      onClick={onNavigate}
+      aria-current={active ? "page" : undefined}
+      className="flex items-center gap-2.5 rounded-md border px-3 py-3 text-[0.875rem] font-medium"
+      style={{
+        borderColor: active ? "var(--border)" : "var(--border-faint)",
+        background: active ? "var(--bg-tint)" : "var(--bg-page)",
+        color: "var(--text)",
+      }}
+    >
+      <span style={{ color: "var(--text-muted)" }}>{icon}</span>
+      {label}
+    </Link>
   );
 }

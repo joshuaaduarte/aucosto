@@ -119,7 +119,7 @@ export function BalanceCheckIn({
             : "Net worth is up to date. See you next month."}
         </p>
         <Link href="/app/finance" className="btn-ink inline-flex">
-          Back to Finance
+          Back to Money
         </Link>
       </div>
     );

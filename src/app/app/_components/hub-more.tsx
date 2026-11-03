@@ -29,7 +29,7 @@ export function HubMore({ children }: { children: React.ReactNode }) {
         >
           <path d="m4 3 2.5 2.5L4 8" />
         </svg>
-        <span className="group-open:hidden">More — actions, decisions, tools</span>
+        <span className="group-open:hidden">More: reflection, projects, shortcuts</span>
         <span className="hidden group-open:inline">Less</span>
       </summary>
       <div className="mt-3 space-y-7 sm:space-y-8">{children}</div>

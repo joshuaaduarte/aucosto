@@ -25,7 +25,7 @@ export function WorkspaceSection({ financeVisible }: { financeVisible: boolean }
         <ToolLink href="/app/projects" icon={<ConnectionIcon />} label="Projects" hint="Outcomes, milestones, and linked work." />
         <ToolLink href="/app/time" icon={<ClockIcon />} label="Time" hint="Logged sessions and where the week went." />
         {financeVisible && (
-          <ToolLink href="/app/finance" icon={<WalletIcon />} label="Finance" hint="Net worth, spend, and monthly pace." />
+          <ToolLink href="/app/finance" icon={<WalletIcon />} label="Money" hint="Net worth, spend, and monthly pace." />
         )}
       </ul>
     </section>
