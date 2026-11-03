@@ -106,20 +106,21 @@ export function TimerBarClient({
     <>
       {/* Publish reserved height while visible: FABs and page content read
           --timer-bar-height to shift above the bar (0 when no timer). */}
-      <style>{`:root{--timer-bar-height:3.25rem}`}</style>
+      {/* Phones: a strip docked on top of the tab bar, like a music app's
+          mini-player. Desktop: a floating pill. */}
+      <style>{`:root{--timer-bar-height:2.75rem}@media (min-width:1024px){:root{--timer-bar-height:3.25rem}}`}</style>
       <div
-        className="pointer-events-none fixed inset-x-0 flex justify-center px-4"
+        className="pointer-events-none fixed inset-x-0 flex justify-center px-0 lg:px-4 lg:pb-2"
         style={{
           zIndex: 41,
-          bottom:
-            "calc(var(--mobile-tabbar-height, 0px) + var(--safe-area-bottom, 0px) + 0.5rem)",
+          bottom: "calc(var(--mobile-tabbar-height, 0px) + var(--safe-area-bottom, 0px))",
         }}
       >
-      <div ref={wrapperRef} className="pointer-events-auto relative w-full max-w-[26rem]">
+      <div ref={wrapperRef} className="pointer-events-auto relative w-full lg:max-w-[26rem]">
         {/* Note popover, anchored above the pill. */}
         {noteOpen ? (
           <div
-            className="absolute inset-x-0 bottom-full mb-2 rounded-2xl border p-2 shadow-lg"
+            className="absolute inset-x-2 bottom-full mb-2 rounded-2xl border p-2 shadow-lg lg:inset-x-0"
             style={{
               background: "var(--bg-page)",
               borderColor: "var(--border-soft)",
@@ -140,11 +141,9 @@ export function TimerBarClient({
         ) : null}
 
         <div
-          className="flex items-center gap-2.5 rounded-full border py-1.5 pl-3.5 pr-1.5 shadow-lg"
+          className="timer-strip flex items-center gap-2.5 border-t py-1.5 pl-4 pr-2 lg:rounded-full lg:border lg:pl-3.5 lg:pr-1.5"
           style={{
-            background: "var(--bg-page)",
             borderColor: "var(--border-soft)",
-            boxShadow: "var(--shadow-pop)",
           }}
         >
           <span

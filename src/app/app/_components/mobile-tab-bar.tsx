@@ -1,17 +1,18 @@
 "use client";
 
-// Bottom tab bar for phones: the four areas you bounce between all day,
-// plus a More tab that opens a half-sheet with the remaining tools
-// (Habits, Projects, Finance when visible, Settings) and theme/sign-out.
+// Bottom tab bar for phones: Today, Do, a centre "+" (quick capture: money,
+// list item, task, timer), Calendar, and More, a half-sheet with the other
+// tools and theme/sign-out. Partners get Home, Finance, +, Me.
 // Hidden on lg+ where the sidebar takes over. Its height is published as
 // --mobile-tabbar-height (globals.css) so the running-timer bar and FABs
 // stack above it.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useSyncExternalStore } from "react";
+import { Fragment, useState, useSyncExternalStore } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SignOutButton } from "../sign-out-button";
+import { openQuickCapture } from "./quick-capture";
 import { useBodyScrollLock } from "./use-body-scroll-lock";
 
 const ip = {
@@ -29,21 +30,11 @@ const ip = {
 const TABS = [
   {
     href: "/app",
-    label: "Hub",
+    label: "Today",
     icon: (
       <svg {...ip}>
         <path d="M2 6.5 7.5 2l5.5 4.5V13H2V6.5Z" />
         <path d="M6 13V9h3v4" />
-      </svg>
-    ),
-  },
-  {
-    href: "/app/time",
-    label: "Time",
-    icon: (
-      <svg {...ip}>
-        <circle cx="7.5" cy="7.5" r="5.5" />
-        <path d="M7.5 4.5V7.5l2 1.25" />
       </svg>
     ),
   },
@@ -90,21 +81,61 @@ const HOME_TOOL: MoreTool = {
   ),
 };
 
-/** Quick add: opens Money with the amount box focused. */
-const SPEND_TOOL: MoreTool = {
-  href: "/app/finance?add=1",
-  label: "Log spend",
-  finance: true,
+/** Partner's "Me" tab: their settings (sign-in, theme, notifications). */
+const ME_TOOL: MoreTool = {
+  href: "/app/settings",
+  label: "Me",
   icon: (
     <svg {...ip}>
-      <circle cx="7.5" cy="7.5" r="5.5" />
-      <path d="M7.5 4.75v5.5M4.75 7.5h5.5" />
+      <circle cx="7.5" cy="5.25" r="2.5" />
+      <path d="M2.5 13c.8-2.4 2.7-3.5 5-3.5s4.2 1.1 5 3.5" />
     </svg>
   ),
 };
 
+/** Centre "+" — opens the quick-capture sheet over the current page. */
+function PlusTab() {
+  return (
+    <div className="flex min-w-0 flex-1 items-center justify-center">
+      <button
+        type="button"
+        onClick={() => openQuickCapture()}
+        aria-label="Add: log money, a list item, a task or a timer"
+        className="tabbar-plus"
+      >
+        <svg width="20" height="20" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden>
+          <path d="M7.5 3v9M3 7.5h9" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+function TabLink({ tool, active }: { tool: { href: string; label: string; icon: React.ReactNode }; active: boolean }) {
+  return (
+    <Link
+      href={tool.href}
+      aria-current={active ? "page" : undefined}
+      className="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-1.5"
+      style={{ color: active ? "var(--text)" : "var(--text-faint)" }}
+    >
+      {tool.icon}
+      <span className="text-[0.625rem] font-medium">{tool.label}</span>
+    </Link>
+  );
+}
+
 const MORE_TOOLS: MoreTool[] = [
-  SPEND_TOOL,
+  {
+    href: "/app/time",
+    label: "Time",
+    icon: (
+      <svg {...ip}>
+        <circle cx="7.5" cy="7.5" r="5.5" />
+        <path d="M7.5 4.5V7.5l2 1.25" />
+      </svg>
+    ),
+  },
   HOME_TOOL,
   {
     href: "/app/plan",
@@ -218,36 +249,17 @@ const MORE_TOOLS: MoreTool[] = [
 // all the reflect dot needs.
 const emptySubscribe = () => () => {};
 
-/** Household partner: Home, Finance, Settings — no More sheet. */
+/** Household partner: Home, Finance, +, Me — no More sheet. */
 function PartnerTabBar({ showFinance }: { showFinance: boolean }) {
   const pathname = usePathname();
   const finance = MORE_TOOLS.find((tool) => tool.href === "/app/finance");
-  const settings = MORE_TOOLS.find((tool) => tool.href === "/app/settings");
-  const tabs = [
-    HOME_TOOL,
-    showFinance ? finance : undefined,
-    showFinance ? SPEND_TOOL : undefined,
-    settings,
-  ].filter(
-    (tab): tab is MoreTool => Boolean(tab),
-  );
+  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   return (
     <nav className="mobile-tabbar lg:hidden" aria-label="Primary">
-      {tabs.map((tab) => {
-        const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
-        return (
-          <Link
-            key={tab.href}
-            href={tab.href}
-            aria-current={active ? "page" : undefined}
-            className="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-1.5"
-            style={{ color: active ? "var(--text)" : "var(--text-faint)" }}
-          >
-            {tab.icon}
-            <span className="text-[0.625rem] font-medium">{tab.label}</span>
-          </Link>
-        );
-      })}
+      <TabLink tool={HOME_TOOL} active={isActive(HOME_TOOL.href)} />
+      {showFinance && finance ? <TabLink tool={finance} active={isActive(finance.href)} /> : null}
+      <PlusTab />
+      <TabLink tool={ME_TOOL} active={isActive(ME_TOOL.href)} />
     </nav>
   );
 }
@@ -297,22 +309,16 @@ function OwnerTabBar({
   return (
     <>
       <nav className="mobile-tabbar lg:hidden" aria-label="Primary">
-        {TABS.map((tab) => {
+        {TABS.map((tab, index) => {
           const active =
             tab.href === "/app"
               ? pathname === "/app"
               : pathname === tab.href || pathname.startsWith(`${tab.href}/`);
           return (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              aria-current={active ? "page" : undefined}
-              className="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-1.5"
-              style={{ color: active ? "var(--text)" : "var(--text-faint)" }}
-            >
-              {tab.icon}
-              <span className="text-[0.625rem] font-medium">{tab.label}</span>
-            </Link>
+            <Fragment key={tab.href}>
+              {index === 2 ? <PlusTab /> : null}
+              <TabLink tool={tab} active={active} />
+            </Fragment>
           );
         })}
 

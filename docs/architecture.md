@@ -331,7 +331,8 @@ projection, goals). View model: `_lib/derive.ts` (older dashboard) +
 
 - `running-timer-bar.tsx` / `timer-bar-client.tsx` — global timer bar
   (layout-rendered; publishes `--timer-bar-height` while visible).
-- `mobile-tab-bar.tsx` — bottom tabs (Hub/Time/Do/Calendar) + More sheet
+- `mobile-tab-bar.tsx` — bottom tabs (Today/Do/**+**/Calendar/More; partners get Home/Finance/+/Me) + More sheet
+- `quick-capture.tsx` + `quick-capture-actions.ts` — the "+" sheet (log money with a number pad, add to a shared list, add a task, start a timer). Opened by the centre tab, the sidebar's New button, the `N` key, or `openQuickCapture(mode)`. Data loads when it opens, not per page. Pure helpers (keypad, category emoji/colour, modes) in `src/lib/quick-capture.ts`
   (Habits/Projects/Finance/Insights/Reflect/Settings, theme, sign-out).
 - `use-body-scroll-lock.ts` — reference-counted body scroll lock; every
   modal uses it.
