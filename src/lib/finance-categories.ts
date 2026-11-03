@@ -16,6 +16,35 @@ export const FINANCE_CATEGORIES = [
 
 export type FinanceCategory = (typeof FINANCE_CATEGORIES)[number];
 
+/**
+ * A category typed in by hand: trimmed, at most 40 characters, and spelled
+ * like a built-in one when it matches one ("groceries" → "Groceries").
+ * Anything else is kept as a custom category. Null for blank.
+ */
+export function normalizeCategory(value: string | null | undefined): string | null {
+  const trimmed = (value ?? "").trim().replace(/\s+/g, " ").slice(0, 40);
+  if (!trimmed) return null;
+  const builtIn = (FINANCE_CATEGORIES as readonly string[]).find((c) => c.toLowerCase() === trimmed.toLowerCase());
+  return builtIn ?? trimmed;
+}
+
+/**
+ * Categories to offer when logging: the built-in ones, then any custom ones
+ * already used (most used first). Income is left out of spending choices.
+ */
+export function spendCategoryChoices(history: Array<{ category: string | null }>): string[] {
+  const builtIn = FINANCE_CATEGORIES.filter((c) => c !== "Income") as string[];
+  const lower = new Set((FINANCE_CATEGORIES as readonly string[]).map((c) => c.toLowerCase()));
+  const counts = new Map<string, number>();
+  for (const t of history) {
+    const c = t.category?.trim();
+    if (!c || lower.has(c.toLowerCase())) continue;
+    counts.set(c, (counts.get(c) ?? 0) + 1);
+  }
+  const custom = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([c]) => c);
+  return [...builtIn, ...custom];
+}
+
 const CATEGORY_RULES: Array<{ category: FinanceCategory; keywords: string[] }> = [
   { category: "Food & Drink", keywords: ["coffee", "cafe", "restaurant", "pizza", "taco", "burger", "doordash", "ubereats", "grubhub", "boba", "bar"] },
   { category: "Groceries", keywords: ["grocery", "trader joe", "safeway", "costco", "whole foods", "market", "aldi", "sprouts"] },

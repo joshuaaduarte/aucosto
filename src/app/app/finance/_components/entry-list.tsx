@@ -6,13 +6,13 @@
 // confirm dialog. Entries confirmed by a finished statement check are locked.
 
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
-import { FINANCE_CATEGORIES } from "@/lib/finance-categories";
 import type { EntryStatus } from "@/lib/finance-entries";
 import {
   addFinanceEntry,
   addFinanceMove,
   deleteFinanceEntry,
   setEntryCategory,
+  setFinanceEntryPot,
   updateFinanceEntry,
 } from "../actions";
 import { UndoToast, type UndoToastState } from "./undo-toast";
@@ -31,7 +31,11 @@ export type EntryView = {
   byName: string | null;
   /** Money moved between accounts (shown once, on the leaving side). */
   move: { toId: string | null; toName: string | null } | null;
+  /** Paid from a set-aside pot (doesn't count as this month's spending). */
+  potId: string | null;
 };
+
+export type PotChoice = { id: string; name: string };
 
 type Filter = "all" | "to_sort" | "pending";
 
@@ -54,10 +58,16 @@ function dayHeading(day: string) {
 export function EntryList({
   entries,
   accounts,
+  categories,
+  pots = [],
   initialFilter = "all",
 }: {
   entries: EntryView[];
   accounts: Array<{ id: string; name: string }>;
+  /** Every category to offer, built-in then your own (spendCategoryChoices). */
+  categories: string[];
+  /** Set-aside pots a purchase can be paid from. */
+  pots?: PotChoice[];
   initialFilter?: Filter;
 }) {
   const [filter, setFilter] = useState<Filter>(initialFilter);
@@ -178,6 +188,8 @@ export function EntryList({
                     key={entry.id}
                     entry={entry}
                     accounts={accounts}
+                    categories={categories}
+                    pots={pots}
                     open={openId === entry.id}
                     onToggle={() => setOpenId(openId === entry.id ? null : entry.id)}
                     onRemoved={() => {
@@ -219,23 +231,113 @@ function FilterChip({ active, onClick, label }: { active: boolean; onClick: () =
   );
 }
 
+const NEW_CATEGORY = "__new__";
+
+/**
+ * A category dropdown with your own categories and "New category…", which
+ * asks for a name. Calls onPick with the chosen name (null for none).
+ */
+function CategorySelect({
+  categories,
+  value,
+  onPick,
+  placeholder,
+  disabled,
+  className,
+  label,
+}: {
+  categories: string[];
+  value: string | null;
+  onPick: (value: string | null) => void;
+  placeholder: string;
+  disabled?: boolean;
+  className: string;
+  label: string;
+}) {
+  const options = value && !categories.includes(value) ? [...categories, value] : categories;
+  return (
+    <select
+      aria-label={label}
+      disabled={disabled}
+      value={value ?? ""}
+      onChange={(e) => {
+        const v = e.target.value;
+        if (v !== NEW_CATEGORY) {
+          onPick(v || null);
+          return;
+        }
+        const name = window.prompt("New category name")?.trim().replace(/\s+/g, " ").slice(0, 40);
+        if (name) onPick(categories.find((c) => c.toLowerCase() === name.toLowerCase()) ?? name);
+      }}
+      className={className}
+    >
+      <option value="">{placeholder}</option>
+      {options.map((c) => (
+        <option key={c} value={c}>
+          {c}
+        </option>
+      ))}
+      <option value={NEW_CATEGORY}>New category…</option>
+    </select>
+  );
+}
+
 function EntryRow({
   entry,
   accounts,
+  categories,
+  pots,
   open,
   onToggle,
   onRemoved,
 }: {
   entry: EntryView;
   accounts: Array<{ id: string; name: string }>;
+  categories: string[];
+  pots: PotChoice[];
   open: boolean;
   onToggle: () => void;
   onRemoved: () => void;
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [lockedCategory, setLockedCategory] = useState<string | null>(entry.category);
+  const [formCategory, setFormCategory] = useState<string | null>(entry.category);
+  const [potId, setPotId] = useState<string | null>(entry.potId);
   const out = entry.amount < 0;
   const isMove = entry.move !== null;
+  const potName = potId ? (pots.find((p) => p.id === potId)?.name ?? "a pot") : null;
+  const potPicker =
+    out && !isMove && (pots.length > 0 || potId) ? (
+      <label className="flex items-center gap-2 text-[0.75rem]" style={{ color: "var(--text-muted)" }}>
+        Paid from
+        <select
+          value={potId ?? ""}
+          disabled={pending}
+          onChange={(e) => {
+            const next = e.target.value || null;
+            const prev = potId;
+            setPotId(next);
+            setError(null);
+            start(async () => {
+              const r = await setFinanceEntryPot(entry.id, next);
+              if (r && !r.ok) {
+                setPotId(prev);
+                setError(r.error);
+              }
+            });
+          }}
+          className="field text-[0.8125rem]"
+        >
+          <option value="">Everyday money</option>
+          {pots.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </label>
+    ) : null;
   const toSort = out && !entry.category && !isMove;
   const title = isMove
     ? out
@@ -265,7 +367,9 @@ function EntryRow({
                 ? /card payment/i.test(entry.description)
                   ? "Card payment"
                   : "Moved money"
-                : [entry.category ?? (out ? "No category" : null), entry.accountName].filter(Boolean).join(" · ")}
+                : [entry.category ?? (out ? "No category" : null), entry.accountName, potName ? `from ${potName}` : null]
+                    .filter(Boolean)
+                    .join(" · ")}
               {entry.status === "pending" ? (
                 <span style={{ color: "var(--accent)" }}> · not on a statement yet</span>
               ) : entry.status === "locked" ? (
@@ -285,26 +389,20 @@ function EntryRow({
 
       {toSort && !open ? (
         <div className="mt-1.5 pl-0 sm:pl-9">
-          <select
-            aria-label={`Category for ${entry.description}`}
+          <CategorySelect
+            label={`Category for ${entry.description}`}
+            categories={categories}
+            value={null}
+            placeholder="Pick a category…"
             disabled={pending}
-            defaultValue=""
-            onChange={(e) => {
-              const value = e.target.value || null;
+            onPick={(value) =>
               start(async () => {
                 const r = await setEntryCategory(entry.id, value);
                 if (r && !r.ok) setError(r.error);
-              });
-            }}
+              })
+            }
             className="field max-w-[12rem] text-[0.8125rem]"
-          >
-            <option value="">Pick a category…</option>
-            {FINANCE_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+          />
         </div>
       ) : null}
 
@@ -334,26 +432,22 @@ function EntryRow({
         entry.status === "locked" ? (
           <p className="mt-2 text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
             This matches a checked statement, so it&rsquo;s locked. You can still change its category.
-            <select
-              aria-label="Category"
+            <CategorySelect
+              label="Category"
+              categories={categories}
+              value={lockedCategory}
+              placeholder="No category"
               disabled={pending}
-              defaultValue={entry.category ?? ""}
-              onChange={(e) => {
-                const value = e.target.value || null;
+              onPick={(value) => {
+                setLockedCategory(value);
                 start(async () => {
                   const r = await setEntryCategory(entry.id, value);
                   if (r && !r.ok) setError(r.error);
                 });
               }}
               className="field mt-2 block max-w-[12rem] text-[0.8125rem]"
-            >
-              <option value="">No category</option>
-              {FINANCE_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+            />
+            {potPicker ? <span className="mt-2 block">{potPicker}</span> : null}
           </p>
         ) : (
           <form
@@ -378,14 +472,15 @@ function EntryRow({
           >
             <input name="amount" inputMode="decimal" defaultValue={(Math.abs(entry.amount) / 100).toFixed(2)} className="field tabular" aria-label="Amount" />
             <input name="description" defaultValue={entry.description} className="field" aria-label="Name" />
-            <select name="category" defaultValue={entry.category ?? ""} className="field" aria-label="Category">
-              <option value="">No category</option>
-              {FINANCE_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+            <input type="hidden" name="category" value={formCategory ?? ""} />
+            <CategorySelect
+              label="Category"
+              categories={categories}
+              value={formCategory}
+              placeholder="No category"
+              onPick={setFormCategory}
+              className="field"
+            />
             <select name="accountId" defaultValue={entry.accountId ?? ""} className="field" aria-label="Account">
               <option value="">No account</option>
               {accounts.map((a) => (
@@ -395,6 +490,7 @@ function EntryRow({
               ))}
             </select>
             <input name="date" type="date" defaultValue={entry.day} className="field" aria-label="Date" />
+            {potPicker ? <div className="sm:col-span-2">{potPicker}</div> : null}
             <div className="flex items-center gap-2">
               <button type="submit" disabled={pending} className="btn-ink">
                 {pending ? "Saving…" : "Save"}

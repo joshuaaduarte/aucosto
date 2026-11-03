@@ -14,12 +14,13 @@ import { requireCan } from "@/lib/auth/can";
 import { currentActorUserId } from "@/lib/actor";
 import { recordEvent } from "@/lib/services/events";
 import { isMissingHouseholdTable } from "@/lib/household";
-import { FINANCE_CATEGORIES } from "@/lib/finance-categories";
+import { normalizeCategory } from "@/lib/finance-categories";
 import {
   ENTRY_CLEARED,
   ENTRY_PENDING,
   ENTRY_RECONCILED,
   encodeEntryMeta,
+  readEntryMeta,
   type EntryVia,
 } from "@/lib/finance-entries";
 import { moveDescriptions, moveExternalId, pairedExternalId } from "@/lib/finance-moves";
@@ -50,10 +51,9 @@ function degrade<T>(label: string, fallback: T) {
   };
 }
 
-function cleanCategory(value: string | null | undefined): string | null {
-  if (!value) return null;
-  return (FINANCE_CATEGORIES as readonly string[]).includes(value) ? value : null;
-}
+// Built-in categories keep their spelling; anything else is a custom
+// category (Ana's own buckets).
+const cleanCategory = normalizeCategory;
 
 async function requireAccount(userId: string, accountId: string) {
   const account = await prisma.financeAccount.findFirst({ where: { id: accountId, userId } });
@@ -152,6 +152,16 @@ export async function updateEntry(userId: string, id: string, patch: UpdateEntry
     data.account = account?.name ?? null;
   }
   await prisma.financeTransaction.update({ where: { id }, data });
+  // Paid from a pot: keep the pot in step with a changed amount.
+  const pot = readEntryMeta(existing.raw).pot;
+  if (pot && existing.amount < 0 && data.amount !== undefined && data.amount !== existing.amount) {
+    const before = -existing.amount;
+    const after = data.amount < 0 ? -data.amount : 0;
+    await prisma.financeGoal.updateMany({
+      where: { id: pot, userId },
+      data: { currentAmountCents: { increment: before - after } },
+    });
+  }
   await recordEvent({ userId, tool: "finance", type: "finance.entry_updated", refId: id });
 }
 
@@ -175,12 +185,92 @@ export async function deleteEntry(userId: string, id: string): Promise<void> {
     });
   }
   await prisma.financeTransaction.delete({ where: { id } });
+  // Paid from a pot: the money goes back into the pot.
+  const pot = readEntryMeta(existing.raw).pot;
+  if (pot && existing.amount < 0) {
+    await prisma.financeGoal.updateMany({
+      where: { id: pot, userId },
+      data: { currentAmountCents: { increment: -existing.amount } },
+    });
+  }
   await recordEvent({
     userId,
     tool: "finance",
     type: "finance.entry_deleted",
     refId: id,
     meta: { amount: existing.amount, description: existing.description },
+  });
+}
+
+// ── Set-aside pots (FinanceGoal rows) ───────────────────────────────────
+
+/** Put money into a pot (or take it out, with a negative amount). */
+export async function setAsideToPot(userId: string, potId: string, amountCents: number): Promise<void> {
+  requireCan(userId, "finance", "write");
+  if (!Number.isInteger(amountCents) || amountCents === 0) throw new Error("Enter an amount.");
+  const pot = await prisma.financeGoal.findFirst({ where: { id: potId, userId } });
+  if (!pot) throw new Error("That pot isn't in this space.");
+  if (pot.currentAmountCents + amountCents < 0) throw new Error(`${pot.name} only has ${(pot.currentAmountCents / 100).toFixed(2)} in it.`);
+  await prisma.financeGoal.update({
+    where: { id: pot.id },
+    data: { currentAmountCents: { increment: amountCents } },
+  });
+  await recordEvent({
+    userId,
+    tool: "finance",
+    type: "finance.set_aside",
+    refId: pot.id,
+    meta: { name: pot.name, amount: amountCents },
+  });
+}
+
+/**
+ * Mark a purchase as paid from a pot (or not, with null). The amount comes
+ * out of the pot, and the purchase stays out of the month's spending.
+ */
+export async function setEntryPot(userId: string, entryId: string, potId: string | null): Promise<void> {
+  requireCan(userId, "finance", "write");
+  const entry = await prisma.financeTransaction.findFirst({ where: { id: entryId, userId } });
+  if (!entry) throw new Error("That entry isn't in this space.");
+  if (entry.amount >= 0) throw new Error("Only purchases can be paid from a pot.");
+  const meta = readEntryMeta(entry.raw);
+  if ((meta.pot ?? null) === potId) return;
+  if (potId) {
+    const pot = await prisma.financeGoal.findFirst({ where: { id: potId, userId } });
+    if (!pot) throw new Error("That pot isn't in this space.");
+  }
+  const cost = -entry.amount;
+  // Set or clear the tag in place; an imported row keeps its original text.
+  let obj: Record<string, unknown> = { aucosto: 1 };
+  if (entry.raw) {
+    try {
+      const parsed = JSON.parse(entry.raw) as unknown;
+      obj =
+        parsed && typeof parsed === "object" && (parsed as Record<string, unknown>).aucosto === 1
+          ? (parsed as Record<string, unknown>)
+          : { aucosto: 1, original: entry.raw };
+    } catch {
+      obj = { aucosto: 1, original: entry.raw };
+    }
+  }
+  if (potId) obj.pot = potId;
+  else delete obj.pot;
+  const nextRaw = JSON.stringify(obj);
+  await prisma.$transaction(async (tx) => {
+    if (meta.pot) {
+      await tx.financeGoal.updateMany({ where: { id: meta.pot, userId }, data: { currentAmountCents: { increment: cost } } });
+    }
+    if (potId) {
+      await tx.financeGoal.updateMany({ where: { id: potId, userId }, data: { currentAmountCents: { increment: -cost } } });
+    }
+    await tx.financeTransaction.update({ where: { id: entry.id }, data: { raw: nextRaw } });
+  });
+  await recordEvent({
+    userId,
+    tool: "finance",
+    type: "finance.entry_pot_set",
+    refId: entry.id,
+    meta: { pot: potId },
   });
 }
 

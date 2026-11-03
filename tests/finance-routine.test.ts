@@ -163,10 +163,16 @@ describe("card bills", () => {
       checkingCents: 500000,
       cardsDueCents: 80000,
       billsDueCents: 250000,
+      setAsideCents: 0,
       safeCents: 170000,
       windowDays: 14,
     });
     expect(safeInChecking({ accounts: [chase], cards, bills: [] })).toBeNull();
+  });
+
+  it("keeps pot money held in checking out of what's safe to spend", () => {
+    const safe = safeInChecking({ accounts: [checking], cards: [], bills: [], setAsideCents: 120000 });
+    expect(safe).toMatchObject({ checkingCents: 500000, setAsideCents: 120000, safeCents: 380000 });
   });
 
   it("counts what was logged against checking since its balance was entered", () => {

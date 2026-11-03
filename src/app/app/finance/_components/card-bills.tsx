@@ -26,6 +26,7 @@ export type SafeView = {
   checkingCents: number;
   cardsDueCents: number;
   billsDueCents: number;
+  setAsideCents: number;
   safeCents: number;
   windowDays: number;
 };
@@ -88,7 +89,8 @@ export function CardBills({
             {safe.safeCents < 0 ? `Short ${fmt(-safe.safeCents)}` : `${fmt(safe.safeCents)} safe`}
           </span>{" "}
           in checking: {fmt(safe.checkingCents)} minus {fmt(safe.cardsDueCents + safe.billsDueCents)} in card
-          bills and other bills due in the next {safe.windowDays} days.
+          bills and other bills due in the next {safe.windowDays} days
+          {safe.setAsideCents > 0 ? `, and ${fmt(safe.setAsideCents)} set aside in pots` : ""}.
         </p>
       ) : null}
     </section>

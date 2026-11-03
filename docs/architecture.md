@@ -264,6 +264,28 @@ projection, goals). View model: `_lib/derive.ts` (older dashboard) +
   a credit-card file that's >60% positive (Amex-style). "Past imports" groups
   imported rows by `createdAt` (one insert per import; >60s gap = new import)
   and `deleteImportBatch` removes only that window's imported rows.
+- **Custom categories** (`normalizeCategory` / `spendCategoryChoices` in
+  `src/lib/finance-categories.ts`): any typed name is kept (trimmed, ≤40
+  chars, built-in spelling when it matches). Choices = built-ins + used
+  custom ones. Unknown names fall back to keyword rules only in reports.
+- **Trends + forecast** (`src/lib/finance-trends.ts`): `categoryTrends` (per
+  category per month) and `forecastNextMonth` (bills' monthly equivalent +
+  repeating charges not covered by a bill + 3-month category averages,
+  pot-funded purchases excluded).
+- **Paychecks / one-salary budget** (`src/lib/finance-paychecks.ts`,
+  `_lib/derive-salary.ts`): paychecks are FinanceBudget rows under the
+  reserved key `__pay__:<live|invest>:<name>` (per-check take-home; monthly =
+  ×26/12). `listBudgets` hides every `__` key. `salaryBudget` checks a
+  typical month against the live-on pay (50/30/20: needs = Housing,
+  Groceries, Bills & Utilities, Insurance, Transport, Health, Pets), flags a
+  dip into the invest pay, notes third-paycheck months, and suggests category
+  limits (wants trimmed first). Paychecks are recognized by amount (±3%).
+- **Pots** (set-aside money) are FinanceGoal rows: `currentAmountCents` is
+  what's set aside ("Set aside" increments it). A purchase tagged
+  `raw.pot = <goalId>` (`setEntryPot`) was paid from that pot: it decrements
+  the pot and stays out of pacing, the forecast and this month's spending;
+  edits/deletes keep the pot in step. With no savings account, pot money is
+  subtracted from safe-in-checking.
 - **Shortcut** (`/api/finance/entries`, `src/lib/finance-shortcut.ts`):
   personal HMAC keys versioned by the latest
   `finance.shortcut_key_created` event — see `docs/finance-shortcut.md`.

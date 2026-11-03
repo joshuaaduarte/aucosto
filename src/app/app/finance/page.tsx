@@ -13,6 +13,7 @@ import {
   listGoals,
   listImportBatches,
   listLinkedConnections,
+  listPaychecks,
   listStatementChecks,
   listTransactions,
   hasShortcutKey,
@@ -35,7 +36,10 @@ import {
 import { FinanceScopeSwitcher } from "./_components/scope-switcher";
 import { InsightsSection } from "./_components/insights-section";
 import { CategoryTrendsCard, NextMonthCard } from "./_components/spending-trends";
-import { categoryTrends, forecastNextMonth } from "@/lib/finance-trends";
+import { categoryTrends } from "@/lib/finance-trends";
+import { PaychecksForm, PotsCard, SalaryBudgetCard } from "./_components/salary-budget";
+import { deriveSalary, type SalaryView } from "./_lib/derive-salary";
+import { spendCategoryChoices } from "@/lib/finance-categories";
 import { PlanningSection } from "./_components/planning-section";
 import { QuickAdd } from "./_components/quick-add";
 import { PaceCard, paceHeadline } from "./_components/pace-card";
@@ -103,6 +107,7 @@ export default async function FinancePage({
     plans,
     checks,
     importBatches,
+    paychecks,
   ] = await Promise.all([
     listAccounts(userId),
     listGoals(userId),
@@ -119,9 +124,11 @@ export default async function FinancePage({
     listAccountPlans(userId),
     listStatementChecks(userId),
     listImportBatches(userId).catch(() => []),
+    listPaychecks(userId),
   ]);
 
   const data = deriveFinanceDashboard({ accounts, goals, history, count });
+  const categoryChoices = spendCategoryChoices(history);
   const tracking = deriveTracking({
     accounts,
     history,
@@ -133,6 +140,22 @@ export default async function FinancePage({
     checks: checks.checks,
     names,
     viewerUserId: context.ownerUserId,
+    now,
+  });
+  const firstName = (n: string) => n.trim().split(/\s+/)[0] ?? n;
+  const salary = deriveSalary({
+    paychecks,
+    history,
+    bills,
+    goals,
+    accounts,
+    hasLimits: tracking.categoryBudgets.length > 0,
+    people: [
+      ...(names[context.ownerUserId] ? [names[context.ownerUserId]!] : []),
+      ...Object.entries(names)
+        .filter(([id]) => id !== context.ownerUserId)
+        .map(([, n]) => n),
+    ].map(firstName),
     now,
   });
   const planning = derivePlanning({
@@ -226,6 +249,8 @@ export default async function FinancePage({
           tracking={tracking}
           planning={planning}
           accounts={accounts.map((a) => ({ id: a.id, name: a.name, kind: a.kind }))}
+          categories={categoryChoices}
+          salary={salary}
           autoFocusAdd={params.add === "1"}
         />
       ) : null}
@@ -236,10 +261,13 @@ export default async function FinancePage({
             accounts={accounts.map((a) => ({ id: a.id, name: a.name, kind: a.kind }))}
             merchants={tracking.merchants}
             defaultAccountId={tracking.defaultAccountId}
+            categories={categoryChoices}
           />
           <EntryList
             entries={tracking.entries}
             accounts={accounts.map((a) => ({ id: a.id, name: a.name }))}
+            categories={[...categoryChoices, "Income"]}
+            pots={salary.pots.map((p) => ({ id: p.id, name: p.name }))}
             initialFilter={params.filter === "to_sort" ? "to_sort" : params.filter === "pending" ? "pending" : "all"}
           />
           {count > history.length ? (
@@ -254,7 +282,7 @@ export default async function FinancePage({
           ) : null}
           {history.length > 0 ? (
             <>
-              <NextMonthCard forecast={forecastNextMonth({ history, bills, now })} />
+              <NextMonthCard forecast={salary.forecast} />
               <CategoryTrendsCard trends={categoryTrends({ history, now })} />
             </>
           ) : null}
@@ -330,6 +358,21 @@ export default async function FinancePage({
       {tab === "plan" ? (
         <div className="space-y-12">
           <SectionCard
+            title="Paychecks"
+            subtitle="Which pay you live on and which goes to saving and investing. The budget builds itself on the live-on pay."
+          >
+            <PaychecksForm initial={salary.paycheckRows} detected={salary.detectedCents} />
+          </SectionCard>
+          {salary.budget ? (
+            <SalaryBudgetCard
+              budget={salary.budget}
+              liveName={salary.liveName}
+              investName={salary.investName}
+              flexibleCents={salary.flexibleCents}
+              hasLimits={salary.hasLimits}
+            />
+          ) : null}
+          <SectionCard
             title="Monthly spending money"
             subtitle="The everyday money: groceries, eating out, shopping, fun. Each week gets a fair share of what's left."
           >
@@ -392,7 +435,7 @@ export default async function FinancePage({
 
           <PlanningSection data={data} showOutlook={false} />
 
-          <Collapsible title={goals.length ? `Edit goals (${goals.length})` : "Add a goal"} defaultOpen={goals.length === 0}>
+          <Collapsible title={goals.length ? `Edit pots and goals (${goals.length})` : "Add a goal"} defaultOpen={goals.length === 0}>
             <GoalsPanel
               goals={goals.map((goal) => ({
                 id: goal.id,
@@ -425,11 +468,15 @@ function OverviewTab({
   tracking,
   planning,
   accounts,
+  categories,
+  salary,
   autoFocusAdd,
 }: {
   tracking: TrackingView;
   planning: HouseholdPlanningData;
   accounts: Array<{ id: string; name: string; kind: string }>;
+  categories: string[];
+  salary: SalaryView;
   autoFocusAdd: boolean;
 }) {
   const nw = tracking.netWorthPoints;
@@ -454,6 +501,7 @@ function OverviewTab({
         accounts={accounts}
         merchants={tracking.merchants}
         defaultAccountId={tracking.defaultAccountId}
+        categories={categories}
         autoFocus={autoFocusAdd}
       />
       <PaceCard pacing={tracking.pacing} suggestedLimitCents={tracking.suggestedLimitCents} />
@@ -477,6 +525,25 @@ function OverviewTab({
         safe={tracking.safe}
         payFrom={payFrom ? { id: payFrom.id, name: payFrom.name } : null}
       />
+      {salary.budget ? (
+        <SalaryBudgetCard
+          budget={salary.budget}
+          liveName={salary.liveName}
+          investName={salary.investName}
+          flexibleCents={salary.flexibleCents}
+          hasLimits={salary.hasLimits}
+        />
+      ) : (
+        <Link
+          href="/app/finance?tab=plan"
+          className="block rounded-md px-4 py-3 text-[0.875rem] transition-colors"
+          style={{ background: "var(--bg-tint)", color: "var(--text)" }}
+        >
+          <span className="font-semibold">Live on one paycheck.</span> Add your paychecks and the budget builds
+          itself from your spending →
+        </Link>
+      )}
+      <PotsCard pots={salary.pots} emergencyTargetCents={salary.emergencyTargetCents} heldIn={salary.heldIn} />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <OverviewTile
           href="/app/finance?tab=accounts"

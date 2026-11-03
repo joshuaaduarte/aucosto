@@ -47,6 +47,8 @@ export type EntryMeta = {
   /** Money moved between two accounts: both rows share a pair id. */
   pair?: string;
   side?: "out" | "in";
+  /** Paid from a set-aside pot (FinanceGoal id): planned, so it stays out of the month's spending. */
+  pot?: string;
 };
 
 export function encodeEntryMeta(meta: EntryMeta): string {
@@ -71,6 +73,7 @@ export function readEntryMeta(raw: string | null | undefined): EntryMeta {
     }
     if (typeof parsed.pair === "string") meta.pair = parsed.pair;
     if (parsed.side === "out" || parsed.side === "in") meta.side = parsed.side;
+    if (typeof parsed.pot === "string") meta.pot = parsed.pot;
     return meta;
   } catch {
     return {};

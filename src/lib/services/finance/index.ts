@@ -34,6 +34,9 @@ export {
   getMoneyDateDone,
   listBills,
   listBudgets,
+  listPaychecks,
+  savePaychecks,
+  saveBudgets,
   markBillPaid,
   markMoneyDateDone,
   saveBill,
@@ -50,6 +53,8 @@ export {
 export {
   addEntry,
   addMove,
+  setAsideToPot,
+  setEntryPot,
   catchUpBalances,
   markCardPaid,
   setCardStatement,

@@ -9,6 +9,7 @@
 import type { FinanceTransaction } from "@/generated/prisma/client";
 import { resolveCategory } from "@/lib/finance-categories";
 import { isMoveEntry } from "@/lib/finance-moves";
+import { readEntryMeta } from "@/lib/finance-entries";
 import { fixedCategorySet, monthlyEquivalentCents, type PacingBill } from "@/lib/finance-pacing";
 import { findRecurringCandidates } from "@/lib/finance-summary";
 import { isTrueExpenseTransaction } from "@/lib/finance-types";
@@ -136,8 +137,9 @@ export function forecastNextMonth(input: {
     return billNames.some((n) => m.includes(n) || n.includes(m));
   };
 
-  // Repeating charges still active (seen in the last ~45 days).
-  const spend = input.history.filter(isSpend);
+  // Repeating charges still active (seen in the last ~45 days). Purchases
+  // paid from a set-aside pot were planned for, so they're left out.
+  const spend = input.history.filter((t) => isSpend(t) && !readEntryMeta(t.raw).pot);
   const recurring = findRecurringCandidates(spend, { limit: 50 }).filter(
     (r) => input.now.getTime() - r.lastDate.getTime() <= 45 * DAY_MS,
   );
