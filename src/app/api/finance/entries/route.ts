@@ -11,7 +11,7 @@
 import { NextResponse } from "next/server";
 import { runAsActor } from "@/lib/actor";
 import { resolveFinanceScopeUserId } from "@/lib/household";
-import { FINANCE_CATEGORIES } from "@/lib/finance-categories";
+import { normalizeCategory } from "@/lib/finance-categories";
 import { shortcutAmountCents, shortcutEntrySchema } from "@/lib/finance-shortcut";
 import { formatUSDFromCents } from "@/lib/money";
 import { addEntry, listAccounts, verifyShortcutKey } from "@/lib/services/finance";
@@ -44,9 +44,7 @@ export async function POST(request: Request) {
       ? (accounts.find((a) => a.name.toLowerCase() === wanted) ??
         accounts.find((a) => a.name.toLowerCase().includes(wanted)))
       : undefined;
-    const category = (FINANCE_CATEGORIES as readonly string[]).find(
-      (c) => c.toLowerCase() === body.category?.toLowerCase(),
-    );
+    const category = normalizeCategory(body.category);
     const date = body.date ? new Date(`${body.date}T12:00:00`) : new Date();
 
     const entry = await runAsActor(personUserId, () =>

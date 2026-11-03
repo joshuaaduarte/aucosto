@@ -9,7 +9,6 @@
 // (a card payment, a deposit into Robinhood): never spending.
 
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
-import { FINANCE_CATEGORIES } from "@/lib/finance-categories";
 import { filterMerchants, parseAmountInput, type MerchantSuggestion } from "@/lib/finance-entries";
 import { addFinanceEntry, addFinanceMove, deleteFinanceEntry } from "../actions";
 import { UndoToast, type UndoToastState } from "./undo-toast";
@@ -17,8 +16,6 @@ import { UndoToast, type UndoToastState } from "./undo-toast";
 export type QuickAddAccount = { id: string; name: string; kind?: string };
 
 type Mode = "out" | "in" | "move";
-
-const SPEND_CATEGORIES = FINANCE_CATEGORIES.filter((c) => c !== "Income");
 
 function localDateKey(offsetDays = 0): string {
   const d = new Date();
@@ -30,17 +27,23 @@ export function QuickAdd({
   accounts,
   merchants,
   defaultAccountId,
+  categories,
   autoFocus = false,
 }: {
   accounts: QuickAddAccount[];
   merchants: MerchantSuggestion[];
   defaultAccountId: string | null;
+  /** Built-in spending categories, then your own (spendCategoryChoices). */
+  categories: string[];
   autoFocus?: boolean;
 }) {
   const amountRef = useRef<HTMLInputElement>(null);
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<string | null>(null);
+  const [newCategory, setNewCategory] = useState<string | null>(null);
+  const [added, setAdded] = useState<string[]>([]);
+  const choices = useMemo(() => [...categories, ...added.filter((c) => !categories.includes(c))], [categories, added]);
   const [accountId, setAccountId] = useState<string>(defaultAccountId ?? "");
   const [direction, setDirection] = useState<Mode>("out");
   const [fromId, setFromId] = useState<string>(
@@ -248,7 +251,7 @@ export function QuickAdd({
 
         {direction === "out" ? (
           <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" role="radiogroup" aria-label="Category">
-            {SPEND_CATEGORIES.map((c) => {
+            {choices.map((c) => {
               const active = category === c;
               return (
                 <button
@@ -268,6 +271,44 @@ export function QuickAdd({
                 </button>
               );
             })}
+            {newCategory === null ? (
+              <button
+                type="button"
+                onClick={() => setNewCategory("")}
+                className="shrink-0 rounded-full border border-dashed px-2.5 py-1 text-[0.75rem]"
+                style={{ borderColor: "var(--border-soft)", color: "var(--text-muted)" }}
+              >
+                + New
+              </button>
+            ) : (
+              <input
+                autoFocus
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setNewCategory("");
+                    e.currentTarget.blur();
+                  }
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    e.currentTarget.blur();
+                  }
+                }}
+                onBlur={() => {
+                  const name = newCategory.trim().replace(/\s+/g, " ").slice(0, 40);
+                  if (name) {
+                    const existing = choices.find((c) => c.toLowerCase() === name.toLowerCase());
+                    if (!existing) setAdded([...added, name]);
+                    setCategory(existing ?? name);
+                  }
+                  setNewCategory(null);
+                }}
+                placeholder="New category"
+                aria-label="New category"
+                className="field w-[9rem] shrink-0 py-1 text-[0.75rem]"
+              />
+            )}
           </div>
         ) : null}
 

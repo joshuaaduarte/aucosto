@@ -75,6 +75,8 @@ export type SafeInChecking = {
   checkingCents: number;
   cardsDueCents: number;
   billsDueCents: number;
+  /** Set-aside pot money kept in checking (no savings account yet). */
+  setAsideCents: number;
   safeCents: number;
   windowDays: number;
 };
@@ -92,6 +94,8 @@ export function safeInChecking(input: {
   history?: Array<Pick<FinanceTransaction, "financeAccountId" | "amount" | "date" | "createdAt">>;
   cards: CardBill[];
   bills: Array<{ amountCents: number | null; daysUntil: number; autopay?: boolean }>;
+  /** Pot money held in checking; it isn't spendable. */
+  setAsideCents?: number;
   windowDays?: number;
 }): SafeInChecking | null {
   const windowDays = input.windowDays ?? 14;
@@ -113,11 +117,13 @@ export function safeInChecking(input: {
   const billsDueCents = input.bills
     .filter((b) => b.amountCents != null && b.daysUntil <= windowDays)
     .reduce((sum, b) => sum + Math.abs(b.amountCents ?? 0), 0);
+  const setAsideCents = Math.max(0, input.setAsideCents ?? 0);
   return {
     checkingCents,
     cardsDueCents,
     billsDueCents,
-    safeCents: checkingCents - cardsDueCents - billsDueCents,
+    setAsideCents,
+    safeCents: checkingCents - cardsDueCents - billsDueCents - setAsideCents,
     windowDays,
   };
 }

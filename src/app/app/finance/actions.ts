@@ -730,3 +730,104 @@ export async function createFinanceShortcutKey(): Promise<ShortcutKeyState> {
     return { ok: true, key: await financeService.createShortcutKey(person) };
   }, "Could not make a key.");
 }
+
+// ── Paychecks, the salary budget, set-aside pots ─────────────────────────
+
+const paychecksSchema = z
+  .array(
+    z.object({
+      name: z.string().trim().min(1).max(40),
+      role: z.enum(["live", "invest"]),
+      perCheck: z.string().max(40),
+    }),
+  )
+  .max(6);
+
+export async function saveFinancePaychecks(
+  input: Array<{ name: string; role: "live" | "invest"; perCheck: string }>,
+) {
+  return withFinanceUser(async (userId) => {
+    const rows = paychecksSchema.parse(input).filter((p) => p.perCheck.trim() !== "");
+    const paychecks = rows.map((p) => {
+      let cents: number;
+      try {
+        cents = Math.abs(parseCurrencyToCents(p.perCheck));
+      } catch {
+        throw new Error(`"${p.perCheck}" isn't an amount. Use a number like 3117.20.`);
+      }
+      return { name: p.name, role: p.role, perCheckCents: cents };
+    });
+    await financeService.savePaychecks(userId, paychecks);
+    revalidateFinance();
+    return { ok: true as const };
+  }, "Could not save the paychecks.");
+}
+
+const limitsSchema = z
+  .array(z.object({ category: z.string().trim().min(1).max(40), cents: z.number().int().positive() }))
+  .max(60);
+
+/** "Use these limits": the suggested category limits, plus the flexible total for pacing. */
+export async function applySuggestedBudget(input: {
+  limits: Array<{ category: string; cents: number }>;
+  flexibleCents: number | null;
+}) {
+  return withFinanceUser(async (userId) => {
+    const limits = limitsSchema.parse(input.limits);
+    await financeService.saveBudgets(
+      userId,
+      limits.map((l) => ({ category: l.category, monthlyLimitCents: l.cents })),
+    );
+    if (input.flexibleCents && Number.isInteger(input.flexibleCents) && input.flexibleCents > 0) {
+      await financeService.saveBudget(userId, { category: FLEXIBLE_BUDGET_KEY, monthlyLimitCents: input.flexibleCents });
+    }
+    revalidateFinance();
+    return { ok: true as const, count: limits.length };
+  }, "Could not save the budget.");
+}
+
+export async function setAsideMoney(input: { potId: string; amount: string }) {
+  return withFinanceUser(async (userId) => {
+    let cents: number;
+    try {
+      cents = parseCurrencyToCents(input.amount);
+    } catch {
+      throw new Error(`"${input.amount}" isn't an amount. Use a number like 200.`);
+    }
+    await financeService.setAsideToPot(userId, z.string().min(1).parse(input.potId), cents);
+    revalidateFinance();
+    return { ok: true as const };
+  }, "Could not set the money aside.");
+}
+
+export async function setFinanceEntryPot(entryId: string, potId: string | null) {
+  return withFinanceUser(async (userId) => {
+    await financeService.setEntryPot(userId, z.string().min(1).parse(entryId), potId ? z.string().min(1).parse(potId) : null);
+    revalidateFinance();
+    return { ok: true as const };
+  }, "Could not update the entry.");
+}
+
+export async function createFinancePot(input: {
+  name: string;
+  target: string;
+  monthly: string;
+  targetDate: string;
+  emergency?: boolean;
+}) {
+  return withFinanceUser(async (userId) => {
+    await financeService.saveGoal(userId, {
+      name: input.name,
+      owner: "shared",
+      category: input.emergency ? "emergency_fund" : "general",
+      targetAmount: input.target,
+      currentAmount: "0",
+      targetDate: /^\d{4}-\d{2}-\d{2}$/.test(input.targetDate) ? input.targetDate : "",
+      monthlyContribution: input.monthly,
+      status: "active",
+      notes: "",
+    });
+    revalidateFinance();
+    return { ok: true as const };
+  }, "Could not create the pot.");
+}

@@ -9,7 +9,15 @@ import { requireCan } from "@/lib/auth/can";
 import { findLatestEvent, recordEvent } from "@/lib/services/events";
 import { isMissingHouseholdTable } from "@/lib/household";
 import { advanceDueDate, isBillCadence } from "@/lib/finance-planning";
-import { FINANCE_CATEGORIES } from "@/lib/finance-categories";
+import { normalizeCategory } from "@/lib/finance-categories";
+import {
+  PAY_KEY_PREFIX,
+  RESERVED_BUDGET_PREFIX,
+  payKey,
+  paychecksFromBudgets,
+  type PayRole,
+  type Paycheck,
+} from "@/lib/finance-paychecks";
 import { FLEXIBLE_BUDGET_KEY } from "@/lib/finance-pacing";
 import type { FinanceBill, FinanceBudget } from "@/generated/prisma/client";
 
@@ -23,8 +31,51 @@ function degrade<T>(label: string, fallback: T) {
 export async function listBudgets(userId: string): Promise<FinanceBudget[]> {
   requireCan(userId, "finance", "read");
   return prisma.financeBudget
-    .findMany({ where: { userId }, orderBy: { category: "asc" } })
+    .findMany({ where: { userId, NOT: { category: { startsWith: RESERVED_BUDGET_PREFIX } } }, orderBy: { category: "asc" } })
     .catch(degrade("budget list", []));
+}
+
+// ── Paychecks (stored as reserved budget rows; see finance-paychecks.ts) ──
+
+export async function listPaychecks(userId: string): Promise<Paycheck[]> {
+  requireCan(userId, "finance", "read");
+  const rows = await prisma.financeBudget
+    .findMany({ where: { userId, category: { startsWith: PAY_KEY_PREFIX } } })
+    .catch(degrade("paycheck list", []));
+  return paychecksFromBudgets(rows);
+}
+
+/** Replace the paycheck list with these. */
+export async function savePaychecks(
+  userId: string,
+  paychecks: Array<{ name: string; role: PayRole; perCheckCents: number }>,
+): Promise<void> {
+  requireCan(userId, "finance", "write");
+  for (const p of paychecks) {
+    if (!p.name.trim()) throw new Error("Give each paycheck a name.");
+    if (!Number.isInteger(p.perCheckCents) || p.perCheckCents <= 0) throw new Error(`Enter ${p.name}'s take-home pay per check.`);
+  }
+  await prisma.$transaction([
+    prisma.financeBudget.deleteMany({ where: { userId, category: { startsWith: PAY_KEY_PREFIX } } }),
+    prisma.financeBudget.createMany({
+      data: paychecks.map((p) => ({ userId, category: payKey(p.role, p.name), monthlyLimitCents: p.perCheckCents })),
+    }),
+  ]);
+  await recordEvent({
+    userId,
+    tool: "finance",
+    type: "finance.paychecks_saved",
+    meta: { count: paychecks.length },
+  });
+}
+
+/** Save several category limits at once (the suggested budget). */
+export async function saveBudgets(
+  userId: string,
+  limits: Array<{ category: string; monthlyLimitCents: number }>,
+): Promise<void> {
+  requireCan(userId, "finance", "write");
+  for (const l of limits) await saveBudget(userId, l);
 }
 
 export async function saveBudget(
@@ -32,12 +83,11 @@ export async function saveBudget(
   input: { category: string; monthlyLimitCents: number },
 ): Promise<void> {
   requireCan(userId, "finance", "write");
-  if (
-    input.category !== FLEXIBLE_BUDGET_KEY &&
-    !(FINANCE_CATEGORIES as readonly string[]).includes(input.category)
-  ) {
+  const category = input.category === FLEXIBLE_BUDGET_KEY ? input.category : normalizeCategory(input.category);
+  if (!category || category === "Income" || (category !== FLEXIBLE_BUDGET_KEY && category.startsWith(RESERVED_BUDGET_PREFIX))) {
     throw new Error("Pick a category.");
   }
+  input = { ...input, category };
   if (!Number.isFinite(input.monthlyLimitCents) || input.monthlyLimitCents <= 0) {
     throw new Error("Enter a monthly amount above $0.");
   }

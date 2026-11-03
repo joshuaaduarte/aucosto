@@ -72,13 +72,16 @@ export function deriveTracking(input: {
   const flexibleBudget = input.budgets.find((b) => b.category === FLEXIBLE_BUDGET_KEY) ?? null;
   const categoryBudgets = input.budgets.filter((b) => b.category !== FLEXIBLE_BUDGET_KEY);
 
+  // Purchases paid from a set-aside pot were saved for already, so they
+  // don't count against this week's or this month's spending.
+  const spendHistory = input.history.filter((t) => !readEntryMeta(t.raw).pot);
   const pacing = buildPacing({
     flexibleLimitCents: flexibleBudget?.monthlyLimitCents ?? null,
-    transactions: input.history,
+    transactions: spendHistory,
     bills: input.bills,
     now,
   });
-  const suggestedLimitCents = suggestFlexibleLimitCents(input.history, input.bills, now);
+  const suggestedLimitCents = suggestFlexibleLimitCents(spendHistory, input.bills, now);
 
   const showWho = Object.keys(input.names).length > 1;
   // A move shows once, on its "out" row, as "From → To".
@@ -122,6 +125,7 @@ export function deriveTracking(input: {
       status: entryStatus(tx),
       byInitials: showWho && byName ? initials(byName) : null,
       byName,
+      potId: meta.pot ?? null,
     };
   });
   const toSortCount = entries.filter((e) => e.amount < 0 && !e.category && !e.move).length;
@@ -217,7 +221,18 @@ export function deriveTracking(input: {
     lastMonth: { start: lastMonthStart, ...cardMonth(input.history, c.id, lastMonthStart) },
   }));
   const billsSoon = billsDueWithin(input.bills, now, 14);
-  const safe = safeInChecking({ accounts: input.accounts, history: input.history, cards, bills: billsSoon });
+  // Until there's a savings account, pot money lives in checking and isn't spendable.
+  const hasSavings = input.accounts.some((a) => a.kind === "savings");
+  const potsSavedCents = input.goals
+    .filter((g) => g.status === "active")
+    .reduce((sum, g) => sum + Math.max(0, g.currentAmountCents), 0);
+  const safe = safeInChecking({
+    accounts: input.accounts,
+    history: input.history,
+    cards,
+    bills: billsSoon,
+    setAsideCents: hasSavings ? 0 : potsSavedCents,
+  });
   const checkIn = checkInRows({
     accounts: input.accounts,
     plans: input.plans,
