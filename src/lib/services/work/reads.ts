@@ -14,7 +14,6 @@ import {
   type WorkWorkspaceSummary,
 } from "@/lib/work";
 import {
-  ensureWorkTables,
   rowToArea,
   rowToMeeting,
   rowToNote,
@@ -44,7 +43,6 @@ export async function getOrCreateDefaultWorkspace(
 ): Promise<WorkWorkspaceSummary | null> {
   requireCan(userId, "work", "read");
   try {
-    await ensureWorkTables();
     const rows = await prisma.$queryRawUnsafe<WorkspaceRow[]>(
       `SELECT "id", "name", "description" FROM "WorkWorkspace"
        WHERE "userId" = $1 ORDER BY "createdAt" ASC LIMIT 1`,
@@ -259,7 +257,6 @@ export async function getWorkTodaySnapshot(
 ): Promise<WorkTodaySnapshot | null> {
   requireCan(userId, "work", "read");
   try {
-    await ensureWorkTables();
     const rows = await prisma.$queryRawUnsafe<WorkspaceRow[]>(
       `SELECT "id", "name", "description" FROM "WorkWorkspace"
        WHERE "userId" = $1 ORDER BY "createdAt" ASC LIMIT 1`,

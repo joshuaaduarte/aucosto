@@ -93,8 +93,8 @@ describe("personTimeSummary", () => {
     }));
     vi.doMock("@/lib/prisma", () => ({
       prisma: {
-        $executeRawUnsafe: vi.fn().mockRejectedValue(new FakeKnownError("missing")),
-        $queryRawUnsafe: vi.fn(),
+        $executeRawUnsafe: vi.fn(),
+        $queryRawUnsafe: vi.fn().mockRejectedValue(new FakeKnownError("missing")),
         timeEntry: { findFirst: vi.fn(), findMany: vi.fn() },
       },
     }));

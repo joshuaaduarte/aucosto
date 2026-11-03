@@ -1,7 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { ensureRolodexTables, listPersons } from "@/lib/services/rolodex";
+import { listPersons } from "@/lib/services/rolodex";
 
 export type MentionSourceTool =
   | "calendar"
@@ -39,7 +39,6 @@ export async function syncRolodexMentionsForText(
 ): Promise<void> {
   const names = extractRolodexMentions(input.text);
   try {
-    await ensureRolodexTables();
     await prisma.$executeRawUnsafe(
       `DELETE FROM "RolodexMention"
        WHERE "userId" = $1

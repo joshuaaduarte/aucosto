@@ -7,7 +7,6 @@ import { prisma } from "@/lib/prisma";
 import { requireCan } from "@/lib/auth/can";
 import type { DoStatus } from "@/lib/do";
 import { type DoItemSummary, summarize } from "./shared";
-import { ensureTimeEntryCalendarLinkColumn } from "@/lib/services/time-calendar";
 
 function laneRank(lane: string) {
   switch (lane) {
@@ -120,7 +119,6 @@ export async function listDoItems(
   // SQL rather than prisma migrate, so ensure it exists before querying —
   // otherwise every caller of listDoItems (assistant snapshot, web pages)
   // crashes on databases created before the column was introduced.
-  await ensureTimeEntryCalendarLinkColumn();
   const items = await prisma.doItem.findMany({
     where: {
       userId,

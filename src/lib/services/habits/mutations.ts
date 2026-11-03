@@ -9,7 +9,7 @@ import type { HabitCadence, HabitDayPart, HabitGoalUnit } from "@/lib/habits";
 import { recordEvent } from "@/lib/services/events";
 import { startEntry } from "@/lib/services/time";
 import { summarizeHabit } from "./derive";
-import { ensureHabitWindowColumns, type HabitEntryMode } from "./shared";
+import { type HabitEntryMode } from "./shared";
 
 export type SaveHabitInput = {
   title: string;
@@ -39,7 +39,6 @@ function sanitizeOptionalString(value: string | null | undefined) {
 
 export async function createHabit(userId: string, input: SaveHabitInput) {
   requireCan(userId, "habit", "write");
-  await ensureHabitWindowColumns();
   const title = sanitizeTitle(input.title);
   if (!title) throw new Error("Habit title is required.");
 
@@ -80,7 +79,6 @@ export async function createHabit(userId: string, input: SaveHabitInput) {
 
 export async function updateHabit(userId: string, id: string, input: Partial<SaveHabitInput>) {
   requireCan(userId, "habit", "write");
-  await ensureHabitWindowColumns();
   const existing = await prisma.habit.findFirst({
     where: { userId, id },
     include: {
@@ -135,7 +133,6 @@ export async function updateHabit(userId: string, id: string, input: Partial<Sav
 
 export async function archiveHabit(userId: string, id: string, archived: boolean) {
   requireCan(userId, "habit", "write");
-  await ensureHabitWindowColumns();
   const habit = await prisma.habit.update({
     where: { id },
     data: { archivedAt: archived ? new Date() : null },
@@ -188,7 +185,6 @@ export async function logHabitProgress(
   input: { quantity: number; notes?: string | null; loggedAt?: Date; mode?: HabitEntryMode },
 ) {
   requireCan(userId, "habit", "write");
-  await ensureHabitWindowColumns();
   const habit = await prisma.habit.findFirst({
     where: { userId, id: habitId },
     include: {
@@ -247,7 +243,6 @@ export async function markHabitDoneFromTimer(
   habitId: string,
 ): Promise<void> {
   requireCan(userId, "habit", "write");
-  await ensureHabitWindowColumns();
   const habit = await prisma.habit.findFirst({
     where: { userId, id: habitId, archivedAt: null },
     include: {
@@ -277,7 +272,6 @@ export async function markHabitDoneFromTimer(
 
 export async function startTimerForHabit(userId: string, habitId: string) {
   requireCan(userId, "habit", "write");
-  await ensureHabitWindowColumns();
   const habit = await prisma.habit.findFirst({
     where: { userId, id: habitId, archivedAt: null },
   });

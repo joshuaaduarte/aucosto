@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import {
-  ensureRolodexTables,
   listPersons,
   listUnresolvedMentions,
   listAllPendingFollowUps,
@@ -63,7 +62,6 @@ export default async function RolodexPage({
   searchParams: Promise<{ q?: string; type?: string; kind?: string }>;
 }) {
   try {
-    await ensureRolodexTables();
   } catch {
     // degrade gracefully — tables may not exist yet
   }

@@ -20,13 +20,11 @@ import { listDoItems } from "@/lib/services/do";
 import { listRecentEvents } from "@/lib/services/events";
 import { listHabits } from "@/lib/services/habits";
 import { listAccounts } from "@/lib/services/finance";
-import { ensureProjectBoardTables, listBoardProjects } from "@/lib/services/projects";
+import { listBoardProjects } from "@/lib/services/projects";
 import {
-  ensureProjectPlanningColumns,
   listProjectPlanSummaries,
 } from "@/lib/services/project-planning";
 import {
-  ensureRolodexTables,
   getUpcomingBirthdays,
   getDueFollowUps,
   getRecentlyMentioned,
@@ -36,7 +34,6 @@ import {
   type RecentMentionSummary,
 } from "@/lib/services/rolodex";
 import {
-  ensureInsightTables,
   listRecentInsights,
 } from "@/lib/services/captured-insights";
 import {
@@ -253,15 +250,6 @@ export async function buildAssistantSnapshot(
       return fallback;
     }
   }
-
-  await Promise.all([
-    section("ensure.project-board", undefined, () => ensureProjectBoardTables()),
-    section("ensure.project-planning", undefined, () =>
-      ensureProjectPlanningColumns(),
-    ),
-    section("ensure.rolodex", undefined, () => ensureRolodexTables()),
-    section("ensure.insights", undefined, () => ensureInsightTables()),
-  ]);
 
   const [
     runningEntry,

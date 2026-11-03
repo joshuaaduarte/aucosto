@@ -5,11 +5,9 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import {
-  ensureInsightTables,
   unlinkInsightFromPerson,
 } from "@/lib/services/captured-insights";
 import {
-  ensureRolodexTables,
   createPerson,
   updatePerson,
   addInteraction,
@@ -238,7 +236,6 @@ export async function createPersonFromMentionAction(
   const name = displayName.trim();
   if (!name) return { ok: false, error: "Display name is required." };
   try {
-    await ensureRolodexTables();
     const personId = await createPerson(userId, {
       displayName: name,
       contactKind: contactKind || "person",
@@ -263,7 +260,6 @@ export async function dismissMentionAction(
   }
   if (!mentionId) return { ok: false, error: "Missing mention id." };
   try {
-    await ensureRolodexTables();
     await dismissMention(userId, mentionId);
     revalidateRolodex();
     return { ok: true };
@@ -285,7 +281,6 @@ export async function linkMentionToPersonAction(
   }
   if (!mentionId || !personId) return { ok: false, error: "Missing ids." };
   try {
-    await ensureRolodexTables();
     await resolveMention(userId, mentionId, personId);
     revalidateRolodex(personId);
     return { ok: true, personId };
@@ -330,7 +325,6 @@ export async function createRelationAction(
     return { ok: false, error: "Cannot relate an entity to itself." };
   }
   try {
-    await ensureRolodexTables();
     await createRelation(userId, parsed.data);
     revalidateRolodex(parsed.data.fromEntityId);
     revalidateRolodex(parsed.data.toEntityId);
@@ -351,7 +345,6 @@ export async function deleteRelationAction(
   }
   if (!relationId) return { ok: false, error: "Missing relation id." };
   try {
-    await ensureRolodexTables();
     await deleteRelation(userId, relationId);
     revalidateRolodex();
     return { ok: true };
@@ -374,7 +367,6 @@ export async function unlinkInsightFromPersonAction(
   }
   if (!insightId || !personId) return { ok: false, error: "Missing ids." };
   try {
-    await ensureInsightTables();
     await unlinkInsightFromPerson(userId, insightId, personId);
     revalidateRolodex(personId);
     return { ok: true };

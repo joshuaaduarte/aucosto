@@ -3,12 +3,10 @@ import { notFound } from "next/navigation";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import { boardStatusMeta, energyTypeMeta, momentumDotColor } from "@/lib/projects";
 import {
-  ensureProjectBoardTables,
   getBoardProject,
   listAreas,
 } from "@/lib/services/projects";
 import {
-  ensureProjectPlanningColumns,
   getProjectPlan,
 } from "@/lib/services/project-planning";
 import { EditProjectSheet, type ProjectEditView } from "../_components/edit-project-sheet";
@@ -33,10 +31,6 @@ export default async function ProjectDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await Promise.all([
-    ensureProjectBoardTables(),
-    ensureProjectPlanningColumns().catch(() => {}),
-  ]);
   const { id } = await params;
   const userId = await resolveActiveUserId();
   const now = new Date();

@@ -158,175 +158,7 @@ function isoString(value: Date | string | null | undefined): string | null {
 
 // ── Ensure tables (raw SQL, memoized) ────────────────────────────────────
 
-let rolodexTablesReady: Promise<void> | null = null;
-
-export function ensureRolodexTables(): Promise<void> {
-  if (!rolodexTablesReady) {
-    rolodexTablesReady = _createRolodexTables();
-  }
-  return rolodexTablesReady;
-}
-
-async function _createRolodexTables(): Promise<void> {
-  try {
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "RolodexPerson" (
-        "id"                TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-        "userId"            TEXT NOT NULL,
-        "displayName"       TEXT NOT NULL,
-        "firstName"         TEXT,
-        "lastName"          TEXT,
-        "aliases"           TEXT,
-        "relationshipType"  TEXT,
-        "organization"      TEXT,
-        "role"              TEXT,
-        "emails"            TEXT,
-        "phones"            TEXT,
-        "addresses"         TEXT,
-        "socials"           TEXT,
-        "birthday"          TIMESTAMPTZ,
-        "importantDates"    TEXT,
-        "notes"             TEXT,
-        "preferences"       TEXT,
-        "giftIdeas"         TEXT,
-        "communicationNotes" TEXT,
-        "collaborationNotes" TEXT,
-        "sensitivities"     TEXT,
-        "createdAt"         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        "updatedAt"         TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `);
-    await prisma.$executeRawUnsafe(`
-      CREATE INDEX IF NOT EXISTS "RolodexPerson_userId_idx"
-        ON "RolodexPerson" ("userId")
-    `);
-    await prisma.$executeRawUnsafe(`
-      CREATE INDEX IF NOT EXISTS "RolodexPerson_userId_displayName_idx"
-        ON "RolodexPerson" ("userId", "displayName")
-    `);
-    await prisma.$executeRawUnsafe(`
-      ALTER TABLE "RolodexPerson"
-        ADD COLUMN IF NOT EXISTS "contactKind" TEXT NOT NULL DEFAULT 'person'
-    `);
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "RolodexInteraction" (
-        "id"             TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-        "userId"         TEXT NOT NULL,
-        "personId"       TEXT NOT NULL
-                           REFERENCES "RolodexPerson"("id") ON DELETE CASCADE,
-        "sourceTool"     TEXT,
-        "sourceRecordId" TEXT,
-        "occurredAt"     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        "title"          TEXT NOT NULL,
-        "body"           TEXT,
-        "followUpNeeded" BOOLEAN NOT NULL DEFAULT false,
-        "followUpDate"   TIMESTAMPTZ,
-        "createdAt"      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `);
-    await prisma.$executeRawUnsafe(`
-      CREATE INDEX IF NOT EXISTS "RolodexInteraction_userId_idx"
-        ON "RolodexInteraction" ("userId")
-    `);
-    await prisma.$executeRawUnsafe(`
-      CREATE INDEX IF NOT EXISTS "RolodexInteraction_personId_occurredAt_idx"
-        ON "RolodexInteraction" ("personId", "occurredAt" DESC)
-    `);
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "RolodexMention" (
-        "id"             TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-        "userId"         TEXT NOT NULL,
-        "personId"       TEXT REFERENCES "RolodexPerson"("id") ON DELETE SET NULL,
-        "mentionedName"  TEXT NOT NULL,
-        "resolved"       BOOLEAN NOT NULL DEFAULT false,
-        "sourceTool"     TEXT NOT NULL,
-        "sourceRecordId" TEXT NOT NULL,
-        "sourceField"    TEXT,
-        "createdAt"      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `);
-    await prisma.$executeRawUnsafe(`
-      CREATE INDEX IF NOT EXISTS "RolodexMention_userId_idx"
-        ON "RolodexMention" ("userId")
-    `);
-    await prisma.$executeRawUnsafe(`
-      CREATE INDEX IF NOT EXISTS "RolodexMention_userId_resolved_idx"
-        ON "RolodexMention" ("userId", "resolved")
-    `);
-    await prisma.$executeRawUnsafe(`
-      CREATE INDEX IF NOT EXISTS "RolodexMention_personId_idx"
-        ON "RolodexMention" ("personId")
-    `);
-    await prisma.$executeRawUnsafe(`
-      ALTER TABLE "RolodexMention"
-        ADD COLUMN IF NOT EXISTS "dismissed" BOOLEAN NOT NULL DEFAULT FALSE
-    `);
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "RolodexRelation" (
-        "id"           TEXT NOT NULL DEFAULT gen_random_uuid()::text PRIMARY KEY,
-        "userId"       TEXT NOT NULL,
-        "fromEntityId" TEXT NOT NULL,
-        "toEntityId"   TEXT NOT NULL,
-        "type"         TEXT NOT NULL DEFAULT 'knows',
-        "label"        TEXT,
-        "notes"        TEXT,
-        "createdAt"    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        "updatedAt"    TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `);
-    await prisma.$executeRawUnsafe(`
-      CREATE INDEX IF NOT EXISTS "RolodexRelation_userId_from_idx"
-        ON "RolodexRelation"("userId", "fromEntityId")
-    `);
-    await prisma.$executeRawUnsafe(`
-      CREATE INDEX IF NOT EXISTS "RolodexRelation_userId_to_idx"
-        ON "RolodexRelation"("userId", "toEntityId")
-    `);
-
-    // Clean up any reserved-marker mentions that leaked through before the fix
-    await _cleanupReservedMarkerMentions();
-  } catch (error) {
-    rolodexTablesReady = null;
-    console.error("[rolodex] ensureRolodexTables failed", error);
-    throw error;
-  }
-}
-
 // ── Reserved-marker cleanup (runs once on table init) ────────────────────
-
-async function _cleanupReservedMarkerMentions(): Promise<void> {
-  try {
-    const deleted = await prisma.$executeRawUnsafe(
-      `DELETE FROM "RolodexMention"
-       WHERE "resolvedPersonId" IS NULL
-         AND (
-           LOWER("mentionedName") = 'insight'
-           OR LOWER("mentionedName") LIKE 'insight %'
-         )`,
-    );
-    if (deleted > 0) {
-      console.log(`[rolodex] cleaned up ${deleted} reserved-marker mention rows`);
-    }
-  } catch {
-    // Column might not exist yet or table structure differs — safe to ignore
-    try {
-      const deleted2 = await prisma.$executeRawUnsafe(
-        `DELETE FROM "RolodexMention"
-         WHERE "personId" IS NULL
-           AND "resolved" = false
-           AND (
-             LOWER("mentionedName") = 'insight'
-             OR LOWER("mentionedName") LIKE 'insight %'
-           )`,
-      );
-      if (deleted2 > 0) {
-        console.log(`[rolodex] cleaned up ${deleted2} reserved-marker mention rows`);
-      }
-    } catch (e2) {
-      console.error("[rolodex] reserved-marker cleanup failed", e2);
-    }
-  }
-}
 
 export async function listBogusReservedPersons(
   userId: string,
@@ -443,7 +275,6 @@ export async function listPersons(
   opts: { search?: string; relationshipType?: string; contactKind?: string } = {},
 ): Promise<RolodexPersonSummary[]> {
   requireCan(userId, "rolodex", "read");
-  await ensureRolodexTables();
   try {
     const rows = await prisma.$queryRawUnsafe<(PersonRow & { lastInteractionAt: Date | null })[]>(
       `SELECT p.id, p."userId", p."displayName", p."firstName", p."lastName", p.aliases,
@@ -495,7 +326,6 @@ export async function getPerson(
   personId: string,
 ): Promise<RolodexPersonDetail | null> {
   requireCan(userId, "rolodex", "read");
-  await ensureRolodexTables();
   try {
     const rows = await prisma.$queryRawUnsafe<PersonRow[]>(
       `SELECT * FROM "RolodexPerson" WHERE "id" = $1 AND "userId" = $2 LIMIT 1`,
@@ -518,7 +348,6 @@ export async function createPerson(
   data: CreatePersonInput,
 ): Promise<string> {
   requireCan(userId, "rolodex", "write");
-  await ensureRolodexTables();
   const id = randomUUID();
   await prisma.$executeRawUnsafe(
     `INSERT INTO "RolodexPerson" (
@@ -570,7 +399,6 @@ export async function updatePerson(
   patch: Partial<CreatePersonInput>,
 ): Promise<void> {
   requireCan(userId, "rolodex", "write");
-  await ensureRolodexTables();
   const sets: string[] = [];
   const values: unknown[] = [];
   let idx = 1;
@@ -649,7 +477,6 @@ export async function addInteraction(
   data: AddInteractionInput,
 ): Promise<string> {
   requireCan(userId, "rolodex", "write");
-  await ensureRolodexTables();
   const id = randomUUID();
   const occurredAt = data.occurredAt ? new Date(data.occurredAt) : new Date();
   const followUpDate = data.followUpDate ? new Date(data.followUpDate) : null;

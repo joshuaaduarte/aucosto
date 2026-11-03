@@ -136,11 +136,11 @@ The daily command center, composed from every other tool.
 ## Rolodex (`/app/rolodex`)
 
 Contact relationship manager. No Prisma-generated client — uses raw SQL
-`ensureRolodexTables()` pattern (three tables: `RolodexPerson`,
-`RolodexInteraction`, `RolodexMention`).
+(tables: `RolodexPerson`, `RolodexInteraction`, `RolodexMention`,
+`RolodexRelation`).
 
 - **Schema:** `prisma/schema/rolodex.prisma` (for future `prisma migrate`);
-  runtime tables created by `ensureRolodexTables()` in service.
+  tables created by `scripts/consolidate-runtime-ddl.sql`.
 - **Service:** `src/lib/services/rolodex.ts` — full CRUD for persons;
   interaction log (title, body, follow-up flag/date); @mention tracking;
   `findPersonByName` (case-insensitive includes across displayName/firstName/
@@ -165,7 +165,7 @@ time entry notes, calendar descriptions, reflections, task notes, or project
 plans files the span into a queryable store linked to Rolodex people.
 
 - **Schema:** `prisma/schema/insights-capture.prisma` (`CapturedInsight`,
-  `CapturedInsightPerson`); runtime tables via `ensureInsightTables()`.
+  `CapturedInsightPerson`); tables via `scripts/consolidate-runtime-ddl.sql`.
 - **Service:** `src/lib/services/captured-insights.ts` (raw SQL; tool key
   `"insight"` in `can.ts`). Re-saving a source record replaces its insights
   (`deleteInsightsForSource` → `createInsight`) so edits don't duplicate.
@@ -194,7 +194,7 @@ human-readable control panel at `/app/assistant`. Full API reference:
   deletes. REST and MCP both execute through `assistant-execute.ts`, the
   single gate + audit write — don't re-implement the checks per surface.
 - **Audit:** `src/lib/services/assistant-audit.ts` — every preview/execute
-  writes `assistant_action_audits` (runtime-ensured table).
+  writes `assistant_action_audits` (created by `scripts/consolidate-runtime-ddl.sql`).
 - **Routes:** `/api/assistant/{snapshot,capabilities,actions/preview,
   actions/execute,actions/history}` — each one re-checks `auth()` (the
   proxy matcher excludes `/api`, so routes are their own gate).

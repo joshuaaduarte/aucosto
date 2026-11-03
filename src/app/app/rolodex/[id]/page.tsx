@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import {
-  ensureRolodexTables,
   getPerson,
   getLinkedCalendarItems,
   getLinkedTimeEntries,
@@ -10,7 +9,6 @@ import {
   listPersons,
 } from "@/lib/services/rolodex";
 import {
-  ensureInsightTables,
   listInsightsForPerson,
 } from "@/lib/services/captured-insights";
 import { getWorkContextForRolodexPerson } from "@/lib/services/work";
@@ -44,7 +42,6 @@ export default async function PersonDetailPage({
   params: Promise<{ id: string }>;
 }) {
   try {
-    await ensureRolodexTables();
   } catch {
     // degrade gracefully
   }
@@ -55,7 +52,6 @@ export default async function PersonDetailPage({
   const person = await getPerson(userId, id).catch(() => null);
   if (!person) notFound();
 
-  await ensureInsightTables().catch(() => {});
 
   const [linkedCalendar, linkedTime, personInsights, relations, allPersons, workContexts] =
     await Promise.all([

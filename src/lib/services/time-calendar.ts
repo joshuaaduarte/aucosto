@@ -3,7 +3,7 @@
 //
 // Like CalendarItem.categoryId and the TimeEntryPerson join table, the
 // `TimeEntry.calendarEventId` column is created via raw SQL
-// (`ensureTimeEntryCalendarLinkColumn`) rather than `prisma migrate` — the
+// (scripts/consolidate-runtime-ddl.sql) rather than `prisma migrate` — the
 // generated client predates it, so all access here goes through $queryRaw /
 // $executeRaw. Reads degrade gracefully when the column is missing; writes
 // surface a clear error.
@@ -66,36 +66,6 @@ function isMissingLinkColumnError(error: unknown): boolean {
   );
 }
 
-let columnReady: Promise<void> | null = null;
-
-/**
- * Idempotently add `TimeEntry.calendarEventId` (FK → CalendarItem, cleared on
- * delete) plus a covering index. Memoized per process; a failure resets the
- * memo so a cold-start DB blip retries instead of poisoning the process (same
- * shape as ensureTimeEntryPersonTable).
- */
-export function ensureTimeEntryCalendarLinkColumn(): Promise<void> {
-  if (!columnReady) {
-    columnReady = (async () => {
-      await prisma.$executeRawUnsafe(
-        'ALTER TABLE "TimeEntry" ADD COLUMN IF NOT EXISTS "calendarEventId" TEXT ' +
-          'REFERENCES "CalendarItem"("id") ON DELETE SET NULL;',
-      );
-      await prisma.$executeRawUnsafe(
-        'CREATE INDEX IF NOT EXISTS "TimeEntry_userId_calendarEventId_idx" ' +
-          'ON "TimeEntry"("userId", "calendarEventId");',
-      );
-    })()
-      .then(() => undefined)
-      .catch((error) => {
-        columnReady = null;
-        console.error("[time-calendar] ensureTimeEntryCalendarLinkColumn failed", error);
-        throw error;
-      });
-  }
-  return columnReady;
-}
-
 /**
  * Link (or unlink with `null`) a time entry to a calendar block. The stored id
  * is the backing CalendarItem id — virtual recurrence-occurrence ids resolve
@@ -108,7 +78,6 @@ export async function setEntryCalendarLink(
   calendarEventId: string | null,
 ): Promise<void> {
   requireCan(userId, "time", "write");
-  await ensureTimeEntryCalendarLinkColumn();
   const entry = await prisma.timeEntry.findFirst({
     where: { id: timeEntryId, userId },
     select: { id: true },
@@ -290,7 +259,6 @@ export async function listEntriesForCalendarEvents(
   requireCan(userId, "time", "read");
   if (eventIds.length === 0) return [];
   try {
-    await ensureTimeEntryCalendarLinkColumn();
     return await prisma.$queryRaw<LinkedTimeEntryRow[]>(Prisma.sql`
       SELECT "id", "label", "startedAt", "endedAt", "calendarEventId"
       FROM "TimeEntry"

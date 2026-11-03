@@ -1,5 +1,4 @@
 import {
-  ensureInsightTables,
   listRecentInsights,
 } from "@/lib/services/captured-insights";
 
@@ -20,7 +19,6 @@ export async function CapturedTodaySection({
 }) {
   let insights: Awaited<ReturnType<typeof listRecentInsights>> = [];
   try {
-    await ensureInsightTables();
     insights = await listRecentInsights(userId, {
       limit: 10,
       since: todayStart,

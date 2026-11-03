@@ -48,38 +48,6 @@ function isoString(val: unknown): string | null {
 
 // ── Ensure columns (idempotent) ───────────────────────────────────────────
 
-let planningColumnsReady: Promise<void> | null = null;
-
-export function ensureProjectPlanningColumns(): Promise<void> {
-  if (!planningColumnsReady) {
-    planningColumnsReady = (async () => {
-      const cols: [string, string][] = [
-        ["goal", "TEXT"],
-        ["why_it_matters", "TEXT"],
-        ["whyItMatters", "TEXT"],
-        ["open_questions", "TEXT"],
-        ["openQuestions", "TEXT"],
-        ["blockers", "TEXT"],
-        ["plan_notes", "TEXT"],
-        ["planNotes", "TEXT"],
-      ];
-      for (const [col, type] of cols) {
-        await prisma
-          .$executeRawUnsafe(
-            `ALTER TABLE "Project" ADD COLUMN IF NOT EXISTS "${col}" ${type}`,
-          )
-          .catch(() => {});
-      }
-    })()
-      .then(() => undefined)
-      .catch((error) => {
-        planningColumnsReady = null;
-        console.error("[projects] ensureProjectPlanningColumns failed", error);
-      });
-  }
-  return planningColumnsReady!;
-}
-
 // ── Service functions ─────────────────────────────────────────────────────
 
 type PlanRow = {
@@ -111,7 +79,6 @@ export async function getProjectPlan(
   projectId: string,
 ): Promise<ProjectPlan | null> {
   requireCan(userId, "projects", "read");
-  await ensureProjectPlanningColumns();
   try {
     const rows = await prisma.$queryRawUnsafe<PlanRow[]>(
       `SELECT ${PLAN_SELECT} FROM "Project" WHERE "id" = $1 AND "userId" = $2 LIMIT 1`,
@@ -142,7 +109,6 @@ export async function updateProjectPlan(
   patch: ProjectPlanPatch,
 ): Promise<void> {
   requireCan(userId, "projects", "write");
-  await ensureProjectPlanningColumns();
 
   const sets: string[] = [];
   const values: unknown[] = [];

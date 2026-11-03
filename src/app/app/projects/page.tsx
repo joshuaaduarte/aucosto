@@ -6,7 +6,6 @@ import {
   formatLastWorkedShort,
 } from "@/lib/projects";
 import {
-  ensureProjectBoardTables,
   getWeekAllocation,
   listAreas,
   listBoardProjects,
@@ -20,7 +19,6 @@ import type { AllocationSegmentView } from "./_components/time-allocation-bar";
 export const dynamic = "force-dynamic";
 
 export default async function ProjectsPage() {
-  await ensureProjectBoardTables();
   const userId = await resolveActiveUserId();
   const now = new Date();
 

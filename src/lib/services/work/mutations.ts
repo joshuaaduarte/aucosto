@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { requireCan } from "@/lib/auth/can";
 import { recordEvent } from "@/lib/services/events";
-import { ensureWorkTables } from "./shared";
 
 // Writes stay strict and throw; server actions translate to `{ error }`.
 
@@ -51,7 +50,6 @@ export async function createArea(
   input: WorkAreaInput,
 ): Promise<string> {
   requireCan(userId, "work", "write");
-  await ensureWorkTables();
   const id = randomUUID();
   await prisma.$executeRawUnsafe(
     `INSERT INTO "WorkArea" ("id", "userId", "workspaceId", "name", "description", "currentFocus")
@@ -102,7 +100,6 @@ export async function createProject(
   input: WorkProjectInput,
 ): Promise<string> {
   requireCan(userId, "work", "write");
-  await ensureWorkTables();
   const id = randomUUID();
   await prisma.$executeRawUnsafe(
     `INSERT INTO "WorkProject"
@@ -181,7 +178,6 @@ export async function createWorkPerson(
   input: WorkPersonInput,
 ): Promise<string> {
   requireCan(userId, "work", "write");
-  await ensureWorkTables();
   const id = randomUUID();
   await prisma.$executeRawUnsafe(
     `INSERT INTO "WorkPerson"
@@ -255,7 +251,6 @@ export async function createMeeting(
   input: WorkMeetingInput,
 ): Promise<string> {
   requireCan(userId, "work", "write");
-  await ensureWorkTables();
   const id = randomUUID();
   await prisma.$executeRawUnsafe(
     `INSERT INTO "WorkMeeting"
@@ -330,7 +325,6 @@ export async function createTask(
   input: WorkTaskInput,
 ): Promise<string> {
   requireCan(userId, "work", "write");
-  await ensureWorkTables();
   const id = randomUUID();
   await prisma.$executeRawUnsafe(
     `INSERT INTO "WorkTask"
@@ -437,7 +431,6 @@ export async function createNote(
   input: WorkNoteInput,
 ): Promise<string> {
   requireCan(userId, "work", "write");
-  await ensureWorkTables();
   const id = randomUUID();
   await prisma.$executeRawUnsafe(
     `INSERT INTO "WorkNote"
@@ -508,7 +501,6 @@ export async function saveReview(
   input: WorkReviewInput,
 ): Promise<void> {
   requireCan(userId, "work", "write");
-  await ensureWorkTables();
   await prisma.$executeRawUnsafe(
     `INSERT INTO "WorkReview"
        ("userId", "workspaceId", "kind", "periodKey",

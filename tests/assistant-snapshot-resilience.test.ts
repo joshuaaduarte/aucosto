@@ -11,16 +11,12 @@ const mocks = vi.hoisted(() => ({
   listRecentEvents: vi.fn(),
   listHabits: vi.fn(),
   listAccounts: vi.fn(),
-  ensureProjectBoardTables: vi.fn(),
   listBoardProjects: vi.fn(),
-  ensureProjectPlanningColumns: vi.fn(),
   listProjectPlanSummaries: vi.fn(),
-  ensureRolodexTables: vi.fn(),
   getUpcomingBirthdays: vi.fn(),
   getDueFollowUps: vi.fn(),
   getRecentlyMentioned: vi.fn(),
   listUnresolvedMentions: vi.fn(),
-  ensureInsightTables: vi.fn(),
   listRecentInsights: vi.fn(),
   getWorkAssistantSummary: vi.fn(),
   getReflection: vi.fn(),
@@ -43,22 +39,18 @@ vi.mock("@/lib/services/finance", () => ({
   listAccounts: mocks.listAccounts,
 }));
 vi.mock("@/lib/services/projects", () => ({
-  ensureProjectBoardTables: mocks.ensureProjectBoardTables,
   listBoardProjects: mocks.listBoardProjects,
 }));
 vi.mock("@/lib/services/project-planning", () => ({
-  ensureProjectPlanningColumns: mocks.ensureProjectPlanningColumns,
   listProjectPlanSummaries: mocks.listProjectPlanSummaries,
 }));
 vi.mock("@/lib/services/rolodex", () => ({
-  ensureRolodexTables: mocks.ensureRolodexTables,
   getUpcomingBirthdays: mocks.getUpcomingBirthdays,
   getDueFollowUps: mocks.getDueFollowUps,
   getRecentlyMentioned: mocks.getRecentlyMentioned,
   listUnresolvedMentions: mocks.listUnresolvedMentions,
 }));
 vi.mock("@/lib/services/captured-insights", () => ({
-  ensureInsightTables: mocks.ensureInsightTables,
   listRecentInsights: mocks.listRecentInsights,
 }));
 vi.mock("@/lib/services/work", () => ({
@@ -92,10 +84,6 @@ const D = (h: number, m = 0) => {
 };
 
 function seedHealthy() {
-  mocks.ensureProjectBoardTables.mockResolvedValue(undefined);
-  mocks.ensureProjectPlanningColumns.mockResolvedValue(undefined);
-  mocks.ensureRolodexTables.mockResolvedValue(undefined);
-  mocks.ensureInsightTables.mockResolvedValue(undefined);
   mocks.getRunningEntry.mockResolvedValue(null);
   mocks.listCalendarItems.mockResolvedValue([
     {
@@ -272,12 +260,6 @@ describe("buildAssistantSnapshot — single failing service degrades", () => {
       () =>
         mocks.getWorkAssistantSummary.mockRejectedValueOnce(new Error("boom")),
       (s) => expect(s.facts.work).toBeNull(),
-    ],
-    [
-      "ensure.project-board",
-      () =>
-        mocks.ensureProjectBoardTables.mockRejectedValueOnce(new Error("boom")),
-      (s) => expect(s.facts.today.projects).toHaveLength(1),
     ],
   ];
 
