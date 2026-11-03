@@ -16,6 +16,7 @@ import {
 } from "@/lib/statement-import";
 import type { FinanceTransaction } from "@/generated/prisma/client";
 import type { ParsedRow } from "@/lib/csv";
+import { checkRunningBalance, type RunningBalanceCheck } from "@/lib/finance-anchor";
 
 export type ImportStatementInput = {
   fileName: string;
@@ -62,22 +63,43 @@ export type ImportOptions = {
   financeAccountId?: string | null;
 };
 
+export type ImportResult = {
+  imported: number;
+  deduped: number;
+  flipped: boolean;
+  /** Null when the file has no running balance or no account was picked. */
+  balanceCheck: RunningBalanceCheck | null;
+};
+
 export async function importTransactions(
   userId: string,
   inputRows: ParsedRow[],
   options: ImportOptions = {},
-): Promise<{ imported: number; deduped: number; flipped: boolean }> {
+): Promise<ImportResult> {
   requireCan(userId, "finance", "write");
-  if (inputRows.length === 0) return { imported: 0, deduped: 0, flipped: false };
+  if (inputRows.length === 0) return { imported: 0, deduped: 0, flipped: false, balanceCheck: null };
 
   const account = options.financeAccountId
     ? await prisma.financeAccount.findFirst({
         where: { id: options.financeAccountId, userId },
-        select: { id: true, name: true, kind: true },
+        select: { id: true, name: true, kind: true, currentBalanceCents: true, balanceUpdatedAt: true },
       })
     : null;
   if (options.financeAccountId && !account) throw new Error("That account wasn't found.");
   const { rows, flipped } = prepareRowsForAccount(inputRows, account);
+  // A file with a running balance (checking exports) is checked against the
+  // balance you typed, walked back to the file's last day.
+  const balanceCheck =
+    account && rows.some((r) => r.runningBalanceCents != null)
+      ? checkRunningBalance({
+          rows,
+          account,
+          history: await prisma.financeTransaction.findMany({
+            where: { userId, financeAccountId: account.id },
+            select: { financeAccountId: true, amount: true, date: true, createdAt: true },
+          }),
+        })
+      : null;
 
   const sortedDates = rows.map((row) => row.date.getTime()).sort((a, b) => a - b);
   const existing = await prisma.financeTransaction.findMany({
@@ -92,7 +114,7 @@ export async function importTransactions(
 
   const { rowsToImport, deduped } = dedupeParsedRows(rows, existing);
   if (rowsToImport.length === 0) {
-    return { imported: 0, deduped, flipped };
+    return { imported: 0, deduped, flipped, balanceCheck };
   }
 
   // The DB has @@unique([userId, externalId]); assigning a deterministic
@@ -128,14 +150,14 @@ export async function importTransactions(
     });
   }
 
-  return { imported, deduped: totalDeduped, flipped };
+  return { imported, deduped: totalDeduped, flipped, balanceCheck };
 }
 
 export async function importStatement(
   userId: string,
   input: ImportStatementInput,
   options: ImportOptions = {},
-): Promise<StatementImportPreview & { imported: number; deduped: number; flipped: boolean }> {
+): Promise<StatementImportPreview & ImportResult> {
   requireCan(userId, "finance", "write");
 
   const preview = parseStatementPdf(input);
@@ -144,13 +166,8 @@ export async function importStatement(
     throw new Error(warning);
   }
 
-  const { imported, deduped, flipped } = await importTransactions(userId, preview.rows, options);
-  return {
-    ...preview,
-    imported,
-    deduped,
-    flipped,
-  };
+  const result = await importTransactions(userId, preview.rows, options);
+  return { ...preview, ...result };
 }
 
 export async function updateTransactionCategory(

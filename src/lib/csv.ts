@@ -6,6 +6,8 @@ export type ParsedRow = {
   description: string;
   account: string | null;
   raw: string;
+  /** The file's running balance after this row, when it has one (checking exports). */
+  runningBalanceCents?: number | null;
 };
 
 export type ParseResult = {
@@ -17,6 +19,7 @@ export type ParseResult = {
 const DATE_KEYS = [
   "date",
   "posted date",
+  "posting date",
   "posted",
   "transaction date",
   "trans date",
@@ -33,6 +36,7 @@ const DESC_KEYS = [
   "transaction",
 ];
 const ACCOUNT_KEYS = ["account", "account name", "account number"];
+const BALANCE_KEYS = ["balance", "running balance", "running bal.", "running bal"];
 
 function pick(
   headerMap: Map<string, string>,
@@ -131,6 +135,10 @@ export function parseTransactionsCsv(text: string): ParseResult {
       description: descStr.trim(),
       account: pick(headerMap, row, ACCOUNT_KEYS)?.trim() ?? null,
       raw: JSON.stringify(row),
+      runningBalanceCents: (() => {
+        const b = pick(headerMap, row, BALANCE_KEYS);
+        return b ? parseAmount(b) : null;
+      })(),
     });
   }
 

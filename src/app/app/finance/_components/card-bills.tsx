@@ -18,6 +18,8 @@ export type CardBillView = {
   dueDay: string | null;
   daysUntil: number | null;
   waitingForStatement: boolean;
+  /** Last month's charges and payments, from imports and entries. */
+  lastMonth: { label: string; chargedCents: number; paidCents: number } | null;
 };
 
 export type SafeView = {
@@ -112,6 +114,11 @@ function CardRow({ card, payFrom }: { card: CardBillView; payFrom: { id: string;
                 ? `Next due ${shortDay(card.dueDay)}. Add the statement when it arrives.`
                 : "Add the statement balance and due date"}
           </p>
+          {card.lastMonth ? (
+            <p className="text-[0.75rem] tabular" style={{ color: "var(--text-faint)" }}>
+              {card.lastMonth.label}: {fmt(card.lastMonth.chargedCents)} charged · {fmt(card.lastMonth.paidCents)} paid
+            </p>
+          ) : null}
         </div>
         {due ? (
           <span className="text-[0.9375rem] font-medium tabular" style={{ color: "var(--text)" }}>

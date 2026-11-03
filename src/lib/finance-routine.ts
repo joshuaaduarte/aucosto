@@ -8,6 +8,7 @@ import type {
   FinanceTransaction,
 } from "@/generated/prisma/client";
 import { ENTRY_PENDING } from "@/lib/finance-entries";
+import { estimateBalance } from "@/lib/finance-anchor";
 import { isMoveEntry, movedInSince } from "@/lib/finance-moves";
 import { summarizeCashflow } from "@/lib/finance-summary";
 
@@ -80,14 +81,15 @@ export type SafeInChecking = {
 
 /**
  * Checking minus the card statements and bills due in the next `windowDays`
- * (overdue ones included): what checking can spare. Checking starts from its
- * last entered balance plus anything logged against it since (a card payment
- * marked paid, a purchase), so paying a bill doesn't look like found money.
+ * (overdue ones included): what checking can spare. Checking is the "about
+ * now" estimate: its last typed balance plus anything logged against it
+ * since (a card payment marked paid, a purchase), so paying a bill doesn't
+ * look like found money.
  * Null without a checking account.
  */
 export function safeInChecking(input: {
   accounts: Array<Pick<FinanceAccount, "kind" | "currentBalanceCents"> & Partial<Pick<FinanceAccount, "id" | "balanceUpdatedAt">>>;
-  history?: Array<Pick<FinanceTransaction, "financeAccountId" | "amount" | "createdAt" | "syncSource" | "postedStatus">>;
+  history?: Array<Pick<FinanceTransaction, "financeAccountId" | "amount" | "date" | "createdAt">>;
   cards: CardBill[];
   bills: Array<{ amountCents: number | null; daysUntil: number; autopay?: boolean }>;
   windowDays?: number;
@@ -95,19 +97,15 @@ export function safeInChecking(input: {
   const windowDays = input.windowDays ?? 14;
   const checking = input.accounts.filter((a) => a.kind === "checking");
   if (checking.length === 0) return null;
-  let checkingCents = checking.reduce((sum, a) => sum + a.currentBalanceCents, 0);
+  let checkingCents = 0;
   for (const a of checking) {
-    if (!a.id || !a.balanceUpdatedAt) continue;
-    for (const t of input.history ?? []) {
-      if (
-        t.financeAccountId === a.id &&
-        t.syncSource === "manual" &&
-        t.postedStatus === ENTRY_PENDING &&
-        t.createdAt > a.balanceUpdatedAt
-      ) {
-        checkingCents += t.amount;
-      }
-    }
+    checkingCents +=
+      a.id && a.balanceUpdatedAt
+        ? estimateBalance(
+            { id: a.id, kind: a.kind, currentBalanceCents: a.currentBalanceCents, balanceUpdatedAt: a.balanceUpdatedAt },
+            input.history ?? [],
+          ).estimateCents
+        : a.currentBalanceCents;
   }
   const cardsDueCents = input.cards
     .filter((c) => !c.waitingForStatement && c.daysUntil !== null && c.daysUntil <= windowDays)

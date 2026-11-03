@@ -248,8 +248,16 @@ projection, goals). View model: `_lib/derive.ts` (older dashboard) +
   check-in with added-vs-growth split) and can mark older pending entries
   `"cleared"`. Savings rate = moves into savings/investment/retirement + the
   401k plan's monthly contribution, over logged income + that contribution.
-  Entries never change account balances; only balance updates and statement
-  checks do.
+  Entries never change typed account balances; only balance updates and
+  statement checks do.
+- **Anchors / history** (`src/lib/finance-anchor.ts`): a typed balance is the
+  truth as of `balanceUpdatedAt`. Linked rows dated before it (or same day,
+  entered before it) are history: they rebuild past balances by walking back
+  from each account's earliest snapshot (`rebuiltBalancePoints` →
+  `netWorthHistory({ rebuilt })`). Rows after it are live: "about $X now" =
+  balance + their effect (`estimateBalance`, also used for safe-in-checking).
+  CSVs with a running balance column (Chase checking) are checked against the
+  typed balance walked back to the file's last day on import.
 - **Imports / undo** (`src/lib/finance-import-batches.ts`): CSV/PDF rows are
   `syncSource = "csv"`. Picking the source account on upload sets
   `financeAccountId`, fills a missing account column with its name, and flips

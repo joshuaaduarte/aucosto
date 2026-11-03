@@ -46,6 +46,16 @@ export default async function CatchUpPage({
       year: updatedAt.getFullYear() === now.getFullYear() ? undefined : "numeric",
     }),
     owed: isLiabilityAccountKind(row.kind),
+    card:
+      mode === "catch_up" && row.kind === "credit_card"
+        ? (() => {
+            const a = accounts.find((x) => x.id === row.id)!;
+            return {
+              statementCents: a.statementBalanceCents,
+              dueDay: a.dueDate ? dayKey(a.dueDate) : null,
+            };
+          })()
+        : null,
   }));
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const confirmBefore =

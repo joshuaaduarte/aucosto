@@ -457,6 +457,14 @@ function OverviewTab({
           dueDay: c.dueDate ? dayKeyOf(c.dueDate) : null,
           daysUntil: c.daysUntil,
           waitingForStatement: c.waitingForStatement,
+          lastMonth:
+            c.lastMonth.chargedCents || c.lastMonth.paidCents
+              ? {
+                  label: c.lastMonth.start.toLocaleDateString([], { month: "long" }),
+                  chargedCents: c.lastMonth.chargedCents,
+                  paidCents: c.lastMonth.paidCents,
+                }
+              : null,
         }))}
         safe={tracking.safe}
         payFrom={payFrom ? { id: payFrom.id, name: payFrom.name } : null}

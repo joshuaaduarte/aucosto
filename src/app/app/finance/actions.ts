@@ -30,6 +30,8 @@ export type UploadState =
       bankLabel?: string;
       /** A card file listed purchases as positive; they were turned around. */
       flipped?: boolean;
+      /** The file's running balance vs your typed balance, walked back. */
+      balanceCheck?: { diffCents: number; day: string } | null;
     }
   | { ok: false; error: string }
   | undefined;
@@ -57,6 +59,14 @@ export type LinkedConnectionState =
 function revalidateFinance() {
   revalidatePath("/app");
   revalidatePath("/app/finance");
+}
+
+function checkView(check: financeService.ImportResult["balanceCheck"]) {
+  if (!check) return null;
+  return {
+    diffCents: check.diffCents,
+    day: check.asOf.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }),
+  };
 }
 
 function importAccountId(formData: FormData): string | null {
@@ -88,11 +98,11 @@ export async function uploadCsv(
       };
     }
 
-    const { imported, deduped, flipped } = await financeService.importTransactions(userId, rows, {
+    const { imported, deduped, flipped, balanceCheck } = await financeService.importTransactions(userId, rows, {
       financeAccountId: importAccountId(formData),
     });
     revalidateFinance();
-    return { ok: true, source: "csv", imported, skipped, deduped, flipped };
+    return { ok: true, source: "csv", imported, skipped, deduped, flipped, balanceCheck: checkView(balanceCheck) };
   }, "Could not import CSV.");
 }
 
@@ -124,6 +134,7 @@ export async function uploadStatementPdf(
       deduped: result.deduped,
       bankLabel: result.bankLabel,
       flipped: result.flipped,
+      balanceCheck: checkView(result.balanceCheck),
     };
   }, "Could not import statement PDF.");
 }
@@ -489,14 +500,38 @@ const catchUpSchema = z.object({
     .array(z.object({ accountId: z.string().min(1), balance: z.string().max(40) }))
     .max(200),
   confirmBefore: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+  statements: z
+    .array(
+      z.object({
+        accountId: z.string().min(1),
+        statement: z.string().max(40),
+        dueDate: z.string().max(10),
+      }),
+    )
+    .max(50)
+    .default([]),
 });
 
 export async function catchUpFinance(input: {
   balances: Array<{ accountId: string; balance: string }>;
   confirmBefore: string | null;
+  /** Cards: the last statement balance and next due date, both or neither. */
+  statements?: Array<{ accountId: string; statement: string; dueDate: string }>;
 }): Promise<{ ok: true; updated: number; confirmed: number } | { ok: false; error: string }> {
   return withFinanceUser(async (userId) => {
     const parsed = catchUpSchema.parse(input);
+    const statements = parsed.statements
+      .filter((s) => s.statement.trim() !== "")
+      .map((s) => {
+        if (!s.dueDate) throw new Error("Add the due date for each card statement you typed.");
+        let cents: number;
+        try {
+          cents = Math.abs(parseCurrencyToCents(s.statement));
+        } catch {
+          throw new Error(`"${s.statement}" isn't a statement balance. Use a number like 820.15.`);
+        }
+        return { accountId: s.accountId, statementBalanceCents: cents, dueDate: parseDateOnly(s.dueDate) };
+      });
     const balances = parsed.balances
       .filter((b) => b.balance.trim() !== "")
       .map((b) => {
@@ -508,8 +543,14 @@ export async function catchUpFinance(input: {
         }
         return { accountId: b.accountId, balanceCents: cents };
       });
-    if (balances.length === 0 && !parsed.confirmBefore) {
+    if (balances.length === 0 && !parsed.confirmBefore && statements.length === 0) {
       throw new Error("Type at least one new balance.");
+    }
+    for (const st of statements) {
+      await financeService.setCardStatement(userId, st.accountId, {
+        statementBalanceCents: st.statementBalanceCents,
+        dueDate: st.dueDate,
+      });
     }
     const result = await financeService.catchUpBalances(userId, {
       balances,

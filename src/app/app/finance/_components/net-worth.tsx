@@ -135,6 +135,9 @@ export type AccountRow = {
   pendingCount: number;
   lastCheckedThrough: Date | null;
   checkDue: boolean;
+  /** Typed balance + entries logged since; null when nothing was logged. */
+  estimateCents: number | null;
+  entriesSince: number;
 };
 
 const STATEMENT_KINDS = new Set(["checking", "savings", "credit_card"]);
@@ -178,6 +181,15 @@ export function AccountList({ accounts }: { accounts: AccountRow[] }) {
                 {owed ? (
                   <span className="block text-[0.6875rem]" style={{ color: "var(--text-faint)" }}>
                     owed
+                  </span>
+                ) : null}
+                {a.estimateCents !== null ? (
+                  <span
+                    className="block text-[0.75rem]"
+                    style={{ color: "var(--text-muted)" }}
+                    title={`${fmt(a.balanceCents)} when you last updated it, plus ${a.entriesSince} ${a.entriesSince === 1 ? "entry" : "entries"} logged since`}
+                  >
+                    about {fmt(a.estimateCents)} now
                   </span>
                 ) : null}
               </p>
