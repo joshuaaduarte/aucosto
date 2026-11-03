@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { openCommandPalette } from "./_components/command-palette";
+import { openQuickCapture } from "./_components/quick-capture";
 import { SignOutButton } from "./sign-out-button";
 
 /* ──────────────────────────────────────────────────────────────────
@@ -335,6 +336,28 @@ function SidebarContents({
           </span>
         )}
       </div>
+
+      {/* Quick capture: the desktop twin of the phone's centre "+". */}
+      <button
+        type="button"
+        onClick={() => openQuickCapture()}
+        className="mb-1 flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[0.8125rem] font-medium transition-colors hover:bg-bg-hover"
+        style={{ color: "var(--text)" }}
+      >
+        <span
+          className="inline-flex h-4 w-4 items-center justify-center rounded-full"
+          style={{ background: "var(--accent)", color: "#fff" }}
+          aria-hidden
+        >
+          <svg width="10" height="10" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M7.5 3v9M3 7.5h9" />
+          </svg>
+        </span>
+        <span>New</span>
+        <span className="ml-auto font-mono text-[0.6875rem]" style={{ color: "var(--text-ghost)" }}>
+          N
+        </span>
+      </button>
 
       {/* Search affordance — opens the global command palette */}
       {isPartner ? null : (

@@ -51,7 +51,7 @@ Cross-tool links (all via nullable FKs with `onDelete: SetNull`, except HabitEnt
 
 Other key entry points:
 - Hub page: `src/app/app/page.tsx` (fetches + composes; sections/icons/derive live in `_components/`, suggestion engine in `_lib/hub-prompts.ts`, today digest in `_lib/daily-digest.ts`).
-- Shared app-level UI lives in `src/app/app/_components/` (icons, start-timer button, hub sections, **global running-timer bar**, **mobile bottom tab bar + More sheet**, `use-body-scroll-lock.ts`).
+- Shared app-level UI lives in `src/app/app/_components/` (icons, start-timer button, hub sections, **global running-timer bar**, **mobile bottom tab bar + More sheet**, **"+" quick-capture sheet** (`quick-capture.tsx`), `use-body-scroll-lock.ts`).
 - App layout (`src/app/app/layout.tsx`): renders sidebar/tab bar/timer bar and a reflection badge read — **anything awaited here runs on every page; reads here must never throw** (wrapped in try/catch, keep it that way).
 - Health probe: `src/app/api/health/route.ts` — live commit sha, DB reachability, reflect-table presence. First stop when production misbehaves.
 - Viewer context: `src/lib/viewer-context.ts` — **read this before touching auth-adjacent code** (see below).

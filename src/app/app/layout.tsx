@@ -11,6 +11,7 @@ import { CommandPalette } from "./_components/command-palette";
 import { MobileTabBar } from "./_components/mobile-tab-bar";
 import { RunningTimerBar } from "./_components/running-timer-bar";
 import { KeyboardInsetProbe } from "./_components/keyboard-inset-probe";
+import { QuickCaptureHost } from "./_components/quick-capture";
 
 export default async function AppLayout({
   children,
@@ -96,6 +97,9 @@ export default async function AppLayout({
         </>
       ) : null}
 
+      {context ? (
+        <QuickCaptureHost financeVisible={navProps.showFinance} isPartner={isPartner} />
+      ) : null}
       {isPartner ? null : <CommandPalette />}
     </div>
   );
