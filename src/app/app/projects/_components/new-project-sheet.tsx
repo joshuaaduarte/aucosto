@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useCallback, useState, useTransition } from "react";
 import {
   AREA_COLOR_PALETTE,
   BOARD_STATUSES,
@@ -9,12 +9,14 @@ import {
 } from "@/lib/projects";
 import { createAreaAction, createProjectAction, type ProjectFormState } from "../actions";
 import { useBodyScrollLock } from "../../_components/use-body-scroll-lock";
+import { usePageAdd } from "../../_components/page-add-button";
 import type { AreaView } from "./area-badge";
 
 const initialState: ProjectFormState = undefined;
 
 export function NewProjectSheet({ areas: initialAreas }: { areas: AreaView[] }) {
   const [open, setOpen] = useState(false);
+  usePageAdd("project", useCallback(() => setOpen(true), []));
   useBodyScrollLock(open);
 
   const [state, formAction, pending] = useActionState(createProjectAction, initialState);
@@ -57,19 +59,6 @@ export function NewProjectSheet({ areas: initialAreas }: { areas: AreaView[] }) 
 
   return (
     <>
-      <button
-        type="button"
-        className="calendar-fab"
-        style={{ width: "3.5rem", padding: 0, justifyContent: "center" }}
-        onClick={() => setOpen(true)}
-        aria-label="New project"
-        title="New project"
-      >
-        <span style={{ fontSize: "1.6rem", lineHeight: 1 }} aria-hidden>
-          ＋
-        </span>
-      </button>
-
       {open ? (
         <div
           className="calendar-modal-backdrop"

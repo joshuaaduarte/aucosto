@@ -13,6 +13,7 @@ import {
   updateProjectAction,
 } from "../actions";
 import { useBodyScrollLock } from "../../_components/use-body-scroll-lock";
+import { openPageAdd } from "../../_components/page-add-button";
 import { ProjectCard, type ProjectCardView } from "./project-card";
 import { ProjectFocusCard } from "./project-focus-card";
 import { ProjectRow } from "./project-row";
@@ -426,10 +427,7 @@ function EmptyState() {
       <button
         type="button"
         className="btn-ink mt-4"
-        onClick={() => {
-          // The persistent "+" FAB owns the new-project sheet.
-          (document.querySelector(".calendar-fab") as HTMLButtonElement | null)?.click();
-        }}
+        onClick={() => openPageAdd("project")}
       >
         Create your first
       </button>

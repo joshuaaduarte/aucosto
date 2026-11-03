@@ -1,5 +1,6 @@
 import type { CalendarItem } from "@/generated/prisma/client";
 import { formatShortTime } from "../_lib/derive";
+import { PageAddButton } from "../../_components/page-add-button";
 
 export function CalendarHeader({
   totalTodayCount,
@@ -27,19 +28,22 @@ export function CalendarHeader({
   return (
     <header className="fade-in">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p
-            className="text-[0.75rem] font-medium uppercase tracking-wider"
-            style={{ color: "var(--text-faint)" }}
-          >
-            Calendar
-          </p>
-          <h1
-            className="mt-1 text-[1.5rem] font-bold tracking-tight sm:text-[1.875rem]"
-            style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
-          >
-            Today
-          </h1>
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <p
+              className="text-[0.75rem] font-medium uppercase tracking-wider"
+              style={{ color: "var(--text-faint)" }}
+            >
+              Calendar
+            </p>
+            <h1
+              className="mt-1 text-[1.5rem] font-bold tracking-tight sm:text-[1.875rem]"
+              style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
+            >
+              Today
+            </h1>
+          </div>
+          <PageAddButton target="calendar-block" label="New event" />
         </div>
         <p
           className="text-[0.8125rem] sm:max-w-[38rem] sm:text-right"

@@ -246,6 +246,39 @@ export function addMinutesToClock(clock: string, minutes: number): string {
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
+/** What the chooser's "type anything" box thinks you meant; the matching form opens prefilled, nothing saves until you confirm. */
+export type CaptureGuess = { mode: CaptureMode; text: string; amount?: string };
+
+const AMOUNT = String.raw`\$\s*(\d+(?:\.\d{1,2})?)|(\d+\.\d{2})`;
+const MONEY_FIRST = new RegExp(String.raw`^(?:${AMOUNT})\s*(?:(?:at|on|for)\s+)?(.*)$`, "i");
+const MONEY_LAST = new RegExp(String.raw`^(.+?)\s+(?:(?:for|was)\s+)?(?:${AMOUNT})$`, "i");
+
+/**
+ * "$12 coffee" / "coffee $12" / "lunch 8.50" → money; "milk, eggs" or
+ * "buy milk" → a list; anything else → a task. A dollar sign or cents is
+ * needed for money, so "2 hours of reading" stays a task. Falls back through
+ * task → list when the guess isn't available to this viewer.
+ */
+export function guessCapture(raw: string, available: readonly CaptureMode[]): CaptureGuess | null {
+  const text = raw.trim().replace(/\s+/g, " ");
+  if (!text) return null;
+  const can = (mode: CaptureMode) => available.includes(mode);
+  const first = text.match(MONEY_FIRST);
+  const last = first ? null : text.match(MONEY_LAST);
+  if (can("spend") && (first || last)) {
+    const amount = first ? (first[1] ?? first[2])! : (last![2] ?? last![3])!;
+    const rest = first ? first[3]!.trim() : last![1]!.trim();
+    return { mode: "spend", amount, text: rest };
+  }
+  const buy = text.match(/^(?:buy|get|pick up)\s+(.+)$/i);
+  if (can("list") && (text.includes(",") || buy)) {
+    return { mode: "list", text: buy ? buy[1]! : text };
+  }
+  if (can("task")) return { mode: "task", text };
+  if (can("list")) return { mode: "list", text: buy ? buy[1]! : text };
+  return null;
+}
+
 /** Recent timer labels, newest first, without repeats (case-insensitive). */
 export function recentTimerLabels(
   entries: Array<{ label: string; category: string | null }>,

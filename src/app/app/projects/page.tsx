@@ -12,6 +12,7 @@ import {
 } from "@/lib/services/projects";
 import { getWorkspaceNamesByProjectId } from "@/lib/services/work";
 import { NewProjectSheet } from "./_components/new-project-sheet";
+import { PageAddButton } from "../_components/page-add-button";
 import { ProjectList } from "./_components/project-list";
 import type { ProjectCardView } from "./_components/project-card";
 import type { AllocationSegmentView } from "./_components/time-allocation-bar";
@@ -66,13 +67,14 @@ export default async function ProjectsPage() {
 
   return (
     <div className="space-y-6">
-      <header className="fade-in">
+      <header className="fade-in flex items-center justify-between gap-3">
         <h1
           className="text-[1.5rem] font-bold tracking-tight sm:text-[1.875rem]"
           style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
         >
           Projects
         </h1>
+        <PageAddButton target="project" label="New project" />
       </header>
 
       <div className="fade-in-delay-1">

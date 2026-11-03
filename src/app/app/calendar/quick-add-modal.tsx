@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { formatMinutes } from "@/lib/do";
 import { fillIsoWindowFields } from "@/lib/wall-clock";
 import { MentionTextarea } from "@/components/mention-textarea";
 import { createCalendarBlockAction } from "./actions";
 import { CategoryPicker, type PickableCategory } from "./_components/category-picker";
 import { useBodyScrollLock } from "../_components/use-body-scroll-lock";
+import { usePageAdd } from "../_components/page-add-button";
 
 const QUICK_TEMPLATES = [
   { title: "Deep work", start: "09:00", end: "10:30" },
@@ -86,12 +87,14 @@ export function CalendarQuickAddModal({
 
   // Recompute the default window each time the modal opens cold, so it always
   // anchors to the next half-hour from *now*, not from page load.
-  function openModal() {
+  const openModal = useCallback(() => {
     const range = nextHalfHourWindow();
     setStart(range.start);
     setEnd(range.end);
     setOpen(true);
-  }
+  }, []);
+  // Opened by the header's "New event" button (the centre "+" is the only floating add button).
+  usePageAdd("calendar-block", openModal);
 
   function applyTemplate(template: (typeof QUICK_TEMPLATES)[number]) {
     setTitle(template.title);
@@ -168,20 +171,6 @@ export function CalendarQuickAddModal({
 
   return (
     <>
-      <button
-        type="button"
-        className="calendar-fab"
-        onClick={openModal}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-controls="calendar-quick-add"
-      >
-        <span className="calendar-fab__plus" aria-hidden="true">
-          +
-        </span>
-        <span>Add block</span>
-      </button>
-
       {open ? (
         <div
           className="calendar-modal-backdrop"

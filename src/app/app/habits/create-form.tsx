@@ -4,7 +4,7 @@
 // Cadence, buckets, durations, reminders, notes, and rescue plans all live
 // behind "More options" — sensible defaults otherwise (daily, anytime).
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 import {
   HABIT_CADENCE_LABELS,
   HABIT_CADENCES,
@@ -17,6 +17,7 @@ import {
 } from "@/lib/habits";
 import { createHabitAction, type HabitState } from "./actions";
 import { useBodyScrollLock } from "../_components/use-body-scroll-lock";
+import { usePageAdd } from "../_components/page-add-button";
 
 const initialState: HabitState = undefined;
 
@@ -47,6 +48,7 @@ function parseClock24(value: string): number | null {
 export function HabitCreateForm() {
   const [state, formAction, pending] = useActionState(createHabitAction, initialState);
   const [open, setOpen] = useState(false);
+  usePageAdd("habit", useCallback(() => setOpen(true), []));
   useBodyScrollLock(open);
   const [cadence, setCadence] = useState<HabitCadence>("daily");
   const [dayPart, setDayPart] = useState<HabitDayPart>("anytime");
@@ -110,13 +112,6 @@ export function HabitCreateForm() {
           New custom habit
         </button>
       </div>
-
-      <button type="button" className="calendar-fab" onClick={() => setOpen(true)}>
-        <span className="calendar-fab__plus" aria-hidden="true">
-          +
-        </span>
-        <span>Add habit</span>
-      </button>
 
       {open ? (
         <div className="calendar-modal-backdrop" role="presentation" onClick={() => setOpen(false)}>

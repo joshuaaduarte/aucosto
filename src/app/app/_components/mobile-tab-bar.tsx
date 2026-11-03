@@ -1,7 +1,8 @@
 "use client";
 
-// Bottom tab bar for phones: Today, Do, a centre "+" (quick capture: money,
-// list item, task, timer), Calendar, and More, a half-sheet with the other
+// Bottom tab bar for phones: Today, Do, a centre "+" (quick capture: a
+// chooser of everything you can add; press and hold to repeat the last
+// kind), Calendar, and More, a half-sheet with the other
 // tools and theme/sign-out. Partners get Home, Money, +, Me.
 // Tool list and grouping come from nav-model.tsx (shared with the sidebar).
 // Hidden on lg+ where the sidebar takes over. Its height is published as
@@ -10,11 +11,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Fragment, useState, useSyncExternalStore } from "react";
+import { Fragment, useRef, useState, useSyncExternalStore } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SignOutButton } from "../sign-out-button";
 import { NAV_GROUPS, NavIcon, navActive, SETTINGS_PATHS, toolByHref, visibleTools } from "./nav-model";
-import { openQuickCapture } from "./quick-capture";
+import { openLastQuickCapture, openQuickCapture } from "./quick-capture";
 import { useBodyScrollLock } from "./use-body-scroll-lock";
 
 const ip = {
@@ -52,15 +53,48 @@ const ME_TOOL: TabTool = {
   ),
 };
 
-/** Centre "+" — opens the quick-capture sheet over the current page. */
+const HOLD_MS = 450;
+
+/**
+ * Centre "+": a tap opens the quick-capture chooser over the current page;
+ * press and hold jumps straight to the last kind of thing you added.
+ */
 function PlusTab() {
+  const timer = useRef<number | null>(null);
+  const held = useRef(false);
+  const cancel = () => {
+    if (timer.current !== null) window.clearTimeout(timer.current);
+    timer.current = null;
+  };
   return (
     <div className="flex min-w-0 flex-1 items-center justify-center">
       <button
         type="button"
-        onClick={() => openQuickCapture()}
-        aria-label="Add: log money, a list item, a task or a timer"
+        onPointerDown={() => {
+          held.current = false;
+          cancel();
+          timer.current = window.setTimeout(() => {
+            held.current = true;
+            timer.current = null;
+            navigator.vibrate?.(10);
+            openLastQuickCapture();
+          }, HOLD_MS);
+        }}
+        onPointerUp={cancel}
+        onPointerLeave={cancel}
+        onPointerCancel={cancel}
+        onContextMenu={(event) => event.preventDefault()}
+        onClick={() => {
+          // The hold already opened the sheet; swallow the click that follows it.
+          if (held.current) {
+            held.current = false;
+            return;
+          }
+          openQuickCapture();
+        }}
+        aria-label="Add something (press and hold to repeat the last kind)"
         className="tabbar-plus"
+        style={{ WebkitTouchCallout: "none", userSelect: "none" }}
       >
         <svg width="20" height="20" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden>
           <path d="M7.5 3v9M3 7.5h9" />

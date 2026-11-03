@@ -221,7 +221,7 @@ Three fixed elements share the bottom of the viewport, coordinated by CSS variab
 
 - `--mobile-tabbar-height` — 3.25rem under `lg`, 0 on desktop.
 - `--timer-bar-height` — published via a `<style>` tag by the timer bar **only while it renders**, so offsets collapse when no timer runs.
-- z-index ladder: tab bar **40** → timer bar **41** → FABs (`.calendar-fab`) **42** → modal backdrops **50**. New bottom-pinned elements must join this ladder and offset with `calc(var(--mobile-tabbar-height) + var(--timer-bar-height) + var(--safe-area-bottom))`.
+- z-index ladder: tab bar **40** → timer bar **41** → (42 free; the old page FABs were removed — the tab bar's centre "+" is the one floating add button, and tool pages put a `PageAddButton` in their header) → modal backdrops **50**. New bottom-pinned elements must join this ladder and offset with `calc(var(--mobile-tabbar-height) + var(--timer-bar-height) + var(--safe-area-bottom))`.
 
 Touch affordances: hover-revealed controls add `[@media(pointer:coarse)]:opacity-100`; `btn-icon`/`btn-ink`/`btn-ghost` grow to ≥2.5rem targets under `pointer: coarse` via `min-*` (desktop untouched); `.field` inputs are ≥1rem under 640px (iOS zoom prevention). Safe-area insets need the `viewport-fit=cover` export in `src/app/layout.tsx`. Modals: bottom sheets on mobile, centered on desktop (`.calendar-modal*`); every modal calls `useBodyScrollLock` (reference-counted) and any modal nested in an animated section should portal to `document.body` (see lessons #6).
 
