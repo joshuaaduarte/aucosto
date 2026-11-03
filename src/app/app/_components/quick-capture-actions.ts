@@ -2,14 +2,20 @@
 
 // Data for the "+" quick-capture sheet, loaded when the sheet opens (not on
 // every page render): accounts, shops you've used, your categories, your
-// shared lists, Home chores and recent timer labels. Every read degrades to empty, so the
+// shared lists, Home chores, recent timer labels, today's habits, whether
+// today is reflected, people and the Work workspace. Every read degrades to empty, so the
 // sheet still opens if one tool's data can't load.
 
 import { lastUsedAccountId, merchantSuggestions, type MerchantSuggestion } from "@/lib/finance-entries";
 import { spendCategoryChoices } from "@/lib/finance-categories";
 import { isMoveEntry } from "@/lib/finance-moves";
 import { homeDaysUntil, homeDueLabel } from "@/lib/home";
-import { choresToOffer, rankCategories, recentTimerLabels } from "@/lib/quick-capture";
+import { choresToOffer, habitsToOffer, rankCategories, recentTimerLabels } from "@/lib/quick-capture";
+import { dayKey } from "@/lib/reflect";
+import { listHabits } from "@/lib/services/habits";
+import { getReflection } from "@/lib/services/reflect";
+import { listPersons } from "@/lib/services/rolodex";
+import { getDefaultWorkspace, listAreas, listProjects } from "@/lib/services/work";
 import { listAccounts, listTransactions } from "@/lib/services/finance";
 import { isHomeReady, listHomeLists, listHomeTasks } from "@/lib/services/home";
 import { listRecentEntries } from "@/lib/services/time";
@@ -26,15 +32,41 @@ export type QuickCaptureData = {
   /** Home chores and upkeep, due soonest first (for "Chore done"). */
   chores: Array<{ id: string; title: string; daysUntil: number; dueLabel: string }>;
   timers: Array<{ label: string; category: string | null }>;
+  /** Habits due today and not yet done. */
+  habits: Array<{ id: string; title: string; targetLabel: string }>;
+  reflectedToday: boolean;
+  people: Array<{ id: string; name: string; lastAt: string | null }>;
+  /** Null until Work is set up (a workspace with at least one area or project). */
+  work: { workspaceId: string; projects: Array<{ id: string; name: string }> } | null;
 };
+
+
+async function loadWork(userId: string): Promise<QuickCaptureData["work"]> {
+  const workspace = await getDefaultWorkspace(userId);
+  if (!workspace) return null;
+  const [areas, projects] = await Promise.all([listAreas(userId, workspace.id), listProjects(userId, workspace.id)]);
+  if (areas.length === 0 && projects.length === 0) return null;
+  return {
+    workspaceId: workspace.id,
+    projects: projects
+      .filter((project) => project.status !== "done")
+      .slice(0, 8)
+      .map((project) => ({ id: project.id, name: project.name })),
+  };
+}
 
 export async function loadQuickCapture(): Promise<QuickCaptureData> {
   const context = await getViewerContext();
-  if (!context) return { finance: null, lists: [], chores: [], timers: [] };
+  if (!context) {
+    return { finance: null, lists: [], chores: [], timers: [], habits: [], reflectedToday: false, people: [], work: null };
+  }
   const isPartner = context.role === "partner";
 
   const homeReady = isHomeReady(context.homeUserId).catch(() => false);
-  const [finance, lists, chores, timers] = await Promise.all([
+  const owner = !isPartner;
+  const now = new Date();
+  const userId = context.effectiveUserId;
+  const [finance, lists, chores, timers, habits, reflectedToday, people, work] = await Promise.all([
     context.financeVisible
       ? Promise.all([
           listAccounts(context.financeUserId),
@@ -72,7 +104,6 @@ export async function loadQuickCapture(): Promise<QuickCaptureData> {
     homeReady
       .then((ready) => (ready ? listHomeTasks(context.homeUserId) : []))
       .then((tasks) => {
-        const now = new Date();
         return choresToOffer(
           tasks.map((task) => ({ id: task.id, title: task.title, daysUntil: homeDaysUntil(task.nextDueAt, now) })),
         ).map((task) => ({ ...task, dueLabel: homeDueLabel(task.daysUntil) }));
@@ -83,7 +114,29 @@ export async function loadQuickCapture(): Promise<QuickCaptureData> {
       : listRecentEntries(context.effectiveUserId, { limit: 40 })
           .then((entries) => recentTimerLabels(entries))
           .catch(() => []),
+    owner
+      ? listHabits(userId)
+          .then((rows) =>
+            habitsToOffer(rows, now.getHours()).map((habit) => ({
+              id: habit.id,
+              title: habit.title,
+              targetLabel: habit.targetLabel,
+            })),
+          )
+          .catch(() => [])
+      : Promise.resolve([]),
+    owner
+      ? getReflection(userId, dayKey(now))
+          .then((row) => row !== null)
+          .catch(() => false)
+      : Promise.resolve(false),
+    owner
+      ? listPersons(userId)
+          .then((rows) => rows.map((person) => ({ id: person.id, name: person.displayName, lastAt: person.lastInteractionAt })))
+          .catch(() => [])
+      : Promise.resolve([]),
+    owner ? loadWork(userId).catch(() => null) : Promise.resolve(null),
   ]);
 
-  return { finance, lists, chores, timers };
+  return { finance, lists, chores, timers, habits, reflectedToday, people, work };
 }

@@ -34,6 +34,22 @@ import {
 // Reads power page/widget rendering — degrade to empty on failure so a
 // missing table can never take down the hub (lessons #2–#4).
 
+/** The existing workspace, without creating one (for read-only callers like the "+" sheet). */
+export async function getDefaultWorkspace(userId: string): Promise<WorkWorkspaceSummary | null> {
+  requireCan(userId, "work", "read");
+  try {
+    const rows = await prisma.$queryRawUnsafe<WorkspaceRow[]>(
+      `SELECT "id", "name", "description" FROM "WorkWorkspace"
+       WHERE "userId" = $1 ORDER BY "createdAt" ASC LIMIT 1`,
+      userId,
+    );
+    return rows[0] ?? null;
+  } catch (error) {
+    console.error("[work] getDefaultWorkspace failed", error);
+    return null;
+  }
+}
+
 /**
  * The single Work workspace for now. Creates "Lucid" on first use so the
  * Work Hub is immediately usable without a seed script.

@@ -86,7 +86,18 @@ export function financeCategoryLook(category: string | null | undefined): {
 // viewer's menu (see nav-model's visibleTools), so a household partner,
 // whose menu is Home + Money, can only ever get Home and Money entries.
 
-export type CaptureMode = "spend" | "list" | "chore-done" | "chore-new" | "task" | "timer";
+export type CaptureMode =
+  | "spend"
+  | "list"
+  | "chore-done"
+  | "chore-new"
+  | "task"
+  | "event"
+  | "timer"
+  | "habit"
+  | "reflect"
+  | "person"
+  | "work-note";
 
 export type CaptureEntry = {
   mode: CaptureMode;
@@ -102,7 +113,12 @@ export const CAPTURE_ENTRIES: CaptureEntry[] = [
   { mode: "chore-done", label: "Chore done", emoji: "✅", tool: "/app/home" },
   { mode: "chore-new", label: "New chore", emoji: "🧹", tool: "/app/home" },
   { mode: "task", label: "Task", emoji: "📝", tool: "/app/do" },
+  { mode: "event", label: "Event", emoji: "📅", tool: "/app/calendar" },
   { mode: "timer", label: "Timer", emoji: "⏱️", tool: "/app/time" },
+  { mode: "habit", label: "Habit done", emoji: "🔁", tool: "/app/habits" },
+  { mode: "reflect", label: "How was today", emoji: "🌙", tool: "/app/reflect" },
+  { mode: "person", label: "Note about someone", emoji: "👤", tool: "/app/rolodex" },
+  { mode: "work-note", label: "Work note", emoji: "💼", tool: "/app/work" },
 ];
 
 /** The entries a viewer can use: only those whose tool is in their menu. */
@@ -117,26 +133,44 @@ const PAGE_MODE: Array<[prefix: string, mode: CaptureMode]> = [
   ["/app/home", "list"],
   ["/app/do", "task"],
   ["/app/time", "timer"],
+  ["/app/calendar", "event"],
+  ["/app/habits", "habit"],
+  ["/app/reflect", "reflect"],
+  ["/app/rolodex", "person"],
+  ["/app/work", "work-note"],
 ];
 
 /**
+ * The entry that fits the hour: today's reflection in the evening (until it's
+ * done), habits in the morning. Undefined the rest of the day.
+ */
+export function hourCaptureMode(hour: number, reflectedToday: boolean): CaptureMode | undefined {
+  if (hour >= 18 && !reflectedToday) return "reflect";
+  if (hour >= 5 && hour < 11) return "habit";
+  return undefined;
+}
+
+/**
  * Up to three entries to put on top: the one that fits the current page,
- * then the ones used most in the recent history (newest first), then the
- * built-in order. Only entries in `available` are returned, without repeats.
+ * then the one that fits the hour, then the ones used most in the recent
+ * history (newest first), then the built-in order. Only entries in `available` are returned, without repeats.
  */
 export function suggestCaptureModes(input: {
   available: readonly CaptureMode[];
   pathname: string;
   recent: readonly string[];
+  /** From hourCaptureMode. */
+  hourMode?: CaptureMode;
   limit?: number;
 }): CaptureMode[] {
-  const { available, pathname, recent, limit = 3 } = input;
+  const { available, pathname, recent, hourMode, limit = 3 } = input;
   const ok = new Set(available);
   const out: CaptureMode[] = [];
   const push = (mode: string | undefined) => {
     if (mode && ok.has(mode as CaptureMode) && !out.includes(mode as CaptureMode)) out.push(mode as CaptureMode);
   };
   push(PAGE_MODE.find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`))?.[1]);
+  push(hourMode);
   const counts = new Map<string, number>();
   recent.forEach((mode) => counts.set(mode, (counts.get(mode) ?? 0) + 1));
   [...counts.entries()]
@@ -154,6 +188,62 @@ export function rememberCaptureMode(recent: readonly string[], mode: CaptureMode
 /** Chores worth offering under "Chore done": due soonest first, at most six. */
 export function choresToOffer<T extends { daysUntil: number; title: string }>(tasks: readonly T[], limit = 6): T[] {
   return [...tasks].sort((a, b) => a.daysUntil - b.daysUntil || a.title.localeCompare(b.title)).slice(0, limit);
+}
+
+/** Habits worth offering under "Habit done": due today and not yet done, morning ones first in the morning. */
+export function habitsToOffer<T extends { dueToday: boolean; completedToday: boolean; dayPart: string }>(
+  habits: readonly T[],
+  hour: number,
+  limit = 8,
+): T[] {
+  const part = hour < 11 ? "morning" : hour < 17 ? "afternoon" : "evening";
+  const rank = (habit: T) => (habit.dayPart === part ? 0 : habit.dayPart === "anytime" ? 1 : 2);
+  return habits
+    .filter((habit) => habit.dueToday && !habit.completedToday)
+    .map((habit, index) => ({ habit, index }))
+    .sort((a, b) => rank(a.habit) - rank(b.habit) || a.index - b.index)
+    .map(({ habit }) => habit)
+    .slice(0, limit);
+}
+
+/**
+ * People to offer under "Note about someone": with no search, the ones you
+ * were last in touch with; with a search, name matches (starts-with first).
+ */
+export function peopleToOffer<T extends { name: string; lastAt: string | null }>(
+  people: readonly T[],
+  query: string,
+  limit = 6,
+): T[] {
+  const q = query.trim().toLowerCase();
+  if (!q) {
+    return [...people]
+      .sort((a, b) => (b.lastAt ?? "").localeCompare(a.lastAt ?? "") || a.name.localeCompare(b.name))
+      .slice(0, limit);
+  }
+  return people
+    .filter((person) => person.name.toLowerCase().includes(q))
+    .sort((a, b) => {
+      const aStarts = a.name.toLowerCase().startsWith(q) ? 0 : 1;
+      const bStarts = b.name.toLowerCase().startsWith(q) ? 0 : 1;
+      return aStarts - bStarts || a.name.localeCompare(b.name);
+    })
+    .slice(0, limit);
+}
+
+/** "HH:mm" for the next half hour after `now` (14:10 → 14:30, 14:40 → 15:00). */
+export function nextHalfHour(now: Date): string {
+  const d = new Date(now);
+  d.setSeconds(0, 0);
+  d.setMinutes(d.getMinutes() < 30 ? 30 : 60);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/** "HH:mm" plus `minutes`, wrapping past midnight (for an event's end field). */
+export function addMinutesToClock(clock: string, minutes: number): string {
+  const [h, m] = clock.split(":").map(Number);
+  const total = (((h ?? 0) * 60 + (m ?? 0) + minutes) % 1440 + 1440) % 1440;
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
 /** Recent timer labels, newest first, without repeats (case-insensitive). */
