@@ -16,6 +16,7 @@ export {
   updateMatchingTransactionCategories,
   updateTransactionCategory,
   type ImportOptions,
+  type ImportResult,
   type ImportStatementInput,
 } from "./transactions";
 export {

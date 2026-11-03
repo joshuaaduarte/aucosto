@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
+import { formatUSDFromCents } from "@/lib/money";
 import { uploadCsv, uploadStatementPdf, type UploadState } from "./actions";
 
 const initialState: UploadState = undefined;
@@ -40,6 +41,20 @@ function UploadStatus({ state }: { state: UploadState }) {
         <>
           {" · "}purchases on this card were listed as positive, so they were turned into spending
         </>
+      ) : null}
+      {state.balanceCheck ? (
+        state.balanceCheck.diffCents === 0 ? (
+          <>{" · "}adds up: the file&rsquo;s balance on {state.balanceCheck.day} matches yours</>
+        ) : (
+          <>
+            {" · "}
+            <span className="not-italic font-semibold">
+              doesn&rsquo;t add up by {formatUSDFromCents(Math.abs(state.balanceCheck.diffCents))} on{" "}
+              {state.balanceCheck.day}
+            </span>
+            : a month may be missing between this file and your balance, or a row is off
+          </>
+        )
       ) : null}
       {state.skipped > 0 ? (
         <>

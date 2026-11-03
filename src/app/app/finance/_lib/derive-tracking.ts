@@ -34,6 +34,7 @@ import {
 import { summarizeCashflow } from "@/lib/finance-summary";
 import { billsDueWithin } from "@/lib/finance-planning";
 import { isMoveEntry } from "@/lib/finance-moves";
+import { cardMonth, estimateBalance, rebuiltBalancePoints } from "@/lib/finance-anchor";
 import {
   cardBills,
   checkInRows,
@@ -137,6 +138,7 @@ export function deriveTracking(input: {
   const netWorthPoints = netWorthHistory({
     accounts: input.accounts,
     snapshots: input.snapshots,
+    rebuilt: rebuiltBalancePoints({ accounts: input.accounts, snapshots: input.snapshots, history: input.history }),
     now,
     months: 12,
   });
@@ -188,12 +190,15 @@ export function deriveTracking(input: {
     const checkDue =
       STATEMENT_KINDS.has(a.kind) &&
       (checked ? now.getTime() - checked.getTime() > 35 * DAY_MS : pending > 0);
+    const estimate = estimateBalance(a, input.history);
     return {
       id: a.id,
       name: a.name,
       kind: a.kind,
       balanceCents: a.currentBalanceCents,
       balanceUpdatedAt: a.balanceUpdatedAt,
+      estimateCents: estimate.entriesSince > 0 ? estimate.estimateCents : null,
+      entriesSince: estimate.entriesSince,
       pendingCount: pending,
       lastCheckedThrough: checked,
       checkDue,
@@ -204,7 +209,13 @@ export function deriveTracking(input: {
   );
 
   // Card bills against checking, the monthly check-in, savings rate.
-  const cards = cardBills(input.accounts, now);
+  // Each card's last full month from the history (imported or logged), so
+  // you can see how you got to what's owed.
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const cards = cardBills(input.accounts, now).map((c) => ({
+    ...c,
+    lastMonth: { start: lastMonthStart, ...cardMonth(input.history, c.id, lastMonthStart) },
+  }));
   const billsSoon = billsDueWithin(input.bills, now, 14);
   const safe = safeInChecking({ accounts: input.accounts, history: input.history, cards, bills: billsSoon });
   const checkIn = checkInRows({

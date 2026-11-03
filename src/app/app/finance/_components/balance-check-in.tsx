@@ -24,6 +24,8 @@ export type CheckInRowView = {
   daysSinceUpdate: number;
   addedSinceCents: number;
   owed: boolean;
+  /** Catch up, credit cards only: the bill as it stands today. */
+  card: { statementCents: number | null; dueDay: string | null } | null;
 };
 
 function fmt(cents: number) {
@@ -41,6 +43,20 @@ function parseBalance(value: string): number | null {
   return Math.round(Number(cleaned) * 100);
 }
 
+function billsFrom(rows: CheckInRowView[]): Record<string, { statement: string; dueDate: string }> {
+  return Object.fromEntries(
+    rows
+      .filter((r) => r.card)
+      .map((r) => [
+        r.id,
+        {
+          statement: r.card!.statementCents != null ? (Math.abs(r.card!.statementCents) / 100).toFixed(2) : "",
+          dueDate: r.card!.dueDay ?? "",
+        },
+      ]),
+  );
+}
+
 export function BalanceCheckIn({
   rows,
   mode,
@@ -53,6 +69,8 @@ export function BalanceCheckIn({
 }) {
   const router = useRouter();
   const [values, setValues] = useState<Record<string, string>>({});
+  const [initialBills] = useState(() => billsFrom(rows));
+  const [bills, setBills] = useState(initialBills);
   const [confirmOld, setConfirmOld] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -72,6 +90,10 @@ export function BalanceCheckIn({
       const result = await catchUpFinance({
         balances: rows.map((r) => ({ accountId: r.id, balance: values[r.id] ?? "" })),
         confirmBefore: mode === "catch_up" && confirmOld && confirmBefore?.count ? confirmBefore.day : null,
+        // Only cards whose bill you changed.
+        statements: Object.entries(bills)
+          .filter(([id, b]) => b.statement !== initialBills[id]?.statement || b.dueDate !== initialBills[id]?.dueDate)
+          .map(([accountId, b]) => ({ accountId, ...b })),
       });
       if (!result.ok) {
         setError(result.error);
@@ -161,6 +183,30 @@ export function BalanceCheckIn({
                   className="field w-[9.5rem] pl-7 tabular"
                 />
               </label>
+              {row.card ? (
+                <div className="flex w-full flex-wrap items-end gap-2 pl-0 text-[0.75rem]" style={{ color: "var(--text-muted)" }}>
+                  <span className="w-full">Card bill as of today. Leave the statement blank if nothing is due.</span>
+                  <label>
+                    Statement balance
+                    <input
+                      value={bills[row.id]?.statement ?? ""}
+                      onChange={(e) => setBills({ ...bills, [row.id]: { ...bills[row.id]!, statement: e.target.value } })}
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      className="field mt-1 block w-[8.5rem] tabular"
+                    />
+                  </label>
+                  <label>
+                    Due
+                    <input
+                      type="date"
+                      value={bills[row.id]?.dueDate ?? ""}
+                      onChange={(e) => setBills({ ...bills, [row.id]: { ...bills[row.id]!, dueDate: e.target.value } })}
+                      className="field mt-1 block"
+                    />
+                  </label>
+                </div>
+              ) : null}
             </li>
           );
         })}

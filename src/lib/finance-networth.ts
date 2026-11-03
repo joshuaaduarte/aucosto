@@ -98,12 +98,14 @@ export function netWorthAt(
 export function netWorthHistory(input: {
   accounts: NetWorthAccount[];
   snapshots: BalancePoint[];
+  /** Past balances rebuilt from imported history (finance-anchor.ts). */
+  rebuilt?: BalancePoint[];
   now: Date;
   months?: number;
 }): NetWorthPoint[] {
   const months = input.months ?? 12;
   const pointsByAccount = new Map<string, BalancePoint[]>();
-  for (const s of input.snapshots) {
+  for (const s of [...(input.rebuilt ?? []), ...input.snapshots]) {
     const list = pointsByAccount.get(s.financeAccountId) ?? [];
     list.push(s);
     pointsByAccount.set(s.financeAccountId, list);
