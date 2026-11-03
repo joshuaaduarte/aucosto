@@ -9,7 +9,7 @@ import { listBills } from "@/lib/services/finance";
 import { isHomeReady, listHomeLists, listHomeTasks } from "@/lib/services/home";
 import { requireViewerContext } from "@/lib/viewer-context";
 import { HomeLists, type ListView } from "./_components/lists";
-import { AddTask, TaskList, type MemberOption, type TaskView } from "./_components/tasks";
+import { ChoreBoard, type MemberOption, type TaskView } from "./_components/tasks";
 
 export const dynamic = "force-dynamic";
 
@@ -72,14 +72,12 @@ export default async function HomePage() {
         }`
       : null,
   }));
-  const dueNow = taskViews.filter((t) => t.daysUntil <= 0);
-  const chores = taskViews.filter((t) => t.kind === "chore");
-  const maintenance = taskViews.filter((t) => t.kind === "maintenance");
   const billsSoon = billsDueWithin(bills, now, 7);
 
   const listViews: ListView[] = lists.map((list) => ({
     id: list.id,
     name: list.name,
+    emoji: list.emoji,
     items: list.items.map((item) => ({
       id: item.id,
       title: item.title,
@@ -99,61 +97,52 @@ export default async function HomePage() {
           : "Lists, chores and maintenance. Invite someone from Settings to share them."
       }
     >
-      <Section title="Needs doing">
-        {dueNow.length === 0 && billsSoon.length === 0 ? (
-          <p className="text-[0.875rem]" style={faint}>
-            Nothing due. Nice.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {dueNow.length ? (
-              <TaskList tasks={dueNow} members={memberOptions} empty="" />
-            ) : null}
-            {billsSoon.length ? (
-              <ul className="space-y-1">
-                {billsSoon.map((bill) => (
-                  <li key={bill.id} className="text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
-                    <Link href="/app/finance?tab=plan#budgets" className="hover:underline">
-                      {bill.name}
-                      {bill.amountCents != null ? ` · ${formatUSDFromCents(bill.amountCents)}` : ""}
-                    </Link>{" "}
-                    <span style={bill.daysUntil <= 1 && !bill.autopay ? { color: "var(--accent-strong)" } : faint}>
-                      {dueLabel(bill.daysUntil)}
-                      {bill.autopay ? " (autopay)" : ""}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-        )}
-      </Section>
-
       <Section title="Lists">
         <HomeLists lists={listViews} showAttribution={shared} />
       </Section>
 
-      <Section title="Chores">
-        <div className="space-y-3">
-          <TaskList tasks={chores} members={memberOptions} empty="No chores yet. Add the ones that repeat." />
-          <AddTask kind="chore" members={memberOptions} today={today} />
-        </div>
-      </Section>
+      {billsSoon.length ? (
+        <Section title="Bills this week">
+          <ul className="rounded-lg border" style={{ borderColor: "var(--border-soft)" }}>
+            {billsSoon.map((bill) => {
+              const urgent = bill.daysUntil <= 1 && !bill.autopay;
+              return (
+                <li key={bill.id} className="border-t first:border-t-0" style={{ borderColor: "var(--border-faint)" }}>
+                  <Link
+                    href="/app/finance?tab=plan#budgets"
+                    className="flex items-center justify-between gap-3 px-3 py-2.5 text-[0.875rem] hover:bg-bg-hover"
+                  >
+                    <span style={{ color: "var(--text)" }}>
+                      {bill.name}
+                      {bill.amountCents != null ? (
+                        <span className="tabular" style={{ color: "var(--text-muted)" }}>
+                          {" "}
+                          {formatUSDFromCents(bill.amountCents)}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="text-[0.75rem]" style={urgent ? { color: "var(--attention)" } : faint}>
+                      {dueLabel(bill.daysUntil)}
+                      {bill.autopay ? " · autopay" : ""}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </Section>
+      ) : null}
 
-      <Section title="Home maintenance">
-        <div className="space-y-3">
-          <TaskList
-            tasks={maintenance}
-            members={memberOptions}
-            empty="Filters, detectors, vents: the things that are easy to forget."
-          />
-          <AddTask kind="maintenance" members={memberOptions} today={today} />
-        </div>
+      <Section title="Chores and upkeep">
+        <ChoreBoard tasks={taskViews} members={memberOptions} viewerUserId={context.ownerUserId} today={today} />
       </Section>
 
       {shared && events.length ? (
-        <Section title="Recent activity">
-          <ul className="space-y-1">
+        <details className="group">
+          <summary className="cursor-pointer text-[0.6875rem] font-semibold uppercase tracking-wider" style={faint}>
+            Recent activity
+          </summary>
+          <ul className="mt-3 space-y-1">
             {events.map((event) => {
               const meta = (event.meta ?? {}) as { actorUserId?: string };
               const who = nameOf(meta.actorUserId ?? null) ?? "Someone";
@@ -167,7 +156,7 @@ export default async function HomePage() {
               );
             })}
           </ul>
-        </Section>
+        </details>
       ) : null}
     </Shell>
   );
