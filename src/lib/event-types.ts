@@ -31,6 +31,7 @@ const EVENT_LABELS: Record<string, string> = {
 
   // finance — imports and clears
   "finance.imported": "imported transactions",
+  "finance.import_undone": "undid an import",
   "finance.cleared": "cleared finance data",
 
   // finance — linked banks

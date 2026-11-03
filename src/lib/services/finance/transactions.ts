@@ -5,6 +5,12 @@ import { recordEvent } from "@/lib/services/events";
 import { inferCategory } from "@/lib/finance-categories";
 import { csvRowExternalId, dedupeParsedRows } from "@/lib/finance-import";
 import {
+  groupImportBatches,
+  IMPORT_SYNC_SOURCE,
+  prepareRowsForAccount,
+  type ImportBatch,
+} from "@/lib/finance-import-batches";
+import {
   parseStatementPdf,
   type StatementImportPreview,
 } from "@/lib/statement-import";
@@ -51,12 +57,27 @@ export async function getSpendCentsSince(
   return Math.abs(agg._sum.amount ?? 0);
 }
 
+export type ImportOptions = {
+  /** The account the file came from: links rows to it and fixes card signs. */
+  financeAccountId?: string | null;
+};
+
 export async function importTransactions(
   userId: string,
-  rows: ParsedRow[],
-): Promise<{ imported: number; deduped: number }> {
+  inputRows: ParsedRow[],
+  options: ImportOptions = {},
+): Promise<{ imported: number; deduped: number; flipped: boolean }> {
   requireCan(userId, "finance", "write");
-  if (rows.length === 0) return { imported: 0, deduped: 0 };
+  if (inputRows.length === 0) return { imported: 0, deduped: 0, flipped: false };
+
+  const account = options.financeAccountId
+    ? await prisma.financeAccount.findFirst({
+        where: { id: options.financeAccountId, userId },
+        select: { id: true, name: true, kind: true },
+      })
+    : null;
+  if (options.financeAccountId && !account) throw new Error("That account wasn't found.");
+  const { rows, flipped } = prepareRowsForAccount(inputRows, account);
 
   const sortedDates = rows.map((row) => row.date.getTime()).sort((a, b) => a - b);
   const existing = await prisma.financeTransaction.findMany({
@@ -71,7 +92,7 @@ export async function importTransactions(
 
   const { rowsToImport, deduped } = dedupeParsedRows(rows, existing);
   if (rowsToImport.length === 0) {
-    return { imported: 0, deduped };
+    return { imported: 0, deduped, flipped };
   }
 
   // The DB has @@unique([userId, externalId]); assigning a deterministic
@@ -82,8 +103,9 @@ export async function importTransactions(
   const result = await prisma.financeTransaction.createMany({
     data: rowsToImport.map((r) => ({
       userId,
+      financeAccountId: account?.id ?? null,
       externalId: csvRowExternalId(r),
-      syncSource: "csv",
+      syncSource: IMPORT_SYNC_SOURCE,
       date: r.date,
       amount: r.amount,
       description: r.description,
@@ -102,17 +124,18 @@ export async function importTransactions(
       userId,
       tool: "finance",
       type: "finance.imported",
-      meta: { count: imported, deduped: totalDeduped },
+      meta: { count: imported, deduped: totalDeduped, ...(flipped ? { flipped } : {}) },
     });
   }
 
-  return { imported, deduped: totalDeduped };
+  return { imported, deduped: totalDeduped, flipped };
 }
 
 export async function importStatement(
   userId: string,
   input: ImportStatementInput,
-): Promise<StatementImportPreview & { imported: number; deduped: number }> {
+  options: ImportOptions = {},
+): Promise<StatementImportPreview & { imported: number; deduped: number; flipped: boolean }> {
   requireCan(userId, "finance", "write");
 
   const preview = parseStatementPdf(input);
@@ -121,11 +144,12 @@ export async function importStatement(
     throw new Error(warning);
   }
 
-  const { imported, deduped } = await importTransactions(userId, preview.rows);
+  const { imported, deduped, flipped } = await importTransactions(userId, preview.rows, options);
   return {
     ...preview,
     imported,
     deduped,
+    flipped,
   };
 }
 
@@ -198,4 +222,45 @@ export async function deleteAllTransactions(userId: string): Promise<void> {
       meta: { count },
     });
   }
+}
+
+// ── Imports (CSV / PDF statements) ─────────────────────────────────────
+
+/** Past imports, newest first, each with what it added. */
+export async function listImportBatches(userId: string): Promise<ImportBatch[]> {
+  requireCan(userId, "finance", "read");
+  const rows = await prisma.financeTransaction.findMany({
+    where: { userId, syncSource: IMPORT_SYNC_SOURCE },
+    select: { createdAt: true, date: true, amount: true, account: true, description: true },
+    orderBy: { createdAt: "asc" },
+  });
+  return groupImportBatches(rows);
+}
+
+/**
+ * Remove the rows one import added (imported rows created inside the
+ * batch's createdAt window). Hand-logged entries, moves, and linked-bank
+ * rows are never touched.
+ */
+export async function deleteImportBatch(
+  userId: string,
+  window: { from: Date; to: Date },
+): Promise<number> {
+  requireCan(userId, "finance", "write");
+  const { count } = await prisma.financeTransaction.deleteMany({
+    where: {
+      userId,
+      syncSource: IMPORT_SYNC_SOURCE,
+      createdAt: { gte: window.from, lte: window.to },
+    },
+  });
+  if (count > 0) {
+    await recordEvent({
+      userId,
+      tool: "finance",
+      type: "finance.import_undone",
+      meta: { count },
+    });
+  }
+  return count;
 }

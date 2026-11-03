@@ -5,6 +5,8 @@ import { uploadCsv, uploadStatementPdf, type UploadState } from "./actions";
 
 const initialState: UploadState = undefined;
 
+export type ImportAccountOption = { id: string; name: string };
+
 function UploadStatus({ state }: { state: UploadState }) {
   if (!state || !("ok" in state)) return null;
 
@@ -34,6 +36,11 @@ function UploadStatus({ state }: { state: UploadState }) {
           duplicates ignored
         </>
       ) : null}
+      {state.flipped ? (
+        <>
+          {" · "}purchases on this card were listed as positive, so they were turned into spending
+        </>
+      ) : null}
       {state.skipped > 0 ? (
         <>
           {" · "}
@@ -58,7 +65,9 @@ function UploadCard({
   formAction,
   pending,
   state,
+  accounts,
 }: {
+  accounts: ImportAccountOption[];
   title: string;
   caption: string;
   accept: string;
@@ -80,6 +89,19 @@ function UploadCard({
             {caption}
           </p>
         </div>
+        {accounts.length > 0 ? (
+          <label className="text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
+            Which account is this file from?
+            <select name="accountId" defaultValue="" className="field mt-1 block w-full sm:w-auto">
+              <option value="">Not sure / several accounts</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
           <input
             type="file"
@@ -98,7 +120,7 @@ function UploadCard({
   );
 }
 
-export function UploadForm() {
+export function UploadForm({ accounts = [] }: { accounts?: ImportAccountOption[] }) {
   const [csvState, csvAction, csvPending] = useActionState(uploadCsv, initialState);
   const [pdfState, pdfAction, pdfPending] = useActionState(uploadStatementPdf, initialState);
   const csvFormRef = useRef<HTMLFormElement>(null);
@@ -122,6 +144,7 @@ export function UploadForm() {
         pendingLabel="Posting…"
         formRef={csvFormRef}
         formAction={csvAction}
+        accounts={accounts}
         pending={csvPending}
         state={csvState}
       />
@@ -133,6 +156,7 @@ export function UploadForm() {
         pendingLabel="Reading…"
         formRef={pdfFormRef}
         formAction={pdfAction}
+        accounts={accounts}
         pending={pdfPending}
         state={pdfState}
       />
