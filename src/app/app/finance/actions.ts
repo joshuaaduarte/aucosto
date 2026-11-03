@@ -393,6 +393,106 @@ export async function setEntryCategory(id: string, category: string | null): Pro
   }, "Could not save the category.");
 }
 
+export type MoveInput = {
+  amount: string;
+  fromAccountId: string;
+  toAccountId: string;
+  /** "YYYY-MM-DD" in the viewer's own calendar. */
+  date: string;
+};
+
+export async function addFinanceMove(input: MoveInput): Promise<EntryResult> {
+  return withFinanceUser<EntryResult>(async (userId) => {
+    const amountCents = parseAmountInput(input.amount);
+    if (amountCents === null) throw new Error("Enter an amount, like 250.");
+    if (!input.fromAccountId || !input.toAccountId) throw new Error("Pick both accounts.");
+    const move = await financeService.addMove(userId, {
+      amountCents,
+      fromAccountId: input.fromAccountId,
+      toAccountId: input.toAccountId,
+      date: parseDateOnly(input.date),
+    });
+    revalidateFinance();
+    return {
+      ok: true,
+      id: move.outId,
+      summary: `Moved ${formatUSDFromCents(amountCents)} from ${move.from} to ${move.to}`,
+    };
+  }, "Could not save that move.");
+}
+
+export async function saveCardStatement(
+  _prev: PlanningState,
+  formData: FormData,
+): Promise<PlanningState> {
+  return withFinanceUser<PlanningState>(async (userId) => {
+    const amountCents = parseAmountInput(String(formData.get("amount") ?? ""));
+    const raw = String(formData.get("amount") ?? "").trim();
+    const owed = amountCents ?? (/^\$?0+(\.0+)?$/.test(raw) ? 0 : null);
+    if (owed === null) throw new Error("Enter what the statement says you owe.");
+    await financeService.setCardStatement(userId, String(formData.get("cardId") ?? ""), {
+      statementBalanceCents: owed,
+      dueDate: parseDateOnly(String(formData.get("dueDate") ?? "")),
+    });
+    revalidateFinance();
+    return { ok: true };
+  }, "Could not save the statement.");
+}
+
+export async function markCardBillPaid(input: {
+  cardId: string;
+  fromAccountId: string | null;
+  amountCents: number;
+  date: string;
+}): Promise<PlanningState> {
+  return withFinanceUser<PlanningState>(async (userId) => {
+    await financeService.markCardPaid(userId, input.cardId, {
+      fromAccountId: input.fromAccountId,
+      amountCents: Math.max(0, Math.round(input.amountCents)),
+      date: parseDateOnly(input.date),
+    });
+    revalidateFinance();
+    return { ok: true };
+  }, "Could not mark it paid.");
+}
+
+const catchUpSchema = z.object({
+  balances: z
+    .array(z.object({ accountId: z.string().min(1), balance: z.string().max(40) }))
+    .max(200),
+  confirmBefore: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+});
+
+export async function catchUpFinance(input: {
+  balances: Array<{ accountId: string; balance: string }>;
+  confirmBefore: string | null;
+}): Promise<{ ok: true; updated: number; confirmed: number } | { ok: false; error: string }> {
+  return withFinanceUser(async (userId) => {
+    const parsed = catchUpSchema.parse(input);
+    const balances = parsed.balances
+      .filter((b) => b.balance.trim() !== "")
+      .map((b) => {
+        let cents: number;
+        try {
+          cents = parseCurrencyToCents(b.balance);
+        } catch {
+          throw new Error(`"${b.balance}" isn't a balance. Use a number like 1520.40.`);
+        }
+        return { accountId: b.accountId, balanceCents: cents };
+      });
+    if (balances.length === 0 && !parsed.confirmBefore) {
+      throw new Error("Type at least one new balance.");
+    }
+    const result = await financeService.catchUpBalances(userId, {
+      balances,
+      asOf: new Date(),
+      confirmBefore: parsed.confirmBefore ? parseDateOnly(parsed.confirmBefore) : null,
+    });
+    revalidateFinance();
+    return { ok: true as const, ...result };
+  }, "Could not save the balances.");
+}
+
 export async function updateFinanceBalance(
   _prev: PlanningState,
   formData: FormData,

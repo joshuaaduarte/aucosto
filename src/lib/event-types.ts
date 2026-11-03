@@ -58,6 +58,10 @@ const EVENT_LABELS: Record<string, string> = {
   "finance.statement_checked": "checked a statement",
   "finance.plan_saved": "updated projection settings",
   "finance.shortcut_key_created": "made a new iPhone Shortcut key",
+  "finance.money_moved": "moved money between accounts",
+  "finance.card_statement_set": "entered a card statement",
+  "finance.card_paid": "marked a card bill paid",
+  "finance.caught_up": "caught up account balances",
 
   // account
   "user.password_changed": "changed their password",

@@ -38,12 +38,15 @@ export function entryStatusLabel(status: EntryStatus): string {
   }
 }
 
-export type EntryVia = "quick_add" | "shortcut" | "statement" | "adjustment";
+export type EntryVia = "quick_add" | "shortcut" | "statement" | "adjustment" | "move";
 
 export type EntryMeta = {
   /** User id of the person who logged it. */
   by?: string;
   via?: EntryVia;
+  /** Money moved between two accounts: both rows share a pair id. */
+  pair?: string;
+  side?: "out" | "in";
 };
 
 export function encodeEntryMeta(meta: EntryMeta): string {
@@ -61,10 +64,13 @@ export function readEntryMeta(raw: string | null | undefined): EntryMeta {
       parsed.via === "quick_add" ||
       parsed.via === "shortcut" ||
       parsed.via === "statement" ||
-      parsed.via === "adjustment"
+      parsed.via === "adjustment" ||
+      parsed.via === "move"
     ) {
       meta.via = parsed.via;
     }
+    if (typeof parsed.pair === "string") meta.pair = parsed.pair;
+    if (parsed.side === "out" || parsed.side === "in") meta.side = parsed.side;
     return meta;
   } catch {
     return {};

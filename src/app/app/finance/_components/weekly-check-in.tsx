@@ -22,6 +22,9 @@ export function WeeklyCheckIn({
   statementsDue,
   staleBalances,
   billsDue,
+  cardsDue = [],
+  checkInDue = false,
+  safeShortCents = 0,
 }: {
   moneyDate: MoneyDateSummary;
   done: { at: Date; by: string | null } | null;
@@ -32,6 +35,9 @@ export function WeeklyCheckIn({
   statementsDue: Array<{ id: string; name: string }>;
   staleBalances: Array<{ id: string; name: string }>;
   billsDue: Array<{ id: string; name: string; amountCents: number | null; daysUntil: number; autopay: boolean }>;
+  cardsDue?: Array<{ id: string; name: string; amountCents: number; daysUntil: number }>;
+  checkInDue?: boolean;
+  safeShortCents?: number;
 }) {
   const delta = moneyDate.lastSevenDaysSpentCents - moneyDate.previousSevenDaysSpentCents;
   const steps: Step[] = [
@@ -56,13 +62,27 @@ export function WeeklyCheckIn({
       href: "/app/finance?tab=plan",
     });
   }
+  for (const card of cardsDue) {
+    steps.push({
+      text: `${card.name} card bill (${fmt(card.amountCents)}): ${dueLabel(card.daysUntil).toLowerCase()}`,
+      href: "/app/finance",
+    });
+  }
+  if (safeShortCents > 0) {
+    steps.push({
+      text: `Checking is ${fmt(safeShortCents)} short of the bills due in the next two weeks. Move money in before they're due.`,
+      href: "/app/finance",
+    });
+  }
   for (const account of statementsDue) {
     steps.push({ text: `Check the ${account.name} statement`, href: `/app/finance/check/${account.id}` });
   }
-  if (staleBalances.length) {
+  if (staleBalances.length || checkInDue) {
     steps.push({
-      text: `Update ${staleBalances.length === 1 ? "the balance" : "balances"} for ${staleBalances.map((a) => a.name).join(", ")}`,
-      href: "/app/finance?tab=accounts",
+      text: staleBalances.length
+        ? `Monthly check-in: update ${staleBalances.map((a) => a.name).join(", ")}`
+        : "Monthly check-in: update savings and investment balances",
+      href: "/app/finance/catch-up?only=invest",
     });
   }
   if (pendingCount && !statementsDue.length) {

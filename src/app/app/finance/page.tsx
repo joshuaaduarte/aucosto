@@ -46,6 +46,7 @@ import {
 } from "./_components/net-worth";
 import { FlexibleLimitForm } from "./_components/tracking-forms";
 import { ShortcutPanel } from "./_components/shortcut-panel";
+import { CardBills } from "./_components/card-bills";
 import { SectionCard } from "./_components/ui";
 import { AccountsPanel } from "./accounts-panel";
 import { GoalsPanel } from "./goals-panel";
@@ -218,7 +219,7 @@ export default async function FinancePage({
         <OverviewTab
           tracking={tracking}
           planning={planning}
-          accounts={accounts}
+          accounts={accounts.map((a) => ({ id: a.id, name: a.name, kind: a.kind }))}
           autoFocusAdd={params.add === "1"}
         />
       ) : null}
@@ -226,7 +227,7 @@ export default async function FinancePage({
       {tab === "spending" ? (
         <div className="space-y-12">
           <QuickAdd
-            accounts={accounts.map((a) => ({ id: a.id, name: a.name }))}
+            accounts={accounts.map((a) => ({ id: a.id, name: a.name, kind: a.kind }))}
             merchants={tracking.merchants}
             defaultAccountId={tracking.defaultAccountId}
           />
@@ -256,6 +257,14 @@ export default async function FinancePage({
             title="Accounts"
             subtitle="Check card and bank statements once a month. For everything else, just update the balance."
           >
+            <div className="mb-4 flex flex-wrap gap-2">
+              <Link href="/app/finance/catch-up?only=invest" className="btn-ink">
+                Monthly balance check-in
+              </Link>
+              <Link href="/app/finance/catch-up" className="btn-ghost">
+                Update every balance
+              </Link>
+            </div>
             <AccountList accounts={tracking.accountRows} />
           </SectionCard>
           <div className="space-y-3">
@@ -402,23 +411,47 @@ function OverviewTab({
 }: {
   tracking: TrackingView;
   planning: HouseholdPlanningData;
-  accounts: Array<{ id: string; name: string }>;
+  accounts: Array<{ id: string; name: string; kind: string }>;
   autoFocusAdd: boolean;
 }) {
   const nw = tracking.netWorthPoints;
   const today = nw.at(-1) ?? null;
   const previous = nw.length >= 2 ? nw[nw.length - 2]! : null;
   const billsDue = planning.bills.filter((b) => b.daysUntil <= 7);
+  const payFrom = accounts.find((a) => a.id === tracking.payFromAccountId) ?? null;
+  const savings = tracking.savings;
   return (
     <div className="space-y-6">
+      {tracking.catchUp ? (
+        <Link
+          href="/app/finance/catch-up"
+          className="block rounded-md px-4 py-3 text-[0.875rem] transition-colors"
+          style={{ background: "var(--accent-tint)", color: "var(--text)" }}
+        >
+          <span className="font-semibold">It&rsquo;s been a while.</span> Skip the months you missed: type in
+          today&rsquo;s balances and start fresh. About 5 minutes →
+        </Link>
+      ) : null}
       <QuickAdd
-        accounts={accounts.map((a) => ({ id: a.id, name: a.name }))}
+        accounts={accounts}
         merchants={tracking.merchants}
         defaultAccountId={tracking.defaultAccountId}
         autoFocus={autoFocusAdd}
       />
       <PaceCard pacing={tracking.pacing} suggestedLimitCents={tracking.suggestedLimitCents} />
-      <div className="grid gap-3 sm:grid-cols-3">
+      <CardBills
+        cards={tracking.cards.map((c) => ({
+          id: c.id,
+          name: c.name,
+          statementBalanceCents: c.statementBalanceCents,
+          dueDay: c.dueDate ? dayKeyOf(c.dueDate) : null,
+          daysUntil: c.daysUntil,
+          waitingForStatement: c.waitingForStatement,
+        }))}
+        safe={tracking.safe}
+        payFrom={payFrom ? { id: payFrom.id, name: payFrom.name } : null}
+      />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <OverviewTile
           href="/app/finance?tab=accounts"
           label="Net worth"
@@ -445,6 +478,16 @@ function OverviewTab({
               : "nothing waiting"
           }
         />
+        <OverviewTile
+          href="/app/finance/catch-up?only=invest"
+          label="Saved this month"
+          value={savings.rate !== null ? `${Math.round(savings.rate * 100)}%` : fmt(savings.savedCents)}
+          hint={
+            savings.rate !== null
+              ? `${fmt(savings.savedCents)} of ${fmt(savings.incomeCents)} income`
+              : "log paychecks to see a rate"
+          }
+        />
       </div>
       <WeeklyCheckIn
         moneyDate={planning.moneyDate}
@@ -456,9 +499,18 @@ function OverviewTab({
         statementsDue={tracking.statementsDue}
         staleBalances={tracking.staleBalances}
         billsDue={billsDue}
+        cardsDue={tracking.cards
+          .filter((c) => !c.waitingForStatement && c.daysUntil !== null && c.daysUntil <= 7)
+          .map((c) => ({ id: c.id, name: c.name, amountCents: c.statementBalanceCents ?? 0, daysUntil: c.daysUntil! }))}
+        checkInDue={tracking.checkInDue.length > 0}
+        safeShortCents={tracking.safe && tracking.safe.safeCents < 0 ? -tracking.safe.safeCents : 0}
       />
     </div>
   );
+}
+
+function dayKeyOf(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function netChangeLabel(cents: number): string {

@@ -32,6 +32,16 @@ import {
   recentMonthlySavingsCents,
 } from "@/lib/finance-networth";
 import { summarizeCashflow } from "@/lib/finance-summary";
+import { billsDueWithin } from "@/lib/finance-planning";
+import { isMoveEntry } from "@/lib/finance-moves";
+import {
+  cardBills,
+  checkInRows,
+  needsCatchUp,
+  payFromAccountId,
+  safeInChecking,
+  savingsRate,
+} from "@/lib/finance-routine";
 import type { EntryView } from "../_components/entry-list";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -70,10 +80,37 @@ export function deriveTracking(input: {
   const suggestedLimitCents = suggestFlexibleLimitCents(input.history, input.bills, now);
 
   const showWho = Object.keys(input.names).length > 1;
-  const entries: EntryView[] = input.history.map((tx) => {
-    const by = readEntryMeta(tx.raw).by ?? null;
+  // A move shows once, on its "out" row, as "From → To".
+  const moveInSide = new Map<string, FinanceTransaction>();
+  const moveOutPairs = new Set<string>();
+  for (const tx of input.history) {
+    const meta = readEntryMeta(tx.raw);
+    if (meta.via !== "move" || !meta.pair) continue;
+    if (meta.side === "in") moveInSide.set(meta.pair, tx);
+    else if (meta.side === "out") moveOutPairs.add(meta.pair);
+  }
+  // Keep an arriving row only when its leaving row is gone (e.g. outside the window).
+  const visibleHistory = input.history.filter((tx) => {
+    const meta = readEntryMeta(tx.raw);
+    return !(meta.via === "move" && meta.side === "in" && meta.pair && moveOutPairs.has(meta.pair));
+  });
+  const entries: EntryView[] = visibleHistory.map((tx) => {
+    const meta = readEntryMeta(tx.raw);
+    const by = meta.by ?? null;
     const byName = by ? (input.names[by] ?? null) : null;
+    const moveIn = meta.via === "move" && meta.side === "out" && meta.pair ? moveInSide.get(meta.pair) : undefined;
+    const move = isMoveEntry(tx)
+      ? {
+          toId: moveIn?.financeAccountId ?? null,
+          toName: moveIn
+            ? moveIn.financeAccountId
+              ? (accountName.get(moveIn.financeAccountId) ?? moveIn.account)
+              : moveIn.account
+            : null,
+        }
+      : null;
     return {
+      move,
       id: tx.id,
       day: dayKey(tx.date),
       amount: tx.amount,
@@ -86,10 +123,10 @@ export function deriveTracking(input: {
       byName,
     };
   });
-  const toSortCount = entries.filter((e) => e.amount < 0 && !e.category).length;
+  const toSortCount = entries.filter((e) => e.amount < 0 && !e.category && !e.move).length;
   const pendingCount = entries.filter((e) => e.status === "pending").length;
 
-  const merchants = merchantSuggestions(input.history);
+  const merchants = merchantSuggestions(input.history.filter((tx) => !isMoveEntry(tx)));
   const defaultAccountId =
     lastUsedAccountId(input.history, input.viewerUserId) ??
     input.accounts.find((a) => a.kind === "credit_card")?.id ??
@@ -166,7 +203,28 @@ export function deriveTracking(input: {
     (a) => !STATEMENT_KINDS.has(a.kind) && now.getTime() - a.balanceUpdatedAt.getTime() > 35 * DAY_MS,
   );
 
+  // Card bills against checking, the monthly check-in, savings rate.
+  const cards = cardBills(input.accounts, now);
+  const billsSoon = billsDueWithin(input.bills, now, 14);
+  const safe = safeInChecking({ accounts: input.accounts, history: input.history, cards, bills: billsSoon });
+  const checkIn = checkInRows({
+    accounts: input.accounts,
+    plans: input.plans,
+    history: input.history,
+    now,
+    onlyCheckIn: true,
+  });
+  const savings = savingsRate({ history: input.history, accounts: input.accounts, plans: input.plans, now });
+  const catchUp = needsCatchUp({ accounts: input.accounts, history: input.history, now });
+
   return {
+    cards,
+    safe,
+    payFromAccountId: payFromAccountId(input.accounts),
+    checkIn,
+    checkInDue: checkIn.filter((r) => r.daysSinceUpdate > 30),
+    savings,
+    catchUp,
     pacing,
     suggestedLimitCents,
     flexibleLimitCents: flexibleBudget?.monthlyLimitCents ?? null,

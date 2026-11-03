@@ -16,11 +16,14 @@ import { recordEvent } from "@/lib/services/events";
 import { isMissingHouseholdTable } from "@/lib/household";
 import { FINANCE_CATEGORIES } from "@/lib/finance-categories";
 import {
+  ENTRY_CLEARED,
   ENTRY_PENDING,
   ENTRY_RECONCILED,
   encodeEntryMeta,
   type EntryVia,
 } from "@/lib/finance-entries";
+import { moveDescriptions, moveExternalId, pairedExternalId } from "@/lib/finance-moves";
+import { nextMonthSameDay } from "@/lib/finance-routine";
 import {
   checkStatementBalance,
   matchStatement,
@@ -159,6 +162,18 @@ export async function deleteEntry(userId: string, id: string): Promise<void> {
   if (existing.postedStatus === ENTRY_RECONCILED) {
     throw new Error("This one matches a checked statement, so it's locked.");
   }
+  // A move is two rows; removing one side removes both, unless the other
+  // side is already confirmed by a statement (then it stays).
+  const pairId = pairedExternalId(existing.externalId);
+  if (pairId) {
+    await prisma.financeTransaction.deleteMany({
+      where: {
+        userId,
+        externalId: pairId,
+        OR: [{ postedStatus: null }, { postedStatus: { not: ENTRY_RECONCILED } }],
+      },
+    });
+  }
   await prisma.financeTransaction.delete({ where: { id } });
   await recordEvent({
     userId,
@@ -167,6 +182,193 @@ export async function deleteEntry(userId: string, id: string): Promise<void> {
     refId: id,
     meta: { amount: existing.amount, description: existing.description },
   });
+}
+
+// ── Moving money between accounts ────────────────────────────────────────
+
+export type AddMoveInput = {
+  /** Positive cents. */
+  amountCents: number;
+  fromAccountId: string;
+  toAccountId: string;
+  date: Date;
+  byUserId?: string | null;
+};
+
+/**
+ * Card payment, deposit into a brokerage, move to savings: one row leaving
+ * `from` and one arriving in `to`. Filed as a transfer, so it never counts
+ * as spending or income. Balances stay as entered (statement checks and
+ * balance updates set them), like every other entry.
+ */
+export async function addMove(
+  userId: string,
+  input: AddMoveInput,
+): Promise<{ outId: string; inId: string; from: string; to: string }> {
+  requireCan(userId, "finance", "write");
+  if (!Number.isInteger(input.amountCents) || input.amountCents <= 0) {
+    throw new Error("Enter an amount above $0.");
+  }
+  if (input.amountCents > 100_000_000) throw new Error("That amount looks too large.");
+  if (Number.isNaN(input.date.getTime())) throw new Error("Pick a date.");
+  if (input.fromAccountId === input.toAccountId) throw new Error("Pick two different accounts.");
+  const [from, to] = await Promise.all([
+    requireAccount(userId, input.fromAccountId),
+    requireAccount(userId, input.toAccountId),
+  ]);
+  const by = input.byUserId ?? currentActorUserId() ?? undefined;
+  const pair = randomUUID();
+  const text = moveDescriptions(from, to);
+  const [out, incoming] = await prisma.$transaction([
+    prisma.financeTransaction.create({
+      data: {
+        userId,
+        financeAccountId: from.id,
+        account: from.name,
+        externalId: moveExternalId(pair, "out"),
+        syncSource: "manual",
+        postedStatus: ENTRY_PENDING,
+        date: input.date,
+        amount: -input.amountCents,
+        description: text.out,
+        category: null,
+        raw: encodeEntryMeta({ by, via: "move", pair, side: "out" }),
+      },
+    }),
+    prisma.financeTransaction.create({
+      data: {
+        userId,
+        financeAccountId: to.id,
+        account: to.name,
+        externalId: moveExternalId(pair, "in"),
+        syncSource: "manual",
+        postedStatus: ENTRY_PENDING,
+        date: input.date,
+        amount: input.amountCents,
+        description: text.in,
+        category: null,
+        raw: encodeEntryMeta({ by, via: "move", pair, side: "in" }),
+      },
+    }),
+  ]);
+  await recordEvent({
+    userId,
+    tool: "finance",
+    type: "finance.money_moved",
+    refId: out.id,
+    meta: { amount: input.amountCents, from: from.name, to: to.name },
+  });
+  return { outId: out.id, inId: incoming.id, from: from.name, to: to.name };
+}
+
+// ── Card bills ───────────────────────────────────────────────────────────
+
+/** This month's statement for a card: what's owed and when it's due. */
+export async function setCardStatement(
+  userId: string,
+  cardId: string,
+  input: { statementBalanceCents: number; dueDate: Date },
+): Promise<void> {
+  requireCan(userId, "finance", "write");
+  const card = await requireAccount(userId, cardId);
+  if (card.kind !== "credit_card") throw new Error("That account isn't a credit card.");
+  if (!Number.isInteger(input.statementBalanceCents) || input.statementBalanceCents < 0) {
+    throw new Error("Enter what the statement says you owe.");
+  }
+  if (Number.isNaN(input.dueDate.getTime())) throw new Error("Pick the due date.");
+  await prisma.financeAccount.update({
+    where: { id: card.id },
+    data: { statementBalanceCents: input.statementBalanceCents, dueDate: input.dueDate },
+  });
+  await recordEvent({
+    userId,
+    tool: "finance",
+    type: "finance.card_statement_set",
+    refId: card.id,
+    meta: { name: card.name, amount: input.statementBalanceCents },
+  });
+}
+
+/**
+ * Mark a card's statement paid: optionally records the payment as a move
+ * from `fromAccountId`, then rolls the due date to next month and clears the
+ * statement amount until the next one arrives.
+ */
+export async function markCardPaid(
+  userId: string,
+  cardId: string,
+  input: { fromAccountId: string | null; amountCents: number; date: Date },
+): Promise<void> {
+  requireCan(userId, "finance", "write");
+  const card = await requireAccount(userId, cardId);
+  if (card.kind !== "credit_card") throw new Error("That account isn't a credit card.");
+  if (input.fromAccountId && input.amountCents > 0) {
+    await addMove(userId, {
+      amountCents: input.amountCents,
+      fromAccountId: input.fromAccountId,
+      toAccountId: card.id,
+      date: input.date,
+    });
+  }
+  await prisma.financeAccount.update({
+    where: { id: card.id },
+    data: {
+      statementBalanceCents: null,
+      dueDate: card.dueDate ? nextMonthSameDay(card.dueDate) : null,
+    },
+  });
+  await recordEvent({
+    userId,
+    tool: "finance",
+    type: "finance.card_paid",
+    refId: card.id,
+    meta: { name: card.name, amount: input.amountCents },
+  });
+}
+
+// ── Catch up / monthly check-in ──────────────────────────────────────────
+
+/**
+ * Many balances at once, as of one day. With `confirmBefore`, hand-logged
+ * entries dated before it that never met a statement stop waiting for one
+ * (they're marked confirmed, not deleted).
+ */
+export async function catchUpBalances(
+  userId: string,
+  input: {
+    balances: Array<{ accountId: string; balanceCents: number }>;
+    asOf: Date;
+    confirmBefore?: Date | null;
+  },
+): Promise<{ updated: number; confirmed: number }> {
+  requireCan(userId, "finance", "write");
+  if (Number.isNaN(input.asOf.getTime())) throw new Error("Pick a date.");
+  for (const b of input.balances) {
+    if (!Number.isInteger(b.balanceCents)) throw new Error("Check the balances: one isn't a number.");
+    await requireAccount(userId, b.accountId);
+  }
+  for (const b of input.balances) {
+    await prisma.financeAccount.updateMany({
+      where: { id: b.accountId, userId, balanceUpdatedAt: { lte: input.asOf } },
+      data: { currentBalanceCents: b.balanceCents, balanceUpdatedAt: input.asOf },
+    });
+    await recordSnapshot(userId, b.accountId, b.balanceCents, input.asOf, "manual");
+  }
+  let confirmed = 0;
+  if (input.confirmBefore && !Number.isNaN(input.confirmBefore.getTime())) {
+    const result = await prisma.financeTransaction.updateMany({
+      where: { userId, postedStatus: ENTRY_PENDING, date: { lt: input.confirmBefore } },
+      data: { postedStatus: ENTRY_CLEARED },
+    });
+    confirmed = result.count;
+  }
+  await recordEvent({
+    userId,
+    tool: "finance",
+    type: "finance.caught_up",
+    meta: { balances: input.balances.length, confirmed },
+  });
+  return { updated: input.balances.length, confirmed };
 }
 
 /** Entries logged today (local server day), for the evening nudge. */

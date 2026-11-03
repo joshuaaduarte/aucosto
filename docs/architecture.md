@@ -233,6 +233,23 @@ projection, goals). View model: `_lib/derive.ts` (older dashboard) +
   rebuild month-ends; `FinanceAccountPlan` holds monthly contribution +
   yearly rate per account. Tables come from
   `scripts/create-finance-tracking.sql`; reads degrade until it runs.
+- **Moves** (`src/lib/finance-moves.ts`, `addMove`): money between two of
+  your own accounts (card payment, savings, brokerage) is two rows sharing a
+  pair id in `raw` (`via: "move"`), external ids `move:<pair>:out|in`, with
+  "Transfer to/from …" descriptions so `classifyTransaction` files them as
+  transfers (never spending or income). Deleting one side deletes both. The
+  entry list shows a move once, on its leaving row.
+- **Card bills / catch-up** (`src/lib/finance-routine.ts`): card bills come
+  from `FinanceAccount.statementBalanceCents` + `dueDate`; "Paid" records a
+  move from the first checking account and rolls the due date a month.
+  "Safe in checking" = last checking balance + pending manual entries logged
+  since − card statements and bills due within 14 days. `/app/finance/catch-up`
+  updates many balances at once (`catchUpBalances`; `?only=invest` = monthly
+  check-in with added-vs-growth split) and can mark older pending entries
+  `"cleared"`. Savings rate = moves into savings/investment/retirement + the
+  401k plan's monthly contribution, over logged income + that contribution.
+  Entries never change account balances; only balance updates and statement
+  checks do.
 - **Shortcut** (`/api/finance/entries`, `src/lib/finance-shortcut.ts`):
   personal HMAC keys versioned by the latest
   `finance.shortcut_key_created` event — see `docs/finance-shortcut.md`.
