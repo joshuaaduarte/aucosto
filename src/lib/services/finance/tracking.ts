@@ -122,8 +122,9 @@ export async function updateEntry(userId: string, id: string, patch: UpdateEntry
   requireCan(userId, "finance", "write");
   const existing = await prisma.financeTransaction.findFirst({ where: { id, userId } });
   if (!existing) throw new Error("Entry not found.");
-  if (existing.postedStatus === ENTRY_RECONCILED) {
-    throw new Error("This one matches a checked statement, so it's locked.");
+  const onlyCategory = Object.keys(patch).every((key) => key === "category");
+  if (existing.postedStatus === ENTRY_RECONCILED && !onlyCategory) {
+    throw new Error("This one matches a checked statement, so only its category can change.");
   }
   const data: Partial<FinanceTransaction> = {};
   if (patch.amountCents !== undefined || patch.direction !== undefined) {

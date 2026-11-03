@@ -26,15 +26,15 @@ export function InsightsSection({ data }: { data: FinanceDashboard }) {
           className="mt-1 text-[1.25rem] font-semibold tracking-tight"
           style={{ color: "var(--text)" }}
         >
-          What the entries, taken together, suggest.
+          Where the money went
         </h2>
       </header>
 
       <div className="grid gap-12 xl:grid-cols-[1.15fr_0.85fr] xl:gap-14">
         {count > 0 && (
           <SectionCard
-            title="The Movement Mix"
-            subtitle="True spend, separated from transfers, payoffs, and inflows."
+            title="Spending vs. transfers"
+            subtitle="Real spending, kept apart from transfers, card payments and money coming in."
           >
             {typeSummary.length > 0 ? (
               <ul>
@@ -78,8 +78,8 @@ export function InsightsSection({ data }: { data: FinanceDashboard }) {
         )}
 
         <SectionCard
-          title="Cash Position"
-          subtitle="What is at hand against what is owed."
+          title="Cash vs. what you owe"
+          subtitle="Cash in the bank against card and loan balances."
         >
           <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-3">
             <CashTile label="Available" value={formatUSDFromCents(snapshot.cashCents)} />
@@ -92,7 +92,7 @@ export function InsightsSection({ data }: { data: FinanceDashboard }) {
       <div className="grid grid-cols-1 gap-10 xl:grid-cols-3 xl:gap-12">
         <SectionCard
           title="Top categories"
-          subtitle="Where true spend is concentrating this month."
+          subtitle="Where spending went this month."
         >
           {topCategories.length === 0 ? (
             <p className="text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
@@ -115,7 +115,7 @@ export function InsightsSection({ data }: { data: FinanceDashboard }) {
 
         <SectionCard
           title="Top merchants"
-          subtitle="The biggest names in this month's accounts."
+          subtitle="The biggest places you spent this month."
         >
           {topMerchants.length === 0 ? (
             <p className="text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
@@ -138,7 +138,7 @@ export function InsightsSection({ data }: { data: FinanceDashboard }) {
 
         <SectionCard
           title="Recurring"
-          subtitle="Charges that appear, again, on the regular."
+          subtitle="Charges that repeat. Worth tracking as bills."
         >
           {recurringCandidates.length === 0 ? (
             <p className="text-[0.875rem]" style={{ color: "var(--text-muted)" }}>

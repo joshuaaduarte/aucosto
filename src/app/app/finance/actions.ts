@@ -13,6 +13,11 @@ import { withFinanceUser } from "@/lib/server-action";
 import { parseCurrencyToCents } from "@/lib/finance-accounts";
 import { setFinanceScope } from "../settings/household-actions";
 import * as financeService from "@/lib/services/finance";
+import { z } from "zod";
+import { parseAmountInput } from "@/lib/finance-entries";
+import { FLEXIBLE_BUDGET_KEY } from "@/lib/finance-pacing";
+import { formatUSDFromCents } from "@/lib/money";
+import { parseStatementPdf } from "@/lib/statement-import";
 
 export type UploadState =
   | {
@@ -318,4 +323,229 @@ export async function completeMoneyDate(weekKey: string): Promise<PlanningState>
 export async function switchFinanceScope(scope: "household" | "personal"): Promise<void> {
   await setFinanceScope(scope);
   revalidateFinance();
+}
+
+// ── Day-to-day tracking: quick add, edits, balances, projection, statements ──
+
+export type EntryInput = {
+  amount: string;
+  direction: "out" | "in";
+  description: string;
+  category: string | null;
+  accountId: string | null;
+  /** "YYYY-MM-DD" in the viewer's own calendar. */
+  date: string;
+};
+
+export type EntryResult =
+  | { ok: true; id: string; summary: string }
+  | { ok: false; error: string };
+
+function entryFields(input: EntryInput) {
+  const amountCents = parseAmountInput(input.amount);
+  if (amountCents === null) throw new Error("Enter an amount, like 12.50.");
+  return {
+    amountCents,
+    direction: input.direction === "in" ? ("in" as const) : ("out" as const),
+    description: input.description,
+    category: input.category,
+    financeAccountId: input.accountId || null,
+    date: parseDateOnly(input.date),
+  };
+}
+
+export async function addFinanceEntry(input: EntryInput): Promise<EntryResult> {
+  return withFinanceUser<EntryResult>(async (userId) => {
+    const entry = await financeService.addEntry(userId, entryFields(input));
+    revalidateFinance();
+    const amount = formatUSDFromCents(Math.abs(entry.amount));
+    return {
+      ok: true,
+      id: entry.id,
+      summary:
+        entry.amount < 0 ? `Logged ${amount} at ${entry.description}` : `Logged ${amount} coming in`,
+    };
+  }, "Could not log that.");
+}
+
+export async function updateFinanceEntry(id: string, input: EntryInput): Promise<PlanningState> {
+  return withFinanceUser<PlanningState>(async (userId) => {
+    await financeService.updateEntry(userId, id, entryFields(input));
+    revalidateFinance();
+    return { ok: true };
+  }, "Could not save the change.");
+}
+
+export async function deleteFinanceEntry(id: string): Promise<PlanningState> {
+  return withFinanceUser<PlanningState>(async (userId) => {
+    await financeService.deleteEntry(userId, id);
+    revalidateFinance();
+    return { ok: true };
+  }, "Could not remove it.");
+}
+
+export async function setEntryCategory(id: string, category: string | null): Promise<PlanningState> {
+  return withFinanceUser<PlanningState>(async (userId) => {
+    await financeService.updateEntry(userId, id, { category });
+    revalidateFinance();
+    return { ok: true };
+  }, "Could not save the category.");
+}
+
+export async function updateFinanceBalance(
+  _prev: PlanningState,
+  formData: FormData,
+): Promise<PlanningState> {
+  return withFinanceUser<PlanningState>(async (userId) => {
+    await financeService.updateAccountBalance(
+      userId,
+      String(formData.get("accountId") ?? ""),
+      parseCurrencyToCents(String(formData.get("balance") ?? "")),
+      parseDateOnly(String(formData.get("asOf") ?? "")),
+    );
+    revalidateFinance();
+    return { ok: true, message: "Balance updated." };
+  }, "Could not update the balance.");
+}
+
+export async function saveFlexibleBudget(
+  _prev: PlanningState,
+  formData: FormData,
+): Promise<PlanningState> {
+  return withFinanceUser<PlanningState>(async (userId) => {
+    const cents = parseCurrencyToCents(String(formData.get("limit") ?? ""));
+    await financeService.saveBudget(userId, { category: FLEXIBLE_BUDGET_KEY, monthlyLimitCents: cents });
+    revalidateFinance();
+    return { ok: true, message: "Saved." };
+  }, "Could not save.");
+}
+
+export async function saveFinanceAccountPlan(
+  _prev: PlanningState,
+  formData: FormData,
+): Promise<PlanningState> {
+  return withFinanceUser<PlanningState>(async (userId) => {
+    const rate = String(formData.get("rate") ?? "").replace(/[%\s]/g, "");
+    const rateNumber = rate === "" ? 0 : Number(rate);
+    if (!Number.isFinite(rateNumber)) throw new Error("Enter a yearly rate like 6.");
+    await financeService.saveAccountPlan(userId, String(formData.get("accountId") ?? ""), {
+      monthlyContributionCents: parseCurrencyToCents(String(formData.get("monthly") ?? "")),
+      annualGrowthBps: Math.round(rateNumber * 100),
+    });
+    revalidateFinance();
+    return { ok: true, message: "Saved." };
+  }, "Could not save.");
+}
+
+export type StatementLineView = { key: string; date: string; amount: number; description: string };
+
+export type StatementPreviewState =
+  | {
+      ok: true;
+      accountId: string;
+      kind: string;
+      lines: StatementLineView[];
+      entries: Array<{ id: string; date: string; amount: number; description: string }>;
+      matched: Array<{ lineKey: string; entryId: string }>;
+      nearMisses: Array<{ lineKey: string; entryId: string }>;
+      statementOnly: string[];
+      entriesOnly: string[];
+      periodStart: string;
+      periodEnd: string;
+      suggestedOpening: string | null;
+    }
+  | { ok: false; error: string }
+  | undefined;
+
+function toDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+export async function previewStatement(
+  _prev: StatementPreviewState,
+  formData: FormData,
+): Promise<StatementPreviewState> {
+  return withFinanceUser<StatementPreviewState>(async (userId) => {
+    const accountId = String(formData.get("accountId") ?? "");
+    const file = formData.get("file");
+    if (!(file instanceof File) || file.size === 0) {
+      return { ok: false, error: "Pick the statement file first (CSV or PDF)." };
+    }
+    if (file.size > 10_000_000) return { ok: false, error: "That file is over 10MB." };
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    const rows = isPdf
+      ? parseStatementPdf({
+          fileName: file.name,
+          mimeType: file.type,
+          bytes: new Uint8Array(await file.arrayBuffer()),
+        }).rows
+      : parseTransactionsCsv(await file.text()).rows;
+    if (rows.length === 0) {
+      return {
+        ok: false,
+        error: isPdf
+          ? "Couldn't read transactions from that PDF. Try the CSV download from your bank."
+          : "Couldn't find transactions. The CSV needs Date, Amount (or Debit/Credit) and Description columns.",
+      };
+    }
+    const preview = await financeService.previewStatementCheck(userId, accountId, rows);
+    return {
+      ok: true,
+      accountId,
+      kind: preview.account.kind,
+      lines: preview.lines.map((l) => ({ key: l.key, date: l.date.toISOString(), amount: l.amount, description: l.description })),
+      entries: preview.entries.map((e) => ({ id: e.id, date: e.date.toISOString(), amount: e.amount, description: e.description })),
+      matched: preview.match.matched,
+      nearMisses: preview.match.nearMisses,
+      statementOnly: preview.match.statementOnly,
+      entriesOnly: preview.match.entriesOnly,
+      periodStart: toDateKey(preview.periodStart),
+      periodEnd: toDateKey(preview.periodEnd),
+      suggestedOpening:
+        preview.suggestedOpeningCents == null ? null : (preview.suggestedOpeningCents / 100).toFixed(2),
+    };
+  }, "Could not read that statement.");
+}
+
+const lineSchema = z.object({
+  key: z.string().min(1).max(64),
+  date: z.string().datetime({ offset: true }),
+  amount: z.number().int(),
+  description: z.string().max(200),
+});
+
+const commitSchema = z.object({
+  accountId: z.string().min(1),
+  periodStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  periodEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  opening: z.string(),
+  closing: z.string(),
+  matches: z.array(z.object({ entryId: z.string().min(1), line: lineSchema })).max(2000),
+  additions: z.array(lineSchema).max(2000),
+  notOnStatement: z.array(z.string().min(1)).max(2000),
+  allowAdjustment: z.boolean(),
+});
+
+export type CommitStatementResult =
+  | { ok: true; differenceCents: number }
+  | { ok: false; error: string };
+
+export async function commitStatement(payload: z.input<typeof commitSchema>): Promise<CommitStatementResult> {
+  return withFinanceUser<CommitStatementResult>(async (userId) => {
+    const input = commitSchema.parse(payload);
+    const toLine = (l: z.infer<typeof lineSchema>) => ({ ...l, date: new Date(l.date) });
+    const result = await financeService.commitStatementCheck(userId, {
+      accountId: input.accountId,
+      periodStart: parseDateOnly(input.periodStart),
+      periodEnd: parseDateOnly(input.periodEnd),
+      openingCents: parseCurrencyToCents(input.opening),
+      closingCents: parseCurrencyToCents(input.closing),
+      matches: input.matches.map((m) => ({ entryId: m.entryId, line: toLine(m.line) })),
+      additions: input.additions.map(toLine),
+      notOnStatement: input.notOnStatement,
+      allowAdjustment: input.allowAdjustment,
+    });
+    revalidateFinance();
+    return { ok: true, differenceCents: result.differenceCents };
+  }, "Could not finish the check.");
 }
