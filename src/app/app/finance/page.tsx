@@ -34,6 +34,8 @@ import {
 } from "./_components/household-planning-section";
 import { FinanceScopeSwitcher } from "./_components/scope-switcher";
 import { InsightsSection } from "./_components/insights-section";
+import { CategoryTrendsCard, NextMonthCard } from "./_components/spending-trends";
+import { categoryTrends, forecastNextMonth } from "@/lib/finance-trends";
 import { PlanningSection } from "./_components/planning-section";
 import { QuickAdd } from "./_components/quick-add";
 import { PaceCard, paceHeadline } from "./_components/pace-card";
@@ -249,6 +251,12 @@ export default async function FinancePage({
             <Collapsible title="Log from your iPhone">
               <ShortcutPanel endpoint={shortcut.endpoint} hasKey={shortcut.hasKey} />
             </Collapsible>
+          ) : null}
+          {history.length > 0 ? (
+            <>
+              <NextMonthCard forecast={forecastNextMonth({ history, bills, now })} />
+              <CategoryTrendsCard trends={categoryTrends({ history, now })} />
+            </>
           ) : null}
           {count > 0 ? <InsightsSection data={data} /> : null}
         </div>
