@@ -11,6 +11,7 @@ import {
   listBills,
   listBudgets,
   listGoals,
+  listImportBatches,
   listLinkedConnections,
   listStatementChecks,
   listTransactions,
@@ -47,6 +48,7 @@ import {
 import { FlexibleLimitForm } from "./_components/tracking-forms";
 import { ShortcutPanel } from "./_components/shortcut-panel";
 import { CardBills } from "./_components/card-bills";
+import { ImportHistory, type ImportBatchView } from "./_components/import-history";
 import { SectionCard } from "./_components/ui";
 import { AccountsPanel } from "./accounts-panel";
 import { GoalsPanel } from "./goals-panel";
@@ -98,6 +100,7 @@ export default async function FinancePage({
     snapshots,
     plans,
     checks,
+    importBatches,
   ] = await Promise.all([
     listAccounts(userId),
     listGoals(userId),
@@ -113,6 +116,7 @@ export default async function FinancePage({
     listBalanceSnapshots(userId),
     listAccountPlans(userId),
     listStatementChecks(userId),
+    listImportBatches(userId).catch(() => []),
   ]);
 
   const data = deriveFinanceDashboard({ accounts, goals, history, count });
@@ -290,11 +294,17 @@ export default async function FinancePage({
             </Collapsible>
             <Collapsible title="Import past transactions (CSV or PDF)">
               <p className="mb-3 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
-                For loading history you never logged. To confirm this month&rsquo;s entries, use
-                &ldquo;Check a statement&rdquo; on the account instead.
+                For loading history you never logged. Import one account&rsquo;s file at a time and
+                pick the account, so rows land in the right place. To confirm this month&rsquo;s
+                entries, use &ldquo;Check a statement&rdquo; on the account instead.
               </p>
-              <UploadForm />
+              <UploadForm accounts={accounts.map((a) => ({ id: a.id, name: a.name }))} />
             </Collapsible>
+            {importBatches.length > 0 ? (
+              <Collapsible title={`Past imports (${importBatches.length})`} defaultOpen>
+                <ImportHistory batches={importBatches.map(importBatchView)} />
+              </Collapsible>
+            ) : null}
             {linkedConnections.length > 0 ? (
               <Collapsible title="Linked banks">
                 <LinkedConnectionsPanel {...getTellerConnectConfig()} connections={linkedConnections} />
@@ -536,6 +546,22 @@ function OverviewTile({ href, label, value, hint }: { href: string; label: strin
       </p>
     </Link>
   );
+}
+
+function importBatchView(b: Awaited<ReturnType<typeof listImportBatches>>[number]): ImportBatchView {
+  const day = (d: Date, year: boolean) =>
+    d.toLocaleDateString([], { month: "short", day: "numeric", year: year ? "numeric" : undefined });
+  const sameYear = b.firstDate.getFullYear() === b.lastDate.getFullYear();
+  return {
+    from: b.from.toISOString(),
+    to: b.to.toISOString(),
+    importedLabel: b.from.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
+    rangeLabel: `${day(b.firstDate, !sameYear)} – ${day(b.lastDate, true)}`,
+    count: b.count,
+    accounts: b.accounts,
+    spentCents: b.spentCents,
+    incomeCents: b.incomeCents,
+  };
 }
 
 function Collapsible({

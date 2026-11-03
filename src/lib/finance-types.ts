@@ -21,6 +21,10 @@ const CARD_PAYMENT_KEYWORDS = [
   "amex payment",
   "credit card payment",
   "card ending in",
+  "payment thank you",
+  "payment - thank you",
+  "thank you for your payment",
+  "autopay payment",
 ];
 
 const TRANSFER_KEYWORDS = [
@@ -78,6 +82,9 @@ export function classifyTransaction(
   const normalized = normalizeText(tx.description);
 
   if (tx.amount > 0) {
+    // A card statement's "Payment, thank you" is the other side of paying
+    // the card from checking, not income.
+    if (hasKeyword(normalized, CARD_PAYMENT_KEYWORDS)) return "credit_card_payment";
     if (hasKeyword(normalized, TRANSFER_KEYWORDS)) return "transfer";
     if (hasKeyword(normalized, REIMBURSEMENT_KEYWORDS)) return "reimbursement";
     return "income";

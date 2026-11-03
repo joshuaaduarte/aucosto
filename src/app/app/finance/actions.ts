@@ -28,6 +28,8 @@ export type UploadState =
       skipped: number;
       deduped: number;
       bankLabel?: string;
+      /** A card file listed purchases as positive; they were turned around. */
+      flipped?: boolean;
     }
   | { ok: false; error: string }
   | undefined;
@@ -57,6 +59,11 @@ function revalidateFinance() {
   revalidatePath("/app/finance");
 }
 
+function importAccountId(formData: FormData): string | null {
+  const value = formData.get("accountId");
+  return typeof value === "string" && value ? value : null;
+}
+
 export async function uploadCsv(
   _prev: UploadState,
   formData: FormData,
@@ -81,9 +88,11 @@ export async function uploadCsv(
       };
     }
 
-    const { imported, deduped } = await financeService.importTransactions(userId, rows);
+    const { imported, deduped, flipped } = await financeService.importTransactions(userId, rows, {
+      financeAccountId: importAccountId(formData),
+    });
     revalidateFinance();
-    return { ok: true, source: "csv", imported, skipped, deduped };
+    return { ok: true, source: "csv", imported, skipped, deduped, flipped };
   }, "Could not import CSV.");
 }
 
@@ -104,7 +113,7 @@ export async function uploadStatementPdf(
       fileName: file.name,
       mimeType: file.type,
       bytes: new Uint8Array(await file.arrayBuffer()),
-    });
+    }, { financeAccountId: importAccountId(formData) });
 
     revalidateFinance();
     return {
@@ -114,6 +123,7 @@ export async function uploadStatementPdf(
       skipped: result.skipped,
       deduped: result.deduped,
       bankLabel: result.bankLabel,
+      flipped: result.flipped,
     };
   }, "Could not import statement PDF.");
 }
@@ -144,6 +154,24 @@ export async function updateMatchingTransactionCategories(
     return { ok: true as const, count };
   });
   return "ok" in result && result.ok ? result.count : 0;
+}
+
+const undoImportSchema = z.object({
+  from: z.string().datetime(),
+  to: z.string().datetime(),
+});
+
+export async function undoFinanceImport(input: { from: string; to: string }) {
+  return withFinanceUser(async (userId) => {
+    const parsed = undoImportSchema.safeParse(input);
+    if (!parsed.success) return { ok: false as const, error: "That import couldn't be found." };
+    const removed = await financeService.deleteImportBatch(userId, {
+      from: new Date(parsed.data.from),
+      to: new Date(parsed.data.to),
+    });
+    revalidateFinance();
+    return { ok: true as const, removed };
+  });
 }
 
 export async function deleteAllTransactions() {

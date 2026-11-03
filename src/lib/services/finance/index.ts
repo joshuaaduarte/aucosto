@@ -7,12 +7,15 @@ export { listGoals, saveGoal, type SaveFinanceGoalInput } from "./goals";
 export {
   countTransactions,
   deleteAllTransactions,
+  deleteImportBatch,
   getSpendCentsSince,
   importStatement,
   importTransactions,
+  listImportBatches,
   listTransactions,
   updateMatchingTransactionCategories,
   updateTransactionCategory,
+  type ImportOptions,
   type ImportStatementInput,
 } from "./transactions";
 export {

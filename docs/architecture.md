@@ -250,6 +250,12 @@ projection, goals). View model: `_lib/derive.ts` (older dashboard) +
   401k plan's monthly contribution, over logged income + that contribution.
   Entries never change account balances; only balance updates and statement
   checks do.
+- **Imports / undo** (`src/lib/finance-import-batches.ts`): CSV/PDF rows are
+  `syncSource = "csv"`. Picking the source account on upload sets
+  `financeAccountId`, fills a missing account column with its name, and flips
+  a credit-card file that's >60% positive (Amex-style). "Past imports" groups
+  imported rows by `createdAt` (one insert per import; >60s gap = new import)
+  and `deleteImportBatch` removes only that window's imported rows.
 - **Shortcut** (`/api/finance/entries`, `src/lib/finance-shortcut.ts`):
   personal HMAC keys versioned by the latest
   `finance.shortcut_key_created` event — see `docs/finance-shortcut.md`.
