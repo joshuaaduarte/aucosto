@@ -47,7 +47,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
+    <html data-scroll-behavior="smooth"
       lang="en"
       className={`${interTight.variable} ${jetbrains.variable} h-full antialiased`}
       // The beforeInteractive theme script sets data-theme from localStorage

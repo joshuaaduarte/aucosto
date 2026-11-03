@@ -72,7 +72,7 @@ function DeleteTaskButton({ id }: { id: string }) {
             await deleteDoItemAction(formData);
           })
         }
-        className="btn-ghost col-span-2 h-8 w-full px-2.5 text-[0.75rem] font-semibold sm:col-span-1"
+        className="btn-ghost h-8 px-2.5 text-[0.75rem] font-semibold sm:col-span-1"
         style={{ color: "var(--accent-strong)", background: "var(--accent-tint)" }}
       >
         {pending ? "Deleting..." : "Sure?"}
@@ -84,7 +84,7 @@ function DeleteTaskButton({ id }: { id: string }) {
     <button
       type="button"
       onClick={() => setArmed(true)}
-      className="btn-ghost col-span-2 h-8 w-full px-2.5 text-[0.75rem] sm:col-span-1"
+      className="btn-ghost h-8 px-2.5 text-[0.75rem]"
     >
       Delete
     </button>
@@ -219,118 +219,120 @@ export function DoItemCard({
 }) {
   const [completeOpen, setCompleteOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+  const done = item.status === "done";
+  // One quiet line instead of a row of pills; "Next"/"Ready" are implied by
+  // the lane the card sits in, so only the unusual states are named.
+  const meta = [
+    item.bucket,
+    item.projectName,
+    item.habitTitle ? `From ${item.habitTitle}` : null,
+    item.status !== "ready" && item.status !== "done" ? DO_STATUS_LABELS[item.status] : null,
+    item.estimatedMinutes ? `~${formatMinutes(item.estimatedMinutes)}` : null,
+    item.scheduledMinutes > 0 ? `${formatMinutes(item.scheduledMinutes)} scheduled` : null,
+    item.trackedMinutes > 0 ? `${formatMinutes(item.trackedMinutes)} tracked` : null,
+    done && item.effectiveActualMinutes ? `took ${formatMinutes(item.effectiveActualMinutes)}` : null,
+  ].filter((part): part is string => Boolean(part));
 
   return (
     <>
       <li
-        className="rounded-md border p-3 sm:p-3.5"
-        style={{ borderColor: "var(--border-faint)" }}
+        className="rounded-md border"
+        style={{ borderColor: open ? "var(--border-soft)" : "var(--border-faint)" }}
       >
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <p
-                  className="text-[0.9375rem] font-medium"
-                  style={{ color: "var(--text)" }}
-                >
-                  {item.title}
-                </p>
+        <div className="flex items-center gap-2.5 px-3 py-2.5">
+          {done ? (
+            <form action={reopenDoItemAction} className="shrink-0">
+              <input type="hidden" name="id" value={item.id} />
+              <button type="submit" className="list-check" data-checked aria-label={`Reopen ${item.title}`} title="Reopen" />
+            </form>
+          ) : (
+            <button
+              type="button"
+              className="list-check shrink-0"
+              onClick={() => setCompleteOpen(true)}
+              aria-label={`Mark ${item.title} done`}
+              title="Mark done"
+            />
+          )}
+
+          <button
+            type="button"
+            className="min-w-0 flex-1 text-left"
+            onClick={() => setOpen((value) => !value)}
+            aria-expanded={open}
+          >
+            <span
+              className="block truncate text-[0.9375rem]"
+              style={{
+                color: done ? "var(--text-faint)" : "var(--text)",
+                textDecoration: done ? "line-through" : undefined,
+              }}
+            >
+              {item.title}
+            </span>
+            {meta.length ? (
+              <span className="mt-0.5 flex items-center gap-1.5 truncate text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
                 {item.bucket ? (
-                  <span className="pill inline-flex items-center gap-1">
-                    <span
-                      className="h-1.5 w-1.5 rounded-full"
-                      style={{ background: categoryColor(item.bucket) }}
-                      aria-hidden
-                    />
-                    {item.bucket}
-                  </span>
+                  <span
+                    className="h-1.5 w-1.5 shrink-0 rounded-full"
+                    style={{ background: categoryColor(item.bucket) }}
+                    aria-hidden
+                  />
                 ) : null}
-                {item.projectName ? <span className="pill">{item.projectName}</span> : null}
-                {item.habitTitle ? <span className="pill">Linked habit</span> : null}
-                <span className="pill">
-                  {DO_LANE_LABELS[item.lane as keyof typeof DO_LANE_LABELS] ?? item.lane}
-                </span>
-                <span className="pill">{DO_STATUS_LABELS[item.status]}</span>
-              </div>
-              <p
-                className="mt-1 text-[0.75rem]"
-                style={{ color: "var(--text-faint)" }}
-              >
-                Est. {formatMinutes(item.estimatedMinutes)}
-                {item.habitTitle ? ` · From ${item.habitTitle}` : ""}
-                {item.scheduledMinutes > 0
-                  ? ` · Scheduled ${formatMinutes(item.scheduledMinutes)}`
-                  : ""}
-                {item.trackedMinutes > 0
-                  ? ` · Tracked ${formatMinutes(item.trackedMinutes)}`
-                  : ""}
-                {item.effectiveActualMinutes
-                  ? ` · Actual ${formatMinutes(item.effectiveActualMinutes)}`
-                  : ""}
+                <span className="truncate">{meta.join(" · ")}</span>
+              </span>
+            ) : null}
+          </button>
+
+          {!done ? (
+            <StartTimerButton id={item.id} action={startDoItemTimerAction} compact label={`Start a timer for ${item.title}`} />
+          ) : null}
+          <button
+            type="button"
+            className="btn-icon shrink-0"
+            onClick={() => setOpen((value) => !value)}
+            aria-label={open ? "Close task details" : "Open task details"}
+            aria-expanded={open}
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 11 11"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+              style={{ transform: open ? "rotate(180deg)" : undefined, transition: "transform 150ms" }}
+            >
+              <path d="m3 4 2.5 2.5L8 4" />
+            </svg>
+          </button>
+        </div>
+
+        {open ? (
+          <div className="space-y-3 border-t px-3 pb-3 pt-3" style={{ borderColor: "var(--border-faint)" }}>
+            {item.notes ? (
+              <p className="whitespace-pre-line text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
+                {item.notes}
               </p>
-              {item.notes ? (
-                <p
-                  className="mt-1.5 whitespace-pre-line text-[0.8125rem]"
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  {item.notes}
-                </p>
-              ) : null}
-            </div>
-
-            <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:justify-end">
-              {item.status !== "done" ? (
-                <StartTimerButton id={item.id} action={startDoItemTimerAction} />
-              ) : null}
-
-              {item.status !== "done" && item.scheduledMinutes === 0 ? (
-                <button
-                  type="button"
-                  className="btn-ghost h-8 w-full px-2.5 text-[0.75rem]"
-                  onClick={() => setScheduleOpen(true)}
-                >
+            ) : null}
+            <div className="flex flex-wrap gap-1.5">
+              {!done && item.scheduledMinutes === 0 ? (
+                <button type="button" className="btn-ghost h-8 px-2.5 text-[0.75rem]" onClick={() => setScheduleOpen(true)}>
                   Schedule
                 </button>
               ) : null}
-
-              {item.status !== "done" ? (
-                <button
-                  type="button"
-                  className="btn-ink h-8 w-full px-2.5 text-[0.75rem]"
-                  onClick={() => setCompleteOpen(true)}
-                >
-                  Done
-                </button>
-              ) : (
-                <form action={reopenDoItemAction} className="contents sm:block">
-                  <input type="hidden" name="id" value={item.id} />
-                  <button className="btn-ghost h-8 w-full px-2.5 text-[0.75rem]" type="submit">
-                    Reopen
-                  </button>
-                </form>
-              )}
-
-              <DeleteTaskButton id={item.id} />
               {item.habitId ? (
-                <a href="/app/habits" className="btn-ghost col-span-2 h-8 w-full px-2.5 text-[0.75rem] sm:col-span-1">
+                <a href="/app/habits" className="btn-ghost h-8 px-2.5 text-[0.75rem]">
                   Open habit
                 </a>
               ) : null}
+              <DeleteTaskButton id={item.id} />
             </div>
-          </div>
-
-          <details
-            className="rounded-md border"
-            style={{ borderColor: "var(--border-faint)" }}
-          >
-            <summary
-              className="cursor-pointer list-none px-3 py-2 text-[0.75rem] font-medium"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Edit and learn
-            </summary>
-            <form action={updateDoItemAction} className="space-y-3 px-3 pb-3">
+            <form action={updateDoItemAction} className="space-y-3">
               <input type="hidden" name="id" value={item.id} />
               <div className="space-y-1.5">
                 <label
@@ -512,8 +514,8 @@ export function DoItemCard({
                 </button>
               </div>
             </form>
-          </details>
-        </div>
+          </div>
+        ) : null}
       </li>
 
       {completeOpen ? <CompletionModal item={item} onClose={() => setCompleteOpen(false)} /> : null}

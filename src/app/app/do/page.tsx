@@ -188,29 +188,11 @@ export default async function DoPage({
     (total, item) => total + item.trackedMinutes,
     0,
   );
-  const completedWithLearned = doneItems.filter(
-    (item) => item.effectiveActualMinutes && item.estimatedMinutes,
-  );
-  const averageAccuracy = completedWithLearned.length
-    ? Math.round(
-        completedWithLearned.reduce((total, item) => {
-          return (
-            total +
-            (item.effectiveActualMinutes! /
-              Math.max(1, item.estimatedMinutes!)) *
-              100
-          );
-        }, 0) / completedWithLearned.length,
-      )
-    : null;
   const waitingCount = activeItems.filter(
     (item) => item.status === "waiting",
   ).length;
   const inProgressCount = activeItems.filter(
     (item) => item.status === "in_progress",
-  ).length;
-  const scheduledCount = activeItems.filter(
-    (item) => item.status === "scheduled",
   ).length;
   const unscheduledTodayCount = activeItems.filter(
     (item) =>
@@ -224,6 +206,17 @@ export default async function DoPage({
       item.estimatedMinutes !== undefined &&
       item.trackedMinutes > item.estimatedMinutes,
   ).length;
+  // Only the things worth acting on; nothing is listed when all is well.
+  const attention = [
+    unscheduledTodayCount > 0
+      ? `${unscheduledTodayCount} Today task${unscheduledTodayCount === 1 ? " still needs" : "s still need"} calendar time.`
+      : null,
+    overEstimateCount > 0
+      ? `${overEstimateCount} task${overEstimateCount === 1 ? " has" : "s have"} run past the estimate.`
+      : null,
+    waitingCount > 0 ? `${waitingCount} waiting on someone or something.` : null,
+    inProgressCount > 0 ? `${inProgressCount} in progress.` : null,
+  ].filter((line): line is string => line !== null);
   const activeProjectCount = new Set(
     activeItems.map((item) => item.projectId).filter(Boolean),
   ).size;
@@ -255,8 +248,9 @@ export default async function DoPage({
             Do List
           </h1>
         </div>
+        <div className="flex items-center gap-3 sm:flex-col sm:items-end">
         <p
-          className="text-[0.8125rem] sm:max-w-[38rem] sm:text-right"
+          className="min-w-0 flex-1 text-[0.8125rem] sm:max-w-[38rem] sm:text-right"
           style={{ color: "var(--text-muted)" }}
         >
           {activeFeedCount} active
@@ -274,6 +268,10 @@ export default async function DoPage({
               }`
             : ""}
         </p>
+        <DoCreateForm
+          projects={projects.map((project) => ({ id: project.id, name: project.name }))}
+        />
+        </div>
       </header>
 
       {workspaceName ? (
@@ -305,125 +303,22 @@ export default async function DoPage({
         </nav>
       ) : null}
 
-      <section
-        className="fade-in-delay-1 grid gap-px overflow-hidden rounded-md border sm:grid-cols-2 xl:grid-cols-3"
-        style={{
-          borderColor: "var(--border-faint)",
-          background: "var(--border-faint)",
-        }}
-      >
-        <MetricCard
-          label="Open"
-          value={String(activeItems.length)}
-          hint="one-off tasks still in motion"
-        />
-        <MetricCard
-          label="Recurring"
-          value={String(habitTasks.length)}
-          hint="habit tasks showing up right now"
-        />
-        <MetricCard
-          label="Estimated"
-          value={formatMinutes(estimatedOpenMinutes)}
-          hint="remaining if estimates hold"
-        />
-        <MetricCard
-          label="Scheduled"
-          value={formatMinutes(scheduledOpenMinutes)}
-          hint="time already protected"
-        />
-        <MetricCard
-          label="Tracked"
-          value={formatMinutes(trackedOpenMinutes)}
-          hint="time already spent"
-        />
-        <MetricCard
-          label="Learning"
-          value={averageAccuracy ? `${averageAccuracy}%` : "Waiting"}
-          hint={
-            averageAccuracy
-              ? "actual vs estimate on recent completions"
-              : "complete a few tasks to calibrate"
-          }
-        />
-      </section>
-
-      {estimateSpark.ratios.length >= 3 ? (
+      {activeFeedCount === 0 ? (
         <section
-          className="fade-in-delay-1 flex items-center gap-4 rounded-md border px-4 py-3"
-          style={{ borderColor: "var(--border-faint)", background: "var(--bg-page)" }}
+          className="fade-in rounded-lg border px-5 py-8 text-center"
+          style={{ borderColor: "var(--border-soft)", background: "var(--bg-page)" }}
         >
-          <div className="min-w-0 flex-1">
-            <p
-              className="text-[0.6875rem] font-semibold uppercase tracking-wider"
-              style={{ color: "var(--text-faint)" }}
-            >
-              Estimation trend · last {estimateSpark.ratios.length} completed
-            </p>
-            {/* 1.0 = perfect estimate; above = ran long, below = ran short. */}
-            <Sparkline values={estimateSpark.ratios} color="#8b5cf6" />
-          </div>
-          {estimateSpark.latestAccuracy !== null ? (
-            <p
-              className="shrink-0 text-right text-[0.78rem] leading-snug"
-              style={{ color: "var(--text-muted)" }}
-            >
-              <span className="font-semibold" style={{ color: "var(--text)" }}>
-                {estimateSpark.latestAccuracy}%
-              </span>
-              <br />
-              accuracy
-            </p>
-          ) : null}
+          <p className="text-[1.5rem]" aria-hidden>
+            ✓
+          </p>
+          <p className="mt-1 text-[0.9375rem] font-semibold" style={{ color: "var(--text)" }}>
+            Nothing on your list.
+          </p>
+          <p className="mx-auto mt-1 max-w-sm text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
+            Add a task with New task, or press + from any page. Habits you set to show up as tasks land here too.
+          </p>
         </section>
-      ) : null}
-
-      <section className="grid gap-3 lg:grid-cols-2">
-        <SectionCard eyebrow="Attention" title="Where the loop still needs help.">
-          <ul
-            className="space-y-2 text-[0.875rem]"
-            style={{ color: "var(--text-muted)" }}
-          >
-            <li>
-              {unscheduledTodayCount > 0
-                ? `${unscheduledTodayCount} Today task${
-                    unscheduledTodayCount === 1 ? "" : "s"
-                  } still need calendar time.`
-                : "Today tasks are either scheduled, done, or intentionally waiting."}
-            </li>
-            <li>
-              {habitTasks.length > 0
-                ? `${habitTasks.length} recurring habit task${
-                    habitTasks.length === 1 ? "" : "s"
-                  } are now flowing through Do List too.`
-                : "No recurring habits are landing in the task flow right now."}
-            </li>
-            <li>
-              {overEstimateCount > 0
-                ? `${overEstimateCount} active task${
-                    overEstimateCount === 1 ? "" : "s"
-                  } have already run past their estimate.`
-                : "No active tasks have blown past their estimate yet."}
-            </li>
-          </ul>
-        </SectionCard>
-
-        <SectionCard eyebrow="States" title="What the work is actually doing.">
-          <ul
-            className="space-y-2 text-[0.875rem]"
-            style={{ color: "var(--text-muted)" }}
-          >
-            <li>{inProgressCount} in progress right now or recently resumed.</li>
-            <li>{scheduledCount} already scheduled before they are done.</li>
-            <li>{waitingCount} waiting on someone or something else.</li>
-          </ul>
-        </SectionCard>
-      </section>
-
-      <DoCreateForm
-        projects={projects.map((project) => ({ id: project.id, name: project.name }))}
-      />
-
+      ) : (
       <section className="grid gap-6 lg:grid-cols-2">
         {DO_LANES.map((lane) => (
           <SectionCard
@@ -480,6 +375,67 @@ export default async function DoPage({
           </SectionCard>
         ))}
       </section>
+      )}
+
+      {activeItems.length > 0 ? (
+        <section className="space-y-3">
+          <p className="text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
+            {[
+              `${activeItems.length} open`,
+              estimatedOpenMinutes > 0 ? `${formatMinutes(estimatedOpenMinutes)} estimated` : null,
+              scheduledOpenMinutes > 0 ? `${formatMinutes(scheduledOpenMinutes)} on the calendar` : null,
+              trackedOpenMinutes > 0 ? `${formatMinutes(trackedOpenMinutes)} tracked so far` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+          {attention.length > 0 ? (
+            <ul
+              className="space-y-1.5 rounded-md border px-4 py-3 text-[0.8125rem]"
+              style={{ borderColor: "var(--border-faint)", background: "var(--bg-page)", color: "var(--text-muted)" }}
+            >
+              {attention.map((line) => (
+                <li key={line} className="flex gap-2">
+                  <span aria-hidden style={{ color: "var(--attention)" }}>
+                    •
+                  </span>
+                  {line}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      ) : null}
+
+      {estimateSpark.ratios.length >= 3 ? (
+        <section
+          className="fade-in-delay-1 flex items-center gap-4 rounded-md border px-4 py-3"
+          style={{ borderColor: "var(--border-faint)", background: "var(--bg-page)" }}
+        >
+          <div className="min-w-0 flex-1">
+            <p
+              className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+              style={{ color: "var(--text-faint)" }}
+            >
+              Estimation trend · last {estimateSpark.ratios.length} completed
+            </p>
+            {/* 1.0 = perfect estimate; above = ran long, below = ran short. */}
+            <Sparkline values={estimateSpark.ratios} color="#8b5cf6" />
+          </div>
+          {estimateSpark.latestAccuracy !== null ? (
+            <p
+              className="shrink-0 text-right text-[0.78rem] leading-snug"
+              style={{ color: "var(--text-muted)" }}
+            >
+              <span className="font-semibold" style={{ color: "var(--text)" }}>
+                {estimateSpark.latestAccuracy}%
+              </span>
+              <br />
+              accuracy
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       <SectionCard
         eyebrow="Done"
@@ -500,39 +456,6 @@ export default async function DoPage({
           />
         )}
       </SectionCard>
-    </div>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-}) {
-  return (
-    <div className="px-4 py-4" style={{ background: "var(--bg-page)" }}>
-      <p
-        className="text-[0.6875rem] font-semibold uppercase tracking-wider"
-        style={{ color: "var(--text-faint)" }}
-      >
-        {label}
-      </p>
-      <p
-        className="mt-1 text-[1.5rem] font-semibold tracking-tight"
-        style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
-      >
-        {value}
-      </p>
-      <p
-        className="mt-0.5 text-[0.75rem]"
-        style={{ color: "var(--text-faint)" }}
-      >
-        {hint}
-      </p>
     </div>
   );
 }

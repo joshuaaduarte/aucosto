@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { DO_BUCKET_SUGGESTIONS, DO_LANE_LABELS, DO_LANES } from "@/lib/do";
 import { MentionTextarea } from "@/components/mention-textarea";
 import { createDoItemAction, type DoState } from "./actions";
@@ -70,34 +71,21 @@ export function DoCreateForm({
 
   return (
     <>
-      <div className="flex justify-end">
-        <button
-          type="button"
-          className="btn-ink"
-          onClick={() => setOpen(true)}
-          aria-haspopup="dialog"
-          aria-expanded={open}
-          aria-controls="do-quick-add"
-        >
-          New task
-        </button>
-      </div>
-
+      {/* Lives in the page header; on phones the tab bar's "+" also adds a task. */}
       <button
         type="button"
-        className="calendar-fab"
+        className="btn-ink shrink-0"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls="do-quick-add"
       >
-        <span className="calendar-fab__plus" aria-hidden="true">
-          +
-        </span>
-        <span>Add task</span>
+        + New task
       </button>
 
-      {open ? (
+      {/* Portalled: the trigger sits in the animated page header, and a
+          transformed ancestor would trap position: fixed (lessons #6). */}
+      {open ? createPortal(
         <div
           className="calendar-modal-backdrop"
           role="presentation"
@@ -181,28 +169,28 @@ export function DoCreateForm({
 
               <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
                 <div className="space-y-1.5">
-                  <label
-                    htmlFor="do-lane"
+                  <p
+                    id="do-lane-label"
                     className="block text-[0.75rem] font-medium"
                     style={{ color: "var(--text-muted)" }}
                   >
                     When
-                  </label>
-                  <select
-                    id="do-lane"
-                    name="lane"
-                    value={lane}
-                    onChange={(event) =>
-                      setLane(event.target.value as (typeof DO_LANES)[number])
-                    }
-                    className="field"
-                  >
+                  </p>
+                  <input type="hidden" name="lane" value={lane} />
+                  <div className="seg" role="radiogroup" aria-labelledby="do-lane-label">
                     {DO_LANES.map((laneOption) => (
-                      <option key={laneOption} value={laneOption}>
+                      <button
+                        key={laneOption}
+                        type="button"
+                        role="radio"
+                        aria-checked={lane === laneOption}
+                        className="seg-item"
+                        onClick={() => setLane(laneOption)}
+                      >
                         {DO_LANE_LABELS[laneOption]}
-                      </option>
+                      </button>
                     ))}
-                  </select>
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
@@ -327,7 +315,8 @@ export function DoCreateForm({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </>
   );
