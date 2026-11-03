@@ -10,6 +10,7 @@ import { FINANCE_CATEGORIES } from "@/lib/finance-categories";
 import type { EntryStatus } from "@/lib/finance-entries";
 import {
   addFinanceEntry,
+  addFinanceMove,
   deleteFinanceEntry,
   setEntryCategory,
   updateFinanceEntry,
@@ -28,6 +29,8 @@ export type EntryView = {
   status: EntryStatus;
   byInitials: string | null;
   byName: string | null;
+  /** Money moved between accounts (shown once, on the leaving side). */
+  move: { toId: string | null; toName: string | null } | null;
 };
 
 type Filter = "all" | "to_sort" | "pending";
@@ -67,7 +70,7 @@ export function EntryList({
 
   const counts = useMemo(
     () => ({
-      to_sort: entries.filter((e) => e.amount < 0 && !e.category).length,
+      to_sort: entries.filter((e) => e.amount < 0 && !e.category && !e.move).length,
       pending: entries.filter((e) => e.status === "pending").length,
     }),
     [entries],
@@ -76,7 +79,7 @@ export function EntryList({
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return entries.filter((e) => {
-      if (filter === "to_sort" && !(e.amount < 0 && !e.category)) return false;
+      if (filter === "to_sort" && !(e.amount < 0 && !e.category && !e.move)) return false;
       if (filter === "pending" && e.status !== "pending") return false;
       if (q && !`${e.description} ${e.category ?? ""} ${e.accountName ?? ""}`.toLowerCase().includes(q)) return false;
       return true;
@@ -93,7 +96,25 @@ export function EntryList({
     return out;
   }, [visible, limit]);
 
-  const removed = (entry: EntryView) =>
+  const removed = (entry: EntryView) => {
+    if (entry.move) {
+      const { toId } = entry.move;
+      if (!entry.accountId || !toId || entry.amount >= 0) return;
+      const fromId = entry.accountId;
+      setToast({
+        id: ++toastSeq.current,
+        message: `Removed the ${money(entry.amount)} move`,
+        onUndo: async () => {
+          await addFinanceMove({
+            amount: (Math.abs(entry.amount) / 100).toFixed(2),
+            fromAccountId: fromId,
+            toAccountId: toId,
+            date: entry.day,
+          });
+        },
+      });
+      return;
+    }
     setToast({
       id: ++toastSeq.current,
       message: `Removed ${money(entry.amount)} ${entry.description}`,
@@ -108,6 +129,7 @@ export function EntryList({
         });
       },
     });
+  };
 
   return (
     <div className="space-y-4">
@@ -213,7 +235,13 @@ function EntryRow({
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const out = entry.amount < 0;
-  const toSort = out && !entry.category;
+  const isMove = entry.move !== null;
+  const toSort = out && !entry.category && !isMove;
+  const title = isMove
+    ? out
+      ? `${entry.accountName ?? "Account"} → ${entry.move?.toName ?? "another account"}`
+      : `Into ${entry.accountName ?? "account"}`
+    : entry.description;
 
   return (
     <li className="border-b py-2.5" style={{ borderColor: "var(--border-faint)" }}>
@@ -230,10 +258,14 @@ function EntryRow({
           ) : null}
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[0.875rem]" style={{ color: "var(--text)" }}>
-              {entry.description}
+              {title}
             </span>
             <span className="block truncate text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
-              {[entry.category ?? (out ? "No category" : null), entry.accountName].filter(Boolean).join(" · ")}
+              {isMove
+                ? /card payment/i.test(entry.description)
+                  ? "Card payment"
+                  : "Moved money"
+                : [entry.category ?? (out ? "No category" : null), entry.accountName].filter(Boolean).join(" · ")}
               {entry.status === "pending" ? (
                 <span style={{ color: "var(--accent)" }}> · not on a statement yet</span>
               ) : entry.status === "locked" ? (
@@ -243,9 +275,9 @@ function EntryRow({
           </span>
           <span
             className="shrink-0 text-[0.9375rem] font-medium tabular"
-            style={{ color: out ? "var(--text)" : "var(--verdigris)" }}
+            style={{ color: out || isMove ? "var(--text)" : "var(--verdigris)" }}
           >
-            {out ? "" : "+"}
+            {out || isMove ? "" : "+"}
             {money(entry.amount)}
           </span>
         </button>
@@ -276,7 +308,29 @@ function EntryRow({
         </div>
       ) : null}
 
-      {open ? (
+      {open && isMove ? (
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <p className="text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+            Moving money between your own accounts never counts as spending.
+          </p>
+          {entry.status === "locked" ? null : (
+            <button
+              type="button"
+              disabled={pending}
+              className="btn-ghost"
+              onClick={() =>
+                start(async () => {
+                  const r = await deleteFinanceEntry(entry.id);
+                  if (r && !r.ok) setError(r.error);
+                  else onRemoved();
+                })
+              }
+            >
+              Remove
+            </button>
+          )}
+        </div>
+      ) : open ? (
         entry.status === "locked" ? (
           <p className="mt-2 text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
             This matches a checked statement, so it&rsquo;s locked. You can still change its category.

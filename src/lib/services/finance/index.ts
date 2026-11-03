@@ -45,6 +45,10 @@ export {
 } from "./transfer";
 export {
   addEntry,
+  addMove,
+  catchUpBalances,
+  markCardPaid,
+  setCardStatement,
   commitStatementCheck,
   countEntriesSince,
   deleteEntry,
@@ -57,6 +61,7 @@ export {
   updateAccountBalance,
   updateEntry,
   type AddEntryInput,
+  type AddMoveInput,
   type CommitStatementInput,
   type StatementLineInput,
   type StatementPreview,

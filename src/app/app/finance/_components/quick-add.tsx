@@ -5,15 +5,18 @@
 // person used last, and the category that merchant had last time. Category
 // can be skipped; it lands in the "to sort" pile for the weekly check-in.
 // Saved entries start as "not on a statement yet" until a statement check
-// confirms them.
+// confirms them. "Moved" logs money going between two of your own accounts
+// (a card payment, a deposit into Robinhood): never spending.
 
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { FINANCE_CATEGORIES } from "@/lib/finance-categories";
 import { filterMerchants, parseAmountInput, type MerchantSuggestion } from "@/lib/finance-entries";
-import { addFinanceEntry, deleteFinanceEntry } from "../actions";
+import { addFinanceEntry, addFinanceMove, deleteFinanceEntry } from "../actions";
 import { UndoToast, type UndoToastState } from "./undo-toast";
 
-export type QuickAddAccount = { id: string; name: string };
+export type QuickAddAccount = { id: string; name: string; kind?: string };
+
+type Mode = "out" | "in" | "move";
 
 const SPEND_CATEGORIES = FINANCE_CATEGORIES.filter((c) => c !== "Income");
 
@@ -39,7 +42,15 @@ export function QuickAdd({
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<string | null>(null);
   const [accountId, setAccountId] = useState<string>(defaultAccountId ?? "");
-  const [direction, setDirection] = useState<"out" | "in">("out");
+  const [direction, setDirection] = useState<Mode>("out");
+  const [fromId, setFromId] = useState<string>(
+    accounts.find((a) => a.kind === "checking")?.id ?? accounts[0]?.id ?? "",
+  );
+  const [toId, setToId] = useState<string>(
+    accounts.find((a) => a.kind === "credit_card")?.id ??
+      accounts.find((a) => a.id !== (accounts.find((x) => x.kind === "checking")?.id ?? accounts[0]?.id))?.id ??
+      "",
+  );
   const [dateMode, setDateMode] = useState<"today" | "yesterday" | "other">("today");
   const [otherDate, setOtherDate] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -68,15 +79,22 @@ export function QuickAdd({
       setError("Pick a date.");
       return;
     }
+    if (direction === "move" && (!fromId || !toId || fromId === toId)) {
+      setError("Pick two different accounts.");
+      return;
+    }
     start(async () => {
-      const result = await addFinanceEntry({
-        amount,
-        direction,
-        description,
-        category: direction === "in" ? "Income" : category,
-        accountId: accountId || null,
-        date,
-      });
+      const result =
+        direction === "move"
+          ? await addFinanceMove({ amount, fromAccountId: fromId, toAccountId: toId, date })
+          : await addFinanceEntry({
+              amount,
+              direction,
+              description,
+              category: direction === "in" ? "Income" : category,
+              accountId: accountId || null,
+              date,
+            });
       if (!result.ok) {
         setError(result.error);
         return;
@@ -84,7 +102,7 @@ export function QuickAdd({
       setAmount("");
       setDescription("");
       setCategory(null);
-      setDirection("out");
+      if (direction !== "move") setDirection("out");
       setDateMode("today");
       setToast({
         id: Date.now(),
@@ -110,18 +128,38 @@ export function QuickAdd({
         }}
         className="space-y-3"
       >
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-[0.875rem] font-semibold" style={{ color: "var(--text)" }}>
-            {direction === "out" ? "Log spending" : "Log money coming in"}
+            {direction === "out" ? "Log spending" : direction === "in" ? "Log money coming in" : "Move money"}
           </p>
-          <button
-            type="button"
-            className="text-[0.75rem] underline-offset-4 hover:underline"
-            style={{ color: "var(--text-muted)" }}
-            onClick={() => setDirection(direction === "out" ? "in" : "out")}
-          >
-            {direction === "out" ? "Money in instead?" : "Spending instead?"}
-          </button>
+          <div className="flex gap-1" role="radiogroup" aria-label="Kind of entry">
+            {(
+              [
+                ["out", "Spent"],
+                ["in", "Received"],
+                ["move", "Moved"],
+              ] as const
+            ).map(([mode, label]) => (
+              <button
+                key={mode}
+                type="button"
+                role="radio"
+                aria-checked={direction === mode}
+                onClick={() => {
+                  setDirection(mode);
+                  setError(null);
+                }}
+                disabled={mode === "move" && accounts.length < 2}
+                className="rounded px-2 py-1 text-[0.75rem]"
+                style={{
+                  background: direction === mode ? "var(--bg-tint-strong)" : "transparent",
+                  color: direction === mode ? "var(--text)" : "var(--text-muted)",
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="flex gap-2">
@@ -145,6 +183,37 @@ export function QuickAdd({
               aria-label="Amount"
             />
           </label>
+          {direction === "move" ? (
+            <div className="flex min-w-0 flex-1 items-center gap-1.5">
+              <select
+                value={fromId}
+                onChange={(e) => setFromId(e.target.value)}
+                className="field min-w-0 flex-1 text-[0.8125rem]"
+                aria-label="From account"
+              >
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+              <span aria-hidden style={{ color: "var(--text-faint)" }}>
+                →
+              </span>
+              <select
+                value={toId}
+                onChange={(e) => setToId(e.target.value)}
+                className="field min-w-0 flex-1 text-[0.8125rem]"
+                aria-label="To account"
+              >
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
           <label className="min-w-0 flex-1">
             <span className="sr-only">{direction === "out" ? "Where" : "From"}</span>
             <input
@@ -157,9 +226,10 @@ export function QuickAdd({
               aria-label={direction === "out" ? "Where" : "From"}
             />
           </label>
+          )}
         </div>
 
-        {suggestions.length > 0 ? (
+        {suggestions.length > 0 && direction !== "move" ? (
           <div className="flex flex-wrap gap-1.5">
             {suggestions.map((m) => (
               <button
@@ -229,7 +299,7 @@ export function QuickAdd({
               aria-label="Date"
             />
           ) : null}
-          {accounts.length > 0 ? (
+          {accounts.length > 0 && direction !== "move" ? (
             <select
               value={accountId}
               onChange={(e) => setAccountId(e.target.value)}
@@ -252,6 +322,10 @@ export function QuickAdd({
         {error ? (
           <p className="text-[0.75rem]" style={{ color: "var(--accent-strong)" }} role="alert">
             {error}
+          </p>
+        ) : direction === "move" ? (
+          <p className="text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+            For card payments, moves to savings and deposits into Robinhood. Never counts as spending.
           </p>
         ) : category === null && direction === "out" && amount ? (
           <p className="text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
