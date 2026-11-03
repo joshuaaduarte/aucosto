@@ -3,7 +3,7 @@
 // settings forms are client components from tracking-forms.
 
 import Link from "next/link";
-import { formatUSDFromCents, formatSignedUSDFromCents } from "@/lib/money";
+import { formatUSDFromCents } from "@/lib/money";
 import { formatAccountKind } from "@/lib/finance-accounts";
 import { isLiabilityKind } from "@/lib/finance-statement-match";
 import {
@@ -63,8 +63,8 @@ export function NetWorthSummary({
         </p>
         {delta !== null ? (
           <p className="text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
-            <span style={{ color: delta >= 0 ? "var(--verdigris)" : "var(--accent-strong)" }}>
-              {formatSignedUSDFromCents(delta)}
+            <span style={{ color: delta >= 0 ? "var(--text)" : "var(--accent-strong)" }}>
+              {delta === 0 ? "No change" : `${delta > 0 ? "+" : "−"}${fmt(Math.abs(delta))}`}
             </span>{" "}
             since {previous!.at.toLocaleDateString([], { month: "short", day: "numeric" })}
             {drivers.length
@@ -91,10 +91,10 @@ export function NetWorthSummary({
 
 function HistoryChart({ points }: { points: NetWorthPoint[] }) {
   const width = 600;
-  const height = 140;
+  const height = 120;
   const padX = 4;
   const padTop = 12;
-  const padBottom = 18;
+  const padBottom = 4;
   const values = points.map((p) => p.totalCents);
   const min = Math.min(...values, 0);
   const max = Math.max(...values, 1);
@@ -107,30 +107,21 @@ function HistoryChart({ points }: { points: NetWorthPoint[] }) {
     <figure>
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        className="h-[140px] w-full"
+        className="h-[120px] w-full"
+        preserveAspectRatio="none"
         role="img"
         aria-label={`Net worth from ${fmt(values[0]!)} to ${fmt(values.at(-1)!)}`}
       >
         {min < 0 ? <line x1={padX} x2={width - padX} y1={y(0)} y2={y(0)} stroke="var(--border)" strokeWidth="1" /> : null}
-        <path d={path} fill="none" stroke="var(--text)" strokeWidth="2" strokeLinejoin="round" />
-        {points.map((p, i) => (
-          <circle key={i} cx={x(i)} cy={y(p.totalCents)} r={i === points.length - 1 ? 3.5 : 2} fill="var(--text)" />
-        ))}
-        {points.map((p, i) =>
-          i === 0 || i === points.length - 1 || points.length <= 7 ? (
-            <text
-              key={`l${i}`}
-              x={x(i)}
-              y={height - 4}
-              textAnchor={i === 0 ? "start" : i === points.length - 1 ? "end" : "middle"}
-              fontSize="10"
-              fill="var(--text-faint)"
-            >
-              {i === points.length - 1 ? "Today" : p.at.toLocaleDateString([], { month: "short" })}
-            </text>
-          ) : null,
-        )}
+        <path d={path} fill="none" stroke="var(--text)" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
       </svg>
+      <AxisLabels
+        labels={points.map((p, i) => ({
+          pct: (x(i) / width) * 100,
+          text: i === points.length - 1 ? "Today" : p.at.toLocaleDateString([], { month: "short" }),
+          show: i === 0 || i === points.length - 1 || points.length <= 7,
+        }))}
+      />
     </figure>
   );
 }
@@ -175,7 +166,7 @@ export function AccountList({ accounts }: { accounts: AccountRow[] }) {
                     : ""}
                 </p>
                 {a.pendingCount > 0 ? (
-                  <p className="text-[0.75rem]" style={{ color: "var(--aged-gold)" }}>
+                  <p className="text-[0.75rem]" style={{ color: "var(--accent)" }}>
                     {a.pendingCount} logged {a.pendingCount === 1 ? "entry" : "entries"} not on a statement yet
                   </p>
                 ) : null}
@@ -253,7 +244,7 @@ export function ProjectionCard({
         {extraMonthlySavingsCents > 0
           ? ` It also adds ${fmt(extraMonthlySavingsCents)} a month, your average savings (income minus spending) over the last three months, since no cash account has a monthly amount set.`
           : ""}
-        {goalMarkers.length ? " Dots mark when each goal is reached at its own monthly pace." : ""}
+        {goalMarkers.length ? " Marks show when each goal is reached at its own monthly pace." : ""}
       </p>
 
       {!ready ? <SetupNote /> : null}
@@ -299,10 +290,10 @@ function ProjectionChart({
   goalMarkers: Array<{ name: string; at: Date; monthIndex: number }>;
 }) {
   const width = 600;
-  const height = 150;
+  const height = 130;
   const padX = 4;
-  const padTop = 14;
-  const padBottom = 18;
+  const padTop = 10;
+  const padBottom = 4;
   const values = points.map((p) => p.totalCents);
   const min = Math.min(...values, 0);
   const max = Math.max(...values, 1);
@@ -314,35 +305,26 @@ function ProjectionChart({
   const ticks = [0, 12, 60, 120].filter((m) => m <= last);
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-[150px] w-full" role="img" aria-label="Projected net worth over ten years">
+    <figure>
+    <svg viewBox={`0 0 ${width} ${height}`} className="h-[130px] w-full" preserveAspectRatio="none" role="img" aria-label="Projected net worth over ten years">
       {min < 0 ? <line x1={padX} x2={width - padX} y1={y(0)} y2={y(0)} stroke="var(--border)" strokeWidth="1" /> : null}
-      <path d={path} fill="none" stroke="var(--text)" strokeWidth="2" strokeDasharray="6 4" strokeLinejoin="round" />
-      {ticks.map((m) => (
-        <g key={m}>
-          <line x1={x(m)} x2={x(m)} y1={height - padBottom} y2={height - padBottom + 4} stroke="var(--border)" />
-          <text
-            x={x(m)}
-            y={height - 4}
-            fontSize="10"
-            fill="var(--text-faint)"
-            textAnchor={m === 0 ? "start" : m === last ? "end" : "middle"}
-          >
-            {m === 0 ? "Now" : `${m / 12}y`}
-          </text>
-        </g>
-      ))}
+      <path d={path} fill="none" stroke="var(--text)" strokeWidth="2" strokeDasharray="6 4" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
       {goalMarkers
         .filter((g) => g.monthIndex > 0 && g.monthIndex <= last)
         .map((g) => {
           const value = points[g.monthIndex]?.totalCents ?? 0;
           return (
             <g key={g.name}>
-              <circle cx={x(g.monthIndex)} cy={y(value)} r="4" fill="var(--verdigris)" />
+              <line x1={x(g.monthIndex)} x2={x(g.monthIndex)} y1={y(value) - 8} y2={y(value) + 8} stroke="var(--accent)" strokeWidth="3" vectorEffect="non-scaling-stroke" />
               <title>{`${g.name}: ${g.at.toLocaleDateString([], { month: "short", year: "numeric" })}`}</title>
             </g>
           );
         })}
     </svg>
+      <AxisLabels
+        labels={ticks.map((m) => ({ pct: (x(m) / width) * 100, text: m === 0 ? "Now" : `${m / 12} yr`, show: m !== 12 }))}
+      />
+    </figure>
   );
 }
 
@@ -352,10 +334,34 @@ export function GoalMarkerList({ markers }: { markers: Array<{ name: string; at:
     <ul className="space-y-1 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
       {markers.map((m) => (
         <li key={m.name}>
-          <span style={{ color: "var(--verdigris)" }}>●</span> {m.name}:{" "}
+          <span style={{ color: "var(--accent)" }}>|</span> {m.name}:{" "}
           {m.at ? `reached around ${m.at.toLocaleDateString([], { month: "short", year: "numeric" })}` : "set a monthly amount to see when"}
         </li>
       ))}
     </ul>
+  );
+}
+
+function AxisLabels({ labels }: { labels: Array<{ pct: number; text: string; show: boolean }> }) {
+  return (
+    <div className="relative mt-1 h-4 text-[0.6875rem]" style={{ color: "var(--text-faint)" }} aria-hidden>
+      {labels
+        .filter((l) => l.show)
+        .map((l) => (
+          <span
+            key={`${l.pct}-${l.text}`}
+            className="absolute top-0 whitespace-nowrap"
+            style={
+              l.pct < 5
+                ? { left: 0 }
+                : l.pct > 95
+                  ? { right: 0 }
+                  : { left: `${l.pct}%`, transform: "translateX(-50%)" }
+            }
+          >
+            {l.text}
+          </span>
+        ))}
+    </div>
   );
 }

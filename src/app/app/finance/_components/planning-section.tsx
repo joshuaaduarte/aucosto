@@ -4,7 +4,14 @@ import { formatSignedUSDFromCents, formatUSDFromCents } from "@/lib/money";
 import type { FinanceDashboard } from "../_lib/derive";
 import { ProgressBar, SectionCard, SummaryCard } from "./ui";
 
-export function PlanningSection({ data }: { data: FinanceDashboard }) {
+export function PlanningSection({
+  data,
+  showOutlook = true,
+}: {
+  data: FinanceDashboard;
+  /** The month-vs-last-month card; the Plan tab leaves it out. */
+  showOutlook?: boolean;
+}) {
   const {
     goals,
     activeGoals,
@@ -35,7 +42,7 @@ export function PlanningSection({ data }: { data: FinanceDashboard }) {
           className="mt-1 text-[1.25rem] font-semibold tracking-tight"
           style={{ color: "var(--text)" }}
         >
-          Goals and this month vs last
+          {showOutlook ? "Goals and this month vs last" : "Savings goals"}
         </h2>
       </header>
 
@@ -147,6 +154,7 @@ export function PlanningSection({ data }: { data: FinanceDashboard }) {
           )}
         </SectionCard>
 
+        {showOutlook ? (
         <SectionCard
           title="This month vs last month"
           subtitle={
@@ -281,6 +289,7 @@ export function PlanningSection({ data }: { data: FinanceDashboard }) {
             </p>
           )}
         </SectionCard>
+        ) : null}
       </div>
     </section>
   );

@@ -63,7 +63,7 @@ export async function FinanceWidget() {
   if (accounts.length > 0) {
     const snapshot = summarizeBalances(accounts);
     return (
-      <WidgetCard name="Money" href="/app/finance">
+      <WidgetCard name="Finance" href="/app/finance">
         <div className="space-y-3">
           {paceLine}
           <div>

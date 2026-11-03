@@ -189,8 +189,8 @@ export function shouldNudgeToLog(input: { loggedLast30Days: number; loggedToday:
 
 export const LOG_NUDGE = {
   title: "Anything to log today?",
-  body: "Nothing's been logged in Money today. It takes a few seconds.",
-  line: "Anything to log in Money today?",
+  body: "Nothing's been logged in Finance today. It takes a few seconds.",
+  line: "Anything to log in Finance today?",
   url: "/app/finance?add=1",
 } as const;
 

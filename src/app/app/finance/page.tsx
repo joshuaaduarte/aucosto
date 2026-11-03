@@ -25,7 +25,7 @@ import {
   moneyDateWeekKey,
   suggestBillsFromRecurring,
 } from "@/lib/finance-planning";
-import { formatUSDFromCents, formatSignedUSDFromCents } from "@/lib/money";
+import { formatUSDFromCents } from "@/lib/money";
 import { requireViewerContext } from "@/lib/viewer-context";
 import {
   HouseholdPlanningSection,
@@ -158,7 +158,7 @@ export default async function FinancePage({
             className="text-[1.5rem] font-bold tracking-tight sm:text-[1.875rem]"
             style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
           >
-            Money
+            Finance
           </h1>
           <p className="mt-0.5 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
             {planning.sharedWith ? `Shared with ${planning.sharedWith}` : "Just you"}
@@ -363,7 +363,7 @@ export default async function FinancePage({
             </div>
           </SectionCard>
 
-          <PlanningSection data={data} />
+          <PlanningSection data={data} showOutlook={false} />
 
           <Collapsible title={goals.length ? `Edit goals (${goals.length})` : "Add a goal"} defaultOpen={goals.length === 0}>
             <GoalsPanel
@@ -425,7 +425,7 @@ function OverviewTab({
           value={today ? fmt(today.totalCents) : "Add accounts"}
           hint={
             today && previous
-              ? `${formatSignedUSDFromCents(today.totalCents - previous.totalCents)} since ${previous.at.toLocaleDateString([], { month: "short", day: "numeric" })}`
+              ? `${netChangeLabel(today.totalCents - previous.totalCents)} since ${previous.at.toLocaleDateString([], { month: "short", day: "numeric" })}`
               : "See accounts"
           }
         />
@@ -459,6 +459,11 @@ function OverviewTab({
       />
     </div>
   );
+}
+
+function netChangeLabel(cents: number): string {
+  if (cents === 0) return "No change";
+  return `${cents > 0 ? "+" : "−"}${fmt(Math.abs(cents))}`;
 }
 
 function OverviewTile({ href, label, value, hint }: { href: string; label: string; value: string; hint: string }) {

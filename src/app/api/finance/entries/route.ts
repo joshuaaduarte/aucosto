@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   const personUserId = key ? await verifyShortcutKey(key) : null;
   if (!personUserId) {
     return NextResponse.json(
-      { ok: false, message: "That key isn't valid anymore. Make a new one on the Money page." },
+      { ok: false, message: "That key isn't valid anymore. Make a new one on the Finance page." },
       { status: 401 },
     );
   }

@@ -235,7 +235,7 @@ function EntryRow({
             <span className="block truncate text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
               {[entry.category ?? (out ? "No category" : null), entry.accountName].filter(Boolean).join(" · ")}
               {entry.status === "pending" ? (
-                <span style={{ color: "var(--aged-gold)" }}> · not on a statement yet</span>
+                <span style={{ color: "var(--accent)" }}> · not on a statement yet</span>
               ) : entry.status === "locked" ? (
                 <span> · matches the bank ✓</span>
               ) : null}

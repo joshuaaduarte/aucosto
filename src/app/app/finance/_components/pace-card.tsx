@@ -7,8 +7,8 @@ import type { Pacing, PaceStatus } from "@/lib/finance-pacing";
 import { FlexibleLimitForm } from "./tracking-forms";
 
 const STATUS_COLOR: Record<PaceStatus, string> = {
-  good: "var(--verdigris)",
-  watch: "var(--aged-gold)",
+  good: "var(--text)",
+  watch: "var(--accent)",
   over: "var(--accent-strong)",
   unset: "var(--text-muted)",
 };
