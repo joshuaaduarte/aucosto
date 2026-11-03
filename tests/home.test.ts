@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   cadenceLabel,
+  homeFreshness,
+  personInitial,
   groupHomeTasks,
   homeDaysUntil,
   homeDueLabel,
@@ -86,5 +88,23 @@ describe("householdNudgeText", () => {
         bills: [{ name: "Rent", daysUntil: 1 }],
       })?.body,
     ).toBe("Replace HVAC filter is due. Rent is due tomorrow.");
+  });
+});
+
+
+describe("homeFreshness", () => {
+  it("runs from 1 (just done) to 0 (due or late)", () => {
+    expect(homeFreshness(7, 7)).toBe(1);
+    expect(homeFreshness(3.5, 7)).toBe(0.5);
+    expect(homeFreshness(0, 7)).toBe(0);
+    expect(homeFreshness(-3, 7)).toBe(0);
+    expect(homeFreshness(20, 7)).toBe(1);
+  });
+});
+
+describe("personInitial", () => {
+  it("takes the first letter", () => {
+    expect(personInitial("ana duarte")).toBe("A");
+    expect(personInitial("")).toBe("?");
   });
 });

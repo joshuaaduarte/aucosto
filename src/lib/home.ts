@@ -131,3 +131,18 @@ export function householdNudgeText(input: {
   const body = parts.join(". ") + ".";
   return { title: "Home today", body };
 }
+
+/**
+ * How "fresh" a repeating task is, 1 right after it's done down to 0 when
+ * it's due (Tody-style). Drives the ring next to each chore.
+ */
+export function homeFreshness(daysUntilDue: number, cadenceDays: number): number {
+  if (cadenceDays <= 0) return daysUntilDue > 0 ? 1 : 0;
+  return Math.max(0, Math.min(1, daysUntilDue / cadenceDays));
+}
+
+/** "Ana Duarte" → "A"; used for the small who-added / whose-turn badges. */
+export function personInitial(name: string | null | undefined): string {
+  const trimmed = (name ?? "").trim();
+  return trimmed ? trimmed[0]!.toUpperCase() : "?";
+}

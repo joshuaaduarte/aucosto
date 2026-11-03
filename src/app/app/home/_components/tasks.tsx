@@ -1,7 +1,15 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
-import { cadenceLabel, HOME_TASK_PRESETS, homeDueLabel, type HomeTaskKind } from "@/lib/home";
+import { useActionState, useMemo, useState, useTransition } from "react";
+import {
+  cadenceLabel,
+  HOME_TASK_PRESETS,
+  homeDueLabel,
+  homeFreshness,
+  personInitial,
+  type HomeTaskKind,
+} from "@/lib/home";
+import { categoryColor } from "@/lib/time-categories";
 import { archiveTask, completeTask, saveTask } from "../actions";
 
 export type TaskView = {
@@ -20,32 +28,116 @@ export type TaskView = {
 
 export type MemberOption = { userId: string; name: string };
 
-export function TaskList({
+type ChoreFilter = "all" | "mine" | "chore" | "maintenance";
+
+/**
+ * Chores and home upkeep in one list, soonest first. A ring empties as each
+ * one gets closer to due (tap it to mark done); the badge shows whose turn
+ * it is. Filters replace separate sections so nothing is listed twice.
+ */
+export function ChoreBoard({
   tasks,
   members,
-  empty,
+  viewerUserId,
+  today,
 }: {
   tasks: TaskView[];
   members: MemberOption[];
-  empty: string;
+  viewerUserId: string;
+  today: string;
 }) {
-  if (tasks.length === 0) {
-    return (
-      <p className="text-[0.8125rem]" style={{ color: "var(--text-faint)" }}>
-        {empty}
-      </p>
-    );
-  }
+  const [filter, setFilter] = useState<ChoreFilter>("all");
+  const [adding, setAdding] = useState(false);
+  const shared = members.length > 1;
+  const visible = useMemo(
+    () =>
+      tasks
+        .filter((t) =>
+          filter === "all"
+            ? true
+            : filter === "mine"
+              ? t.assigneeUserId === viewerUserId || t.assigneeUserId === null
+              : t.kind === filter,
+        )
+        .sort((a, b) => a.daysUntil - b.daysUntil),
+    [tasks, filter, viewerUserId],
+  );
+  const dueCount = tasks.filter((t) => t.daysUntil <= 0).length;
+  const filters: Array<[ChoreFilter, string]> = [
+    ["all", dueCount ? `All · ${dueCount} due` : "All"],
+    ...(shared ? ([["mine", "Mine"]] as Array<[ChoreFilter, string]>) : []),
+    ["chore", "Chores"],
+    ["maintenance", "Upkeep"],
+  ];
+
   return (
-    <ul className="divide-y rounded-md border" style={{ borderColor: "var(--border-faint)" }}>
-      {tasks.map((task) => (
-        <TaskRow key={task.id} task={task} members={members} />
-      ))}
-    </ul>
+    <div className="space-y-3">
+      <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1" role="radiogroup" aria-label="Show">
+        {filters.map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={filter === value}
+            onClick={() => setFilter(value)}
+            className="chip shrink-0"
+            data-on={filter === value || undefined}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {visible.length === 0 ? (
+        <p className="rounded-lg border px-4 py-6 text-center text-[0.875rem]" style={{ borderColor: "var(--border-soft)", color: "var(--text-faint)" }}>
+          {tasks.length === 0
+            ? "Add the chores that repeat and the upkeep that's easy to forget: filters, detectors, vents."
+            : "Nothing here."}
+        </p>
+      ) : (
+        <ul className="rounded-lg border" style={{ borderColor: "var(--border-soft)" }}>
+          {visible.map((task) => (
+            <TaskRow key={task.id} task={task} members={members} shared={shared} />
+          ))}
+        </ul>
+      )}
+      {adding ? (
+        <div className="rounded-lg border p-3" style={{ borderColor: "var(--border-soft)" }}>
+          <TaskForm members={members} today={today} onDone={() => setAdding(false)} />
+        </div>
+      ) : (
+        <button type="button" className="btn-ghost" onClick={() => setAdding(true)}>
+          + Add a chore or upkeep task
+        </button>
+      )}
+    </div>
   );
 }
 
-function TaskRow({ task, members }: { task: TaskView; members: MemberOption[] }) {
+function FreshnessRing({ task, onDone, pending }: { task: TaskView; onDone: () => void; pending: boolean }) {
+  const fresh = homeFreshness(task.daysUntil, task.cadenceDays);
+  const color = task.daysUntil <= 0 ? "var(--attention)" : fresh < 0.34 ? "var(--attention)" : "var(--positive)";
+  const deg = Math.round(fresh * 360);
+  return (
+    <button
+      type="button"
+      onClick={onDone}
+      disabled={pending}
+      aria-label={`Mark ${task.title} done`}
+      title="Mark done"
+      className="group/ring relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+      style={{ background: `conic-gradient(${color} ${deg}deg, var(--bg-tint-strong) 0)` }}
+    >
+      <span
+        className="inline-flex h-[1.625rem] w-[1.625rem] items-center justify-center rounded-full text-[0.75rem] transition-colors group-hover/ring:bg-bg-hover"
+        style={{ background: "var(--bg-page)", color: task.daysUntil <= 0 ? "var(--attention)" : "var(--text-faint)" }}
+      >
+        {pending ? "…" : "✓"}
+      </span>
+    </button>
+  );
+}
+
+function TaskRow({ task, members, shared }: { task: TaskView; members: MemberOption[]; shared: boolean }) {
   const [pending, start] = useTransition();
   const [editing, setEditing] = useState(false);
   const late = task.daysUntil < 0;
@@ -53,48 +145,49 @@ function TaskRow({ task, members }: { task: TaskView; members: MemberOption[] })
 
   if (editing) {
     return (
-      <li className="p-3" style={{ borderColor: "var(--border-faint)" }}>
-        <TaskForm kind={task.kind as HomeTaskKind} members={members} task={task} onDone={() => setEditing(false)} />
-      </li>
-    );
-  }
-
-  return (
-    <li className="flex items-center justify-between gap-3 px-3 py-2.5" style={{ borderColor: "var(--border-faint)" }}>
-      <button type="button" className="min-w-0 text-left" onClick={() => setEditing(true)} title="Edit">
-        <p className="truncate text-[0.875rem]" style={{ color: "var(--text)" }}>
-          {task.title}
-        </p>
-        <p className="truncate text-[0.75rem]" style={{ color: late ? "var(--accent-strong)" : "var(--text-faint)" }}>
-          {homeDueLabel(task.daysUntil)} · {cadenceLabel(task.cadenceDays)}
-          {task.assigneeName ? ` · ${task.assigneeName}${task.rotate ? " (rotates)" : ""}` : ""}
-          {task.lastDone ? ` · last done ${task.lastDone}` : ""}
-        </p>
-      </button>
-      <div className="flex shrink-0 items-center gap-1">
+      <li className="border-t p-3 first:border-t-0" style={{ borderColor: "var(--border-faint)" }}>
+        <TaskForm members={members} task={task} onDone={() => setEditing(false)} />
         <button
           type="button"
-          className={due ? "btn-ink" : "btn-ghost"}
-          disabled={pending}
-          onClick={() => start(async () => void (await completeTask(task.id)))}
-        >
-          {pending ? "…" : "Done"}
-        </button>
-        <button
-          type="button"
-          className="btn-icon"
-          aria-label={`Remove ${task.title}`}
-          title="Remove"
+          className="btn-ghost mt-2"
+          style={{ color: "var(--text-faint)" }}
           disabled={pending}
           onClick={() => {
             if (confirm(`Stop tracking "${task.title}"?`)) start(async () => void (await archiveTask(task.id)));
           }}
         >
-          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden>
-            <path d="M3 3l8 8M11 3l-8 8" />
-          </svg>
+          Stop tracking this
         </button>
-      </div>
+      </li>
+    );
+  }
+
+  return (
+    <li className="flex items-center gap-3 border-t px-3 py-2.5 first:border-t-0" style={{ borderColor: "var(--border-faint)" }}>
+      <FreshnessRing task={task} pending={pending} onDone={() => start(async () => void (await completeTask(task.id)))} />
+      <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setEditing(true)} title="Edit">
+        <p className="truncate text-[0.9375rem]" style={{ color: "var(--text)", fontWeight: due ? 600 : 400 }}>
+          {task.title}
+        </p>
+        <p className="truncate text-[0.75rem]" style={{ color: late || due ? "var(--attention)" : "var(--text-faint)" }}>
+          {homeDueLabel(task.daysUntil)} · {cadenceLabel(task.cadenceDays).toLowerCase()}
+          {task.rotate ? " · takes turns" : ""}
+          {task.lastDone ? <span style={{ color: "var(--text-faint)" }}> · last {task.lastDone}</span> : null}
+        </p>
+      </button>
+      {shared ? (
+        <span
+          title={task.assigneeName ? `${task.assigneeName}'s turn` : "Anyone"}
+          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[0.6875rem] font-semibold"
+          style={
+            task.assigneeName
+              ? { background: categoryColor(task.assigneeName), color: "#fff" }
+              : { background: "var(--bg-tint-strong)", color: "var(--text-faint)" }
+          }
+        >
+          {task.assigneeName ? personInitial(task.assigneeName) : "·"}
+        </span>
+      ) : null}
     </li>
   );
 }
@@ -102,13 +195,13 @@ function TaskRow({ task, members }: { task: TaskView; members: MemberOption[] })
 const CADENCE_CHOICES = [1, 7, 14, 30, 90, 180, 365];
 
 export function TaskForm({
-  kind,
+  kind: initialKind = "chore",
   members,
   task,
   today,
   onDone,
 }: {
-  kind: HomeTaskKind;
+  kind?: HomeTaskKind;
   members: MemberOption[];
   task?: TaskView;
   today?: string;
@@ -119,6 +212,7 @@ export function TaskForm({
     if (result?.ok) onDone?.();
     return result;
   }, undefined);
+  const [kind, setKind] = useState<HomeTaskKind>((task?.kind as HomeTaskKind | undefined) ?? initialKind);
   const [title, setTitle] = useState(task?.title ?? "");
   const [cadence, setCadence] = useState(task?.cadenceDays ?? (kind === "chore" ? 7 : 90));
   const presets = HOME_TASK_PRESETS.filter((p) => p.kind === kind);
@@ -128,13 +222,37 @@ export function TaskForm({
       <input type="hidden" name="kind" value={kind} />
       {task ? <input type="hidden" name="id" value={task.id} /> : null}
       {!task ? (
+        <div className="seg max-w-xs" role="tablist" aria-label="Kind">
+          {(
+            [
+              ["chore", "Chore"],
+              ["maintenance", "Upkeep"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={kind === value}
+              className="seg-item"
+              onClick={() => {
+                setKind(value);
+                setCadence(value === "chore" ? 7 : 90);
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {!task ? (
         <div className="flex flex-wrap gap-1.5">
           {presets.map((preset) => (
             <button
               key={preset.title}
               type="button"
-              className="rounded-full border px-2.5 py-1 text-[0.75rem]"
-              style={{ borderColor: "var(--border-soft)", color: "var(--text-muted)" }}
+              className="chip"
+              data-on={title === preset.title || undefined}
               onClick={() => {
                 setTitle(preset.title);
                 setCadence(preset.cadenceDays);
@@ -205,16 +323,4 @@ export function TaskForm({
       ) : null}
     </form>
   );
-}
-
-export function AddTask({ kind, members, today }: { kind: HomeTaskKind; members: MemberOption[]; today: string }) {
-  const [open, setOpen] = useState(false);
-  if (!open) {
-    return (
-      <button type="button" className="btn-ghost" onClick={() => setOpen(true)}>
-        {kind === "chore" ? "Add a chore" : "Add maintenance"}
-      </button>
-    );
-  }
-  return <TaskForm kind={kind} members={members} today={today} onDone={() => setOpen(false)} />;
 }
