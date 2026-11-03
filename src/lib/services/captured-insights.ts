@@ -58,64 +58,6 @@ function rowToInsight(row: InsightRow, personIds: string[] = []): CapturedInsigh
   };
 }
 
-let insightTablesReady: Promise<void> | null = null;
-
-export function ensureInsightTables(): Promise<void> {
-  if (!insightTablesReady) {
-    insightTablesReady = _createInsightTables();
-  }
-  return insightTablesReady;
-}
-
-async function _createInsightTables(): Promise<void> {
-  try {
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "CapturedInsight" (
-        "id"             TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-        "userId"         TEXT NOT NULL,
-        "sourceTool"     TEXT NOT NULL,
-        "sourceRecordId" TEXT NOT NULL,
-        "sourceField"    TEXT,
-        "occurredAt"     TIMESTAMPTZ NOT NULL,
-        "text"           TEXT NOT NULL,
-        "kind"           TEXT NOT NULL DEFAULT 'insight',
-        "status"         TEXT NOT NULL DEFAULT 'active',
-        "createdAt"      TIMESTAMPTZ NOT NULL DEFAULT now(),
-        "updatedAt"      TIMESTAMPTZ NOT NULL DEFAULT now()
-      )
-    `);
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "CapturedInsightPerson" (
-        "id"        TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-        "userId"    TEXT NOT NULL,
-        "insightId" TEXT NOT NULL REFERENCES "CapturedInsight"("id") ON DELETE CASCADE,
-        "personId"  TEXT NOT NULL,
-        UNIQUE("insightId", "personId")
-      )
-    `);
-    await prisma.$executeRawUnsafe(`
-      CREATE INDEX IF NOT EXISTS "CapturedInsight_userId_idx"
-        ON "CapturedInsight"("userId")
-    `);
-    await prisma.$executeRawUnsafe(`
-      CREATE INDEX IF NOT EXISTS "CapturedInsight_userId_occurredAt_idx"
-        ON "CapturedInsight"("userId", "occurredAt" DESC)
-    `);
-    await prisma.$executeRawUnsafe(`
-      CREATE INDEX IF NOT EXISTS "CapturedInsight_source_idx"
-        ON "CapturedInsight"("userId", "sourceTool", "sourceRecordId")
-    `);
-    await prisma.$executeRawUnsafe(`
-      CREATE INDEX IF NOT EXISTS "CapturedInsightPerson_userId_personId_idx"
-        ON "CapturedInsightPerson"("userId", "personId")
-    `);
-  } catch (error) {
-    insightTablesReady = null;
-    console.error("[captured-insights] ensureInsightTables failed", error);
-    throw error;
-  }
-}
-
 export async function deleteInsightsForSource(
   userId: string,
   sourceTool: string,

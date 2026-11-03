@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveActiveUserId } from "@/lib/viewer-context";
-import { ensureRolodexTables, getPerson } from "@/lib/services/rolodex";
+import { getPerson } from "@/lib/services/rolodex";
 import { EditPersonForm } from "./_edit-form";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,6 @@ export default async function EditPersonPage({
   params: Promise<{ id: string }>;
 }) {
   try {
-    await ensureRolodexTables();
   } catch {
     // degrade gracefully
   }

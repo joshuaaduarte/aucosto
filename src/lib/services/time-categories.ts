@@ -1,7 +1,7 @@
 // Service layer for user-manageable time categories.
 //
 // Like reflect/rhythms/projects, the TimeCategory table is created via raw SQL
-// (`ensureTimeCategoryTable`) rather than `prisma migrate` — the generated
+// (scripts/consolidate-runtime-ddl.sql) rather than `prisma migrate` — the generated
 // client predates this model, so all access here goes through $queryRaw /
 // $executeRaw. Reads degrade to the hardcoded presets so the time tracker keeps
 // working before the table exists; writes surface a clear "not ready" error.
@@ -57,40 +57,6 @@ function isMissingTableError(error: unknown): boolean {
   );
 }
 
-let tableReady: Promise<void> | null = null;
-
-/**
- * Idempotently create the TimeCategory table + index. Memoized per process; a
- * failure resets the memo so a cold-start DB blip retries instead of poisoning
- * the process (same shape as ensureProjectBoardTables).
- */
-export function ensureTimeCategoryTable(): Promise<void> {
-  if (!tableReady) {
-    tableReady = (async () => {
-      await prisma.$executeRawUnsafe(
-        'CREATE TABLE IF NOT EXISTS "TimeCategory" (' +
-          '"id" TEXT PRIMARY KEY DEFAULT gen_random_uuid(), ' +
-          '"userId" TEXT NOT NULL, ' +
-          '"name" TEXT NOT NULL, ' +
-          "\"color\" TEXT NOT NULL DEFAULT '#6366f1', " +
-          '"emoji" TEXT, ' +
-          '"isHidden" BOOLEAN NOT NULL DEFAULT false, ' +
-          '"sortOrder" INTEGER NOT NULL DEFAULT 0, ' +
-          '"createdAt" TIMESTAMPTZ NOT NULL DEFAULT now());',
-      );
-      await prisma.$executeRawUnsafe(
-        'CREATE INDEX IF NOT EXISTS "TimeCategory_userId_sortOrder_idx" ON "TimeCategory" ("userId", "sortOrder");',
-      );
-    })()
-      .then(() => undefined)
-      .catch((error) => {
-        tableReady = null;
-        console.error("[time-categories] ensureTimeCategoryTable failed", error);
-      });
-  }
-  return tableReady;
-}
-
 /**
  * One-time seed of the user's defaults from the hardcoded preset list. Only
  * runs when the user has no categories yet — so it never clobbers edits.
@@ -120,7 +86,6 @@ export async function listTimeCategories(
 ): Promise<TimeCategoryRecord[]> {
   requireCan(userId, "time", "read");
   try {
-    await ensureTimeCategoryTable();
     await seedDefaultsIfEmpty(userId);
     const rows = await prisma.$queryRaw<Row[]>(Prisma.sql`
       SELECT "id", "name", "color", "emoji", "isHidden", "sortOrder"
@@ -172,7 +137,6 @@ export async function createTimeCategory(
   const emoji = input.emoji?.trim() || null;
   const id = randomUUID();
   try {
-    await ensureTimeCategoryTable();
     const next = await prisma.$queryRaw<Array<{ next: number }>>(Prisma.sql`
       SELECT COALESCE(MAX("sortOrder"), -1) + 1 AS "next"
       FROM "TimeCategory" WHERE "userId" = ${userId}
@@ -214,7 +178,6 @@ export async function updateTimeCategory(
   // to avoid null-typed parameter pitfalls in raw SQL.)
   const emoji = patch.emoji?.trim() || null;
   try {
-    await ensureTimeCategoryTable();
     await prisma.$executeRaw(Prisma.sql`
       UPDATE "TimeCategory" SET
         "name" = COALESCE(${name ?? null}, "name"),
@@ -242,7 +205,6 @@ export async function reorderTimeCategories(
 ): Promise<void> {
   requireCan(userId, "time", "write");
   try {
-    await ensureTimeCategoryTable();
     for (let index = 0; index < orderedIds.length; index += 1) {
       const categoryId = orderedIds[index];
       if (!categoryId) continue;

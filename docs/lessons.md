@@ -144,6 +144,9 @@ columns were then added by services at request time. To bring it back:
    move the old migration folders aside, and mark the baseline applied with
    `npx prisma migrate resolve --applied <ts>_baseline`. Never accept a
    `migrate dev` reset — it truncates live data.
-4. Delete the `ensure*()` helpers and swap raw SQL for the typed client
-   tool by tool, now that the generated client knows every model.
+4. Swap raw SQL for the typed client tool by tool, now that the generated
+   client knows every model.
+
+Status: step 1 was applied to production on 2026-11-03 and the runtime
+`ensure*()` helpers were deleted after it; steps 2–4 are still open.
 

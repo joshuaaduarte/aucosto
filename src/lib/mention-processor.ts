@@ -2,7 +2,6 @@ import "server-only";
 
 import { parseMentions, parseInsights, RESERVED_MARKERS } from "@/lib/mention-parser";
 import {
-  ensureRolodexTables,
   findPersonByName,
   createMention,
   resolveMention,
@@ -12,7 +11,6 @@ import {
   updateInteractionContent,
 } from "@/lib/services/rolodex";
 import {
-  ensureInsightTables,
   deleteInsightsForSource,
   createInsight,
   linkInsightToPerson,
@@ -88,13 +86,6 @@ export async function processMentions(
 
   // ── Mention processing ────────────────────────────────────────────────
   if (mentions.length > 0) {
-    try {
-      await ensureRolodexTables();
-    } catch (e) {
-      console.error("[mention-processor] ensureRolodexTables failed", e);
-      return result;
-    }
-
     for (const mention of mentions) {
       const firstWord = mention.name.split(/\s/)[0] ?? "";
       if (RESERVED_MARKERS.has(firstWord.toLowerCase())) {
@@ -195,7 +186,6 @@ export async function processMentions(
   // ── Insight processing ──────────────────────────────────────────────────
   if (insights.length > 0) {
     try {
-      await ensureInsightTables();
       await deleteInsightsForSource(userId, sourceTool, sourceRecordId, sourceField);
 
       const personIds = [...resolvedPersonIds];

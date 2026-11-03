@@ -37,7 +37,6 @@ import {
   type WorkMeetingSummary,
   type WorkTaskSummary,
 } from "@/lib/work";
-import { ensureWorkTables } from "./shared";
 import { getOrCreateDefaultWorkspace, getWorkTodaySnapshot } from "./reads";
 import {
   createMeeting,
@@ -294,7 +293,6 @@ export async function linkCoworker(
   extras: { relationship?: string | null } = {},
 ): Promise<string> {
   requireCan(userId, "work", "write");
-  await ensureWorkTables();
   const existing = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
     `SELECT "id" FROM "WorkPerson"
      WHERE "userId" = $1 AND "workspaceId" = $2 AND "rolodexPersonId" = $3 LIMIT 1`,
@@ -351,7 +349,6 @@ export async function linkExistingProject(
   extras: { areaId?: string | null } = {},
 ): Promise<string> {
   requireCan(userId, "work", "write");
-  await ensureWorkTables();
   const existing = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
     `SELECT "id" FROM "WorkProject"
      WHERE "userId" = $1 AND "workspaceId" = $2 AND "projectId" = $3 LIMIT 1`,
@@ -392,7 +389,6 @@ export async function listCoworkerCandidates(
 ): Promise<RolodexPersonSummary[]> {
   requireCan(userId, "work", "read");
   try {
-    await ensureWorkTables();
     const [persons, linked] = await Promise.all([
       listPersons(userId),
       prisma.$queryRawUnsafe<Array<{ rolodexPersonId: string | null }>>(
@@ -420,7 +416,6 @@ export async function listUnlinkedProjectOptions(
 ): Promise<Array<{ id: string; name: string }>> {
   requireCan(userId, "work", "read");
   try {
-    await ensureWorkTables();
     const [options, linked] = await Promise.all([
       listProjectPickerOptions(userId),
       prisma.$queryRawUnsafe<Array<{ projectId: string | null }>>(
@@ -455,7 +450,6 @@ export async function getWorkContextForDoItems(
   requireCan(userId, "work", "read");
   const map = new Map<string, DoItemWorkContext>();
   try {
-    await ensureWorkTables();
     const rows = await prisma.$queryRawUnsafe<
       Array<{ doItemId: string; id: string; workspaceId: string; name: string }>
     >(
@@ -493,7 +487,6 @@ export async function getWorkContextForRolodexPerson(
 ): Promise<RolodexWorkContext[]> {
   requireCan(userId, "work", "read");
   try {
-    await ensureWorkTables();
     return await prisma.$queryRawUnsafe<RolodexWorkContext[]>(
       `SELECT p."id" AS "workPersonId", w."name" AS "workspaceName",
               p."relationship", p."team", p."role"
@@ -516,7 +509,6 @@ export async function getWorkspaceNamesByProjectId(
   requireCan(userId, "work", "read");
   const map = new Map<string, string>();
   try {
-    await ensureWorkTables();
     const rows = await prisma.$queryRawUnsafe<
       Array<{ projectId: string; name: string }>
     >(

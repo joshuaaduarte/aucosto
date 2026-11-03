@@ -22,47 +22,9 @@ export interface AssistantActionAudit {
   createdAt: string; // ISO
 }
 
-let auditTableReady: Promise<void> | null = null;
-
-export function ensureAuditTable(): Promise<void> {
-  if (!auditTableReady) {
-    auditTableReady = (async () => {
-      await prisma.$executeRawUnsafe(`
-        CREATE TABLE IF NOT EXISTS assistant_action_audits (
-          id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-          user_id TEXT NOT NULL,
-          action TEXT NOT NULL,
-          actor TEXT NOT NULL DEFAULT 'assistant',
-          risk_level TEXT NOT NULL DEFAULT 'low',
-          confirmed BOOLEAN NOT NULL DEFAULT false,
-          status TEXT NOT NULL DEFAULT 'previewed',
-          source JSONB,
-          normalized_input JSONB NOT NULL DEFAULT '{}',
-          preview_text TEXT NOT NULL DEFAULT '',
-          result_record_id TEXT,
-          result_record_type TEXT,
-          before_state JSONB,
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-      `);
-      await prisma.$executeRawUnsafe(`
-        CREATE INDEX IF NOT EXISTS idx_aaa_user_created
-        ON assistant_action_audits(user_id, created_at DESC)
-      `);
-    })()
-      .then(() => undefined)
-      .catch((error) => {
-        auditTableReady = null;
-        console.error("[assistant-audit] ensureAuditTable failed", error);
-      });
-  }
-  return auditTableReady!;
-}
-
 export async function recordAudit(
   entry: Omit<AssistantActionAudit, "id" | "createdAt">,
 ): Promise<string> {
-  await ensureAuditTable();
   const rows = await prisma.$queryRawUnsafe<{ id: string }[]>(
     `INSERT INTO assistant_action_audits
        (user_id, action, actor, risk_level, confirmed, status, source,
@@ -89,7 +51,6 @@ export async function getRecentAudits(
   userId: string,
   limit = 20,
 ): Promise<AssistantActionAudit[]> {
-  await ensureAuditTable();
   const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
     `SELECT id, user_id, action, actor, risk_level, confirmed, status,
             source, normalized_input, preview_text, result_record_id,

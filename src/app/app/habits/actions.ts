@@ -9,7 +9,6 @@ import {
   archiveHabit,
   createHabit,
   deleteHabit,
-  ensureHabitWindowColumns,
   listHabits,
   logHabitProgress,
   removeTodayHabitEntries,
@@ -63,16 +62,6 @@ function nullableNumber(formData: FormData, key: string) {
 export type HabitState = { error?: string } | undefined;
 export type HabitLogState = { error?: string } | undefined;
 export type HabitScheduleState = { error?: string } | undefined;
-
-// One-time, idempotent application of the flexible-window columns. The habit
-// reads/mutations already call ensureHabitWindowColumns() internally (so the
-// columns exist on the first habits/calendar render after deploy); this action
-// is the explicit, manually-invocable entry point for the same DDL.
-export async function ensureHabitWindowColumnsAction(): Promise<{ ok: true }> {
-  await resolveActiveUserId();
-  await ensureHabitWindowColumns();
-  return { ok: true };
-}
 
 export async function createHabitAction(
   _prev: HabitState,

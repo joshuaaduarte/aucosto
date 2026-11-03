@@ -7,7 +7,6 @@ import { listAccounts } from "@/lib/services/finance";
 import { listDoItems, listSuggestedDoItems } from "@/lib/services/do";
 import { listHabits, listSuggestedHabits } from "@/lib/services/habits";
 import {
-  ensureCalendarCategoryColumn,
   getCalendarItemCategoryIds,
   listCalendarItems,
 } from "@/lib/services/calendar";
@@ -62,7 +61,6 @@ export default async function CalendarPage({
 
   // Make sure the out-of-band categoryId column exists before any read/write
   // touches it (raw-SQL column — see src/lib/services/calendar.ts).
-  await ensureCalendarCategoryColumn();
 
   const weekStart = startOfCalendarWeek();
   const weekEnd = addDays(weekStart, 7);

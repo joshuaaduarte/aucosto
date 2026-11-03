@@ -1,5 +1,4 @@
 // Work domain service — barrel. Reads degrade to empty; writes throw.
-export { ensureWorkTables } from "./shared";
 export {
   getOrCreateDefaultWorkspace,
   listAreas,

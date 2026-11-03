@@ -8,7 +8,6 @@ import { normalizeDoStatus } from "@/lib/do";
 import { deleteDoItemsByProject } from "@/lib/services/do";
 import { recordEvent } from "@/lib/services/events";
 import { listHabits } from "@/lib/services/habits";
-import { ensureProjectPlanningColumns } from "@/lib/services/project-planning";
 import {
   computeMomentum,
   normalizeBoardStatus,
@@ -285,10 +284,6 @@ function summarize(
 export async function listProjects(userId: string): Promise<ProjectSummary[]> {
   requireCan(userId, "projects", "read");
   const now = new Date();
-  await Promise.all([
-    ensureProjectBoardTables(),
-    ensureProjectPlanningColumns(),
-  ]);
 
   const projects = await prisma.project.findMany({
     where: { userId },
@@ -577,7 +572,6 @@ export async function updateProject(
   input: Partial<SaveProjectInput>,
 ): Promise<ProjectSummary | null> {
   requireCan(userId, "projects", "write");
-  await ensureProjectBoardTables();
   const existing = await prisma.project.findFirst({ where: { userId, id } });
   if (!existing) return null;
 
@@ -685,7 +679,6 @@ export async function deleteProject(
   options: { deleteTasks?: boolean } = {},
 ): Promise<void> {
   requireCan(userId, "projects", "write");
-  await ensureProjectBoardTables();
   let deletedTaskCount = 0;
   if (options.deleteTasks) {
     deletedTaskCount = await deleteDoItemsByProject(userId, id);
@@ -720,7 +713,6 @@ export async function getProjectDeleteImpact(
   id: string,
 ): Promise<ProjectDeleteImpact> {
   requireCan(userId, "projects", "read");
-  await ensureProjectBoardTables();
   try {
     const rows = await prisma.$queryRaw<
       Array<{ project_task_count: bigint; do_item_count: bigint; time_entry_count: bigint }>
@@ -746,16 +738,15 @@ export async function getProjectDeleteImpact(
 // Rebuilt Projects board (raw SQL).
 //
 // The richer board model (Area, ProjectTask, Project.intent/energyType/…,
-// TimeEntry.projectId) is applied to the live DB via ensureProjectBoardTables()
-// — not `prisma migrate` — so all access here goes through raw SQL, mirroring
+// TimeEntry.projectId) is applied to the live DB via
+// scripts/consolidate-runtime-ddl.sql — not `prisma migrate` — so all access here goes through raw SQL, mirroring
 // the reflect.ts pattern. Reads degrade to empty so a page never 500s before
 // the tables exist; writes surface a clear "not migrated yet" error.
 // ===========================================================================
 
 /**
- * True when the board tables/columns haven't been created yet (the page calls
- * ensureProjectBoardTables() first, but the time tracker reads tags before any
- * project page is opened). Match on error CODES first — the pg adapter rewrites
+ * True when the board tables/columns are missing (e.g. a fresh DB that hasn't
+ * had scripts/consolidate-runtime-ddl.sql applied). Match on error CODES first — the pg adapter rewrites
  * messages (see reflect.ts for the full war story).
  *   P2021 / 42P01 = missing table; 42703 = missing column.
  */
@@ -774,65 +765,6 @@ function isMissingBoardSchema(error: unknown): boolean {
       ((error.message.includes("ProjectTask") || error.message.includes("Area")) &&
         error.message.includes("does not exist")))
   );
-}
-
-let boardSchemaReady: Promise<void> | null = null;
-
-/**
- * Idempotently create/extend the board schema. Memoized per process; a failure
- * resets the memo so a cold-start DB blip retries instead of poisoning the
- * process (same shape as ensureHabitWindowColumns).
- */
-export function ensureProjectBoardTables(): Promise<void> {
-  if (!boardSchemaReady) {
-    boardSchemaReady = (async () => {
-      await prisma.$executeRawUnsafe(
-        'ALTER TABLE "Project" ' +
-          'ADD COLUMN IF NOT EXISTS "areaId" TEXT, ' +
-          'ADD COLUMN IF NOT EXISTS "intent" TEXT, ' +
-          'ADD COLUMN IF NOT EXISTS "energyType" TEXT NOT NULL DEFAULT \'deep\', ' +
-          'ADD COLUMN IF NOT EXISTS "timeBudgetMinutes" INTEGER, ' +
-          'ADD COLUMN IF NOT EXISTS "nextAction" TEXT;',
-      );
-      await prisma.$executeRawUnsafe(
-        'CREATE TABLE IF NOT EXISTS "Area" (' +
-          '"id" TEXT PRIMARY KEY DEFAULT gen_random_uuid(), ' +
-          '"userId" TEXT NOT NULL, ' +
-          '"name" TEXT NOT NULL, ' +
-          '"color" TEXT NOT NULL DEFAULT \'#6366f1\', ' +
-          '"createdAt" TIMESTAMPTZ NOT NULL DEFAULT now());',
-      );
-      await prisma.$executeRawUnsafe(
-        'CREATE INDEX IF NOT EXISTS "Area_userId_idx" ON "Area" ("userId");',
-      );
-      await prisma.$executeRawUnsafe(
-        'CREATE TABLE IF NOT EXISTS "ProjectTask" (' +
-          '"id" TEXT PRIMARY KEY DEFAULT gen_random_uuid(), ' +
-          '"projectId" TEXT NOT NULL REFERENCES "Project"("id") ON DELETE CASCADE, ' +
-          '"userId" TEXT NOT NULL, ' +
-          '"title" TEXT NOT NULL, ' +
-          '"done" BOOLEAN NOT NULL DEFAULT false, ' +
-          '"isToday" BOOLEAN NOT NULL DEFAULT false, ' +
-          '"sortOrder" INTEGER NOT NULL DEFAULT 0, ' +
-          '"createdAt" TIMESTAMPTZ NOT NULL DEFAULT now());',
-      );
-      await prisma.$executeRawUnsafe(
-        'CREATE INDEX IF NOT EXISTS "ProjectTask_projectId_idx" ON "ProjectTask" ("projectId");',
-      );
-      await prisma.$executeRawUnsafe(
-        'ALTER TABLE "TimeEntry" ADD COLUMN IF NOT EXISTS "projectId" TEXT;',
-      );
-      await prisma.$executeRawUnsafe(
-        'CREATE INDEX IF NOT EXISTS "TimeEntry_projectId_startedAt_idx" ON "TimeEntry" ("projectId", "startedAt");',
-      );
-    })()
-      .then(() => undefined)
-      .catch((error) => {
-        boardSchemaReady = null;
-        console.error("[projects] ensureProjectBoardTables failed", error);
-      });
-  }
-  return boardSchemaReady;
 }
 
 function notMigrated(): never {
@@ -1043,7 +975,6 @@ async function loadTaskCounts(userId: string): Promise<Map<string, { open: numbe
 
 export async function listBoardProjects(userId: string): Promise<BoardProjectCard[]> {
   requireCan(userId, "projects", "read");
-  await ensureProjectBoardTables();
   const now = new Date();
   try {
     const [projects, timeAgg, taskCounts] = await Promise.all([
@@ -1130,7 +1061,6 @@ export async function createBoardProject(
   input: SaveBoardProjectInput,
 ): Promise<string> {
   requireCan(userId, "projects", "write");
-  await ensureProjectBoardTables();
   const name = input.name.trim();
   if (!name) throw new Error("Project name is required.");
   const id = randomUUID();
@@ -1162,7 +1092,6 @@ export async function updateBoardProject(
   input: SaveBoardProjectInput,
 ): Promise<void> {
   requireCan(userId, "projects", "write");
-  await ensureProjectBoardTables();
   const name = input.name.trim();
   if (!name) throw new Error("Project name is required.");
   const status = normalizeBoardStatus(input.status);
@@ -1376,7 +1305,6 @@ export async function getBoardProject(
   id: string,
 ): Promise<BoardProjectDetail | null> {
   requireCan(userId, "projects", "read");
-  await ensureProjectBoardTables();
   const now = new Date();
   try {
     const rows = await prisma.$queryRaw<ProjectRowRaw[]>(Prisma.sql`

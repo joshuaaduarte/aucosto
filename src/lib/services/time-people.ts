@@ -1,7 +1,7 @@
 // Service layer for linking Rolodex people to time entries ("time with people").
 //
 // Like time-categories and rolodex, the TimeEntryPerson join table is created
-// via raw SQL (`ensureTimeEntryPersonTable`) rather than `prisma migrate` —
+// via raw SQL (scripts/consolidate-runtime-ddl.sql) rather than `prisma migrate` —
 // the generated client predates this model, so all access here goes through
 // $queryRaw / $executeRaw. Reads degrade to empty when the table is missing;
 // writes surface a clear error.
@@ -50,33 +50,6 @@ function isMissingTableError(error: unknown): boolean {
   );
 }
 
-let tableReady: Promise<void> | null = null;
-
-export function ensureTimeEntryPersonTable(): Promise<void> {
-  if (!tableReady) {
-    tableReady = (async () => {
-      await prisma.$executeRawUnsafe(
-        'CREATE TABLE IF NOT EXISTS "TimeEntryPerson" (' +
-          '"id" TEXT PRIMARY KEY, ' +
-          '"userId" TEXT NOT NULL, ' +
-          '"timeEntryId" TEXT NOT NULL, ' +
-          '"personId" TEXT NOT NULL, ' +
-          '"createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(), ' +
-          'UNIQUE("userId", "timeEntryId", "personId"));',
-      );
-      await prisma.$executeRawUnsafe(
-        'CREATE INDEX IF NOT EXISTS "TimeEntryPerson_user_time_idx" ' +
-          'ON "TimeEntryPerson" ("userId", "timeEntryId");',
-      );
-      await prisma.$executeRawUnsafe(
-        'CREATE INDEX IF NOT EXISTS "TimeEntryPerson_user_person_idx" ' +
-          'ON "TimeEntryPerson" ("userId", "personId");',
-      );
-    })();
-  }
-  return tableReady;
-}
-
 /**
  * Replace the set of people linked to a time entry. Throws when the entry
  * does not exist or belongs to another user.
@@ -87,7 +60,6 @@ export async function setEntryPeople(
   personIds: string[],
 ): Promise<void> {
   requireCan(userId, "time", "write");
-  await ensureTimeEntryPersonTable();
   const entry = await prisma.timeEntry.findFirst({
     where: { id: timeEntryId, userId },
     select: { id: true },
@@ -131,7 +103,6 @@ export async function clearEntryPeople(
   timeEntryId: string,
 ): Promise<void> {
   requireCan(userId, "time", "write");
-  await ensureTimeEntryPersonTable();
   await prisma.$executeRawUnsafe(
     'DELETE FROM "TimeEntryPerson" WHERE "userId" = $1 AND "timeEntryId" = $2',
     userId,
@@ -146,7 +117,6 @@ export async function listEntryPeople(
 ): Promise<string[]> {
   requireCan(userId, "time", "read");
   try {
-    await ensureTimeEntryPersonTable();
     const rows = await prisma.$queryRawUnsafe<LinkRow[]>(
       'SELECT "timeEntryId", "personId" FROM "TimeEntryPerson" ' +
         'WHERE "userId" = $1 AND "timeEntryId" = $2',
@@ -177,7 +147,6 @@ export async function personTimeSummary(
 ): Promise<PersonTimeSummary[]> {
   requireCan(userId, "time", "read");
   try {
-    await ensureTimeEntryPersonTable();
     const links = await prisma.$queryRawUnsafe<LinkRow[]>(
       'SELECT "timeEntryId", "personId" FROM "TimeEntryPerson" WHERE "userId" = $1',
       userId,

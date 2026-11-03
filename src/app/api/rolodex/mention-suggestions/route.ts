@@ -1,5 +1,5 @@
 import { getViewerContext } from "@/lib/viewer-context";
-import { ensureRolodexTables, listPersons } from "@/lib/services/rolodex";
+import { listPersons } from "@/lib/services/rolodex";
 
 export async function GET() {
   // effectiveUserId, not the session id, so demo mode suggests demo people.
@@ -9,7 +9,6 @@ export async function GET() {
     return Response.json({ people: [] }, { status: 401 });
   }
 
-  await ensureRolodexTables().catch(() => {});
   const people = await listPersons(userId).catch(() => []);
   return Response.json({
     people: people.slice(0, 25).map((person) => ({
