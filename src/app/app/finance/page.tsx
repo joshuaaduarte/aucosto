@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getTellerConnectConfig } from "@/lib/teller";
 import {
@@ -13,6 +14,7 @@ import {
   listLinkedConnections,
   listStatementChecks,
   listTransactions,
+  hasShortcutKey,
 } from "@/lib/services/finance";
 import { householdMemberNames } from "@/lib/household";
 import { findRecurringCandidates } from "@/lib/finance-summary";
@@ -43,6 +45,7 @@ import {
   ProjectionCard,
 } from "./_components/net-worth";
 import { FlexibleLimitForm } from "./_components/tracking-forms";
+import { ShortcutPanel } from "./_components/shortcut-panel";
 import { SectionCard } from "./_components/ui";
 import { AccountsPanel } from "./accounts-panel";
 import { GoalsPanel } from "./goals-panel";
@@ -136,6 +139,16 @@ export default async function FinancePage({
   });
   planning.sharedWith = context.financeScope === "household" ? context.householdName : null;
   const setupReady = snapshots.ready && plans.ready && checks.ready;
+  let shortcut: { endpoint: string; hasKey: boolean } | null = null;
+  if (tab === "spending") {
+    const h = await headers();
+    const host = h.get("x-forwarded-host") ?? h.get("host") ?? "aucosto.com";
+    const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+    shortcut = {
+      endpoint: `${proto}://${host}/api/finance/entries`,
+      hasKey: await hasShortcutKey(context.ownerUserId),
+    };
+  }
 
   return (
     <div className="space-y-8 pb-6">
@@ -226,6 +239,11 @@ export default async function FinancePage({
             <p className="text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
               Showing the latest {history.length} of {count} entries.
             </p>
+          ) : null}
+          {shortcut && !context.isDemoMode ? (
+            <Collapsible title="Log from your iPhone">
+              <ShortcutPanel endpoint={shortcut.endpoint} hasKey={shortcut.hasKey} />
+            </Collapsible>
           ) : null}
           {count > 0 ? <InsightsSection data={data} /> : null}
         </div>

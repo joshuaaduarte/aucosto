@@ -62,3 +62,4 @@ export {
   type StatementPreview,
   type UpdateEntryInput,
 } from "./tracking";
+export { createShortcutKey, hasShortcutKey, verifyShortcutKey } from "./shortcut";

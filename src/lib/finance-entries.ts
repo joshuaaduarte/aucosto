@@ -174,3 +174,26 @@ export function lastUsedAccountId(
   }
   return best?.id ?? null;
 }
+
+// ── Evening "anything to log?" nudge ─────────────────────────────────────
+
+const NUDGE_DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Nudge only people who actually log by hand (an entry in the last 30
+ * days) and only on a day nothing was logged yet in their space.
+ */
+export function shouldNudgeToLog(input: { loggedLast30Days: number; loggedToday: number }): boolean {
+  return input.loggedLast30Days > 0 && input.loggedToday === 0;
+}
+
+export const LOG_NUDGE = {
+  title: "Anything to log today?",
+  body: "Nothing's been logged in Money today. It takes a few seconds.",
+  line: "Anything to log in Money today?",
+  url: "/app/finance?add=1",
+} as const;
+
+export function thirtyDaysBefore(now: Date): Date {
+  return new Date(now.getTime() - 30 * NUDGE_DAY_MS);
+}

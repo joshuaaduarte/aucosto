@@ -14,6 +14,7 @@ import { parseCurrencyToCents } from "@/lib/finance-accounts";
 import { setFinanceScope } from "../settings/household-actions";
 import * as financeService from "@/lib/services/finance";
 import { z } from "zod";
+import { currentActorUserId } from "@/lib/actor";
 import { parseAmountInput } from "@/lib/finance-entries";
 import { FLEXIBLE_BUDGET_KEY } from "@/lib/finance-pacing";
 import { formatUSDFromCents } from "@/lib/money";
@@ -548,4 +549,15 @@ export async function commitStatement(payload: z.input<typeof commitSchema>): Pr
     revalidateFinance();
     return { ok: true, differenceCents: result.differenceCents };
   }, "Could not finish the check.");
+}
+
+export type ShortcutKeyState = { ok: true; key: string } | { ok: false; error: string } | undefined;
+
+/** A new personal key for the iPhone Shortcut; older keys stop working. */
+export async function createFinanceShortcutKey(): Promise<ShortcutKeyState> {
+  return withFinanceUser<ShortcutKeyState>(async () => {
+    const person = currentActorUserId();
+    if (!person) throw new Error("Not signed in.");
+    return { ok: true, key: await financeService.createShortcutKey(person) };
+  }, "Could not make a key.");
 }
