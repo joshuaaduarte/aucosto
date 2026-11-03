@@ -3,6 +3,7 @@
 
 import { formatUSDFromCents } from "@/lib/money";
 import { categoryColor } from "@/lib/time-categories";
+import { financeCategoryLook } from "@/lib/quick-capture";
 import type { CategoryTrends, ForecastLine, NextMonthForecast } from "@/lib/finance-trends";
 import { SectionCard } from "./ui";
 
@@ -25,7 +26,8 @@ export function CategoryTrendsCard({ trends }: { trends: CategoryTrends }) {
       title="Categories by month"
       subtitle="What each category cost, month by month. The arrow compares last month with the months before it."
     >
-      <div className="-mx-2 overflow-x-auto px-2">
+      <MobileTrends trends={trends} />
+      <div className="-mx-2 hidden overflow-x-auto px-2 sm:block">
         <table className="w-full min-w-[32rem] text-[0.8125rem] tabular">
           <thead>
             <tr style={{ color: "var(--text-faint)" }}>
@@ -64,7 +66,7 @@ export function CategoryTrendsCard({ trends }: { trends: CategoryTrends }) {
                   </td>
                   <td
                     className="py-2 pl-2 text-right"
-                    style={{ color: change?.up ? "var(--accent-strong)" : "var(--text-muted)" }}
+                    style={{ color: change?.up ? "var(--attention)" : "var(--text-muted)" }}
                   >
                     {change?.text ?? ""}
                   </td>
@@ -85,6 +87,53 @@ export function CategoryTrendsCard({ trends }: { trends: CategoryTrends }) {
         </table>
       </div>
     </SectionCard>
+  );
+}
+
+/** Phones: one row per category with a tiny month-by-month bar strip. */
+function MobileTrends({ trends }: { trends: CategoryTrends }) {
+  const last = trends.months.length - 1;
+  const max = Math.max(1, ...trends.rows.flatMap((r) => r.cents));
+  return (
+    <ul className="sm:hidden">
+      {trends.rows.map((row) => {
+        const change = changeLabel(row.change);
+        const look = financeCategoryLook(row.category);
+        return (
+          <li key={row.category} className="flex items-center gap-3 border-t py-2.5 first:border-t-0" style={{ borderColor: "var(--border-faint)" }}>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-1.5 truncate text-[0.875rem]" style={{ color: "var(--text)" }}>
+                {look.emoji ? <span aria-hidden>{look.emoji}</span> : <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: look.color }} />}
+                {look.label}
+              </span>
+              <span className="text-[0.75rem]" style={{ color: change?.up ? "var(--attention)" : "var(--text-faint)" }}>
+                {row.averageCents ? `usually ${fmt(row.averageCents)}` : "new"}
+                {change ? ` · ${change.text}` : ""}
+              </span>
+            </span>
+            <span className="flex h-7 items-end gap-[2px]" aria-hidden>
+              {row.cents.map((c, i) => (
+                <span
+                  key={i}
+                  className="w-1.5 rounded-sm"
+                  style={{
+                    height: `${Math.max(2, Math.round((c / max) * 28))}px`,
+                    background: i === last ? look.color : "var(--bg-tint-strong)",
+                  }}
+                />
+              ))}
+            </span>
+            <span className="w-16 shrink-0 text-right text-[0.875rem] font-medium tabular" style={{ color: "var(--text)" }}>
+              {fmt(row.cents[last] ?? 0)}
+            </span>
+          </li>
+        );
+      })}
+      <li className="flex justify-between border-t pt-2.5 text-[0.8125rem] font-semibold" style={{ borderColor: "var(--border-soft)", color: "var(--text)" }}>
+        <span>This month</span>
+        <span className="tabular">{fmt(trends.totals[last] ?? 0)}</span>
+      </li>
+    </ul>
   );
 }
 

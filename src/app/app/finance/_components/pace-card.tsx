@@ -7,9 +7,9 @@ import type { Pacing, PaceStatus } from "@/lib/finance-pacing";
 import { FlexibleLimitForm } from "./tracking-forms";
 
 const STATUS_COLOR: Record<PaceStatus, string> = {
-  good: "var(--text)",
-  watch: "var(--accent)",
-  over: "var(--accent-strong)",
+  good: "var(--positive)",
+  watch: "var(--attention)",
+  over: "var(--attention)",
   unset: "var(--text-muted)",
 };
 
@@ -40,24 +40,20 @@ export function PaceCard({
   if (!pacing.limitCents) {
     return (
       <section className="rounded-md border p-5" style={{ borderColor: "var(--border-soft)" }}>
-        <p className="text-[1.25rem] font-semibold tracking-tight" style={{ color: "var(--text)" }}>
-          How much do you want to spend each month?
+        <p className="text-[0.6875rem] font-semibold uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>
+          Spent this month
+        </p>
+        <p className="mt-1 text-[1.75rem] font-semibold tabular tracking-tight" style={{ color: "var(--text)", letterSpacing: "-0.025em" }}>
+          {fmt(month.spentCents)}
         </p>
         <p className="mt-1 text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
-          This is the everyday money: groceries, eating out, shopping, fun. Rent and other bills are
-          counted separately, so they never look like overspending.
-          {suggestedLimitCents
-            ? ` Over the last few months you spent about ${fmt(suggestedLimitCents)} a month on these.`
-            : ""}
+          Pick a monthly number for everyday spending (groceries, eating out, shopping, fun) and this
+          turns into &ldquo;left this week&rdquo;. Bills are counted separately.
+          {suggestedLimitCents ? ` You usually spend about ${fmt(suggestedLimitCents)}.` : ""}
         </p>
         <div className="mt-4">
           <FlexibleLimitForm suggestedCents={suggestedLimitCents} />
         </div>
-        {month.spentCents > 0 ? (
-          <p className="mt-3 text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
-            So far this month: {fmt(month.spentCents)}.
-          </p>
-        ) : null}
       </section>
     );
   }

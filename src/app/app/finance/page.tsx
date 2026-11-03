@@ -41,7 +41,10 @@ import { PaychecksForm, PotsCard, SalaryBudgetCard } from "./_components/salary-
 import { deriveSalary, type SalaryView } from "./_lib/derive-salary";
 import { spendCategoryChoices } from "@/lib/finance-categories";
 import { PlanningSection } from "./_components/planning-section";
-import { QuickAdd } from "./_components/quick-add";
+import { LogButton } from "./_components/log-button";
+import { NeedsYou } from "./_components/needs-you";
+import { RecentEntries } from "./_components/recent-entries";
+import { buildNeedsYou } from "./_lib/needs-you";
 import { PaceCard, paceHeadline } from "./_components/pace-card";
 import { EntryList } from "./_components/entry-list";
 import { WeeklyCheckIn } from "./_components/weekly-check-in";
@@ -194,12 +197,15 @@ export default async function FinancePage({
             {planning.sharedWith ? `Shared with ${planning.sharedWith}` : "Just you"}
           </p>
         </div>
-        {context.householdUserId && !context.isDemoMode ? (
-          <FinanceScopeSwitcher
-            scope={context.financeScope}
-            householdName={context.householdName ?? "Household"}
-          />
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {context.householdUserId && !context.isDemoMode ? (
+            <FinanceScopeSwitcher
+              scope={context.financeScope}
+              householdName={context.householdName ?? "Household"}
+            />
+          ) : null}
+          <LogButton autoOpen={params.add === "1"} className="btn-ink hidden lg:inline-flex" />
+        </div>
       </header>
 
       <nav
@@ -245,24 +251,11 @@ export default async function FinancePage({
       </nav>
 
       {tab === "overview" ? (
-        <OverviewTab
-          tracking={tracking}
-          planning={planning}
-          accounts={accounts.map((a) => ({ id: a.id, name: a.name, kind: a.kind }))}
-          categories={categoryChoices}
-          salary={salary}
-          autoFocusAdd={params.add === "1"}
-        />
+        <OverviewTab tracking={tracking} planning={planning} salary={salary} now={now} />
       ) : null}
 
       {tab === "spending" ? (
-        <div className="space-y-12">
-          <QuickAdd
-            accounts={accounts.map((a) => ({ id: a.id, name: a.name, kind: a.kind }))}
-            merchants={tracking.merchants}
-            defaultAccountId={tracking.defaultAccountId}
-            categories={categoryChoices}
-          />
+        <div className="space-y-10">
           <EntryList
             entries={tracking.entries}
             accounts={accounts.map((a) => ({ id: a.id, name: a.name }))}
@@ -280,18 +273,45 @@ export default async function FinancePage({
               <ShortcutPanel endpoint={shortcut.endpoint} hasKey={shortcut.hasKey} />
             </Collapsible>
           ) : null}
+          {history.length > 0 ? <CategoryTrendsCard trends={categoryTrends({ history, now })} /> : null}
           {history.length > 0 ? (
-            <>
+            <Collapsible title={`What ${salary.forecast.month.toLocaleDateString([], { month: "long" })} will likely cost`}>
               <NextMonthCard forecast={salary.forecast} />
-              <CategoryTrendsCard trends={categoryTrends({ history, now })} />
-            </>
+            </Collapsible>
           ) : null}
-          {count > 0 ? <InsightsSection data={data} /> : null}
+          {count > 0 ? (
+            <Collapsible title="Patterns and recurring charges">
+              <InsightsSection data={data} />
+            </Collapsible>
+          ) : null}
         </div>
       ) : null}
 
       {tab === "accounts" ? (
         <div className="space-y-10">
+          <CardBills
+            cards={tracking.cards.map((c) => ({
+              id: c.id,
+              name: c.name,
+              statementBalanceCents: c.statementBalanceCents,
+              dueDay: c.dueDate ? dayKeyOf(c.dueDate) : null,
+              daysUntil: c.daysUntil,
+              waitingForStatement: c.waitingForStatement,
+              lastMonth:
+                c.lastMonth.chargedCents || c.lastMonth.paidCents
+                  ? {
+                      label: c.lastMonth.start.toLocaleDateString([], { month: "long" }),
+                      chargedCents: c.lastMonth.chargedCents,
+                      paidCents: c.lastMonth.paidCents,
+                    }
+                  : null,
+            }))}
+            safe={tracking.safe}
+            payFrom={(() => {
+              const a = accounts.find((x) => x.id === tracking.payFromAccountId);
+              return a ? { id: a.id, name: a.name } : null;
+            })()}
+          />
           <NetWorthSummary points={tracking.netWorthPoints} ready={snapshots.ready} />
           <SectionCard
             title="Accounts"
@@ -372,6 +392,25 @@ export default async function FinancePage({
               hasLimits={salary.hasLimits}
             />
           ) : null}
+          <PotsCard pots={salary.pots} emergencyTargetCents={salary.emergencyTargetCents} heldIn={salary.heldIn} />
+          <div id="money-date" className="scroll-mt-20">
+            <WeeklyCheckIn
+              moneyDate={planning.moneyDate}
+              done={planning.moneyDateDone}
+              shared={Boolean(planning.sharedWith)}
+              toSortCount={tracking.toSortCount}
+              pendingCount={tracking.pendingCount}
+              paceLine={paceHeadline(tracking.pacing)}
+              statementsDue={tracking.statementsDue}
+              staleBalances={tracking.staleBalances}
+              billsDue={planning.bills.filter((b) => b.daysUntil <= 7)}
+              cardsDue={tracking.cards
+                .filter((c) => !c.waitingForStatement && c.daysUntil !== null && c.daysUntil <= 7)
+                .map((c) => ({ id: c.id, name: c.name, amountCents: c.statementBalanceCents ?? 0, daysUntil: c.daysUntil! }))}
+              checkInDue={tracking.checkInDue.length > 0}
+              safeShortCents={tracking.safe && tracking.safe.safeCents < 0 ? -tracking.safe.safeCents : 0}
+            />
+          </div>
           <SectionCard
             title="Monthly spending money"
             subtitle="The everyday money: groceries, eating out, shopping, fun. Each week gets a fair share of what's left."
@@ -467,26 +506,31 @@ export default async function FinancePage({
 function OverviewTab({
   tracking,
   planning,
-  accounts,
-  categories,
   salary,
-  autoFocusAdd,
+  now,
 }: {
   tracking: TrackingView;
   planning: HouseholdPlanningData;
-  accounts: Array<{ id: string; name: string; kind: string }>;
-  categories: string[];
   salary: SalaryView;
-  autoFocusAdd: boolean;
+  now: Date;
 }) {
   const nw = tracking.netWorthPoints;
   const today = nw.at(-1) ?? null;
   const previous = nw.length >= 2 ? nw[nw.length - 2]! : null;
-  const billsDue = planning.bills.filter((b) => b.daysUntil <= 7);
-  const payFrom = accounts.find((a) => a.id === tracking.payFromAccountId) ?? null;
   const savings = tracking.savings;
+  const items = buildNeedsYou({
+    toSortCount: tracking.toSortCount,
+    cards: tracking.cards,
+    payFromAccountId: tracking.payFromAccountId,
+    safeShortCents: tracking.safe && tracking.safe.safeCents < 0 ? -tracking.safe.safeCents : 0,
+    statementsDue: tracking.statementsDue,
+    bills: planning.bills,
+    balancesToUpdate: tracking.checkInDue.length,
+    checkInDone: Boolean(planning.moneyDateDone),
+    now,
+  });
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {tracking.catchUp ? (
         <Link
           href="/app/finance/catch-up"
@@ -497,54 +541,10 @@ function OverviewTab({
           today&rsquo;s balances and start fresh. About 5 minutes →
         </Link>
       ) : null}
-      <QuickAdd
-        accounts={accounts}
-        merchants={tracking.merchants}
-        defaultAccountId={tracking.defaultAccountId}
-        categories={categories}
-        autoFocus={autoFocusAdd}
-      />
       <PaceCard pacing={tracking.pacing} suggestedLimitCents={tracking.suggestedLimitCents} />
-      <CardBills
-        cards={tracking.cards.map((c) => ({
-          id: c.id,
-          name: c.name,
-          statementBalanceCents: c.statementBalanceCents,
-          dueDay: c.dueDate ? dayKeyOf(c.dueDate) : null,
-          daysUntil: c.daysUntil,
-          waitingForStatement: c.waitingForStatement,
-          lastMonth:
-            c.lastMonth.chargedCents || c.lastMonth.paidCents
-              ? {
-                  label: c.lastMonth.start.toLocaleDateString([], { month: "long" }),
-                  chargedCents: c.lastMonth.chargedCents,
-                  paidCents: c.lastMonth.paidCents,
-                }
-              : null,
-        }))}
-        safe={tracking.safe}
-        payFrom={payFrom ? { id: payFrom.id, name: payFrom.name } : null}
-      />
-      {salary.budget ? (
-        <SalaryBudgetCard
-          budget={salary.budget}
-          liveName={salary.liveName}
-          investName={salary.investName}
-          flexibleCents={salary.flexibleCents}
-          hasLimits={salary.hasLimits}
-        />
-      ) : (
-        <Link
-          href="/app/finance?tab=plan"
-          className="block rounded-md px-4 py-3 text-[0.875rem] transition-colors"
-          style={{ background: "var(--bg-tint)", color: "var(--text)" }}
-        >
-          <span className="font-semibold">Live on one paycheck.</span> Add your paychecks and the budget builds
-          itself from your spending →
-        </Link>
-      )}
-      <PotsCard pots={salary.pots} emergencyTargetCents={salary.emergencyTargetCents} heldIn={salary.heldIn} />
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <NeedsYou items={items} />
+      <RecentEntries entries={tracking.entries} />
+      <div className="grid grid-cols-2 gap-3">
         <OverviewTile
           href="/app/finance?tab=accounts"
           label="Net worth"
@@ -556,48 +556,18 @@ function OverviewTab({
           }
         />
         <OverviewTile
-          href="/app/finance?tab=spending&filter=to_sort"
-          label="To sort"
-          value={String(tracking.toSortCount)}
-          hint={tracking.toSortCount ? "entries need a category" : "all sorted"}
-        />
-        <OverviewTile
-          href="/app/finance?tab=accounts"
-          label="Statements"
-          value={tracking.statementsDue.length ? `${tracking.statementsDue.length} to check` : "Up to date"}
-          hint={
-            tracking.pendingCount
-              ? `${tracking.pendingCount} logged ${tracking.pendingCount === 1 ? "entry" : "entries"} waiting`
-              : "nothing waiting"
-          }
-        />
-        <OverviewTile
-          href="/app/finance/catch-up?only=invest"
+          href="/app/finance?tab=plan"
           label="Saved this month"
           value={savings.rate !== null ? `${Math.round(savings.rate * 100)}%` : fmt(savings.savedCents)}
           hint={
             savings.rate !== null
               ? `${fmt(savings.savedCents)} of ${fmt(savings.incomeCents)} income`
-              : "log paychecks to see a rate"
+              : salary.budget
+                ? "log paychecks to see a rate"
+                : "add paychecks under Plan"
           }
         />
       </div>
-      <WeeklyCheckIn
-        moneyDate={planning.moneyDate}
-        done={planning.moneyDateDone}
-        shared={Boolean(planning.sharedWith)}
-        toSortCount={tracking.toSortCount}
-        pendingCount={tracking.pendingCount}
-        paceLine={paceHeadline(tracking.pacing)}
-        statementsDue={tracking.statementsDue}
-        staleBalances={tracking.staleBalances}
-        billsDue={billsDue}
-        cardsDue={tracking.cards
-          .filter((c) => !c.waitingForStatement && c.daysUntil !== null && c.daysUntil <= 7)
-          .map((c) => ({ id: c.id, name: c.name, amountCents: c.statementBalanceCents ?? 0, daysUntil: c.daysUntil! }))}
-        checkInDue={tracking.checkInDue.length > 0}
-        safeShortCents={tracking.safe && tracking.safe.safeCents < 0 ? -tracking.safe.safeCents : 0}
-      />
     </div>
   );
 }
