@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 // the pure bearer-matching logic.
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
 
-import { bearerMatches } from "@/lib/bearer";
+import { bearerMatches, bearerMatchesAny, parseSecrets } from "@/lib/bearer";
 
 describe("bearerMatches", () => {
   const secret = "test-secret-value-123";
@@ -40,5 +40,29 @@ describe("bearerMatches", () => {
 
   it("is case-sensitive on the scheme prefix", () => {
     expect(bearerMatches(`bearer ${secret}`, secret)).toBe(false);
+  });
+});
+
+describe("parseSecrets", () => {
+  it("combines the primary secret with comma-separated extras", () => {
+    expect(parseSecrets("main", "a, b ,c")).toEqual(["main", "a", "b", "c"]);
+  });
+  it("drops blanks and handles unset values", () => {
+    expect(parseSecrets(undefined, undefined)).toEqual([]);
+    expect(parseSecrets("  ", ",, ,")).toEqual([]);
+    expect(parseSecrets(undefined, "only")).toEqual(["only"]);
+  });
+});
+
+describe("bearerMatchesAny", () => {
+  const secrets = ["first-agent-secret", "second-agent-secret"];
+  it("accepts any configured secret", () => {
+    expect(bearerMatchesAny("Bearer first-agent-secret", secrets)).toBe(true);
+    expect(bearerMatchesAny("Bearer second-agent-secret", secrets)).toBe(true);
+  });
+  it("rejects unknown tokens and empty lists", () => {
+    expect(bearerMatchesAny("Bearer nope", secrets)).toBe(false);
+    expect(bearerMatchesAny("Bearer first-agent-secret", [])).toBe(false);
+    expect(bearerMatchesAny(null, secrets)).toBe(false);
   });
 });

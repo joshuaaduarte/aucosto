@@ -14,7 +14,7 @@
 import "server-only";
 
 import { auth } from "@/auth";
-import { bearerMatches } from "@/lib/bearer";
+import { bearerMatches, bearerMatchesAny, parseSecrets } from "@/lib/bearer";
 import { isPartnerUser } from "@/lib/household";
 import { resolveOwnerUserId } from "@/lib/owner";
 
@@ -32,8 +32,9 @@ export interface AssistantAuth {
  * Resolve the acting user for an assistant route.
  *
  * Session cookie wins (existing behavior unchanged). Otherwise, when a
- * request is provided and ASSISTANT_API_SECRET is configured, accept
- * `Authorization: Bearer <secret>` and resolve to the owner user.
+ * request is provided and ASSISTANT_API_SECRET / ASSISTANT_API_SECRETS is
+ * configured, accept `Authorization: Bearer <secret>` for any configured
+ * secret and resolve to the owner user.
  * Returns null when neither authenticates.
  */
 export async function resolveAssistantAuth(
@@ -47,9 +48,14 @@ export async function resolveAssistantAuth(
     return { userId: session.user.id, via: "session" };
   }
 
-  const secret = process.env.ASSISTANT_API_SECRET?.trim();
-  if (!secret || !request) return null;
-  if (!bearerMatches(request.headers.get("authorization"), secret)) {
+  // ASSISTANT_API_SECRET is the original shared key; ASSISTANT_API_SECRETS
+  // holds extra comma-separated per-agent keys (all owner-equivalent).
+  const secrets = parseSecrets(
+    process.env.ASSISTANT_API_SECRET,
+    process.env.ASSISTANT_API_SECRETS,
+  );
+  if (secrets.length === 0 || !request) return null;
+  if (!bearerMatchesAny(request.headers.get("authorization"), secrets)) {
     return null;
   }
 
