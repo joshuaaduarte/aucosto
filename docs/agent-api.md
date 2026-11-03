@@ -123,6 +123,14 @@ with custom headers.)
 - **Transport.** Always use HTTPS (Vercel provides it). Never put the secret
   in a URL query param — header only.
 
+## Per-agent keys (`ASSISTANT_API_SECRETS`)
+
+Rather than sharing one key between every agent, give each new agent its own:
+add it to `ASSISTANT_API_SECRETS` (comma-separated, Production) and redeploy.
+Any key in that list, or the original `ASSISTANT_API_SECRET`, is accepted, and
+all of them are owner-equivalent. To cut off one agent, remove only its key
+from the list and redeploy; the other agents keep working.
+
 ## Rotating the secret
 
 1. Generate a new value, update the Vercel env var, redeploy.

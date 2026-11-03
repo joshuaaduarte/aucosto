@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-aucosto is a personal day-to-day dashboard / hub of tools. Owner (Josh) plus an optional household partner limited to Finance + Home (`docs/household.md`). External agents read/write through the **assistant surface** (`/api/assistant/*` — snapshot read + preview/execute action API + MCP endpoint, authed by session cookie or the owner-equivalent `ASSISTANT_API_SECRET` bearer, audited; see `docs/assistant-actions.md`). Keep that surface narrow — new write actions need a risk level and an audit trail, and finance writes/deletes/bulk ops stay excluded.
+aucosto is a personal day-to-day dashboard / hub of tools. Owner (Josh) plus an optional household partner limited to Finance + Home (`docs/household.md`). External agents read/write through the **assistant surface** (`/api/assistant/*` — snapshot read + preview/execute action API + MCP endpoint, authed by session cookie or the owner-equivalent `ASSISTANT_API_SECRET` bearer (plus per-agent keys in comma-separated `ASSISTANT_API_SECRETS`), audited; see `docs/assistant-actions.md`). Keep that surface narrow — new write actions need a risk level and an audit trail, and finance writes/deletes/bulk ops stay excluded.
 
 **Current branch state: `main` IS the live Next.js app.** (The old CRA scaffold is history; `origin/nextjs-rewrite` is a stale remnant of the rewrite.)
 
