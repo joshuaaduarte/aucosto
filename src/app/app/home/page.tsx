@@ -113,7 +113,7 @@ export default async function HomePage() {
               <ul className="space-y-1">
                 {billsSoon.map((bill) => (
                   <li key={bill.id} className="text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
-                    <Link href="/app/finance#budgets" className="hover:underline">
+                    <Link href="/app/finance?tab=plan#budgets" className="hover:underline">
                       {bill.name}
                       {bill.amountCents != null ? ` · ${formatUSDFromCents(bill.amountCents)}` : ""}
                     </Link>{" "}

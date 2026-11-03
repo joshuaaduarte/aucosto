@@ -209,10 +209,15 @@ webhook route; CSV/PDF statement import under `src/lib/statement-import/`.
 
 Built around **manual day-to-day entry, confirmed by monthly statements**
 (the household can't link banks). The page is four `?tab=` sections:
-Overview (quick add, pace card, weekly check-in), Spending (entry list +
-patterns + iPhone Shortcut setup), Accounts (net worth history, statement
-checks, balances), Plan (spending money, category limits, bills,
-projection, goals). View model: `_lib/derive.ts` (older dashboard) +
+Overview (pace card as the headline, "Needs you" list from
+`_lib/needs-you.ts`, recent entries, net worth + savings tiles), Spending
+(entry list with day totals, category trends as a bar list on phones,
+forecast + patterns collapsed, iPhone Shortcut setup), Accounts (card
+bills, net worth history, statement checks, balances), Plan (paychecks,
+one-salary budget, pots, weekly money check-in at `#money-date`, spending
+money, category limits, bills, projection, goals). Logging happens in the
+"+" quick-capture sheet (`?add=1` opens it); `/app/finance/sort` files
+unsorted entries one card at a time (`src/lib/finance-sort.ts`). View model: `_lib/derive.ts` (older dashboard) +
 `_lib/derive-tracking.ts` (tracking).
 
 - **Entries** (`src/lib/finance-entries.ts`, service `tracking.ts`): quick

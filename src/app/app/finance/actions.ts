@@ -59,6 +59,7 @@ export type LinkedConnectionState =
 function revalidateFinance() {
   revalidatePath("/app");
   revalidatePath("/app/finance");
+  revalidatePath("/app/finance/sort");
 }
 
 function checkView(check: financeService.ImportResult["balanceCheck"]) {
@@ -427,6 +428,21 @@ export async function deleteFinanceEntry(id: string): Promise<PlanningState> {
 export async function setEntryCategory(id: string, category: string | null): Promise<PlanningState> {
   return withFinanceUser<PlanningState>(async (userId) => {
     await financeService.updateEntry(userId, id, { category });
+    revalidateFinance();
+    return { ok: true };
+  }, "Could not save the category.");
+}
+
+/**
+ * Give several entries the same category at once: the sort flow's "always
+ * use this for <shop>" files every other unsorted entry from that shop.
+ */
+export async function setCategoryForEntries(ids: string[], category: string): Promise<PlanningState> {
+  return withFinanceUser<PlanningState>(async (userId) => {
+    const unique = [...new Set(ids)].slice(0, 200);
+    for (const id of unique) {
+      await financeService.updateEntry(userId, id, { category });
+    }
     revalidateFinance();
     return { ok: true };
   }, "Could not save the category.");

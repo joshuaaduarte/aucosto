@@ -16,6 +16,9 @@ import {
   updateFinanceEntry,
 } from "../actions";
 import { UndoToast, type UndoToastState } from "./undo-toast";
+import { CategoryBadge } from "./recent-entries";
+import { financeCategoryLook } from "@/lib/quick-capture";
+import Link from "next/link";
 
 export type EntryView = {
   id: string;
@@ -72,7 +75,7 @@ export function EntryList({
 }) {
   const [filter, setFilter] = useState<Filter>(initialFilter);
   const [query, setQuery] = useState("");
-  const [limit, setLimit] = useState(60);
+  const [limit, setLimit] = useState(30);
   const [openId, setOpenId] = useState<string | null>(null);
   const [toast, setToast] = useState<UndoToastState>(null);
   const closeToast = useCallback(() => setToast(null), []);
@@ -164,6 +167,19 @@ export function EntryList({
         />
       </div>
 
+      {filter === "to_sort" && counts.to_sort > 1 ? (
+        <Link
+          href="/app/finance/sort"
+          className="flex items-center justify-between rounded-md px-4 py-3 text-[0.875rem]"
+          style={{ background: "var(--accent-tint)", color: "var(--text)" }}
+        >
+          <span>
+            <span className="font-semibold">Sort them one at a time.</span> Big buttons, about a minute.
+          </span>
+          <span aria-hidden>→</span>
+        </Link>
+      ) : null}
+
       {groups.length === 0 ? (
         <p
           className="rounded-md py-10 text-center text-[0.875rem]"
@@ -179,8 +195,15 @@ export function EntryList({
         <div className="space-y-5">
           {groups.map((group) => (
             <section key={group.day}>
-              <h3 className="mb-1 text-[0.6875rem] font-semibold uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>
-                {dayHeading(group.day)}
+              <h3
+                className="mb-1 flex items-baseline justify-between text-[0.6875rem] font-semibold uppercase tracking-wider"
+                style={{ color: "var(--text-faint)" }}
+              >
+                <span>{dayHeading(group.day)}</span>
+                {(() => {
+                  const spent = group.items.reduce((sum, e) => (e.amount < 0 && !e.move ? sum - e.amount : sum), 0);
+                  return spent ? <span className="tabular normal-case tracking-normal">{money(spent)} spent</span> : null;
+                })()}
               </h3>
               <ul>
                 {group.items.map((entry) => (
@@ -202,8 +225,8 @@ export function EntryList({
             </section>
           ))}
           {visible.length > limit ? (
-            <button type="button" className="btn-ghost" onClick={() => setLimit(limit + 100)}>
-              Show more ({visible.length - limit} left)
+            <button type="button" className="btn-ghost" onClick={() => setLimit(limit + 60)}>
+              Show earlier ({visible.length - limit} more)
             </button>
           ) : null}
         </div>
@@ -349,15 +372,17 @@ function EntryRow({
     <li className="border-b py-2.5" style={{ borderColor: "var(--border-faint)" }}>
       <div className="flex items-center gap-3">
         <button type="button" onClick={onToggle} className="flex min-w-0 flex-1 items-center gap-3 text-left" aria-expanded={open}>
-          {entry.byInitials ? (
+          {isMove ? (
             <span
-              title={entry.byName ? `Logged by ${entry.byName}` : undefined}
-              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[0.625rem] font-semibold"
+              aria-hidden
+              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[0.8125rem]"
               style={{ background: "var(--bg-tint-strong)", color: "var(--text-muted)" }}
             >
-              {entry.byInitials}
+              ⇄
             </span>
-          ) : null}
+          ) : (
+            <CategoryBadge category={out ? entry.category : "Income"} size="sm" />
+          )}
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[0.875rem]" style={{ color: "var(--text)" }}>
               {title}
@@ -367,11 +392,16 @@ function EntryRow({
                 ? /card payment/i.test(entry.description)
                   ? "Card payment"
                   : "Moved money"
-                : [entry.category ?? (out ? "No category" : null), entry.accountName, potName ? `from ${potName}` : null]
+                : [
+                    entry.category ? financeCategoryLook(entry.category).label : out ? "No category" : null,
+                    entry.accountName,
+                    potName ? `from ${potName}` : null,
+                    entry.byName ? entry.byName.split(" ")[0] : null,
+                  ]
                     .filter(Boolean)
                     .join(" · ")}
               {entry.status === "pending" ? (
-                <span style={{ color: "var(--accent)" }}> · not on a statement yet</span>
+                <span style={{ color: "var(--attention)" }}> · not on a statement yet</span>
               ) : entry.status === "locked" ? (
                 <span> · matches the bank ✓</span>
               ) : null}
@@ -379,7 +409,7 @@ function EntryRow({
           </span>
           <span
             className="shrink-0 text-[0.9375rem] font-medium tabular"
-            style={{ color: out || isMove ? "var(--text)" : "var(--verdigris)" }}
+            style={{ color: out || isMove ? "var(--text)" : "var(--positive)" }}
           >
             {out || isMove ? "" : "+"}
             {money(entry.amount)}
@@ -388,7 +418,7 @@ function EntryRow({
       </div>
 
       {toSort && !open ? (
-        <div className="mt-1.5 pl-0 sm:pl-9">
+        <div className="mt-1.5 pl-10">
           <CategorySelect
             label={`Category for ${entry.description}`}
             categories={categories}

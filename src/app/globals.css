@@ -874,3 +874,9 @@ input.field[type="time"]::-webkit-datetime-edit {
     box-shadow: var(--shadow-pop);
   }
 }
+
+/* The tab bar is phone-only. Its height is 0 on desktop, but contents (the
+   raised "+") would still paint, so take it out entirely. */
+@media (min-width: 1024px) {
+  .mobile-tabbar { display: none; }
+}
