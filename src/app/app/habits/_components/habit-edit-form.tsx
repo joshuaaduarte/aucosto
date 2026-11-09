@@ -13,6 +13,7 @@ import {
   parseHabitDays,
 } from "@/lib/habits";
 import type { HabitSummary } from "@/lib/services/habits";
+import { HEALTH_METRICS, HEALTH_METRIC_LABELS, suggestHealthMetric } from "@/lib/health-habits";
 import { type HabitState, updateHabitAction } from "../actions";
 
 /** Clamp minutes-since-midnight to a 24-hour HH:MM string for <input type="time">. */
@@ -197,6 +198,55 @@ export function HabitEditForm({ habit }: { habit: HabitSummary }) {
               className="field"
             />
           </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <label htmlFor={`focus-${habit.id}`} className="block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
+              Right now
+            </label>
+            <select id={`focus-${habit.id}`} name="focus" defaultValue={habit.focus ?? ""} className="field">
+              <option value="">Not chosen</option>
+              <option value="focus">Focus: on the hub, nudged</option>
+              <option value="later">Later: paused, no reminders</option>
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor={`health-${habit.id}`} className="block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
+              Fill from Apple Health
+            </label>
+            <select
+              id={`health-${habit.id}`}
+              name="healthMetric"
+              defaultValue={habit.healthMetric ?? ""}
+              className="field"
+            >
+              <option value="">Off (log it yourself)</option>
+              {HEALTH_METRICS.map((metric) => (
+                <option key={metric} value={metric}>
+                  {HEALTH_METRIC_LABELS[metric]}
+                  {suggestHealthMetric(habit.title) === metric ? " (suggested)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label htmlFor={`cue-${habit.id}`} className="block text-[0.75rem] font-medium" style={{ color: "var(--text-muted)" }}>
+            After I…
+          </label>
+          <input
+            id={`cue-${habit.id}`}
+            name="cue"
+            defaultValue={habit.cue ?? ""}
+            placeholder="make coffee, get home, brush my teeth"
+            maxLength={80}
+            className="field"
+          />
+          <p className="text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+            Tie it to something you already do every day. It shows on the habit card.
+          </p>
         </div>
 
         <div className="space-y-1.5">

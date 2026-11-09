@@ -12,6 +12,7 @@ import {
   resolveHabitTaskLane,
   summarizeHabit,
 } from "./derive";
+import { listHabitPreferences } from "./preferences";
 
 export async function listHabits(
   userId: string,
@@ -32,8 +33,15 @@ export async function listHabits(
     orderBy: [{ archivedAt: "asc" }, { updatedAt: "desc" }],
   });
   const now = new Date();
+  const prefs = await listHabitPreferences(userId);
   return habits
-    .map((habit) => summarizeHabit(habit, now))
+    .map((habit) => {
+      const summary = summarizeHabit(habit, now);
+      const pref = prefs.get(habit.id);
+      return pref
+        ? { ...summary, healthMetric: pref.healthMetric, focus: pref.focus, cue: pref.cue }
+        : summary;
+    })
     .sort((a, b) => compareHabitDisplayOrder(a, b, now));
 }
 

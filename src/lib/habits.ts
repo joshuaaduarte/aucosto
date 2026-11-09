@@ -112,3 +112,65 @@ export function habitWeekConsistency(
     pct: scheduledCount > 0 ? Math.round((doneCount / scheduledCount) * 100) : 0,
   };
 }
+
+/**
+ * Habit strength, 0–100 (Loop Habit Tracker's idea): an exponentially
+ * smoothed score over scheduled slots, so one missed day dents it instead of
+ * zeroing a streak. Each slot's value is 0–1 — partial progress counts
+ * fractionally, a fallback/recovery ("kept alive") counts half.
+ *
+ * `slotsPerWeek` sets how fast it moves: a daily habit (7) reaches ~80%
+ * after a month of perfect days; a weekly habit (1) moves more per slot.
+ */
+export function habitStrength(slots: number[], slotsPerWeek: number): number {
+  const perDay = Math.max(1, slotsPerWeek) / 7;
+  // Loop: multiplier = 0.5^(sqrt(frequency) / 13) per day, expressed per slot.
+  const multiplier = Math.pow(0.5, Math.sqrt(1 / perDay) / 13);
+  let score = 0;
+  for (const raw of slots) {
+    const value = Math.min(1, Math.max(0, raw));
+    score = score * multiplier + value * (1 - multiplier);
+  }
+  return Math.round(score * 100);
+}
+
+/** Plain-language strength label for the card. */
+export function habitStrengthLabel(strength: number): string {
+  if (strength >= 80) return "Solid";
+  if (strength >= 50) return "Building";
+  if (strength >= 20) return "Starting";
+  return "New";
+}
+
+/** Keywords for habits that tend to stick and are easy to measure. */
+const FOCUS_KEYWORDS = /\b(steps?|walk|run|read|weigh|gym|workout|lift|exercise|sleep)/i;
+
+/**
+ * Pick up to `limit` habits to focus on when someone has more than they can
+ * keep up with (Tiny Habits / Atomic Habits: a few at a time). Habits already
+ * gaining strength win, then easily measured ones; ties go to the oldest.
+ */
+export function suggestFocusHabits<
+  T extends { id: string; title: string; strength: number; createdAt: Date },
+>(habits: T[], limit = 4): string[] {
+  return habits
+    .map((habit) => ({
+      habit,
+      score: habit.strength * 2 + (FOCUS_KEYWORDS.test(habit.title) ? 30 : 0),
+    }))
+    .sort(
+      (a, b) =>
+        b.score - a.score || a.habit.createdAt.getTime() - b.habit.createdAt.getTime(),
+    )
+    .slice(0, limit)
+    .map(({ habit }) => habit.id);
+}
+
+/** Fresh-start moments (Monday, the 1st) — a good time to re-commit. */
+export function freshStartLabel(now: Date): string | null {
+  if (now.getDate() === 1) {
+    return `New month. ${now.toLocaleDateString("en-US", { month: "long" })} starts clean.`;
+  }
+  if (now.getDay() === 1) return "New week. Last week doesn't count against this one.";
+  return null;
+}

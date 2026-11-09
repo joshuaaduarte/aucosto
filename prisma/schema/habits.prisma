@@ -43,3 +43,17 @@ model HabitEntry {
   @@index([userId, loggedAt])
   @@index([habitId, loggedAt])
 }
+
+// Per-habit settings kept out of Habit so existing queries never depend on
+// it (accessed with raw SQL in services/habits/preferences.ts; created by
+// scripts/create-habit-preferences.sql). No Prisma relation on purpose.
+model HabitPreference {
+  habitId      String   @id
+  userId       String
+  healthMetric String?
+  focus        String?
+  cue          String?
+  updatedAt    DateTime @default(now())
+
+  @@index([userId])
+}

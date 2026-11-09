@@ -1,11 +1,21 @@
 import type { ReactNode } from "react";
-import { HABIT_DAY_PARTS, HABIT_DAY_PART_LABELS, type HabitDayPart } from "@/lib/habits";
-import { listHabits, type HabitSummary } from "@/lib/services/habits";
+import {
+  HABIT_DAY_PARTS,
+  HABIT_DAY_PART_LABELS,
+  freshStartLabel,
+  suggestFocusHabits,
+  type HabitDayPart,
+} from "@/lib/habits";
+import { habitPreferencesReady, listHabits, type HabitSummary } from "@/lib/services/habits";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import { HabitCreateForm } from "./create-form";
 import { PageAddButton } from "../_components/page-add-button";
 import { DoneHabitChip, HabitCard } from "./habit-card";
 import { TemplatePicker } from "./_components/template-picker";
+import { FocusPicker } from "./_components/focus-picker";
+
+/** More active habits than this and none marked → offer the focus picker. */
+const FOCUS_PICKER_THRESHOLD = 5;
 
 export const dynamic = "force-dynamic";
 
@@ -21,12 +31,29 @@ function SectionHeading({ children, count }: { children: ReactNode; count?: numb
   );
 }
 
+function currentTime() {
+  return new Date();
+}
+
 export default async function HabitsPage() {
   const userId = await resolveActiveUserId();
-  const habits = await listHabits(userId, { includeArchived: true });
+  const [habits, prefsReady] = await Promise.all([
+    listHabits(userId, { includeArchived: true }),
+    habitPreferencesReady(userId),
+  ]);
 
-  const activeHabits = habits.filter((habit) => !habit.archivedAt);
+  const allActive = habits.filter((habit) => !habit.archivedAt);
   const archivedHabits = habits.filter((habit) => habit.archivedAt);
+  // "Later" habits stay listed but collapsed, off today's board.
+  const laterHabits = allActive.filter((habit) => habit.focus === "later");
+  const activeHabits = allActive.filter((habit) => habit.focus !== "later");
+  const anyMarked = allActive.some((habit) => habit.focus !== null);
+  const showFocusPicker = prefsReady && !anyMarked && allActive.length >= FOCUS_PICKER_THRESHOLD;
+  const pickerHabits = allActive.map(({ id, title, strength }) => ({ id, title, strength }));
+  const focusIds = allActive.filter((habit) => habit.focus === "focus").map((habit) => habit.id);
+  // Server components can't call new Date() in the body directly (purity
+  // lint), but the page is force-dynamic so a module helper is fine.
+  const freshStart = freshStartLabel(currentTime());
 
   // Today's board: due habits, pending first (rescue-mode bubbles to the
   // top inside each day-part group via the service's display ordering).
@@ -77,7 +104,7 @@ export default async function HabitsPage() {
           className="text-[0.8125rem] sm:text-right"
           style={{ color: "var(--text-muted)" }}
         >
-          {activeHabits.length === 0
+          {allActive.length === 0
             ? "Pick a couple below to get rolling."
             : [
                 bestStreak > 0 ? `🔥 best streak ${bestStreak}` : null,
@@ -90,8 +117,24 @@ export default async function HabitsPage() {
         </p>
       </header>
 
+      {showFocusPicker ? (
+        <section className="fade-in-delay-1">
+          <FocusPicker habits={pickerHabits} suggested={suggestFocusHabits(allActive)} />
+        </section>
+      ) : freshStart && activeHabits.length > 0 ? (
+        <p
+          className="fade-in-delay-1 rounded-[0.9rem] px-4 py-3 text-[0.8125rem]"
+          style={{ background: "var(--bg-tint)", color: "var(--text-muted)" }}
+        >
+          <span className="font-semibold" style={{ color: "var(--text)" }}>
+            {freshStart}
+          </span>{" "}
+          Strength carries over; streaks are only part of the story.
+        </p>
+      ) : null}
+
       {/* Empty state IS the template picker. */}
-      {activeHabits.length === 0 ? (
+      {allActive.length === 0 ? (
         <section className="fade-in-delay-1 space-y-4">
           <TemplatePicker
             existingTitles={habits.map((habit) => habit.title)}
@@ -171,6 +214,35 @@ export default async function HabitsPage() {
                   <HabitCard key={habit.id} habit={habit} />
                 ))}
               </ol>
+            </details>
+          ) : null}
+
+          {laterHabits.length > 0 ? (
+            <details className="fade-in-delay-2 group">
+              <summary
+                className="cursor-pointer list-none text-[0.6875rem] font-semibold uppercase tracking-wider"
+                style={{ color: "var(--text-faint)" }}
+              >
+                Later · {laterHabits.length}{" "}
+                <span className="inline-block transition-transform group-open:rotate-180">v</span>
+              </summary>
+              <p className="mt-2 text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
+                Parked while you focus on the others. Still loggable; left out of the evening
+                check-in.
+              </p>
+              <ol className="mt-3 space-y-2.5">
+                {laterHabits.map((habit) => (
+                  <HabitCard key={habit.id} habit={habit} />
+                ))}
+              </ol>
+              <div className="mt-3">
+                <FocusPicker
+                  habits={pickerHabits}
+                  suggested={focusIds}
+                  title="Change which habits you focus on"
+                  defaultOpen={false}
+                />
+              </div>
             </details>
           ) : null}
 

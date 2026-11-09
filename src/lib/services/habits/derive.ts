@@ -9,10 +9,12 @@ import {
   type HabitGoalUnit,
   HABIT_DAY_PART_LABELS,
   formatHabitQuantity,
+  habitStrength,
   parseHabitDays,
 } from "@/lib/habits";
 import type { Habit, HabitEntry, TimeEntry } from "@/generated/prisma/client";
 import type { HabitEntryMode, HabitWithRelations } from "./shared";
+import type { HealthMetric } from "@/lib/health-habits";
 
 export type HabitSummary = Habit & {
   entriesToday: number;
@@ -54,6 +56,12 @@ export type HabitSummary = Habit & {
     dueDays: number;
     avgStartMinutes: number | null;
   };
+  /** 0–100 smoothed strength (see habitStrength) — forgiving, unlike streaks. */
+  strength: number;
+  /** From HabitPreference (null until set / before the table exists). */
+  healthMetric: HealthMetric | null;
+  focus: "focus" | "later" | null;
+  cue: string | null;
 };
 
 export type HabitTaskSummary = HabitSummary & {
@@ -386,6 +394,55 @@ function weekAdherenceForHabit(habit: HabitWithRelations, now: Date) {
   return { ranDays, dueDays, avgStartMinutes };
 }
 
+const STRENGTH_LOOKBACK_DAYS = 120;
+
+/**
+ * Slot values for habitStrength, oldest first, from the later of the habit's
+ * creation and the lookback window. The current day/week only counts once it
+ * has progress, so an unfinished today never drags the score down.
+ */
+function strengthForHabit(habit: HabitWithRelations, now: Date): number {
+  const floor = startOfDay(now);
+  floor.setDate(floor.getDate() - STRENGTH_LOOKBACK_DAYS);
+  const created = startOfDay(habit.createdAt);
+  const begin = created > floor ? created : floor;
+  const target = Math.max(1, habit.targetCount);
+  const slotValue = (start: Date, end: Date, isCurrent: boolean): number | null => {
+    const entries = habit.entries.filter((entry) => entry.loggedAt >= start && entry.loggedAt < end);
+    const timeEntries = habit.timeEntries.filter((entry) => entry.startedAt >= start && entry.startedAt < end);
+    const progress = progressForWindow(habit, entries, timeEntries);
+    const keptAlive = entries.some((entry) => entry.mode === "fallback" || entry.mode === "recovery");
+    const value = Math.max(Math.min(1, progress / target), keptAlive ? 0.5 : 0);
+    if (isCurrent && value === 0) return null;
+    return value;
+  };
+
+  const slots: number[] = [];
+  if (habit.cadence === "weekly") {
+    const thisWeek = startOfWeek(now);
+    const cursor = startOfWeek(begin);
+    while (cursor <= thisWeek) {
+      const value = slotValue(new Date(cursor), endOfWeek(cursor), cursor.getTime() === thisWeek.getTime());
+      if (value !== null) slots.push(value);
+      cursor.setDate(cursor.getDate() + 7);
+    }
+    return habitStrength(slots, 1);
+  }
+
+  const today = startOfDay(now);
+  const cursor = new Date(begin);
+  while (cursor <= today) {
+    if (isDueOnDate(habit, cursor)) {
+      const value = slotValue(new Date(cursor), endOfDay(cursor), cursor.getTime() === today.getTime());
+      if (value !== null) slots.push(value);
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  const perWeek =
+    habit.cadence === "weekdays" ? 5 : habit.cadence === "custom" ? parseHabitDays(habit.daysOfWeek).length || 7 : 7;
+  return habitStrength(slots, perWeek);
+}
+
 export function summarizeHabit(habit: HabitWithRelations, now: Date): HabitSummary {
   const todayStart = startOfDay(now);
   const tomorrow = endOfDay(now);
@@ -462,6 +519,10 @@ export function summarizeHabit(habit: HabitWithRelations, now: Date): HabitSumma
     needsSaveToday,
     salvageLabel: habit.fallbackTitle ?? (habit.rescuePrompt ? "Run recovery" : null),
     weekAdherence: weekAdherenceForHabit(habit, now),
+    strength: strengthForHabit(habit, now),
+    healthMetric: null,
+    focus: null,
+    cue: null,
     recentDays,
     dayPartLabel: HABIT_DAY_PART_LABELS[normalizeDayPart(habit.dayPart)],
     cadenceLabel:

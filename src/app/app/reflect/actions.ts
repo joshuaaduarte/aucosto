@@ -5,6 +5,7 @@ import { z } from "zod";
 import { dayKey } from "@/lib/reflect";
 import {
   buildReflectionSnapshot,
+  getReflection,
   upsertReflection,
 } from "@/lib/services/reflect";
 import { resolveActiveUserId } from "@/lib/viewer-context";
@@ -112,5 +113,48 @@ export async function saveReflectionAction(
   revalidatePath("/app");
   revalidatePath("/app/reflect");
   revalidatePath("/app/reflect/history");
+  return { ok: true };
+}
+
+/**
+ * Two-tap evening check-in: save today's mood from the hub. Other ratings
+ * keep what the day already has, else follow the mood; notes stay as they
+ * are (an agent's morning note survives). The full form can refine it.
+ */
+export async function quickMoodAction(
+  mood: number,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const parsed = rating.safeParse(mood);
+  if (!parsed.success) return { ok: false, error: "Pick a mood from 1 to 5." };
+  let userId: string;
+  try {
+    userId = await resolveActiveUserId();
+  } catch {
+    return { ok: false, error: "Not signed in." };
+  }
+  try {
+    const now = new Date();
+    const todayKey = dayKey(now);
+    const [existing, contextSnapshot] = await Promise.all([
+      getReflection(userId, todayKey),
+      buildReflectionSnapshot(userId, now),
+    ]);
+    await upsertReflection(userId, {
+      dateKey: todayKey,
+      mood: parsed.data,
+      energyLevel: existing?.energyLevel ?? parsed.data,
+      productivityRating: existing?.productivityRating ?? parsed.data,
+      dayRating: existing?.dayRating ?? parsed.data,
+      wentWell: existing?.wentWell ?? null,
+      carryForward: existing?.carryForward ?? null,
+      freeNotes: existing?.freeNotes ?? null,
+      contextSnapshot,
+    });
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not save." };
+  }
+  revalidatePath("/app");
+  revalidatePath("/app/reflect");
+  revalidatePath("/app/insights");
   return { ok: true };
 }
