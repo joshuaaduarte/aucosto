@@ -27,6 +27,7 @@ export {
   type LinkedFinanceConnectionSummary,
 } from "./connections";
 export { syncFinanceConnection } from "./teller-sync";
+export { deleteShopRule, listShopRules, saveShopRule, type SaveShopRuleInput } from "./rules";
 export { handleTellerWebhookEvent } from "./webhooks";
 export {
   archiveBill,

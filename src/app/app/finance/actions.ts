@@ -453,17 +453,33 @@ export async function setEntryCategory(id: string, category: string | null): Pro
 
 /**
  * Give several entries the same category at once: the sort flow's "always
- * use this for <shop>" files every other unsorted entry from that shop.
+ * use this for <shop>" files every other unsorted entry from that shop and,
+ * given the shop's text, remembers it for the person sorting.
  */
-export async function setCategoryForEntries(ids: string[], category: string): Promise<PlanningState> {
+export async function setCategoryForEntries(
+  ids: string[],
+  category: string,
+  rememberShop?: string,
+): Promise<PlanningState> {
   return withFinanceUser<PlanningState>(async (userId) => {
     const unique = [...new Set(ids)].slice(0, 200);
     for (const id of unique) {
       await financeService.updateEntry(userId, id, { category });
     }
+    if (rememberShop?.trim()) {
+      await financeService.saveShopRule(userId, { description: rememberShop.slice(0, 200), category });
+    }
     revalidateFinance();
     return { ok: true };
   }, "Could not save the category.");
+}
+
+export async function removeShopRule(id: string): Promise<PlanningState> {
+  return withFinanceUser<PlanningState>(async (userId) => {
+    await financeService.deleteShopRule(userId, id);
+    revalidateFinance();
+    return { ok: true };
+  }, "Could not remove that shop.");
 }
 
 export type MoveInput = {

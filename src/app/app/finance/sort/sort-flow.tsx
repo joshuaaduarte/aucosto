@@ -1,9 +1,9 @@
 "use client";
 
 // One card per unsorted purchase. Tap a category and the next card appears.
-// When the same shop is waiting more than once, "Use this for every <shop>"
-// (on by default) files all of them in the same tap. New entries from that
-// shop pick the category up when logged, from quick add's shop memory.
+// "Always use this for <shop>" (on by default) files every waiting entry
+// from that shop in the same tap and remembers the shop, so later entries
+// from quick add, the iPhone Shortcut and bank files arrive sorted.
 
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
@@ -33,7 +33,7 @@ export function SortFlow({ initialQueue, categories }: { initialQueue: SortItem[
   const item = visible[0] ?? null;
   const others = useMemo(() => (item ? sameShopIds(queue, item) : []), [queue, item]);
   const [alwaysFor, setAlwaysFor] = useState<Record<string, boolean>>({});
-  const always = item ? (alwaysFor[item.description.toLowerCase()] ?? others.length > 0) : false;
+  const always = item ? (alwaysFor[item.description.toLowerCase()] ?? true) : false;
 
   if (!item) {
     return (
@@ -73,8 +73,8 @@ export function SortFlow({ initialQueue, categories }: { initialQueue: SortItem[
     setDone((n) => n + 1 + also.length);
     setShowAll(false);
     start(async () => {
-      const r = also.length
-        ? await setCategoryForEntries([item.id, ...also], category)
+      const r = always
+        ? await setCategoryForEntries([item.id, ...also], category, item.description)
         : await setEntryCategory(item.id, category);
       if (r && !r.ok) {
         setQueue(prevQueue);
@@ -193,7 +193,6 @@ export function SortFlow({ initialQueue, categories }: { initialQueue: SortItem[
         )}
       </div>
 
-      {others.length ? (
       <label className="flex items-center gap-3 text-[0.875rem]" style={{ color: "var(--text)" }}>
         <input
           type="checkbox"
@@ -202,11 +201,12 @@ export function SortFlow({ initialQueue, categories }: { initialQueue: SortItem[
           className="h-5 w-5"
         />
         <span>
-          Use this for every {item.description}
-          <span style={{ color: "var(--text-faint)" }}> (sorts {others.length} more)</span>
+          Always use this for {item.description}
+          <span style={{ color: "var(--text-faint)" }}>
+            {others.length ? ` (sorts ${others.length} more now)` : " from now on"}
+          </span>
         </span>
       </label>
-      ) : null}
 
       {error ? (
         <p className="text-[0.8125rem]" style={{ color: "var(--attention)" }} role="alert">
