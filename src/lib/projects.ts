@@ -337,3 +337,88 @@ export function formatLastWorked(value: Date | null | undefined, now: Date): str
   if (months < 12) return `${months} months ago`;
   return ">1 year ago";
 }
+
+// ---------------------------------------------------------------------------
+// Project task tab: one list from two sources.
+//
+// A project's task tab used to read only the board's own ProjectTask rows, so
+// a Do List task linked to the project (DoItem.projectId) never appeared
+// there, and the project showed "0 open tasks" while the Do List showed
+// several. These helpers fold linked Do List tasks into the same list.
+// ---------------------------------------------------------------------------
+
+export type ProjectTaskSource = "project" | "do";
+
+export type ProjectTaskView = {
+  id: string;
+  title: string;
+  done: boolean;
+  isToday: boolean;
+  sortOrder: number;
+  createdAt: Date;
+  /** "project" = a board task; "do" = a Do List task linked to the project. */
+  source: ProjectTaskSource;
+};
+
+/** The few DoItem fields the project task tab needs. */
+export type LinkedDoTaskRow = {
+  id: string;
+  title: string;
+  status: string | null;
+  lane: string | null;
+  createdAt: Date;
+};
+
+export type ProjectTaskCounts = { open: number; done: number };
+
+/** A Do List task as the project tab shows it: "today" lane = Today, else Backlog. */
+export function doTaskToProjectTask(row: LinkedDoTaskRow, sortOrder: number): ProjectTaskView {
+  return {
+    id: row.id,
+    title: row.title,
+    done: row.status === "done",
+    isToday: row.lane === "today",
+    sortOrder,
+    createdAt: row.createdAt,
+    source: "do",
+  };
+}
+
+/**
+ * Board tasks plus linked Do List tasks, in the tab's order: open before done,
+ * Today before Backlog, board tasks in their own order, then Do List tasks
+ * oldest first.
+ */
+export function mergeProjectTasks(
+  projectTasks: Omit<ProjectTaskView, "source">[],
+  doTasks: LinkedDoTaskRow[],
+): ProjectTaskView[] {
+  const board: ProjectTaskView[] = projectTasks.map((task) => ({ ...task, source: "project" }));
+  const maxSort = board.reduce((max, task) => Math.max(max, task.sortOrder), 0);
+  const linked = [...doTasks]
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+    .map((row, index) => doTaskToProjectTask(row, maxSort + 1 + index));
+  return [...board, ...linked].sort((a, b) => {
+    if (a.done !== b.done) return a.done ? 1 : -1;
+    if (a.isToday !== b.isToday) return a.isToday ? -1 : 1;
+    if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+    return a.createdAt.getTime() - b.createdAt.getTime();
+  });
+}
+
+/** Per-project open/done totals across both sources. */
+export function mergeTaskCounts(
+  board: Map<string, ProjectTaskCounts>,
+  linked: Map<string, ProjectTaskCounts>,
+): Map<string, ProjectTaskCounts> {
+  const merged = new Map<string, ProjectTaskCounts>();
+  for (const [projectId, counts] of board) merged.set(projectId, { ...counts });
+  for (const [projectId, counts] of linked) {
+    const current = merged.get(projectId) ?? { open: 0, done: 0 };
+    merged.set(projectId, {
+      open: current.open + counts.open,
+      done: current.done + counts.done,
+    });
+  }
+  return merged;
+}

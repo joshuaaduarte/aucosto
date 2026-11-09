@@ -5,11 +5,17 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { requireCan } from "@/lib/auth/can";
 import { normalizeDoStatus } from "@/lib/do";
-import { deleteDoItemsByProject } from "@/lib/services/do";
+import {
+  countDoTasksByProject,
+  deleteDoItemsByProject,
+  listDoTasksForProject,
+} from "@/lib/services/do";
 import { recordEvent } from "@/lib/services/events";
 import { listHabits } from "@/lib/services/habits";
 import {
   computeMomentum,
+  mergeProjectTasks,
+  mergeTaskCounts,
   normalizeBoardStatus,
   normalizeEnergyType,
   normalizeProjectStatus,
@@ -17,6 +23,7 @@ import {
   type EnergyType,
   type Momentum,
   type ProjectStatus,
+  type ProjectTaskView,
 } from "@/lib/projects";
 import type { Project } from "@/generated/prisma/client";
 
@@ -795,14 +802,8 @@ export type BoardProjectCard = {
   momentum: Momentum;
 };
 
-export type ProjectTaskRecord = {
-  id: string;
-  title: string;
-  done: boolean;
-  isToday: boolean;
-  sortOrder: number;
-  createdAt: Date;
-};
+/** A row on the project task tab: a board task or a linked Do List task. */
+export type ProjectTaskRecord = ProjectTaskView;
 
 export type ProjectTimeRow = {
   id: string;
@@ -970,7 +971,19 @@ async function loadTaskCounts(userId: string): Promise<Map<string, { open: numbe
   `);
   const map = new Map<string, { open: number; done: number }>();
   for (const row of rows) map.set(row.projectId, { open: row.openCount, done: row.doneCount });
-  return map;
+  // Do List tasks linked to a project count too — otherwise a project with
+  // five linked tasks reads "0 open tasks" on the board and in the snapshot.
+  return mergeTaskCounts(map, await loadLinkedDoCounts(userId));
+}
+
+/** Linked Do List counts; an unexpected failure must not take the board down. */
+async function loadLinkedDoCounts(userId: string): Promise<Map<string, { open: number; done: number }>> {
+  try {
+    return await countDoTasksByProject(userId);
+  } catch (error) {
+    console.error("[projects] linked Do List task counts failed", error);
+    return new Map();
+  }
 }
 
 export async function listBoardProjects(userId: string): Promise<BoardProjectCard[]> {
@@ -1146,13 +1159,21 @@ async function syncNextAction(userId: string, projectId: string): Promise<void> 
   `);
 }
 
+/** The task tab's rows: board tasks plus Do List tasks linked to the project. */
 async function loadProjectTasks(userId: string, projectId: string): Promise<ProjectTaskRecord[]> {
-  return prisma.$queryRaw<ProjectTaskRecord[]>(Prisma.sql`
-    SELECT "id", "title", "done", "isToday", "sortOrder", "createdAt"
-    FROM "ProjectTask"
-    WHERE "userId" = ${userId} AND "projectId" = ${projectId}
-    ORDER BY "done" ASC, "isToday" DESC, "sortOrder" ASC, "createdAt" ASC
-  `);
+  const [boardTasks, doTasks] = await Promise.all([
+    prisma.$queryRaw<Omit<ProjectTaskRecord, "source">[]>(Prisma.sql`
+      SELECT "id", "title", "done", "isToday", "sortOrder", "createdAt"
+      FROM "ProjectTask"
+      WHERE "userId" = ${userId} AND "projectId" = ${projectId}
+      ORDER BY "done" ASC, "isToday" DESC, "sortOrder" ASC, "createdAt" ASC
+    `),
+    listDoTasksForProject(userId, projectId).catch((error) => {
+      console.error("[projects] linked Do List tasks failed", error);
+      return [];
+    }),
+  ]);
+  return mergeProjectTasks(boardTasks, doTasks);
 }
 
 export async function createProjectTask(
