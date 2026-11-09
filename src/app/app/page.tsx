@@ -58,6 +58,8 @@ import { syncStaleCalendarFeeds } from "@/lib/services/calendar-feeds";
 import { ConfirmEventsCard } from "./_components/confirm-events-card";
 import { EveningCheckIn } from "./_components/evening-check-in";
 import { loadConfirmRows } from "./_components/confirm-events-data";
+import { StaleDataCard } from "./_components/stale-data-card";
+import { loadStaleNotices } from "./_components/stale-data-data";
 import { deriveDailyDigest } from "./_lib/daily-digest";
 import { deriveHubPrompts } from "./_lib/hub-prompts";
 import { buildTodayTimeline, pickNowCards } from "./_lib/hub-now";
@@ -162,6 +164,17 @@ export default async function HubPage() {
   const now = new Date();
   const confirmRows =
     userId && context?.role !== "partner" ? await loadConfirmRows(userId, now) : [];
+  const staleNotices =
+    userId && context?.role !== "partner"
+      ? await loadStaleNotices({
+          userId,
+          financeUserId: financeUserId ?? userId,
+          financeVisible,
+          accountCount: accounts.length,
+          healthLinkedHabitCount: allHabits.filter((habit) => habit.healthMetric).length,
+          now,
+        })
+      : [];
   const todayStart = startOfToday();
 
   // Sleep is always surfaced (like the running-timer bar) — never gated behind
@@ -475,6 +488,8 @@ export default async function HubPage() {
           hasPlanToday={todayPlan.length > 0}
         />
       ) : null}
+
+      <StaleDataCard notices={staleNotices} />
 
       {/* Now: only what fits this hour (focus, sleep, morning or reflection). */}
       {userId ? <div className="space-y-3">{nowSlot}</div> : <FocusModuleCard focus={focus} />}
