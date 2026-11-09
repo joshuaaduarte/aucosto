@@ -150,6 +150,8 @@ export type AssistantSnapshot = {
       avgDailyMinutes: number;
       habitConsistency: {
         name: string;
+        /** 0–100 smoothed habit strength (forgiving of single misses). */
+        strength: number;
         doneCount: number;
         scheduledCount: number;
         pct: number;
@@ -444,8 +446,10 @@ export async function buildAssistantSnapshot(
   const last7TrackedMinutes =
     Math.round(sumDurations(last7DaysEntries) / 60000) + runningTodayMinutes;
   const avgDailyMinutes = Math.round(last7TrackedMinutes / 7);
-  const habitConsistency = allHabits.map((habit) => ({
+  // Parked ("later") habits would read as constant misses — leave them out.
+  const habitConsistency = allHabits.filter((habit) => habit.focus !== "later").map((habit) => ({
     name: habit.title,
+    strength: habit.strength,
     ...habitWeekConsistency(habit, habit.recentDays.slice(-7)),
   }));
 

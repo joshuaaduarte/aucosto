@@ -414,6 +414,12 @@ export default async function HubPage() {
     <EveningCheckIn
       key="reflect"
       habits={allHabits
+        // Focus habits only when any are marked; never "later" ones.
+        .filter((habit) =>
+          allHabits.some((other) => other.focus === "focus")
+            ? habit.focus === "focus"
+            : habit.focus !== "later",
+        )
         .filter(
           (habit) =>
             habit.dueToday &&

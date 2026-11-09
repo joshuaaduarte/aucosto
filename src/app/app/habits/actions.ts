@@ -379,3 +379,26 @@ export async function undoTodayHabitLogAction(formData: FormData) {
   await removeTodayHabitEntries(userId, id);
   revalidateHabits();
 }
+
+/** Save the focus picker: chosen habits become Focus, the rest Later. */
+export async function saveFocusPicksAction(
+  focusIds: string[],
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const userId = await resolveActiveUserId();
+  const parsed = z.array(z.string().min(1).max(64)).max(12).safeParse(focusIds);
+  if (!parsed.success) return { ok: false, error: "Pick up to 12 habits." };
+  const chosen = new Set(parsed.data);
+  try {
+    const habits = await listHabits(userId);
+    for (const habit of habits) {
+      await setHabitPreference(userId, habit.id, { focus: chosen.has(habit.id) ? "focus" : "later" });
+    }
+  } catch (error) {
+    if (error instanceof HabitPreferencesUnavailableError) {
+      return { ok: false, error: error.message };
+    }
+    return { ok: false, error: error instanceof Error ? error.message : "Could not save." };
+  }
+  revalidateHabits();
+  return { ok: true };
+}

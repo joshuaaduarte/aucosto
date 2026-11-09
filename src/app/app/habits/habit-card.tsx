@@ -10,7 +10,12 @@
 import { useState, useTransition } from "react";
 import { categoryColor } from "@/lib/time-categories";
 import { splitLeadingEmoji } from "@/lib/habit-templates";
-import { formatClockMinutes, formatHabitQuantity, type HabitGoalUnit } from "@/lib/habits";
+import {
+  formatClockMinutes,
+  formatHabitQuantity,
+  habitStrengthLabel,
+  type HabitGoalUnit,
+} from "@/lib/habits";
 import type { HabitSummary } from "@/lib/services/habits";
 import {
   quickLogHabitAction,
@@ -106,7 +111,13 @@ export function HabitCard({ habit }: { habit: HabitSummary }) {
               {goalUnit !== "check"
                 ? ` · ${formatHabitQuantity(habit.targetCount, goalUnit)} target`
                 : ""}
+              {habit.healthMetric ? " · from Apple Health" : ""}
             </span>
+            {habit.cue ? (
+              <span className="mt-0.5 block truncate text-[0.72rem] italic" style={{ color: "var(--text-muted)" }}>
+                After I {habit.cue.replace(/^after i\s+/i, "")}
+              </span>
+            ) : null}
           </span>
           <span className="shrink-0 text-right" title="Current streak (longest run kept alive)">
             <span
@@ -122,19 +133,22 @@ export function HabitCard({ habit }: { habit: HabitSummary }) {
           </span>
         </button>
 
-        {/* Consistency + last-7 rhythm */}
-        <div className="mt-2.5 flex items-center gap-2.5">
+        {/* Strength (forgiving: a missed day dents it, never zeroes it) + last-7 rhythm */}
+        <div
+          className="mt-2.5 flex items-center gap-2.5"
+          title={`Strength ${habit.strength}% — builds with every day you do it, dips a little when you miss. ${Math.min(100, Math.round(habit.completionRate30d))}% of the last 30 days.`}
+        >
           <div className="h-[4px] min-w-0 flex-1 rounded-full" style={{ background: "var(--bg-tint-strong)" }}>
             <div
               className="h-[4px] rounded-full transition-all"
               style={{
-                width: `${Math.min(100, Math.max(2, Math.round(habit.completionRate30d)))}%`,
+                width: `${Math.min(100, Math.max(2, habit.strength))}%`,
                 background: color,
               }}
             />
           </div>
           <span className="tabular shrink-0 text-[0.65rem]" style={{ color: "var(--text-faint)" }}>
-            {Math.min(100, Math.round(habit.completionRate30d))}% · 30d
+            {habitStrengthLabel(habit.strength)} · {habit.strength}%
           </span>
           <span className="flex shrink-0 items-center gap-1" aria-hidden>
             {last7.map((day) => (
