@@ -11,6 +11,11 @@ import {
   listCalendarItems,
 } from "@/lib/services/calendar";
 import { listTimeCategories } from "@/lib/services/time-categories";
+import {
+  calendarFeedNames,
+  FEED_SOURCE_TOOL,
+  syncStaleCalendarFeeds,
+} from "@/lib/services/calendar-feeds";
 import { listRhythmSessionsBetween } from "@/lib/services/rhythms";
 import {
   resolveActiveUserId,
@@ -59,8 +64,12 @@ export default async function CalendarPage({
   const context = await requireViewerContext();
   const params = await searchParams;
 
-  // Make sure the out-of-band categoryId column exists before any read/write
-  // touches it (raw-SQL column — see src/lib/services/calendar.ts).
+  // Linked calendar feeds: refresh stale ones before reading, but never wait
+  // more than a few seconds — a slow feed shows on the next view instead.
+  await Promise.race([
+    syncStaleCalendarFeeds(userId),
+    new Promise((resolve) => setTimeout(resolve, 4000)),
+  ]);
 
   const weekStart = startOfCalendarWeek();
   const weekEnd = addDays(weekStart, 7);
@@ -137,6 +146,7 @@ export default async function CalendarPage({
   // Category assignments for the timeline blocks (raw-SQL column), plus the
   // picker options (visible only) and an id→color map over ALL categories so a
   // block tagged with a since-hidden category still tints correctly.
+  const feedNames = await calendarFeedNames(userId);
   const categoryIdByItem = await getCalendarItemCategoryIds(
     userId,
     timelineItems.map((item) => item.id),
@@ -293,6 +303,10 @@ export default async function CalendarPage({
         status: item.status,
         categoryId: categoryIdByItem.get(item.id) ?? null,
         recurrenceRule: item.recurrenceRule as RecurrenceRule | null,
+        linkedCalendar:
+          item.sourceTool === FEED_SOURCE_TOOL
+            ? (feedNames.get(item.sourceRefId ?? "") ?? "Linked")
+            : null,
         recurrenceParentId: item.recurrenceParentId,
       },
     };

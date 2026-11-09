@@ -46,6 +46,9 @@ export function CalendarItemCard({
   item: CalendarItem;
   showAttentionActions?: boolean;
 }) {
+  // Mirrored from a linked calendar: the next sync would undo edits, so
+  // only "Start timer" stays.
+  const fromFeed = item.sourceTool === "feed";
   return (
     <li
       className="rounded-md p-3 sm:p-3.5"
@@ -68,6 +71,7 @@ export function CalendarItemCard({
               {item.status === "done" ? (
                 <span className="pill">done</span>
               ) : null}
+              {fromFeed ? <span className="pill">linked calendar</span> : null}
             </div>
             <p
               className="mt-1 text-[0.75rem]"
@@ -109,7 +113,7 @@ export function CalendarItemCard({
                 </button>
               </form>
             ) : null}
-            {item.status !== "done" ? (
+            {item.status !== "done" && !fromFeed ? (
               <form action={completeCalendarItemAction}>
                 <input type="hidden" name="id" value={item.id} />
                 <button
@@ -120,19 +124,21 @@ export function CalendarItemCard({
                 </button>
               </form>
             ) : null}
-            <form action={deleteCalendarItemAction}>
-              <input type="hidden" name="id" value={item.id} />
-              <button
-                className="btn-ghost h-8 px-2.5 text-[0.75rem]"
-                type="submit"
-              >
-                Delete
-              </button>
-            </form>
+            {fromFeed ? null : (
+              <form action={deleteCalendarItemAction}>
+                <input type="hidden" name="id" value={item.id} />
+                <button
+                  className="btn-ghost h-8 px-2.5 text-[0.75rem]"
+                  type="submit"
+                >
+                  Delete
+                </button>
+              </form>
+            )}
           </div>
         </div>
 
-        {showAttentionActions ? (
+        {showAttentionActions && !fromFeed ? (
           <div className="flex flex-wrap gap-2">
             <CompactMoveForm item={item} label="Later today" />
             <CompactMoveForm item={item} label="Tomorrow" shiftDays={1} />

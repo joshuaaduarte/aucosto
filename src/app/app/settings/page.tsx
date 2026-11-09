@@ -16,6 +16,8 @@ import { PrivacyPanel } from "../privacy-panel";
 import { LocationPanel } from "./location-panel";
 import { NotificationsPanel } from "./notifications-panel";
 import { WhoopPanel } from "./whoop-panel";
+import { CalendarFeedsPanel } from "./calendar-feeds-panel";
+import { listCalendarFeeds } from "@/lib/services/calendar-feeds";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +38,8 @@ export default async function SettingsPage({
 
   const household = context ? await loadHouseholdPanel(context) : null;
   const passwordSet = context ? await hasPassword(context.ownerUserId) : true;
+  const calendarFeeds =
+    context && !isPartner ? await listCalendarFeeds(context.effectiveUserId) : [];
 
   return (
     <div className="space-y-10">
@@ -102,6 +106,25 @@ export default async function SettingsPage({
           />
         </div>
       </section>
+      )}
+
+      {isPartner ? null : (
+        <Section id="calendars" eyebrow="Calendars" title="Show your Google or Outlook calendar here.">
+          <CalendarFeedsPanel
+            feeds={
+              calendarFeeds === null
+                ? null
+                : calendarFeeds.map((feed) => ({
+                    id: feed.id,
+                    name: feed.name,
+                    host: feed.host,
+                    lastSyncedAt: feed.lastSyncedAt?.toISOString() ?? null,
+                    lastError: feed.lastError,
+                    eventCount: feed.eventCount,
+                  }))
+            }
+          />
+        </Section>
       )}
 
       <section

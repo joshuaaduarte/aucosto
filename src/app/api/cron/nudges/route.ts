@@ -31,6 +31,7 @@ import { countEntriesSince, listBills } from "@/lib/services/finance";
 import { resolveFinanceScopeUserId } from "@/lib/household";
 import { LOG_NUDGE, shouldNudgeToLog, thirtyDaysBefore } from "@/lib/finance-entries";
 import { listHomeTasks } from "@/lib/services/home";
+import { syncAllStaleCalendarFeeds } from "@/lib/services/calendar-feeds";
 
 export const dynamic = "force-dynamic";
 
@@ -41,12 +42,15 @@ export async function GET(request: Request) {
   }
 
   const now = new Date();
+  // Every cron line also refreshes linked calendar feeds (hourly staleness),
+  // so events stay current on days the app isn't opened.
+  const feedsSynced = await syncAllStaleCalendarFeeds(now);
   const forced = new URL(request.url).searchParams.get("slot");
   const slot: NudgeSlot | null =
     forced === "morning" || forced === "evening" ? forced : slotDueAt(now.getHours());
   if (!slot) {
     // The other DST state's cron line — its twin sends this slot.
-    return NextResponse.json({ ok: true, slot: null, hour: now.getHours() });
+    return NextResponse.json({ ok: true, slot: null, hour: now.getHours(), feedsSynced });
   }
 
   const subscribed = await listSubscribedUserIds();

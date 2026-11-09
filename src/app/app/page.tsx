@@ -53,6 +53,8 @@ import { HubMore } from "./_components/hub-more";
 import { ReturnCard } from "./_components/return-card";
 import { TodayPlanCard, type HubPlanBlock } from "./_components/today-plan-card";
 import { WorkspaceSection } from "./_components/workspace-section";
+import { after } from "next/server";
+import { syncStaleCalendarFeeds } from "@/lib/services/calendar-feeds";
 import { deriveDailyDigest } from "./_lib/daily-digest";
 import { deriveHubPrompts } from "./_lib/hub-prompts";
 import { buildTodayTimeline, pickNowCards } from "./_lib/hub-now";
@@ -66,6 +68,13 @@ export default async function HubPage() {
   const userId = context?.effectiveUserId;
   const financeUserId = context?.financeUserId ?? userId;
   const financeVisible = context?.financeVisible ?? false;
+
+  // Linked calendar feeds refresh after the response (never blocks the hub);
+  // the calendar page awaits the same call, the cron covers quiet days.
+  if (userId && context?.role !== "partner") {
+    const feedUserId = userId;
+    after(() => syncStaleCalendarFeeds(feedUserId));
+  }
 
   const [
     runningEntry,

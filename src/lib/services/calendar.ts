@@ -13,6 +13,10 @@ import {
 
 export type CalendarRange = { from: Date; to: Date };
 
+/** Feed-mirrored events (sourceTool "feed") can't be edited here. */
+export const FEED_READ_ONLY_MESSAGE =
+  "This event comes from a linked calendar. Change it there and it updates here.";
+
 export type CreateCalendarItemInput = {
   title: string;
   startsAt: Date;
@@ -332,6 +336,21 @@ export async function updateCalendarItem(
   }
   if (!existing) return null;
 
+  if (existing.sourceTool === "feed") {
+    // Mirrored from an outside calendar: the next sync would undo any edit.
+    // Only the category (stored out-of-band, never touched by sync) can change.
+    const onlyCategory = Object.entries(input).every(
+      ([key, value]) => key === "categoryId" || value === undefined,
+    );
+    if (!onlyCategory) {
+      throw new Error(FEED_READ_ONLY_MESSAGE);
+    }
+    if (input.categoryId !== undefined) {
+      await writeCalendarItemCategory(userId, existing.id, input.categoryId || null);
+    }
+    return existing;
+  }
+
   const startsAt = input.startsAt ?? existing.startsAt;
   const endsAt = input.endsAt ?? existing.endsAt;
   validateWindow(startsAt, endsAt);
@@ -416,6 +435,12 @@ export async function deleteCalendarItem(userId: string, id: string): Promise<vo
       refId: id,
     });
     return;
+  }
+  const target = await prisma.calendarItem
+    .findFirst({ where: { id, userId }, select: { sourceTool: true } })
+    .catch(() => null);
+  if (target?.sourceTool === "feed") {
+    throw new Error(FEED_READ_ONLY_MESSAGE);
   }
   let count = 0;
   try {
