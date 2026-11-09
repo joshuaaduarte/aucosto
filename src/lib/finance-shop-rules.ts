@@ -85,3 +85,16 @@ export function ruleFromConfirmation(input: {
   if (!category && (sameName || !name)) return null;
   return { match, name: name && !sameName ? name : null, category };
 }
+
+/**
+ * Does this read like a name a person typed ("Blue Bottle") rather than bank
+ * text ("SQ *BLUE BOTTLE COFFEE 0042")? Sorting a hand-typed entry keeps its
+ * name on the rule, so bank rows from that shop get it too.
+ */
+export function looksLikeYourName(description: string): boolean {
+  const text = description.trim();
+  if (!text || text.length > 40) return false;
+  if (/[#*\d]/.test(text)) return false;
+  const letters = text.replace(/[^A-Za-z]/g, "");
+  return letters.length > 0 && letters !== letters.toUpperCase();
+}

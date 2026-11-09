@@ -1,7 +1,7 @@
 // Groups imported (CSV / PDF statement) rows into the import they came from,
 // so one bad import can be undone without clearing everything. Each import
 // writes all its rows in one insert, so they share a createdAt; rows more
-// than `gapMs` apart belong to different imports. Pure; tested in
+// than `gapMs` (2 seconds) apart belong to different imports. Pure; tested in
 // tests/finance-import-batches.test.ts.
 
 import type { FinanceTransaction } from "@/generated/prisma/client";
@@ -34,7 +34,7 @@ export type ImportBatch = {
   incomeCents: number;
 };
 
-export function groupImportBatches(rows: ImportedRow[], gapMs = 60_000): ImportBatch[] {
+export function groupImportBatches(rows: ImportedRow[], gapMs = 2_000): ImportBatch[] {
   const sorted = [...rows].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   type Building = ImportBatch & { accountSet: Set<string> };
   const batches: Building[] = [];

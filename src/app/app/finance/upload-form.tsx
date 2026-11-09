@@ -31,8 +31,8 @@ function UploadStatus({ state }: { state: UploadState }) {
       {state.matched ? (
         <>
           {" · "}
-          <span className="not-italic font-mono tabular text-ink-soft">{state.matched}</span> matched what you&rsquo;d
-          already logged
+          <span className="not-italic font-mono tabular text-ink-soft">{state.matched}</span>{" "}
+          matched what you&rsquo;d already logged
           {state.adjusted ? ` (${state.adjusted} with the bank’s amount, like a tip)` : ""}
         </>
       ) : null}

@@ -18,6 +18,7 @@ import { currentActorUserId } from "@/lib/actor";
 import { parseAmountInput } from "@/lib/finance-entries";
 import { FLEXIBLE_BUDGET_KEY } from "@/lib/finance-pacing";
 import { formatUSDFromCents } from "@/lib/money";
+import { looksLikeYourName } from "@/lib/finance-shop-rules";
 import { parseStatementPdf } from "@/lib/statement-import";
 
 export type UploadState =
@@ -467,7 +468,12 @@ export async function setCategoryForEntries(
       await financeService.updateEntry(userId, id, { category });
     }
     if (rememberShop?.trim()) {
-      await financeService.saveShopRule(userId, { description: rememberShop.slice(0, 200), category });
+      const shop = rememberShop.slice(0, 200);
+      await financeService.saveShopRule(userId, {
+        description: shop,
+        category,
+        ...(looksLikeYourName(shop) ? { name: shop.trim() } : {}),
+      });
     }
     revalidateFinance();
     return { ok: true };
