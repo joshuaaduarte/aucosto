@@ -35,6 +35,7 @@ export const USAGE_AREAS: UsageArea[] = [
   { key: "habit", label: "Habits", href: "/app/habits" },
   { key: "reflect", label: "Reflect", href: "/app/reflect" },
   { key: "rhythm", label: "Check-ins", href: "/app" },
+  { key: "review", label: "Weekly review", href: "/app/review" },
   { key: "project", label: "Projects", href: "/app/projects" },
   { key: "finance", label: "Money", href: "/app/finance" },
   { key: "home", label: "Home", href: "/app/home" },

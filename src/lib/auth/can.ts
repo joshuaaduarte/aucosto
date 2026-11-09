@@ -25,7 +25,8 @@ export type Tool =
   | "location"
   | "work"
   | "home"
-  | "household";
+  | "household"
+  | "review";
 export type Action = "read" | "write";
 
 export function can(
