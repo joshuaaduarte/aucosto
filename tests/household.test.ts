@@ -74,4 +74,14 @@ describe("withActorMeta", () => {
     expect(withActorMeta(null, "household", "ana")).toEqual({ actorUserId: "ana" });
     expect(withActorMeta({ count: 2 }, "household", "ana")).toEqual({ count: 2, actorUserId: "ana" });
   });
+
+  it("stamps via when an agent made the write", () => {
+    expect(withActorMeta(null, "u1", null, "agent")).toEqual({ via: "agent" });
+    expect(withActorMeta({ a: 1 }, "u1", "u1", "agent")).toEqual({ a: 1, via: "agent" });
+    expect(withActorMeta({ a: 1 }, "household", "ana", "agent")).toEqual({
+      a: 1,
+      actorUserId: "ana",
+      via: "agent",
+    });
+  });
 });

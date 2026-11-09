@@ -35,6 +35,11 @@
   --attention:        #A86A12;
   --attention-tint:   rgba(183, 121, 31, 0.13);
 
+  /* Chart series (usage page): who made an entry. Validated as a pair for
+     colour-blind separation and contrast in each theme; marks only, never text. */
+  --series-you:       #DE6B2A;
+  --series-partner:   #2A78D6;
+
   /* Shadows — mostly border-only */
   --shadow-card:      0 0 0 1px var(--border);
   --shadow-pop:       0 0 0 1px rgba(15, 15, 15, 0.05),
@@ -122,6 +127,8 @@
     --positive-tint:    rgba(92, 196, 140, 0.14);
     --attention:        #E0B055;
     --attention-tint:   rgba(224, 176, 85, 0.15);
+    --series-you:       #D95926;
+    --series-partner:   #3987E5;
 
     --shadow-card:      0 0 0 1px var(--border);
     --shadow-pop:       0 0 0 1px rgba(0, 0, 0, 0.35),
@@ -158,6 +165,8 @@
   --positive-tint:    rgba(92, 196, 140, 0.14);
   --attention:        #E0B055;
   --attention-tint:   rgba(224, 176, 85, 0.15);
+  --series-you:       #D95926;
+  --series-partner:   #3987E5;
 
   --shadow-card:      0 0 0 1px var(--border);
   --shadow-pop:       0 0 0 1px rgba(0, 0, 0, 0.35),
@@ -195,6 +204,11 @@
   --positive-tint:    rgba(47, 143, 91, 0.12);
   --attention:        #A86A12;
   --attention-tint:   rgba(183, 121, 31, 0.13);
+
+  /* Chart series (usage page): who made an entry. Validated as a pair for
+     colour-blind separation and contrast in each theme; marks only, never text. */
+  --series-you:       #DE6B2A;
+  --series-partner:   #2A78D6;
 
   --shadow-card:      0 0 0 1px var(--border);
   --shadow-pop:       0 0 0 1px rgba(15, 15, 15, 0.05),
