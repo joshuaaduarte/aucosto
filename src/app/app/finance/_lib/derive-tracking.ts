@@ -43,6 +43,7 @@ import {
   safeInChecking,
   savingsRate,
 } from "@/lib/finance-routine";
+import { buildMoneyMap } from "@/lib/finance-money-map";
 import type { EntryView } from "../_components/entry-list";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -233,6 +234,15 @@ export function deriveTracking(input: {
     bills: billsSoon,
     setAsideCents: hasSavings ? 0 : potsSavedCents,
   });
+  const moneyMap = buildMoneyMap({
+    accounts: input.accounts,
+    history: input.history,
+    cards,
+    bills: billsSoon,
+    budgetLeftCents: pacing.limitCents ? pacing.month.remainingCents : null,
+    pots: input.goals,
+    now,
+  });
   const checkIn = checkInRows({
     accounts: input.accounts,
     plans: input.plans,
@@ -246,6 +256,7 @@ export function deriveTracking(input: {
   return {
     cards,
     safe,
+    moneyMap,
     payFromAccountId: payFromAccountId(input.accounts),
     checkIn,
     checkInDue: checkIn.filter((r) => r.daysSinceUpdate > 30),

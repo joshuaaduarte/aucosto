@@ -19,6 +19,7 @@ import {
   type Paycheck,
 } from "@/lib/finance-paychecks";
 import { FLEXIBLE_BUDGET_KEY } from "@/lib/finance-pacing";
+import { likeLiteral } from "@/lib/sql-like";
 import type { FinanceBill, FinanceBudget } from "@/generated/prisma/client";
 
 function degrade<T>(label: string, fallback: T) {
@@ -31,7 +32,7 @@ function degrade<T>(label: string, fallback: T) {
 export async function listBudgets(userId: string): Promise<FinanceBudget[]> {
   requireCan(userId, "finance", "read");
   return prisma.financeBudget
-    .findMany({ where: { userId, NOT: { category: { startsWith: RESERVED_BUDGET_PREFIX } } }, orderBy: { category: "asc" } })
+    .findMany({ where: { userId, NOT: { category: { startsWith: likeLiteral(RESERVED_BUDGET_PREFIX) } } }, orderBy: { category: "asc" } })
     .catch(degrade("budget list", []));
 }
 
@@ -40,7 +41,7 @@ export async function listBudgets(userId: string): Promise<FinanceBudget[]> {
 export async function listPaychecks(userId: string): Promise<Paycheck[]> {
   requireCan(userId, "finance", "read");
   const rows = await prisma.financeBudget
-    .findMany({ where: { userId, category: { startsWith: PAY_KEY_PREFIX } } })
+    .findMany({ where: { userId, category: { startsWith: likeLiteral(PAY_KEY_PREFIX) } } })
     .catch(degrade("paycheck list", []));
   return paychecksFromBudgets(rows);
 }
@@ -56,7 +57,7 @@ export async function savePaychecks(
     if (!Number.isInteger(p.perCheckCents) || p.perCheckCents <= 0) throw new Error(`Enter ${p.name}'s take-home pay per check.`);
   }
   await prisma.$transaction([
-    prisma.financeBudget.deleteMany({ where: { userId, category: { startsWith: PAY_KEY_PREFIX } } }),
+    prisma.financeBudget.deleteMany({ where: { userId, category: { startsWith: likeLiteral(PAY_KEY_PREFIX) } } }),
     prisma.financeBudget.createMany({
       data: paychecks.map((p) => ({ userId, category: payKey(p.role, p.name), monthlyLimitCents: p.perCheckCents })),
     }),

@@ -68,6 +68,7 @@ import { UploadForm } from "./upload-form";
 import { ClearButton } from "./clear-button";
 import { deriveFinanceDashboard } from "./_lib/derive";
 import { deriveTracking, type TrackingView } from "./_lib/derive-tracking";
+import { WhereMoneyIs } from "./_components/where-money-is";
 
 export const dynamic = "force-dynamic";
 
@@ -563,6 +564,7 @@ function OverviewTab({
       ) : null}
       <PaceCard pacing={tracking.pacing} suggestedLimitCents={tracking.suggestedLimitCents} />
       <NeedsYou items={items} />
+      <WhereMoneyIs map={tracking.moneyMap} />
       <RecentEntries entries={tracking.entries} />
       <div className="grid grid-cols-2 gap-3">
         <OverviewTile
