@@ -55,6 +55,8 @@ import { TodayPlanCard, type HubPlanBlock } from "./_components/today-plan-card"
 import { WorkspaceSection } from "./_components/workspace-section";
 import { after } from "next/server";
 import { syncStaleCalendarFeeds } from "@/lib/services/calendar-feeds";
+import { ConfirmEventsCard } from "./_components/confirm-events-card";
+import { loadConfirmRows } from "./_components/confirm-events-data";
 import { deriveDailyDigest } from "./_lib/daily-digest";
 import { deriveHubPrompts } from "./_lib/hub-prompts";
 import { buildTodayTimeline, pickNowCards } from "./_lib/hub-now";
@@ -157,6 +159,8 @@ export default async function HubPage() {
       : null;
 
   const now = new Date();
+  const confirmRows =
+    userId && context?.role !== "partner" ? await loadConfirmRows(userId, now) : [];
   const todayStart = startOfToday();
 
   // Sleep is always surfaced (like the running-timer bar) — never gated behind
@@ -473,6 +477,8 @@ export default async function HubPage() {
           canPlanToday={canPlanToday}
         />
       ) : null}
+
+      {confirmRows.length > 0 ? <ConfirmEventsCard rows={confirmRows} /> : null}
 
       <DailyDigestSection digest={digest} />
 

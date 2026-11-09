@@ -22,6 +22,10 @@ import {
 import { PipLaunchButton } from "../time/pip-launch-button";
 import type { PipState } from "./pip-data";
 
+/** After this long a running timer is more likely forgotten than focused. */
+const STILL_ON_MS = 4 * 60 * 60 * 1000;
+const STILL_ON_SNOOZE_MS = 2 * 60 * 60 * 1000;
+
 export function TimerBarClient({
   entryId,
   entryLabel,
@@ -44,6 +48,9 @@ export function TimerBarClient({
   const [now, setNow] = useState(() => Date.now());
 
   const [noteOpen, setNoteOpen] = useState(false);
+  // Forgotten-timer guard: past STILL_ON_MS the bar asks "Still on …?".
+  // "Keep going" snoozes it for another 2 hours of elapsed time.
+  const [stillOnSnoozeMs, setStillOnSnoozeMs] = useState(STILL_ON_MS);
   const [stopAtOpen, setStopAtOpen] = useState(false);
   const [notes, setNotes] = useState(initialNotes ?? "");
   // notesRef mirrors the latest text so the document-level outside-click
@@ -101,6 +108,8 @@ export function TimerBarClient({
   if (pathname === "/app/time") return null;
 
   const hasNote = notes.trim().length > 0;
+  const elapsedMs = now - startedAt;
+  const askStillOn = elapsedMs >= stillOnSnoozeMs && !stopAtOpen;
 
   return (
     <>
@@ -117,6 +126,42 @@ export function TimerBarClient({
         }}
       >
       <div ref={wrapperRef} className="pointer-events-auto relative w-full lg:max-w-[26rem]">
+        {askStillOn && !noteOpen ? (
+          <div
+            role="alertdialog"
+            aria-label="Is this timer still running?"
+            className="absolute inset-x-2 bottom-full mb-2 flex flex-wrap items-center justify-between gap-2 rounded-2xl border px-3 py-2 lg:inset-x-0"
+            style={{
+              background: "var(--bg-page)",
+              borderColor: "var(--border-soft)",
+              boxShadow: "var(--shadow-pop)",
+            }}
+          >
+            <p className="min-w-0 text-[0.8125rem]" style={{ color: "var(--text)" }}>
+              Still on <strong>{entryLabel}</strong>? It&apos;s been {formatDuration(elapsedMs)}.
+            </p>
+            <div className="flex shrink-0 gap-1.5">
+              <button
+                type="button"
+                className="btn-ghost h-8 px-2.5 text-[0.75rem]"
+                onClick={() => setStillOnSnoozeMs(elapsedMs + STILL_ON_SNOOZE_MS)}
+              >
+                Keep going
+              </button>
+              <button
+                type="button"
+                className="btn-ink h-8 px-3 text-[0.75rem]"
+                onClick={() => {
+                  flush();
+                  setStopAtOpen(true);
+                }}
+              >
+                Stop at…
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         {/* Note popover, anchored above the pill. */}
         {noteOpen ? (
           <div

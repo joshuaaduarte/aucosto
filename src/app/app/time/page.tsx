@@ -41,6 +41,8 @@ import { suggestGapFills } from "@/lib/gap-suggestions";
 import { EntryDeleteButton, EntryNoteIndicator } from "./entry-row";
 import { AddEntryButton, EntryEditButton } from "./entry-editor";
 import { GapBackfillCard } from "./gap-backfill-card";
+import { ConfirmEventsCard } from "../_components/confirm-events-card";
+import { loadConfirmRows } from "../_components/confirm-events-data";
 import { TagProjectButton } from "./tag-project-button";
 import { GapSlotRow } from "./gap-slot";
 import { SleepWakeMarker } from "./sleep-wake-marker";
@@ -225,6 +227,7 @@ export default async function TimePage() {
   const userId = await resolveActiveUserId();
 
   const now = new Date();
+  const confirmRows = await loadConfirmRows(userId, now, 10);
   const todayStart = startOfToday();
   const weekStart = startOfWeek();
   const sevenDaysAgo = new Date(todayStart);
@@ -665,6 +668,13 @@ export default async function TimePage() {
           </p>
         </div>
       </header>
+
+      {/* Ended calendar events → one-tap time entries */}
+      {confirmRows.length > 0 ? (
+        <section className="fade-in">
+          <ConfirmEventsCard rows={confirmRows} />
+        </section>
+      ) : null}
 
       {/* Untracked gap backfill */}
       {gap ? (

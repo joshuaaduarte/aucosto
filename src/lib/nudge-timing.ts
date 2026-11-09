@@ -15,7 +15,11 @@ export type ActivityHour = {
   activeDays: number;
 };
 
-export type NudgeSlot = "morning" | "evening";
+/** morning/evening plan the day; midday/afternoon are the short time
+ *  check-ins ("what happened since 9:00?"), sent only when there's
+ *  something to confirm or a long untracked stretch. */
+export type NudgeSlot = "morning" | "midday" | "afternoon" | "evening";
+export const NUDGE_SLOTS: readonly NudgeSlot[] = ["morning", "midday", "afternoon", "evening"];
 
 /** Hours we'll consider for each slot. Morning is capped before the midday
  *  work block; evening stops at 21 so there's still runway to plan before a
@@ -87,6 +91,8 @@ export function slotForHour(hour: number): NudgeSlot {
  *  the owner's histogram. Re-check with scripts/derive-nudge-times.ts. */
 export const NUDGE_LOCAL_HOURS: Record<NudgeSlot, number> = {
   morning: 5,
+  midday: 12,
+  afternoon: 17,
   evening: 21,
 };
 
@@ -117,8 +123,9 @@ export function slotDueAt(
   localHour: number,
   hours: Record<NudgeSlot, number> = NUDGE_LOCAL_HOURS,
 ): NudgeSlot | null {
-  if (localHour === hours.morning) return "morning";
-  if (localHour === hours.evening) return "evening";
+  for (const slot of NUDGE_SLOTS) {
+    if (localHour === hours[slot]) return slot;
+  }
   return null;
 }
 
