@@ -150,3 +150,11 @@ columns were then added by services at request time. To bring it back:
 Status: step 1 was applied to production on 2026-11-03 and the runtime
 `ensure*()` helpers were deleted after it; steps 2–4 are still open.
 
+
+## 12. Prisma `startsWith` / `contains` don't escape `_` or `%`
+
+They compile to SQL `LIKE`, and Prisma passes the value through unescaped, so
+`NOT: { category: { startsWith: "__" } }` excluded every category of two or
+more characters: `listBudgets` returned nothing and the monthly spending
+number never loaded (found 2026-11-09). Wrap literal text in `likeLiteral()`
+from `src/lib/sql-like.ts`.
