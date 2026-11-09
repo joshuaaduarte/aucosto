@@ -1,8 +1,8 @@
 "use client";
 
 // Past CSV / PDF imports, newest first, each with a Remove button that takes
-// out only the rows that import added. Hand-logged entries, moves and
-// linked-bank rows are never touched.
+// out only the rows that import added and puts back the hand-logged entries
+// it confirmed. Other entries, moves and linked-bank rows are never touched.
 
 import { useState, useTransition } from "react";
 import { formatUSDFromCents } from "@/lib/money";
@@ -17,6 +17,8 @@ export type ImportBatchView = {
   /** e.g. "Jan 2 – Mar 30, 2025". */
   rangeLabel: string;
   count: number;
+  /** Entries you'd logged that this import confirmed instead of copying. */
+  confirmed: number;
   accounts: string[];
   spentCents: number;
   incomeCents: number;
@@ -37,7 +39,8 @@ export function ImportHistory({ batches }: { batches: ImportBatchView[] }) {
   return (
     <div className="space-y-2">
       <p className="text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
-        Removing an import takes out only the rows that file added. Entries you logged yourself stay.
+        Removing an import takes out only the rows that file added. Entries you logged yourself stay, back to
+        waiting for the bank.
       </p>
       <ul>
         {batches.map((b) => (
@@ -53,12 +56,15 @@ function BatchRow({ batch }: { batch: ImportBatchView }) {
   const [error, setError] = useState<string | null>(null);
   const [removed, setRemoved] = useState<number | null>(null);
   const rows = `${batch.count} ${batch.count === 1 ? "row" : "rows"}`;
+  const summary = batch.confirmed
+    ? `${batch.count} new · ${batch.confirmed} matched what you'd logged`
+    : rows;
   return (
     <li className="border-b py-2.5" style={{ borderColor: "var(--border-faint)", opacity: removed !== null ? 0.5 : 1 }}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <div className="min-w-0 flex-1">
           <p className="text-[0.875rem]" style={{ color: "var(--text)" }}>
-            {batch.rangeLabel} · {rows}
+            {batch.rangeLabel} · {summary}
           </p>
           <p className="text-[0.75rem]" style={{ color: "var(--text-faint)" }}>
             Imported {batch.importedLabel}

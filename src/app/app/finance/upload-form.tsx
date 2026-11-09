@@ -26,8 +26,16 @@ function UploadStatus({ state }: { state: UploadState }) {
     <p className="mt-3 font-serif text-sm italic text-verdigris">
       {sourceLabel}:{" "}
       <span className="not-italic font-mono tabular text-ink-soft">
-        {state.imported > 0 ? `${state.imported} entries posted` : "no new entries"}
+        {state.imported > 0 ? `${state.imported} new entries` : "no new entries"}
       </span>
+      {state.matched ? (
+        <>
+          {" · "}
+          <span className="not-italic font-mono tabular text-ink-soft">{state.matched}</span> matched what you&rsquo;d
+          already logged
+          {state.adjusted ? ` (${state.adjusted} with the bank’s amount, like a tip)` : ""}
+        </>
+      ) : null}
       {state.deduped > 0 ? (
         <>
           {" · "}

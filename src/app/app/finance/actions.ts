@@ -27,6 +27,10 @@ export type UploadState =
       imported: number;
       skipped: number;
       deduped: number;
+      /** Rows that confirmed entries you'd already logged. */
+      matched?: number;
+      /** Of those, how many took the bank's different amount. */
+      adjusted?: number;
       bankLabel?: string;
       /** A card file listed purchases as positive; they were turned around. */
       flipped?: boolean;
@@ -99,11 +103,23 @@ export async function uploadCsv(
       };
     }
 
-    const { imported, deduped, flipped, balanceCheck } = await financeService.importTransactions(userId, rows, {
-      financeAccountId: importAccountId(formData),
-    });
+    const { imported, deduped, matched, adjusted, flipped, balanceCheck } = await financeService.importTransactions(
+      userId,
+      rows,
+      { financeAccountId: importAccountId(formData) },
+    );
     revalidateFinance();
-    return { ok: true, source: "csv", imported, skipped, deduped, flipped, balanceCheck: checkView(balanceCheck) };
+    return {
+      ok: true,
+      source: "csv",
+      imported,
+      skipped,
+      deduped,
+      matched,
+      adjusted,
+      flipped,
+      balanceCheck: checkView(balanceCheck),
+    };
   }, "Could not import CSV.");
 }
 
@@ -133,6 +149,8 @@ export async function uploadStatementPdf(
       imported: result.imported,
       skipped: result.skipped,
       deduped: result.deduped,
+      matched: result.matched,
+      adjusted: result.adjusted,
       bankLabel: result.bankLabel,
       flipped: result.flipped,
       balanceCheck: checkView(result.balanceCheck),

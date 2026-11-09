@@ -12,13 +12,19 @@ export const IMPORT_SYNC_SOURCE = "csv";
 type ImportedRow = Pick<
   FinanceTransaction,
   "createdAt" | "date" | "amount" | "account" | "description"
->;
+> & {
+  /** A hand-logged entry this import confirmed, rather than a row it added. */
+  confirmed?: boolean;
+};
 
 export type ImportBatch = {
   /** First and last createdAt in the batch: the window an undo deletes. */
   from: Date;
   to: Date;
+  /** Rows the import added. */
   count: number;
+  /** Entries you'd already logged that the import confirmed instead of copying. */
+  confirmed: number;
   firstDate: Date;
   lastDate: Date;
   /** Account names as they appeared in the file. */
@@ -39,6 +45,7 @@ export function groupImportBatches(rows: ImportedRow[], gapMs = 60_000): ImportB
         from: row.createdAt,
         to: row.createdAt,
         count: 0,
+        confirmed: 0,
         firstDate: row.date,
         lastDate: row.date,
         accounts: [],
@@ -49,11 +56,15 @@ export function groupImportBatches(rows: ImportedRow[], gapMs = 60_000): ImportB
       batches.push(current);
     }
     current.to = row.createdAt;
-    current.count += 1;
     if (row.date < current.firstDate) current.firstDate = row.date;
     if (row.date > current.lastDate) current.lastDate = row.date;
     const name = row.account?.trim();
     if (name) current.accountSet.add(name);
+    if (row.confirmed) {
+      current.confirmed += 1;
+      continue;
+    }
+    current.count += 1;
     const kind = classifyTransaction(row);
     if (row.amount < 0 && isTrueExpenseType(kind)) current.spentCents += Math.abs(row.amount);
     else if (kind === "income") current.incomeCents += row.amount;
