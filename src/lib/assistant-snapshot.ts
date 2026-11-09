@@ -13,6 +13,7 @@ import "server-only";
 
 import { describeEventType } from "@/lib/event-types";
 import { dayKey } from "@/lib/reflect";
+import { habitWeekConsistency } from "@/lib/habits";
 import { startOfToday } from "@/lib/time";
 import { sumDurations } from "@/lib/time-summary";
 import { listCalendarItems } from "@/lib/services/calendar";
@@ -443,18 +444,10 @@ export async function buildAssistantSnapshot(
   const last7TrackedMinutes =
     Math.round(sumDurations(last7DaysEntries) / 60000) + runningTodayMinutes;
   const avgDailyMinutes = Math.round(last7TrackedMinutes / 7);
-  const habitConsistency = allHabits.map((habit) => {
-    const last7 = habit.recentDays.slice(-7);
-    const scheduledCount = last7.filter((day) => day.due).length;
-    const doneCount = last7.filter((day) => day.due && day.completed).length;
-    return {
-      name: habit.title,
-      doneCount,
-      scheduledCount,
-      pct:
-        scheduledCount > 0 ? Math.round((doneCount / scheduledCount) * 100) : 0,
-    };
-  });
+  const habitConsistency = allHabits.map((habit) => ({
+    name: habit.title,
+    ...habitWeekConsistency(habit, habit.recentDays.slice(-7)),
+  }));
 
   // ── finance ──────────────────────────────────────────────────────────────
   let financeSummary: string | null = null;

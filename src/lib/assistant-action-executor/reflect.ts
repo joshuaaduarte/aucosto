@@ -33,6 +33,9 @@ export async function previewAddReflection(
   };
 }
 
+/** Stored in the NOT NULL rating columns when nobody rated the day. */
+const PLACEHOLDER_RATING = 3;
+
 export async function executeAddReflection(
   userId: string,
   n: Record<string, unknown>,
@@ -47,9 +50,14 @@ export async function executeAddReflection(
     buildReflectionSnapshot(userId, now),
   ]);
 
-  const mood = inputMood ?? existing?.mood ?? 3;
+  // Never invent a mood: a note-only save on a day nobody has rated keeps
+  // the ratings unset. The columns are NOT NULL, so placeholders go in and
+  // the snapshot flag makes the service read them back as null.
+  const existingRated = existing !== null && existing.mood !== null;
+  const ratingsUnset = inputMood === null && !existingRated;
+  const mood = inputMood ?? existing?.mood ?? PLACEHOLDER_RATING;
   const energyLevel = existing?.energyLevel ?? mood;
-  const productivityRating = existing?.productivityRating ?? 3;
+  const productivityRating = existing?.productivityRating ?? PLACEHOLDER_RATING;
   const dayRating = existing?.dayRating ?? mood;
   const freeNotes = inputNote ?? existing?.freeNotes ?? null;
 
@@ -62,7 +70,7 @@ export async function executeAddReflection(
     freeNotes,
     wentWell: existing?.wentWell ?? null,
     carryForward: existing?.carryForward ?? null,
-    contextSnapshot,
+    contextSnapshot: ratingsUnset ? { ...contextSnapshot, ratingsUnset: true } : contextSnapshot,
   });
 
   return {

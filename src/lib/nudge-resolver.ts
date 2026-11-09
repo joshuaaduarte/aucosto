@@ -6,7 +6,7 @@
 // against a throwaway user without fanning out real pushes to real devices.
 
 import "server-only";
-import { dayKey } from "@/lib/reflect";
+import { dayKey, isRatedReflection } from "@/lib/reflect";
 import { startOfDay } from "@/lib/day-plan";
 import {
   buildConfirmNudge,
@@ -74,7 +74,7 @@ export async function resolveNudge(
   ]);
 
   return buildPlanNudge({
-    reflected: Boolean(reflection),
+    reflected: isRatedReflection(reflection),
     plannedTomorrow: tomorrow.length,
   });
 }

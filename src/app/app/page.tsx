@@ -24,7 +24,7 @@ import {
   deriveInsightOfTheDay,
 } from "@/lib/insights";
 import { getRunningEntry, listCompletedSince, listEntriesBetween } from "@/lib/services/time";
-import { dayKey, reflectionStreak } from "@/lib/reflect";
+import { dayKey, isRatedReflection, reflectionStreak } from "@/lib/reflect";
 import { startOfToday, startOfWeek } from "@/lib/time";
 import { sumDurations } from "@/lib/time-summary";
 import { getViewerContext } from "@/lib/viewer-context";
@@ -264,12 +264,14 @@ export default async function HubPage() {
   const moodsByDay = Object.fromEntries(
     recentMoods.map((row) => [row.dateKey, row.mood]),
   );
-  const reflectedToday = dayKey(now) in moodsByDay;
+  const reflectedToday = moodsByDay[dayKey(now)] != null;
   const isEvening = now.getHours() >= 18;
   // Consecutive-day reflection streak from the 60-day window already fetched
   // for insights — pure derive, no extra query.
   const reflectStreak = reflectionStreak(
-    recentReflections.map((reflection) => reflection.dateKey),
+    recentReflections
+      .filter((reflection) => isRatedReflection(reflection))
+      .map((reflection) => reflection.dateKey),
     dayKey(now),
   );
 
@@ -279,7 +281,7 @@ export default async function HubPage() {
   const yesterday = new Date(todayStart);
   yesterday.setDate(yesterday.getDate() - 1);
   const yesterdayKey = dayKey(yesterday);
-  const reflectedYesterday = yesterdayKey in moodsByDay;
+  const reflectedYesterday = moodsByDay[yesterdayKey] != null;
   const yesterdayLabel = yesterday.toLocaleDateString([], { weekday: "long" });
   const beforeNoon = now.getHours() < 12;
 

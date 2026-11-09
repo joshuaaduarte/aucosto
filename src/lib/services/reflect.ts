@@ -22,10 +22,11 @@ import { listEntriesBetween } from "@/lib/services/time";
 export type DailyReflectionRecord = {
   id: string;
   dateKey: string;
-  mood: number;
-  energyLevel: number;
-  productivityRating: number;
-  dayRating: number;
+  /** Null when nobody chose the ratings (see ReflectionContextSnapshot.ratingsUnset). */
+  mood: number | null;
+  energyLevel: number | null;
+  productivityRating: number | null;
+  dayRating: number | null;
   wentWell: string | null;
   carryForward: string | null;
   freeNotes: string | null;
@@ -72,11 +73,19 @@ function isMissingTableError(error: unknown): boolean {
 }
 
 function toRecord(row: Row): DailyReflectionRecord {
-  return {
-    ...row,
-    contextSnapshot: (row.contextSnapshot ??
-      null) as ReflectionContextSnapshot | null,
-  };
+  const contextSnapshot = (row.contextSnapshot ??
+    null) as ReflectionContextSnapshot | null;
+  if (contextSnapshot?.ratingsUnset) {
+    return {
+      ...row,
+      mood: null,
+      energyLevel: null,
+      productivityRating: null,
+      dayRating: null,
+      contextSnapshot,
+    };
+  }
+  return { ...row, contextSnapshot };
 }
 
 const SELECT_FIELDS = Prisma.sql`

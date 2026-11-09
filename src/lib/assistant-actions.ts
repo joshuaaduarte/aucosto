@@ -121,7 +121,7 @@ export const ACTION_REGISTRY: Record<string, ActionDef> = {
     risk: "low",
     confirmationRequired: false,
     supported: true,
-    description: "Add or update today's reflection note and mood",
+    description: "Add or update today's reflection note and mood. Without a mood the day stays unrated (Josh still gets his evening check-in); only pass mood when he told you how the day felt.",
   },
   update_project: {
     action: "update_project",

@@ -72,7 +72,7 @@ export default async function ReflectHistoryPage() {
 }
 
 function HistoryRow({ reflection }: { reflection: DailyReflectionRecord }) {
-  const ratings: Array<{ label: string; value: number }> = RATING_FIELDS.map(
+  const ratings: Array<{ label: string; value: number | null }> = RATING_FIELDS.map(
     ({ field, label }) => ({ label, value: reflection[field] }),
   );
   const prose = [
@@ -107,7 +107,7 @@ function HistoryRow({ reflection }: { reflection: DailyReflectionRecord }) {
             {ratings.map((rating) => (
               <span
                 key={rating.label}
-                title={`${rating.label}: ${MOOD_SCALE.find((s) => s.value === rating.value)?.label ?? rating.value}`}
+                title={`${rating.label}: ${MOOD_SCALE.find((s) => s.value === rating.value)?.label ?? rating.value ?? "not rated"}`}
                 className="inline-flex items-center gap-1 text-[0.7rem] tabular"
                 style={{ color: "var(--text-faint)" }}
               >
@@ -116,7 +116,7 @@ function HistoryRow({ reflection }: { reflection: DailyReflectionRecord }) {
                   style={{ background: moodColor(rating.value) }}
                   aria-hidden
                 />
-                {rating.value}
+                {rating.value ?? "–"}
               </span>
             ))}
           </span>

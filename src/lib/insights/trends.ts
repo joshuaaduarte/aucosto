@@ -100,10 +100,11 @@ export function deriveTimeAllocation(
 
 export type ReflectionLite = {
   dateKey: string;
-  mood: number;
-  energyLevel: number;
-  productivityRating: number;
-  dayRating: number;
+  /** Null when the day has a note but nobody rated it. */
+  mood: number | null;
+  energyLevel: number | null;
+  productivityRating: number | null;
+  dayRating: number | null;
 };
 
 export type WellbeingMetricKey =
@@ -145,7 +146,9 @@ export function deriveWellbeingTrends(
   }
 
   const weekRatings = new Map<string, number[]>();
+  const rated = reflections.filter((r) => r.mood !== null);
   for (const reflection of reflections) {
+    if (reflection.dayRating === null) continue;
     const weekKey = weekKeyOf(new Date(`${reflection.dateKey}T12:00:00`));
     const bucket = weekRatings.get(weekKey) ?? [];
     bucket.push(reflection.dayRating);
@@ -162,7 +165,7 @@ export function deriveWellbeingTrends(
   return {
     dayKeys,
     series,
-    sampleCount: reflections.length,
+    sampleCount: rated.length,
     bestWeek: weeks[0] ?? null,
     worstWeek: weeks.length > 1 ? weeks[weeks.length - 1]! : null,
   };
