@@ -15,7 +15,7 @@ export function ReflectSection({
 }: {
   /** Last 7 local day keys, oldest first (today last). */
   days: string[];
-  moodsByDay: Record<string, number>;
+  moodsByDay: Record<string, number | null>;
   reflectedToday: boolean;
   isEvening: boolean;
   /** Consecutive-day reflection streak (today or yesterday anchored). */

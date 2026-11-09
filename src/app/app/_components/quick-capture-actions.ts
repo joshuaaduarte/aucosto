@@ -11,7 +11,7 @@ import { spendCategoryChoices } from "@/lib/finance-categories";
 import { isMoveEntry } from "@/lib/finance-moves";
 import { homeDaysUntil, homeDueLabel } from "@/lib/home";
 import { choresToOffer, habitsToOffer, rankCategories, recentTimerLabels } from "@/lib/quick-capture";
-import { dayKey } from "@/lib/reflect";
+import { dayKey, isRatedReflection } from "@/lib/reflect";
 import { listHabits } from "@/lib/services/habits";
 import { getReflection } from "@/lib/services/reflect";
 import { listPersons } from "@/lib/services/rolodex";
@@ -127,7 +127,7 @@ export async function loadQuickCapture(): Promise<QuickCaptureData> {
       : Promise.resolve([]),
     owner
       ? getReflection(userId, dayKey(now))
-          .then((row) => row !== null)
+          .then((row) => isRatedReflection(row))
           .catch(() => false)
       : Promise.resolve(false),
     owner

@@ -23,10 +23,10 @@ export function ReflectionForm({
   dayLabel,
 }: {
   existing: {
-    mood: number;
-    energyLevel: number;
-    productivityRating: number;
-    dayRating: number;
+    mood: number | null;
+    energyLevel: number | null;
+    productivityRating: number | null;
+    dayRating: number | null;
     wentWell: string | null;
     carryForward: string | null;
     freeNotes: string | null;

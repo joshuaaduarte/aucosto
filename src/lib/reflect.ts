@@ -39,11 +39,22 @@ export const RATING_FIELDS: Array<{
   { field: "dayRating", label: "Overall", question: "Rate the day overall." },
 ];
 
-export function moodColor(value: number): string {
+/**
+ * True when someone actually rated the day. An agent's note-only save leaves
+ * a row with null ratings; that still needs the person's own check-in, so
+ * the badge, nudges and streak only count rated days.
+ */
+export function isRatedReflection(
+  reflection: { mood: number | null } | null | undefined,
+): boolean {
+  return reflection != null && reflection.mood !== null;
+}
+
+export function moodColor(value: number | null): string {
   return MOOD_SCALE.find((step) => step.value === value)?.color ?? "#9ca3af";
 }
 
-export function moodEmoji(value: number): string {
+export function moodEmoji(value: number | null): string {
   return MOOD_SCALE.find((step) => step.value === value)?.emoji ?? "·";
 }
 
@@ -113,6 +124,10 @@ export type ReflectionContextSnapshot = {
   habitsDue: number;
   habitsHit: number;
   entryNotes: ReflectionEntryNote[];
+  /** Set when the row was saved without anyone choosing the ratings (an
+   *  agent's note-only save). The four rating columns are NOT NULL, so they
+   *  hold placeholders; the service reads them back as null. */
+  ratingsUnset?: boolean;
 };
 
 export function summarizeSnapshot(snapshot: ReflectionContextSnapshot): string {

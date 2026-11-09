@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { isPartnerPathAllowed, PARTNER_HOME_PATH } from "@/lib/household-access";
 import { auth } from "@/auth";
-import { dayKey } from "@/lib/reflect";
+import { dayKey, isRatedReflection } from "@/lib/reflect";
 import { getReflection } from "@/lib/services/reflect";
 import { getViewerContext } from "@/lib/viewer-context";
 import { AppSidebar, MobileNav } from "./sidebar";
@@ -90,7 +90,7 @@ export default async function AppLayout({
         <>
           <MobileTabBar
             showFinance={navProps.showFinance}
-            needsReflect={!isPartner && !todayReflection}
+            needsReflect={!isPartner && !isRatedReflection(todayReflection)}
             isPartner={isPartner}
           />
           {isPartner ? null : <RunningTimerBar userId={context.effectiveUserId} />}

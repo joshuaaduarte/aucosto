@@ -88,3 +88,27 @@ export function formatClockMinutes(minutes: number): string {
   const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
   return `${hours12}:${String(mins).padStart(2, "0")}${period}`;
 }
+
+/**
+ * Last-7-days consistency for one habit, as the assistant snapshot reports
+ * it. A weekly habit is due once per week, not on every day of it, so it
+ * counts as one scheduled slot that's done when the week's progress reaches
+ * the target. Other cadences count each due day.
+ */
+export function habitWeekConsistency(
+  habit: { cadence: string; targetCount: number },
+  last7: Array<{ due: boolean; completed: boolean; progress: number }>,
+): { doneCount: number; scheduledCount: number; pct: number } {
+  if (habit.cadence === "weekly") {
+    const progress = last7.reduce((sum, day) => sum + day.progress, 0);
+    const done = progress >= Math.max(1, habit.targetCount) ? 1 : 0;
+    return { doneCount: done, scheduledCount: 1, pct: done * 100 };
+  }
+  const scheduledCount = last7.filter((day) => day.due).length;
+  const doneCount = last7.filter((day) => day.due && day.completed).length;
+  return {
+    doneCount,
+    scheduledCount,
+    pct: scheduledCount > 0 ? Math.round((doneCount / scheduledCount) * 100) : 0,
+  };
+}
