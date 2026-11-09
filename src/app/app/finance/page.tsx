@@ -348,11 +348,12 @@ export default async function FinancePage({
                 }))}
               />
             </Collapsible>
-            <Collapsible title="Import past transactions (CSV or PDF)">
+            <Collapsible title="Import a bank file (CSV or PDF)">
               <p className="mb-3 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
-                For loading history you never logged. Import one account&rsquo;s file at a time and
-                pick the account, so rows land in the right place. To confirm this month&rsquo;s
-                entries, use &ldquo;Check a statement&rdquo; on the account instead.
+                Import one account&rsquo;s file at a time and pick the account. Anything you already
+                logged is matched and confirmed, not added twice; the rest comes in as new entries. To
+                also lock a month against the statement&rsquo;s balance, use &ldquo;Check a
+                statement&rdquo; on the account.
               </p>
               <UploadForm accounts={accounts.map((a) => ({ id: a.id, name: a.name }))} />
             </Collapsible>
@@ -611,6 +612,7 @@ function importBatchView(b: Awaited<ReturnType<typeof listImportBatches>>[number
     importedLabel: b.from.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
     rangeLabel: `${day(b.firstDate, !sameYear)} – ${day(b.lastDate, true)}`,
     count: b.count,
+    confirmed: b.confirmed,
     accounts: b.accounts,
     spentCents: b.spentCents,
     incomeCents: b.incomeCents,
