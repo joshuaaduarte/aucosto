@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyShopRule,
   findShopRule,
+  looksLikeYourName,
   ruleFromConfirmation,
   shopRuleKey,
   type ShopRule,
@@ -82,5 +83,15 @@ describe("ruleFromConfirmation", () => {
 
   it("learns nothing from an unsorted entry with the bank's own name", () => {
     expect(ruleFromConfirmation({ bankDescription: "SHELL", yourDescription: "shell", category: null })).toBeNull();
+  });
+});
+
+describe("looksLikeYourName", () => {
+  it("tells typed names from bank text", () => {
+    expect(looksLikeYourName("Blue Bottle")).toBe(true);
+    expect(looksLikeYourName("Trader Joe's")).toBe(true);
+    expect(looksLikeYourName("SQ *BLUE BOTTLE COFFEE")).toBe(false);
+    expect(looksLikeYourName("SHELL OIL 1234")).toBe(false);
+    expect(looksLikeYourName("COSTCO")).toBe(false);
   });
 });
