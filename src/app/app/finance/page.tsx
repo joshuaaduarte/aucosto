@@ -14,6 +14,7 @@ import {
   listImportBatches,
   listLinkedConnections,
   listPaychecks,
+  listShopRules,
   listStatementChecks,
   listTransactions,
   hasShortcutKey,
@@ -58,6 +59,7 @@ import { FlexibleLimitForm } from "./_components/tracking-forms";
 import { ShortcutPanel } from "./_components/shortcut-panel";
 import { CardBills } from "./_components/card-bills";
 import { ImportHistory, type ImportBatchView } from "./_components/import-history";
+import { ShopRules } from "./_components/shop-rules";
 import { SectionCard } from "./_components/ui";
 import { AccountsPanel } from "./accounts-panel";
 import { GoalsPanel } from "./goals-panel";
@@ -111,6 +113,7 @@ export default async function FinancePage({
     checks,
     importBatches,
     paychecks,
+    shopRules,
   ] = await Promise.all([
     listAccounts(userId),
     listGoals(userId),
@@ -128,6 +131,7 @@ export default async function FinancePage({
     listStatementChecks(userId),
     listImportBatches(userId).catch(() => []),
     listPaychecks(userId),
+    listShopRules(userId),
   ]);
 
   const data = deriveFinanceDashboard({ accounts, goals, history, count });
@@ -348,11 +352,12 @@ export default async function FinancePage({
                 }))}
               />
             </Collapsible>
-            <Collapsible title="Import past transactions (CSV or PDF)">
+            <Collapsible title="Import a bank file (CSV or PDF)">
               <p className="mb-3 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
-                For loading history you never logged. Import one account&rsquo;s file at a time and
-                pick the account, so rows land in the right place. To confirm this month&rsquo;s
-                entries, use &ldquo;Check a statement&rdquo; on the account instead.
+                Import one account&rsquo;s file at a time and pick the account. Anything you already
+                logged is matched and confirmed, not added twice; the rest comes in as new entries. To
+                also lock a month against the statement&rsquo;s balance, use &ldquo;Check a
+                statement&rdquo; on the account.
               </p>
               <UploadForm accounts={accounts.map((a) => ({ id: a.id, name: a.name }))} />
             </Collapsible>
@@ -442,6 +447,21 @@ export default async function FinancePage({
                 </div>
               ) : null}
             </dl>
+          </SectionCard>
+
+          <SectionCard
+            title="Remembered shops"
+            subtitle="Each shop's name and category, used for everything logged or imported from it."
+          >
+            <ShopRules
+              rules={shopRules.map((r) => ({
+                id: r.id,
+                match: r.match,
+                name: r.name,
+                category: r.category,
+                ownerName: Object.keys(names).length > 1 ? (names[r.ownerUserId]?.split(" ")[0] ?? null) : null,
+              }))}
+            />
           </SectionCard>
 
           <HouseholdPlanningSection data={planning} />
@@ -611,6 +631,7 @@ function importBatchView(b: Awaited<ReturnType<typeof listImportBatches>>[number
     importedLabel: b.from.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
     rangeLabel: `${day(b.firstDate, !sameYear)} – ${day(b.lastDate, true)}`,
     count: b.count,
+    confirmed: b.confirmed,
     accounts: b.accounts,
     spentCents: b.spentCents,
     incomeCents: b.incomeCents,

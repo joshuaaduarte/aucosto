@@ -15,6 +15,8 @@ import { currentActorUserId } from "@/lib/actor";
 import { recordEvent } from "@/lib/services/events";
 import { isMissingHouseholdTable } from "@/lib/household";
 import { normalizeCategory } from "@/lib/finance-categories";
+import { findShopRule } from "@/lib/finance-shop-rules";
+import { listShopRules } from "./rules";
 import {
   ENTRY_CLEARED,
   ENTRY_PENDING,
@@ -86,6 +88,12 @@ export async function addEntry(userId: string, input: AddEntryInput): Promise<Fi
   const description = input.description.trim().replace(/\s+/g, " ").slice(0, 120) || "Spending";
   const account = input.financeAccountId ? await requireAccount(userId, input.financeAccountId) : null;
   const by = input.byUserId ?? currentActorUserId() ?? undefined;
+  // Left for sorting? A remembered shop fills the category in.
+  let category = input.direction === "in" ? "Income" : cleanCategory(input.category);
+  if (!category && input.direction === "out") {
+    const rule = findShopRule(await listShopRules(userId), description, by ?? null);
+    category = rule?.category ?? null;
+  }
 
   const entry = await prisma.financeTransaction.create({
     data: {
@@ -98,7 +106,7 @@ export async function addEntry(userId: string, input: AddEntryInput): Promise<Fi
       date: input.date,
       amount: input.direction === "out" ? -input.amountCents : input.amountCents,
       description,
-      category: input.direction === "in" ? "Income" : cleanCategory(input.category),
+      category,
       raw: encodeEntryMeta({ by, via: input.via ?? "quick_add" }),
     },
   });

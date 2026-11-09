@@ -18,6 +18,7 @@ import { currentActorUserId } from "@/lib/actor";
 import { parseAmountInput } from "@/lib/finance-entries";
 import { FLEXIBLE_BUDGET_KEY } from "@/lib/finance-pacing";
 import { formatUSDFromCents } from "@/lib/money";
+import { looksLikeYourName } from "@/lib/finance-shop-rules";
 import { parseStatementPdf } from "@/lib/statement-import";
 
 export type UploadState =
@@ -27,6 +28,10 @@ export type UploadState =
       imported: number;
       skipped: number;
       deduped: number;
+      /** Rows that confirmed entries you'd already logged. */
+      matched?: number;
+      /** Of those, how many took the bank's different amount. */
+      adjusted?: number;
       bankLabel?: string;
       /** A card file listed purchases as positive; they were turned around. */
       flipped?: boolean;
@@ -99,11 +104,23 @@ export async function uploadCsv(
       };
     }
 
-    const { imported, deduped, flipped, balanceCheck } = await financeService.importTransactions(userId, rows, {
-      financeAccountId: importAccountId(formData),
-    });
+    const { imported, deduped, matched, adjusted, flipped, balanceCheck } = await financeService.importTransactions(
+      userId,
+      rows,
+      { financeAccountId: importAccountId(formData) },
+    );
     revalidateFinance();
-    return { ok: true, source: "csv", imported, skipped, deduped, flipped, balanceCheck: checkView(balanceCheck) };
+    return {
+      ok: true,
+      source: "csv",
+      imported,
+      skipped,
+      deduped,
+      matched,
+      adjusted,
+      flipped,
+      balanceCheck: checkView(balanceCheck),
+    };
   }, "Could not import CSV.");
 }
 
@@ -133,6 +150,8 @@ export async function uploadStatementPdf(
       imported: result.imported,
       skipped: result.skipped,
       deduped: result.deduped,
+      matched: result.matched,
+      adjusted: result.adjusted,
       bankLabel: result.bankLabel,
       flipped: result.flipped,
       balanceCheck: checkView(result.balanceCheck),
@@ -435,17 +454,38 @@ export async function setEntryCategory(id: string, category: string | null): Pro
 
 /**
  * Give several entries the same category at once: the sort flow's "always
- * use this for <shop>" files every other unsorted entry from that shop.
+ * use this for <shop>" files every other unsorted entry from that shop and,
+ * given the shop's text, remembers it for the person sorting.
  */
-export async function setCategoryForEntries(ids: string[], category: string): Promise<PlanningState> {
+export async function setCategoryForEntries(
+  ids: string[],
+  category: string,
+  rememberShop?: string,
+): Promise<PlanningState> {
   return withFinanceUser<PlanningState>(async (userId) => {
     const unique = [...new Set(ids)].slice(0, 200);
     for (const id of unique) {
       await financeService.updateEntry(userId, id, { category });
     }
+    if (rememberShop?.trim()) {
+      const shop = rememberShop.slice(0, 200);
+      await financeService.saveShopRule(userId, {
+        description: shop,
+        category,
+        ...(looksLikeYourName(shop) ? { name: shop.trim() } : {}),
+      });
+    }
     revalidateFinance();
     return { ok: true };
   }, "Could not save the category.");
+}
+
+export async function removeShopRule(id: string): Promise<PlanningState> {
+  return withFinanceUser<PlanningState>(async (userId) => {
+    await financeService.deleteShopRule(userId, id);
+    revalidateFinance();
+    return { ok: true };
+  }, "Could not remove that shop.");
 }
 
 export type MoveInput = {
