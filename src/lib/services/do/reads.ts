@@ -6,6 +6,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { requireCan } from "@/lib/auth/can";
 import type { DoStatus } from "@/lib/do";
+import type { LinkedDoTaskRow, ProjectTaskCounts } from "@/lib/projects";
 import { type DoItemSummary, summarize } from "./shared";
 
 function laneRank(lane: string) {
@@ -236,4 +237,41 @@ export async function getDoItemSummary(
 ): Promise<DoItemSummary | null> {
   const items = await listDoItems(userId, { includeDone: true });
   return items.find((item) => item.id === id) ?? null;
+}
+
+/**
+ * Do List tasks linked to one project, for the project's task tab. Light on
+ * purpose: no time entries or schedule, just what the row shows.
+ */
+export async function listDoTasksForProject(
+  userId: string,
+  projectId: string,
+): Promise<LinkedDoTaskRow[]> {
+  requireCan(userId, "do", "read");
+  return prisma.doItem.findMany({
+    where: { userId, projectId },
+    select: { id: true, title: true, status: true, lane: true, createdAt: true },
+    orderBy: { createdAt: "asc" },
+  });
+}
+
+/** Open/done Do List task totals per project (tasks with no project are skipped). */
+export async function countDoTasksByProject(
+  userId: string,
+): Promise<Map<string, ProjectTaskCounts>> {
+  requireCan(userId, "do", "read");
+  const rows = await prisma.doItem.groupBy({
+    by: ["projectId", "status"],
+    where: { userId, projectId: { not: null } },
+    _count: { _all: true },
+  });
+  const map = new Map<string, ProjectTaskCounts>();
+  for (const row of rows) {
+    if (!row.projectId) continue;
+    const current = map.get(row.projectId) ?? { open: 0, done: 0 };
+    if (row.status === "done") current.done += row._count._all;
+    else current.open += row._count._all;
+    map.set(row.projectId, current);
+  }
+  return map;
 }

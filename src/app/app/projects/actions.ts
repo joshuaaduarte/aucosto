@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { resolveActiveUserId } from "@/lib/viewer-context";
+import type { ProjectTaskSource } from "@/lib/projects";
+import { updateDoItem } from "@/lib/services/do";
 import {
   archiveBoardProject,
   completeProjectTask,
@@ -189,13 +191,24 @@ export async function createTaskAction(
   revalidateProjects(projectId);
 }
 
+// The task tab lists board tasks and Do List tasks linked to the project in
+// one list. `source` says which one a row is, so an edit lands on the right
+// record: "do" rows are written through the Do service and stay in step with
+// the Do List page.
+
 export async function toggleTaskAction(
   projectId: string,
   taskId: string,
   done: boolean,
+  source: ProjectTaskSource = "project",
 ): Promise<void> {
   const userId = await resolveActiveUserId();
-  await updateProjectTask(userId, taskId, { done });
+  if (source === "do") {
+    await updateDoItem(userId, taskId, { status: done ? "done" : "ready" });
+    revalidatePath("/app/do");
+  } else {
+    await updateProjectTask(userId, taskId, { done });
+  }
   revalidateProjects(projectId);
 }
 
@@ -203,11 +216,17 @@ export async function renameTaskAction(
   projectId: string,
   taskId: string,
   title: string,
+  source: ProjectTaskSource = "project",
 ): Promise<void> {
   const clean = title.trim();
   if (!clean) return;
   const userId = await resolveActiveUserId();
-  await updateProjectTask(userId, taskId, { title: clean });
+  if (source === "do") {
+    await updateDoItem(userId, taskId, { title: clean });
+    revalidatePath("/app/do");
+  } else {
+    await updateProjectTask(userId, taskId, { title: clean });
+  }
   revalidateProjects(projectId);
 }
 
@@ -215,9 +234,16 @@ export async function setTaskTodayAction(
   projectId: string,
   taskId: string,
   isToday: boolean,
+  source: ProjectTaskSource = "project",
 ): Promise<void> {
   const userId = await resolveActiveUserId();
-  await updateProjectTask(userId, taskId, { isToday });
+  if (source === "do") {
+    // Leaving Today sends a Do List task back to "Next", its default lane.
+    await updateDoItem(userId, taskId, { lane: isToday ? "today" : "next" });
+    revalidatePath("/app/do");
+  } else {
+    await updateProjectTask(userId, taskId, { isToday });
+  }
   revalidateProjects(projectId);
 }
 

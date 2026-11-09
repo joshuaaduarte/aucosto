@@ -4,7 +4,13 @@
 // re-exported, except the DoItemSummary type.
 
 export type { DoItemSummary } from "./shared";
-export { getDoItemSummary, listDoItems, listSuggestedDoItems } from "./reads";
+export {
+  countDoTasksByProject,
+  getDoItemSummary,
+  listDoItems,
+  listDoTasksForProject,
+  listSuggestedDoItems,
+} from "./reads";
 export {
   createDoItem,
   deleteDoItem,

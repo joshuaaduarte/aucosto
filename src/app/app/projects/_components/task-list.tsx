@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import {
   createTaskAction,
@@ -112,7 +113,7 @@ function TaskRow({ projectId, task }: { projectId: string; task: ProjectTaskReco
     const next = draft.trim();
     setEditing(false);
     if (next && next !== task.title) {
-      startTransition(() => renameTaskAction(projectId, task.id, next));
+      startTransition(() => renameTaskAction(projectId, task.id, next, task.source));
     } else {
       setDraft(task.title);
     }
@@ -126,7 +127,7 @@ function TaskRow({ projectId, task }: { projectId: string; task: ProjectTaskReco
       <button
         type="button"
         onClick={() =>
-          startTransition(() => toggleTaskAction(projectId, task.id, !task.done))
+          startTransition(() => toggleTaskAction(projectId, task.id, !task.done, task.source))
         }
         aria-label={task.done ? "Mark not done" : "Mark done"}
         className="flex h-[1.15rem] w-[1.15rem] shrink-0 items-center justify-center rounded-full border transition-colors"
@@ -174,11 +175,24 @@ function TaskRow({ projectId, task }: { projectId: string; task: ProjectTaskReco
         </button>
       )}
 
+      {task.source === "do" && !editing ? (
+        <Link
+          href="/app/do"
+          title="This task lives on your Do List"
+          className="shrink-0 rounded px-1.5 py-0.5 text-[0.6875rem] font-medium"
+          style={{ background: "var(--bg-tint)", color: "var(--text-faint)" }}
+        >
+          Do List
+        </Link>
+      ) : null}
+
       {!task.done && !editing ? (
         <button
           type="button"
           onClick={() =>
-            startTransition(() => setTaskTodayAction(projectId, task.id, !task.isToday))
+            startTransition(() =>
+              setTaskTodayAction(projectId, task.id, !task.isToday, task.source),
+            )
           }
           className="shrink-0 rounded px-1.5 py-0.5 text-[0.6875rem] font-medium opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 [@media(pointer:coarse)]:opacity-100"
           style={{ background: "var(--bg-tint)", color: "var(--text-muted)" }}
