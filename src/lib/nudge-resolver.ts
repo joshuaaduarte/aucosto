@@ -15,6 +15,9 @@ import {
   type NudgeSlot,
 } from "@/lib/nudge-timing";
 import { getReflection } from "@/lib/services/reflect";
+import { buildCheckInNudge, untrackedMinutes } from "@/lib/confirm-events";
+import { loadPendingConfirmations } from "@/lib/event-confirmations";
+import { getRunningEntry, listEntriesBetween } from "@/lib/services/time";
 import { getTodayWakeStatus } from "@/lib/services/rhythms";
 import { listPlannedBlocks } from "@/lib/services/day-plan";
 import { listHabits } from "@/lib/services/habits";
@@ -39,6 +42,39 @@ export async function pickHabitCue(userId: string): Promise<NudgeBlock | null> {
     console.error("[nudges] habit cue failed", { userId }, error);
     return null;
   }
+}
+
+/**
+ * Daytime time check-in (TagTime-style sampling, but about real events):
+ * ended calendar events to confirm and long untracked stretches since the
+ * day started (wake time, else 9:00). Silent when there's nothing to ask.
+ */
+async function resolveCheckIn(userId: string, now: Date): Promise<PushPayload | null> {
+  const dayStart = startOfDay(now);
+  const [wake, pending, entries, running] = await Promise.all([
+    getTodayWakeStatus(userId).catch(() => null),
+    loadPendingConfirmations(userId, now, { since: dayStart }),
+    listEntriesBetween(userId, { from: dayStart, to: now }).catch(() => []),
+    getRunningEntry(userId).catch(() => null),
+  ]);
+  const from = new Date(dayStart);
+  const [wakeHour, wakeMinute] = (wake?.wakeTime ?? "").split(":").map(Number);
+  if (Number.isFinite(wakeHour) && Number.isFinite(wakeMinute)) {
+    from.setHours(wakeHour!, wakeMinute!, 0, 0);
+  } else {
+    from.setHours(9, 0, 0, 0);
+  }
+  return buildCheckInNudge({
+    pending: pending.length,
+    untracked: untrackedMinutes({ entries, from, now }),
+    sinceLabel: timeLabel(from),
+    longTimer: running
+      ? {
+          label: running.label,
+          hours: Math.floor((now.getTime() - running.startedAt.getTime()) / 3_600_000),
+        }
+      : null,
+  });
 }
 
 /** The payload for one user's nudge, or null when there's nothing worth
@@ -66,6 +102,10 @@ export async function resolveNudge(
         })),
       habitCue,
     });
+  }
+
+  if (slot === "midday" || slot === "afternoon") {
+    return resolveCheckIn(userId, now);
   }
 
   const [reflection, tomorrow] = await Promise.all([

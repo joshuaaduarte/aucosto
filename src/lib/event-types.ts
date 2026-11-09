@@ -94,6 +94,8 @@ const EVENT_LABELS: Record<string, string> = {
   "calendar.completed": "completed a calendar block",
   "calendar.feed_added": "linked a calendar feed",
   "calendar.feed_removed": "removed a calendar feed",
+  "calendar.confirm_logged": "logged a calendar event as time",
+  "calendar.confirm_skipped": "marked a calendar event as skipped",
 
   // do
   "do.created": "added a do item",

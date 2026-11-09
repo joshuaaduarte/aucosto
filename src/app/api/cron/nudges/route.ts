@@ -8,7 +8,7 @@
 // UTC-only, so each slot has two cron lines (one per DST offset) and this
 // route sends only on the run whose local hour — read off the server clock,
 // which instrumentation.ts pins to the owner's timezone — matches the target.
-// `?slot=morning|evening` forces a slot for manual end-to-end checks.
+// `?slot=morning|midday|afternoon|evening` forces a slot for manual end-to-end checks.
 //
 // Content lives in src/lib/nudge-resolver.ts: the evening nudge asks for
 // tomorrow's blocks (plan-ahead beats a plain reminder), and the morning nudge
@@ -21,7 +21,7 @@
 
 import { NextResponse } from "next/server";
 import { bearerMatches } from "@/lib/bearer";
-import { slotDueAt, type NudgeSlot } from "@/lib/nudge-timing";
+import { NUDGE_SLOTS, slotDueAt, type NudgeSlot } from "@/lib/nudge-timing";
 import { resolveNudge } from "@/lib/nudge-resolver";
 import { listSubscribedUserIds, sendPushToUser } from "@/lib/services/push";
 import { listActiveHouseholds, listPartnerUserIds } from "@/lib/household";
@@ -47,7 +47,9 @@ export async function GET(request: Request) {
   const feedsSynced = await syncAllStaleCalendarFeeds(now);
   const forced = new URL(request.url).searchParams.get("slot");
   const slot: NudgeSlot | null =
-    forced === "morning" || forced === "evening" ? forced : slotDueAt(now.getHours());
+    forced && (NUDGE_SLOTS as readonly string[]).includes(forced)
+      ? (forced as NudgeSlot)
+      : slotDueAt(now.getHours());
   if (!slot) {
     // The other DST state's cron line — its twin sends this slot.
     return NextResponse.json({ ok: true, slot: null, hour: now.getHours(), feedsSynced });

@@ -48,6 +48,21 @@ export async function countEventsSince(
 }
 
 /** Most recent event of one type (optionally for one refId), or null. */
+/** Events of one type since a moment, newest first. */
+export async function listEventsOfTypeSince(
+  userId: string,
+  type: string,
+  since: Date,
+  options: { limit?: number } = {},
+): Promise<Event[]> {
+  requireCan(userId, "events", "read");
+  return prisma.event.findMany({
+    where: { userId, type, at: { gte: since } },
+    orderBy: { at: "desc" },
+    take: options.limit ?? 200,
+  });
+}
+
 export async function findLatestEvent(
   userId: string,
   type: string,

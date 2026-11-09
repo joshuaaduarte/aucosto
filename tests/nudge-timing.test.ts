@@ -8,6 +8,7 @@ import {
   NUDGE_LOCAL_HOURS,
   preferredNudgeHours,
   slotDueAt,
+  NUDGE_SLOTS,
   slotForHour,
   type ActivityHour,
 } from "@/lib/nudge-timing";
@@ -89,7 +90,7 @@ describe("DST-proof cron schedule", () => {
 
   it("sends on exactly one line per slot in each DST state", () => {
     for (const offset of [-7, -8]) {
-      for (const slot of ["morning", "evening"] as const) {
+      for (const slot of NUDGE_SLOTS) {
         const due = cronUtcHours(NUDGE_LOCAL_HOURS[slot])
           .map((utc) => ((utc + offset) % 24 + 24) % 24)
           .map((local) => slotDueAt(local));
@@ -104,6 +105,8 @@ describe("DST-proof cron schedule", () => {
     expect(slotDueAt(20)).toBeNull();
     expect(slotDueAt(5)).toBe("morning");
     expect(slotDueAt(21)).toBe("evening");
+    expect(slotDueAt(12)).toBe("midday");
+    expect(slotDueAt(17)).toBe("afternoon");
   });
 
   it("matches vercel.json", () => {
@@ -114,10 +117,9 @@ describe("DST-proof cron schedule", () => {
       .filter((cron) => cron.path === "/api/cron/nudges")
       .map((cron) => Number(cron.schedule.split(" ")[1]))
       .sort((a, b) => a - b);
-    const expected = [
-      ...cronUtcHours(NUDGE_LOCAL_HOURS.morning),
-      ...cronUtcHours(NUDGE_LOCAL_HOURS.evening),
-    ].sort((a, b) => a - b);
+    const expected = NUDGE_SLOTS.flatMap((slot) => cronUtcHours(NUDGE_LOCAL_HOURS[slot])).sort(
+      (a, b) => a - b,
+    );
     expect(scheduled).toEqual(expected);
   });
 });

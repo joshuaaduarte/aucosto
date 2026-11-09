@@ -145,7 +145,7 @@ export default async function SettingsPage({
           className="mt-1 text-[1rem] font-semibold tracking-tight"
           style={{ color: "var(--text)" }}
         >
-          Morning and evening nudges on this device.
+          Nudges on this device: morning plan, two quick time check-ins, evening wrap-up.
         </h2>
         <div className="mt-4">
           <NotificationsPanel />
