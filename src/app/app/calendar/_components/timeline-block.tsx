@@ -42,6 +42,8 @@ export type TimelineItemPayload = {
   categoryId: string | null;
   recurrenceRule?: RecurrenceRule | null;
   recurrenceParentId?: string | null;
+  /** Name of the linked calendar this event is mirrored from (read-only). */
+  linkedCalendar?: string | null;
 };
 
 export type TimelineBlockPayload =
@@ -252,7 +254,11 @@ export function TimelineBlockButton({
         />
       ) : null}
 
-      {open && payload.type === "item" ? (
+      {open && payload.type === "item" && payload.item.linkedCalendar ? (
+        <LinkedEventModal item={payload.item} onClose={() => setOpen(false)} />
+      ) : null}
+
+      {open && payload.type === "item" && !payload.item.linkedCalendar ? (
         <CalendarBlockModal
           mode="edit"
           item={payload.item}
@@ -261,6 +267,68 @@ export function TimelineBlockButton({
         />
       ) : null}
     </>
+  );
+}
+
+/**
+ * Read-only sheet for an event mirrored from a linked calendar (Google,
+ * Outlook). Edits would be undone by the next sync, so it only explains
+ * where the event lives.
+ */
+function LinkedEventModal({
+  item,
+  onClose,
+}: {
+  item: TimelineItemPayload;
+  onClose: () => void;
+}) {
+  useBodyScrollLock();
+  const headingId = `linked-event-${item.id}`;
+  return createPortal(
+    <div className="calendar-modal-backdrop" role="presentation" onPointerDown={(e) => e.stopPropagation()} onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={headingId}
+        className="calendar-modal"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p
+              className="text-[0.6875rem] font-semibold uppercase tracking-wider"
+              style={{ color: "var(--text-faint)" }}
+            >
+              {item.linkedCalendar}
+            </p>
+            <h2
+              id={headingId}
+              className="mt-1 text-[1.125rem] font-semibold tracking-tight"
+              style={{ color: "var(--text)" }}
+            >
+              {item.title}
+            </h2>
+            <p className="mt-1 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
+              {item.startValue}–{item.endValue}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn-icon h-8 w-8 rounded-full border"
+            style={{ borderColor: "var(--border-faint)" }}
+            onClick={onClose}
+            aria-label="Close"
+          >
+            x
+          </button>
+        </div>
+        <p className="mt-4 text-[0.8125rem]" style={{ color: "var(--text-muted)" }}>
+          This event comes from your linked {item.linkedCalendar} calendar. Change it there and it
+          updates here.
+        </p>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

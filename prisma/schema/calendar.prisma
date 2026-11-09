@@ -36,3 +36,26 @@ model CalendarItem {
   @@index([userId, recurrenceParentId, recurrenceOriginalStart])
   @@unique([userId, externalId])
 }
+
+// A read-only calendar feed (the private iCal link Google Calendar or Outlook
+// publishes). Its events are mirrored into CalendarItem with
+// sourceTool = "feed", sourceRefId = this id and externalId = "feed:<id>:<key>",
+// refreshed when the app is opened (at most every 15 minutes) and by the cron.
+// The URL is a secret (anyone with it can read the calendar), so it's stored
+// encrypted with secrets.ts. Applied with scripts/create-calendar-feeds.sql.
+model CalendarFeed {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  urlEncrypted String
+  urlHost      String
+  color        String?
+  lastSyncedAt DateTime?
+  lastError    String?
+  eventCount   Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([userId])
+}

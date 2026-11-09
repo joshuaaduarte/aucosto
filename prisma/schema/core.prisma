@@ -43,6 +43,7 @@ model User {
   capturedInsights     CapturedInsight[]
   events              Event[]
   pushSubscriptions   PushSubscription[]
+  calendarFeeds       CalendarFeed[]
   whoopConnection     WhoopConnection?
   locationEvents      LocationEvent[]
   financeBudgets      FinanceBudget[]
