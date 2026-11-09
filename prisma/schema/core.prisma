@@ -50,6 +50,7 @@ model User {
   financeBalanceSnapshots FinanceBalanceSnapshot[]
   financeStatementChecks  FinanceStatementCheck[]
   financeAccountPlans     FinanceAccountPlan[]
+  financeShopRules        FinanceShopRule[]
   homeLists           HomeList[]
   homeTasks           HomeTask[]
   householdData       Household?           @relation("HouseholdData")

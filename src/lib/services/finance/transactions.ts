@@ -17,7 +17,10 @@ import {
 import type { FinanceTransaction } from "@/generated/prisma/client";
 import type { ParsedRow } from "@/lib/csv";
 import { checkRunningBalance, type RunningBalanceCheck } from "@/lib/finance-anchor";
-import { ENTRY_CLEARED, ENTRY_PENDING, ENTRY_RECONCILED } from "@/lib/finance-entries";
+import { ENTRY_CLEARED, ENTRY_PENDING, ENTRY_RECONCILED, readEntryMeta } from "@/lib/finance-entries";
+import { currentActorUserId } from "@/lib/actor";
+import { applyShopRule, findShopRule, ruleFromConfirmation } from "@/lib/finance-shop-rules";
+import { listShopRules, saveShopRule } from "./rules";
 import {
   planImportMatches,
   readImportConfirmation,
@@ -126,9 +129,12 @@ export async function importTransactions(
   });
 
   const { rowsToImport: unseen, deduped: exactDupes } = dedupeParsedRows(rows, existing);
-  // Rows an earlier import already used to confirm a hand-logged entry.
+  // Rows already in (a shop rule may have renamed them, so the text check
+  // above misses them) or used by an earlier import to confirm an entry.
   const confirmedExts = new Set(
-    existing.map((e) => readImportConfirmation(e.raw)?.ext).filter((x): x is string => Boolean(x)),
+    existing
+      .flatMap((e) => [e.externalId, readImportConfirmation(e.raw)?.ext])
+      .filter((x): x is string => Boolean(x)),
   );
   const rowsToImport = unseen.filter((r) => !confirmedExts.has(csvRowExternalId(r)));
   const deduped = exactDupes + (unseen.length - rowsToImport.length);
@@ -146,6 +152,8 @@ export async function importTransactions(
   const plan = planImportMatches(rowsToImport, pending, { dayWindow: MATCH_DAYS });
   const pendingById = new Map(pending.map((e) => [e.id, e]));
   const importedAt = new Date();
+  const actor = currentActorUserId();
+  const rules = await listShopRules(userId);
 
   const imported = await prisma.$transaction(async (tx) => {
     for (const c of plan.confirms) {
@@ -181,6 +189,13 @@ export async function importTransactions(
     const result = await tx.financeTransaction.createMany({
       data: plan.newRows.map((i) => {
         const r = rowsToImport[i]!;
+        // A remembered shop gives the row your name and category; the
+        // bank's text stays in raw.
+        const named = applyShopRule(
+          { description: r.description, category: inferCategory(r.description, r.amount) },
+          r.amount < 0 ? findShopRule(rules, r.description, actor) : null,
+          { rename: true },
+        );
         return {
           userId,
           financeAccountId: account?.id ?? null,
@@ -188,9 +203,9 @@ export async function importTransactions(
           syncSource: IMPORT_SYNC_SOURCE,
           date: r.date,
           amount: r.amount,
-          description: r.description,
+          description: named.description,
           account: r.account,
-          category: inferCategory(r.description, r.amount),
+          category: named.category,
           raw: r.raw,
           createdAt: importedAt,
         };
@@ -199,6 +214,28 @@ export async function importTransactions(
     });
     return result.count;
   });
+
+  // Each confirmed entry teaches its shop: the bank's text now maps to the
+  // name and category you gave it, for whoever logged it.
+  const learned = new Set<string>();
+  for (const c of plan.confirms) {
+    const entry = pendingById.get(c.entryId)!;
+    if (entry.amount >= 0) continue;
+    const rule = ruleFromConfirmation({
+      bankDescription: rowsToImport[c.rowIndex]!.description,
+      yourDescription: entry.description,
+      category: entry.category,
+    });
+    const owner = readEntryMeta(entry.raw).by ?? actor ?? userId;
+    if (!rule || learned.has(`${owner}|${rule.match}`)) continue;
+    learned.add(`${owner}|${rule.match}`);
+    await saveShopRule(userId, {
+      description: rowsToImport[c.rowIndex]!.description,
+      name: rule.name ?? undefined,
+      category: rule.category ?? undefined,
+      ownerUserId: owner,
+    });
+  }
 
   const matched = plan.confirms.length;
   const adjusted = plan.confirms.filter((c) => !c.exact).length;

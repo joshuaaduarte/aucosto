@@ -27,6 +27,8 @@ const EVENT_LABELS: Record<string, string> = {
   "finance.goal_created": "added a goal bucket",
   "finance.goal_updated": "updated a goal bucket",
   "finance.category_updated": "recategorized a transaction",
+  "finance.rule_saved": "remembered a shop",
+  "finance.rule_removed": "forgot a shop rule",
   "finance.category_bulk_updated": "recategorized matching transactions",
 
   // finance — imports and clears
