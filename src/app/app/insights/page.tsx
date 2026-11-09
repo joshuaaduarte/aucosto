@@ -131,6 +131,13 @@ export default async function InsightsPage({
           >
             Trends
           </h1>
+          <Link
+            href="/app/insights/usage"
+            className="mt-1.5 inline-block text-[0.8rem] font-medium underline-offset-2 hover:underline"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Is the app being used? See usage →
+          </Link>
         </div>
         <nav className="flex flex-wrap gap-1.5" aria-label="Time range">
           {RANGE_OPTIONS.map((option) => (

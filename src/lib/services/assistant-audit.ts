@@ -82,3 +82,26 @@ export async function getRecentAudits(
         : String(r.created_at),
   }));
 }
+
+/**
+ * When agents executed actions since a moment, oldest first. The usage page
+ * uses these to recognise agent-written entries from before events carried
+ * meta.via. Cosmetic read: returns [] if the audit table is unavailable.
+ */
+export async function listExecutedAuditTimes(userId: string, since: Date): Promise<Date[]> {
+  try {
+    const rows = await prisma.$queryRawUnsafe<{ created_at: Date }[]>(
+      `SELECT created_at
+       FROM assistant_action_audits
+       WHERE user_id = $1 AND status = 'executed' AND created_at >= $2
+       ORDER BY created_at ASC
+       LIMIT 20000`,
+      userId,
+      since,
+    );
+    return rows.map((row) => new Date(row.created_at));
+  } catch (error) {
+    console.error("[assistant-audit] executed audit times failed", error);
+    return [];
+  }
+}

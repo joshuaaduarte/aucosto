@@ -1,3 +1,4 @@
+import { runAsAgent } from "@/lib/actor";
 import { resolveAssistantAuth } from "@/lib/assistant-auth";
 import { executeGatedAction } from "@/lib/assistant-execute";
 import { NextRequest, NextResponse } from "next/server";
@@ -36,16 +37,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "input must be an object" }, { status: 400 });
   }
 
-  const outcome = await executeGatedAction(userId, {
-    action,
-    input: input as Record<string, unknown>,
-    confirmed,
-    source:
-      typeof source === "object" && source !== null
-        ? (source as Record<string, unknown>)
-        : null,
-    defaultActor: "assistant",
-  });
+  const run = () =>
+    executeGatedAction(userId, {
+      action,
+      input: input as Record<string, unknown>,
+      confirmed,
+      source:
+        typeof source === "object" && source !== null
+          ? (source as Record<string, unknown>)
+          : null,
+      defaultActor: "assistant",
+    });
+  // A bearer key means an external agent, not Josh in the app: mark the
+  // events it writes so usage numbers can tell the two apart.
+  const outcome = authed.via === "bearer" ? await runAsAgent(run) : await run();
 
   if (!outcome.ok) {
     if (outcome.refused === "needs_confirmation") {

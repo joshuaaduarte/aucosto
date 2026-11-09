@@ -15,7 +15,7 @@ import { logger } from "@/lib/logger";
 import { requireCan } from "@/lib/auth/can";
 import type { Event, Prisma } from "@/generated/prisma/client";
 import type { Tool } from "@/lib/auth/can";
-import { currentActorUserId } from "@/lib/actor";
+import { currentActorUserId, currentActorVia } from "@/lib/actor";
 
 export type EventInput = {
   userId: string;
@@ -91,17 +91,22 @@ export async function listEventsByTool(
 
 /**
  * Stamp meta.actorUserId when someone other than the scope owner acted
- * (household data). Pure so it can be tested; object metas only.
+ * (household data), and meta.via = "agent" when an external agent made the
+ * write through the assistant API. Pure so it can be tested; object metas only.
  */
 export function withActorMeta(
   meta: Prisma.InputJsonValue | null | undefined,
   scopeUserId: string,
   actorUserId: string | null,
+  via: "agent" | null = null,
 ): Prisma.InputJsonValue | undefined {
-  if (!actorUserId || actorUserId === scopeUserId) return meta ?? undefined;
-  if (meta == null) return { actorUserId };
+  const extra: Record<string, Prisma.InputJsonValue> = {};
+  if (actorUserId && actorUserId !== scopeUserId) extra.actorUserId = actorUserId;
+  if (via) extra.via = via;
+  if (Object.keys(extra).length === 0) return meta ?? undefined;
+  if (meta == null) return extra;
   if (typeof meta === "object" && !Array.isArray(meta)) {
-    return { ...(meta as Record<string, Prisma.InputJsonValue>), actorUserId };
+    return { ...(meta as Record<string, Prisma.InputJsonValue>), ...extra };
   }
   return meta;
 }
@@ -113,7 +118,7 @@ export async function recordEvent(input: EventInput): Promise<void> {
       tool: input.tool,
       type: input.type,
       refId: input.refId ?? null,
-      meta: withActorMeta(input.meta, input.userId, currentActorUserId()),
+      meta: withActorMeta(input.meta, input.userId, currentActorUserId(), currentActorVia()),
     },
   });
   logger.info(
@@ -125,4 +130,32 @@ export async function recordEvent(input: EventInput): Promise<void> {
     },
     "event recorded",
   );
+}
+
+/** The few event fields the usage page needs. */
+export type UsageEventRow = {
+  userId: string;
+  type: string;
+  at: Date;
+  meta: Prisma.JsonValue | null;
+};
+
+/**
+ * Every event in a window for one or more data owners (the viewer plus the
+ * household's shared data user), oldest first. Columns are kept minimal:
+ * eight weeks of activity is a few thousand small rows.
+ */
+export async function listUsageEvents(
+  userIds: string[],
+  from: Date,
+  to: Date,
+): Promise<UsageEventRow[]> {
+  for (const userId of userIds) requireCan(userId, "events", "read");
+  if (userIds.length === 0) return [];
+  return prisma.event.findMany({
+    where: { userId: { in: userIds }, at: { gte: from, lt: to } },
+    select: { userId: true, type: true, at: true, meta: true },
+    orderBy: { at: "asc" },
+    take: 20000,
+  });
 }

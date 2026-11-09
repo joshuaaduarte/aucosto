@@ -9,6 +9,7 @@
 //     -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 
 import { resolveAssistantAuth } from "@/lib/assistant-auth";
+import { runAsAgent } from "@/lib/actor";
 import { handleMcpRequest } from "@/lib/assistant-mcp";
 import { NextResponse } from "next/server";
 
@@ -30,10 +31,10 @@ export async function POST(req: Request) {
     );
   }
 
-  const { status, body: responseBody } = await handleMcpRequest(
-    authed.userId,
-    body,
-  );
+  const run = () => handleMcpRequest(authed.userId, body);
+  // Bearer key = external agent: mark the events it writes (see actor.ts).
+  const { status, body: responseBody } =
+    authed.via === "bearer" ? await runAsAgent(run) : await run();
   if (status === 202 || responseBody === null) {
     return new NextResponse(null, { status: 202 });
   }
