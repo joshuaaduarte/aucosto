@@ -59,6 +59,9 @@ import { ConfirmEventsCard } from "./_components/confirm-events-card";
 import { EveningCheckIn } from "./_components/evening-check-in";
 import { loadConfirmRows } from "./_components/confirm-events-data";
 import { StaleDataCard } from "./_components/stale-data-card";
+import { WeeklyReviewCard } from "./_components/weekly-review-card";
+import { listSavedReviews } from "@/lib/services/review";
+import { hubReviewState, priorityOutcomes } from "@/lib/weekly-review";
 import { loadStaleNotices } from "./_components/stale-data-data";
 import { deriveDailyDigest } from "./_lib/daily-digest";
 import { deriveHubPrompts } from "./_lib/hub-prompts";
@@ -175,6 +178,13 @@ export default async function HubPage() {
           now,
         })
       : [];
+  const savedReviews =
+    userId && context?.role !== "partner"
+      ? await listSavedReviews(userId, new Date(now.getTime() - 21 * 86_400_000))
+      : [];
+  const reviewState = userId && context?.role !== "partner" ? hubReviewState(now, savedReviews) : null;
+  const reviewOutcomes =
+    reviewState?.kind === "priorities" ? priorityOutcomes(reviewState.review, allTasks) : [];
   const todayStart = startOfToday();
 
   // Sleep is always surfaced (like the running-timer bar) — never gated behind
@@ -511,6 +521,8 @@ export default async function HubPage() {
           canPlanToday={canPlanToday}
         />
       ) : null}
+
+      <WeeklyReviewCard state={reviewState} outcomes={reviewOutcomes} />
 
       {confirmRows.length > 0 ? <ConfirmEventsCard rows={confirmRows} /> : null}
 

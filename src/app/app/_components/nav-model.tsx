@@ -51,6 +51,18 @@ export const NAV_TOOLS: NavTool[] = [
     ),
   },
   {
+    href: "/app/review",
+    label: "Weekly review",
+    group: "day",
+    paths: (
+      <>
+        <rect x="2" y="3" width="11" height="10" rx="1.5" />
+        <path d="M2 6h11" />
+        <path d="m5 9.25 1.5 1.5L10 7.75" />
+      </>
+    ),
+  },
+  {
     href: "/app/calendar",
     label: "Calendar",
     group: "day",

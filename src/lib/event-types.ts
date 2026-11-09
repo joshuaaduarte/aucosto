@@ -141,6 +141,9 @@ const EVENT_LABELS: Record<string, string> = {
   // insights
   "insight.captured": "captured an insight",
 
+  // weekly review
+  "review.saved": "did the weekly review",
+
   // push notifications
   "push.subscribed": "enabled notifications on a device",
   "push.unsubscribed": "disabled notifications on a device",
