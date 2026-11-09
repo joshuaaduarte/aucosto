@@ -14,8 +14,11 @@ import {
   removeTodayHabitEntries,
   startTimerForHabit,
   updateHabit,
+  setHabitPreference,
+  HabitPreferencesUnavailableError,
 } from "@/lib/services/habits";
 import { findHabitTemplate, templateTitle } from "@/lib/habit-templates";
+import { isHealthMetric } from "@/lib/health-habits";
 import { resolveActiveUserId } from "@/lib/viewer-context";
 import { windowFromFormData } from "@/lib/wall-clock";
 
@@ -127,8 +130,48 @@ export async function updateHabitAction(
   if (!updated) {
     return { error: "Habit not found." };
   }
+  const prefError = await savePreferencesFromForm(userId, id, formData);
   revalidateHabits();
-  return undefined;
+  return prefError ? { error: prefError } : undefined;
+}
+
+/** Focus / Apple Health / cue fields from the edit form (HabitPreference). */
+async function savePreferencesFromForm(
+  userId: string,
+  habitId: string,
+  formData: FormData,
+): Promise<string | null> {
+  if (!formData.has("focus") && !formData.has("healthMetric") && !formData.has("cue")) return null;
+  const focusRaw = String(formData.get("focus") ?? "");
+  const metricRaw = String(formData.get("healthMetric") ?? "");
+  const cue = String(formData.get("cue") ?? "").trim();
+  const focus = focusRaw === "focus" || focusRaw === "later" ? focusRaw : null;
+  const healthMetric = isHealthMetric(metricRaw) ? metricRaw : null;
+  try {
+    await setHabitPreference(userId, habitId, { focus, healthMetric, cue: cue || null });
+    return null;
+  } catch (error) {
+    if (error instanceof HabitPreferencesUnavailableError) {
+      // Nothing chosen → nothing lost; otherwise say what's missing.
+      return focus || healthMetric || cue ? error.message : null;
+    }
+    throw error;
+  }
+}
+
+/** One-tap Focus/Later from the habits page. */
+export async function setHabitFocusAction(
+  habitId: string,
+  focus: "focus" | "later" | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const userId = await resolveActiveUserId();
+  try {
+    await setHabitPreference(userId, habitId, { focus });
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not save." };
+  }
+  revalidateHabits();
+  return { ok: true };
 }
 
 export async function logHabitAction(

@@ -13,6 +13,7 @@ import {
 } from "@/lib/habits";
 import type { Habit, HabitEntry, TimeEntry } from "@/generated/prisma/client";
 import type { HabitEntryMode, HabitWithRelations } from "./shared";
+import type { HealthMetric } from "@/lib/health-habits";
 
 export type HabitSummary = Habit & {
   entriesToday: number;
@@ -54,6 +55,10 @@ export type HabitSummary = Habit & {
     dueDays: number;
     avgStartMinutes: number | null;
   };
+  /** From HabitPreference (null until set / before the table exists). */
+  healthMetric: HealthMetric | null;
+  focus: "focus" | "later" | null;
+  cue: string | null;
 };
 
 export type HabitTaskSummary = HabitSummary & {
@@ -462,6 +467,9 @@ export function summarizeHabit(habit: HabitWithRelations, now: Date): HabitSumma
     needsSaveToday,
     salvageLabel: habit.fallbackTitle ?? (habit.rescuePrompt ? "Run recovery" : null),
     weekAdherence: weekAdherenceForHabit(habit, now),
+    healthMetric: null,
+    focus: null,
+    cue: null,
     recentDays,
     dayPartLabel: HABIT_DAY_PART_LABELS[normalizeDayPart(habit.dayPart)],
     cadenceLabel:

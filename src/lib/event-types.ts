@@ -109,6 +109,7 @@ const EVENT_LABELS: Record<string, string> = {
   "habit.created": "added a habit",
   "habit.updated": "updated a habit",
   "habit.logged": "logged habit progress",
+  "habit.health_synced": "synced habits from Apple Health",
   "habit.unlogged": "undid today's habit log",
   "habit.archived": "archived a habit",
   "habit.reopened": "reopened a habit",

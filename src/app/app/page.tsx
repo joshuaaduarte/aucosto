@@ -56,6 +56,7 @@ import { WorkspaceSection } from "./_components/workspace-section";
 import { after } from "next/server";
 import { syncStaleCalendarFeeds } from "@/lib/services/calendar-feeds";
 import { ConfirmEventsCard } from "./_components/confirm-events-card";
+import { EveningCheckIn } from "./_components/evening-check-in";
 import { loadConfirmRows } from "./_components/confirm-events-data";
 import { deriveDailyDigest } from "./_lib/daily-digest";
 import { deriveHubPrompts } from "./_lib/hub-prompts";
@@ -409,7 +410,19 @@ export default async function HubPage() {
       whoop={whoopPrefill}
     />
   );
-  const reflectToday = (
+  const reflectToday = isEvening && !reflectedToday && userId ? (
+    <EveningCheckIn
+      key="reflect"
+      habits={allHabits
+        .filter(
+          (habit) =>
+            habit.dueToday &&
+            (habit.cadence === "weekly" ? !habit.completedThisWeek : !habit.completedToday),
+        )
+        .slice(0, 8)
+        .map((habit) => ({ id: habit.id, title: habit.title }))}
+    />
+  ) : (
     <ReflectSection
       key="reflect"
       days={reflectDays}
