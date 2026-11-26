@@ -17,6 +17,9 @@ import { LocationPanel } from "./location-panel";
 import { NotificationsPanel } from "./notifications-panel";
 import { WhoopPanel } from "./whoop-panel";
 import { CalendarFeedsPanel } from "./calendar-feeds-panel";
+import { RestDaysPanel } from "./rest-days-panel";
+import { REST_DAYS_MAX_AHEAD, streakDayKey, upcomingRestDays } from "@/lib/app-streak";
+import { listRestDays } from "@/lib/services/streaks";
 import { listCalendarFeeds } from "@/lib/services/calendar-feeds";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +43,10 @@ export default async function SettingsPage({
   const passwordSet = context ? await hasPassword(context.ownerUserId) : true;
   const calendarFeeds =
     context && !isPartner ? await listCalendarFeeds(context.effectiveUserId) : [];
+  const now = new Date();
+  const restDays = context ? await listRestDays(context.effectiveUserId, now) : new Set<string>();
+  const maxRestDay = new Date(now);
+  maxRestDay.setDate(maxRestDay.getDate() + REST_DAYS_MAX_AHEAD);
 
   return (
     <div className="space-y-10">
@@ -73,6 +80,14 @@ export default async function SettingsPage({
           <HouseholdPanel data={household} />
         </Section>
       ) : null}
+
+      <Section id="rest-days" eyebrow="Rest days" title="Time off that doesn't cost your streak.">
+        <RestDaysPanel
+          todayKey={streakDayKey(now)}
+          maxKey={streakDayKey(maxRestDay)}
+          upcoming={upcomingRestDays(restDays, now)}
+        />
+      </Section>
 
       <Section id="password" eyebrow="Sign-in" title="Your password.">
         <PasswordPanel hasPassword={passwordSet} />

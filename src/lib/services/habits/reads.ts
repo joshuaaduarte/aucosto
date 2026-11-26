@@ -13,6 +13,7 @@ import {
   summarizeHabit,
 } from "./derive";
 import { listHabitPreferences } from "./preferences";
+import { listRestDays } from "@/lib/services/streaks";
 
 export async function listHabits(
   userId: string,
@@ -33,10 +34,15 @@ export async function listHabits(
     orderBy: [{ archivedAt: "asc" }, { updatedAt: "desc" }],
   });
   const now = new Date();
-  const prefs = await listHabitPreferences(userId);
+  const since = new Date(now);
+  since.setDate(since.getDate() - 60);
+  const [prefs, restDays] = await Promise.all([
+    listHabitPreferences(userId),
+    listRestDays(userId, since),
+  ]);
   return habits
     .map((habit) => {
-      const summary = summarizeHabit(habit, now);
+      const summary = summarizeHabit(habit, now, restDays);
       const pref = prefs.get(habit.id);
       return pref
         ? { ...summary, healthMetric: pref.healthMetric, focus: pref.focus, cue: pref.cue }

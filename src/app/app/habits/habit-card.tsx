@@ -119,18 +119,34 @@ export function HabitCard({ habit }: { habit: HabitSummary }) {
               </span>
             ) : null}
           </span>
-          <span className="shrink-0 text-right" title="Current streak (longest run kept alive)">
-            <span
-              className="block text-[1.45rem] font-bold leading-none tracking-tight tabular"
-              style={{ color: streak > 0 ? "var(--text)" : "var(--text-faint)" }}
-            >
-              {streak > 1 ? "🔥 " : ""}
-              {streak}
+          {streak === 0 && habit.longestStreak > 0 ? (
+            // A run that ended shows strength, not a big 0: a broken streak
+            // pointed out lowers motivation more than none at all.
+            <span className="shrink-0 text-right" title={`Best run: ${habit.longestStreak}`}>
+              <span
+                className="block text-[1.45rem] font-bold leading-none tracking-tight tabular"
+                style={{ color: "var(--text-muted)" }}
+              >
+                {habit.strength}%
+              </span>
+              <span className="text-[0.6rem] font-medium uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>
+                strength
+              </span>
             </span>
-            <span className="text-[0.6rem] font-medium uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>
-              day streak
+          ) : (
+            <span className="shrink-0 text-right" title="Current streak (one miss is forgiven, two end it)">
+              <span
+                className="block text-[1.45rem] font-bold leading-none tracking-tight tabular"
+                style={{ color: streak > 0 ? "var(--text)" : "var(--text-faint)" }}
+              >
+                {streak > 1 ? "🔥 " : ""}
+                {streak}
+              </span>
+              <span className="text-[0.6rem] font-medium uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>
+                {isWeekly ? "week streak" : "day streak"}
+              </span>
             </span>
-          </span>
+          )}
         </button>
 
         {/* Strength (forgiving: a missed day dents it, never zeroes it) + last-7 rhythm */}
@@ -170,6 +186,15 @@ export function HabitCard({ habit }: { habit: HabitSummary }) {
             ))}
           </span>
         </div>
+
+        {/* Never miss twice: one miss bends the streak, the next slot keeps it. */}
+        {habit.streakAtRisk && streak > 0 && !done && !habit.archivedAt && (isWeekly || habit.dueToday) ? (
+          <p className="mt-1.5 text-[0.72rem] font-medium" style={{ color: "var(--accent-strong)" }} data-testid="streak-at-risk">
+            {isWeekly
+              ? `Missed last week. Do it this week to keep ${streak}.`
+              : `Missed last time. Do it today to keep ${streak} ${streak === 1 ? "day" : "days"}.`}
+          </p>
+        ) : null}
 
         {/* This-week adherence: days ran out of days due + avg start time. */}
         {adherence.dueDays > 0 ? (

@@ -12,6 +12,7 @@ import {
   type UsageDay,
   type UsageReport,
 } from "@/lib/insights";
+import { buildAppStreak, showUpDayKeys, weeksRunningLabel } from "@/lib/app-streak";
 import { householdMemberNames } from "@/lib/household";
 import { PARTNER_HOME_PATH } from "@/lib/household-access";
 import { listExecutedAuditTimes } from "@/lib/services/assistant-audit";
@@ -82,6 +83,13 @@ export default async function UsagePage() {
     hasPartner,
   });
 
+  // Same weekly streak as the hub line, from the 8 weeks already loaded.
+  const weekly = buildAppStreak({
+    activeDays: showUpDayKeys(events, viewerUserId),
+    now,
+    windowWeeks: 8,
+  });
+
   const activeAreas = report.areas
     .filter((area) => area.totals.you + area.totals.partner + area.totals.agent > 0)
     .sort(
@@ -142,10 +150,15 @@ export default async function UsagePage() {
           good={report.goal.prior7 >= USAGE_GOAL_DAYS}
         />
         <StatTile
-          label="Streak"
-          value={`${report.streak}`}
-          unit={report.streak === 1 ? "day" : "days"}
-          note="Days in a row"
+          label="Weekly streak"
+          value={`${weekly.weeksRunning}${weekly.capped ? "+" : ""}`}
+          unit={weekly.weeksRunning === 1 && !weekly.capped ? "week" : "weeks"}
+          note={
+            weeksRunningLabel(weekly)
+              ? `Weeks of ${USAGE_GOAL_DAYS}+ days in a row`
+              : `A week counts at ${USAGE_GOAL_DAYS} days`
+          }
+          good={weekly.weeksRunning > 0}
         />
         <StatTile
           label="Your last entry"
