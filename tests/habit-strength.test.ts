@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  forgivingStreak,
   freshStartLabel,
   habitStrength,
   habitStrengthLabel,
@@ -70,5 +71,47 @@ describe("freshStartLabel", () => {
   });
   it("is quiet other days", () => {
     expect(freshStartLabel(new Date(2026, 10, 10))).toBeNull();
+  });
+});
+
+describe("forgivingStreak (never miss twice)", () => {
+  it("counts hits and ignores an unfinished today", () => {
+    expect(forgivingStreak(["hit", "hit", "hit", "open"])).toEqual({
+      current: 3,
+      longest: 3,
+      atRisk: false,
+    });
+  });
+
+  it("bends on one miss and flags it until the next hit", () => {
+    expect(forgivingStreak(["hit", "hit", "miss", "open"])).toEqual({
+      current: 2,
+      longest: 2,
+      atRisk: true,
+    });
+    expect(forgivingStreak(["hit", "hit", "miss", "hit"])).toEqual({
+      current: 3,
+      longest: 3,
+      atRisk: false,
+    });
+  });
+
+  it("ends on two misses in a row", () => {
+    expect(forgivingStreak(["hit", "hit", "hit", "miss", "miss", "hit"])).toEqual({
+      current: 1,
+      longest: 3,
+      atRisk: false,
+    });
+    expect(forgivingStreak(["hit", "miss", "miss"]).current).toBe(0);
+  });
+
+  it("skips rest days in either position", () => {
+    expect(forgivingStreak(["hit", "rest", "rest", "hit", "miss", "rest", "hit"]).current).toBe(3);
+    expect(forgivingStreak(["hit", "miss", "rest", "miss"]).current).toBe(0);
+  });
+
+  it("starts at zero with nothing to bend", () => {
+    expect(forgivingStreak(["miss", "open"])).toEqual({ current: 0, longest: 0, atRisk: false });
+    expect(forgivingStreak([])).toEqual({ current: 0, longest: 0, atRisk: false });
   });
 });

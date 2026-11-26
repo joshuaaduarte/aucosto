@@ -63,6 +63,8 @@ import { WeeklyReviewCard } from "./_components/weekly-review-card";
 import { listSavedReviews } from "@/lib/services/review";
 import { hubReviewState, priorityOutcomes } from "@/lib/weekly-review";
 import { loadStaleNotices } from "./_components/stale-data-data";
+import { loadAppStreak } from "./_components/app-streak-data";
+import { StreakLine } from "./_components/streak-line";
 import { deriveDailyDigest } from "./_lib/daily-digest";
 import { deriveHubPrompts } from "./_lib/hub-prompts";
 import { buildTodayTimeline, pickNowCards } from "./_lib/hub-now";
@@ -182,6 +184,8 @@ export default async function HubPage() {
     userId && context?.role !== "partner"
       ? await listSavedReviews(userId, new Date(now.getTime() - 21 * 86_400_000))
       : [];
+  const appStreak =
+    context && context.role !== "partner" ? await loadAppStreak(context, now) : null;
   const reviewState = userId && context?.role !== "partner" ? hubReviewState(now, savedReviews) : null;
   const reviewOutcomes =
     reviewState?.kind === "priorities" ? priorityOutcomes(reviewState.review, allTasks) : [];
@@ -482,6 +486,11 @@ export default async function HubPage() {
         firstName={firstName}
         subline={subline}
         actions={[]}
+        streak={
+          appStreak ? (
+            <StreakLine view={appStreak} href="/app/insights/usage" />
+          ) : null
+        }
         placeLine={
           currentPlace
             ? `At ${currentPlace.place} since ${currentPlace.since.toLocaleTimeString(

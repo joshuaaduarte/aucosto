@@ -144,6 +144,9 @@ const EVENT_LABELS: Record<string, string> = {
   // weekly review
   "review.saved": "did the weekly review",
 
+  // streaks
+  "streak.rest_days_set": "changed rest days",
+
   // push notifications
   "push.subscribed": "enabled notifications on a device",
   "push.unsubscribed": "disabled notifications on a device",

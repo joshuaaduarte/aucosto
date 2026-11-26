@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import type { TopAction } from "./hub-types";
 
 export function HubHeader({
@@ -8,6 +9,7 @@ export function HubHeader({
   subline,
   actions,
   placeLine = null,
+  streak = null,
 }: {
   todayLong: string;
   greeting: string;
@@ -16,6 +18,8 @@ export function HubHeader({
   actions: TopAction[];
   /** "At Gym since 6:12pm" — from location signals, when known. */
   placeLine?: string | null;
+  /** The weekly app-streak line, when it could be loaded. */
+  streak?: ReactNode;
 }) {
   return (
     <header className="fade-in space-y-4 sm:space-y-5">
@@ -42,6 +46,7 @@ export function HubHeader({
         >
           {subline}
         </p>
+        {streak ? <div className="mt-2">{streak}</div> : null}
       </div>
 
       <TopActionsBar actions={actions} />

@@ -26,7 +26,8 @@ export type Tool =
   | "work"
   | "home"
   | "household"
-  | "review";
+  | "review"
+  | "streak";
 export type Action = "read" | "write";
 
 export function can(

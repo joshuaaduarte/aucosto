@@ -8,6 +8,9 @@ import { listEventsByTool } from "@/lib/services/events";
 import { listBills } from "@/lib/services/finance";
 import { isHomeReady, listHomeLists, listHomeTasks } from "@/lib/services/home";
 import { requireViewerContext } from "@/lib/viewer-context";
+import { loadAppStreak } from "../_components/app-streak-data";
+import { StreakLine } from "../_components/streak-line";
+import type { StreakView } from "@/lib/app-streak";
 import { HomeLists, type ListView } from "./_components/lists";
 import { ChoreBoard, type MemberOption, type TaskView } from "./_components/tasks";
 
@@ -41,13 +44,15 @@ export default async function HomePage() {
   }
 
   const shared = Boolean(context.householdId);
-  const [lists, tasks, members, names, events, bills] = await Promise.all([
+  const [lists, tasks, members, names, events, bills, streak] = await Promise.all([
     listHomeLists(userId),
     listHomeTasks(userId),
     context.householdId ? listHouseholdMembers(context.householdId) : Promise.resolve([]),
     context.householdId ? householdMemberNames(context.householdId) : Promise.resolve({} as Record<string, string>),
     shared ? listEventsByTool(userId, ["home", "finance"], { limit: 8 }).catch(() => []) : Promise.resolve([]),
     context.financeVisible ? listBills(context.financeUserId) : Promise.resolve([]),
+    // The owner sees their streak on the hub; a partner lands here instead.
+    context.role === "partner" ? loadAppStreak(context, now) : Promise.resolve(null),
   ]);
 
   const memberOptions: MemberOption[] = members
@@ -90,6 +95,7 @@ export default async function HomePage() {
 
   return (
     <Shell
+      streak={streak}
       title={context.householdName ?? "Home"}
       subtitle={
         shared
@@ -162,7 +168,17 @@ export default async function HomePage() {
   );
 }
 
-function Shell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+function Shell({
+  title,
+  subtitle,
+  streak = null,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  streak?: StreakView | null;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-10">
       <header className="fade-in">
@@ -178,6 +194,11 @@ function Shell({ title, subtitle, children }: { title: string; subtitle: string;
         <p className="mt-1 text-[0.875rem]" style={{ color: "var(--text-muted)" }}>
           {subtitle}
         </p>
+        {streak ? (
+          <div className="mt-2">
+            <StreakLine view={streak} />
+          </div>
+        ) : null}
       </header>
       {children}
     </div>

@@ -8,6 +8,8 @@ import {
   type HabitDayPart,
   type HabitGoalUnit,
   HABIT_DAY_PART_LABELS,
+  type StreakSlot,
+  forgivingStreak,
   formatHabitQuantity,
   habitStrength,
   parseHabitDays,
@@ -27,6 +29,8 @@ export type HabitSummary = Habit & {
   currentStreak: number;
   keptAliveStreak: number;
   longestStreak: number;
+  /** Missed the last scheduled day (or week): doing it now keeps the streak. */
+  streakAtRisk: boolean;
   completionRate30d: number;
   keptAliveRate30d: number;
   fallbackLoggedToday: boolean;
@@ -247,99 +251,72 @@ function keptAliveForWindow(habit: HabitWithRelations, start: Date, end: Date) {
   return { completed, keptAlive, mode: modeForWindow(entries, completed) };
 }
 
-function streakForHabit(habit: HabitWithRelations, now: Date) {
-  if (habit.cadence === "weekly") {
-    let streak = 0;
-    const cursor = startOfWeek(now);
-    while (streak < 104) {
-      const weekEnd = endOfWeek(cursor);
-      const entries = habit.entries.filter((entry) => entry.loggedAt >= cursor && entry.loggedAt < weekEnd);
-      const timeEntries = habit.timeEntries.filter((entry) => entry.startedAt >= cursor && entry.startedAt < weekEnd);
-      const progress = progressForWindow(habit, entries, timeEntries);
-      if (progress < habit.targetCount) break;
-      streak += 1;
-      cursor.setDate(cursor.getDate() - 7);
-    }
+function localDayKey(date: Date) {
+  return date.toLocaleDateString("en-CA");
+}
 
-    let longest = 0;
-    let run = 0;
+/**
+ * Scheduled slots, oldest first, for the forgiving streak: due days for
+ * daily-style habits (60 days back), weeks for weekly ones (a year back).
+ * `hitFor` decides what counts — a full hit, or "kept alive" by the minimum.
+ */
+function streakSlots(
+  habit: HabitWithRelations,
+  now: Date,
+  restDays: ReadonlySet<string>,
+  hitFor: (start: Date, end: Date) => boolean,
+): StreakSlot[] {
+  if (habit.cadence === "weekly") {
+    const slots: StreakSlot[] = [];
     for (let i = 52; i >= 0; i -= 1) {
       const weekStart = startOfWeek(now);
       weekStart.setDate(weekStart.getDate() - i * 7);
       const weekEnd = endOfWeek(weekStart);
-      const entries = habit.entries.filter((entry) => entry.loggedAt >= weekStart && entry.loggedAt < weekEnd);
-      const timeEntries = habit.timeEntries.filter((entry) => entry.startedAt >= weekStart && entry.startedAt < weekEnd);
-      const progress = progressForWindow(habit, entries, timeEntries);
-      if (progress >= habit.targetCount) {
-        run += 1;
-        longest = Math.max(longest, run);
-      } else {
-        run = 0;
+      if (hitFor(weekStart, weekEnd)) {
+        slots.push("hit");
+        continue;
       }
+      if (i === 0) {
+        slots.push("open");
+        continue;
+      }
+      let allRest = true;
+      for (let d = 0; d < 7 && allRest; d += 1) {
+        const day = new Date(weekStart);
+        day.setDate(day.getDate() + d);
+        allRest = restDays.has(localDayKey(day));
+      }
+      slots.push(allRest ? "rest" : "miss");
     }
-    return { currentStreak: streak, longestStreak: longest };
+    return slots;
   }
 
-  const windows = buildDailyWindows(now, 60).filter((date) => isDueOnDate(habit, date));
-  let current = 0;
-  for (let i = windows.length - 1; i >= 0; i -= 1) {
-    const day = windows[i]!;
-    const nextDay = endOfDay(day);
-    const entries = habit.entries.filter((entry) => entry.loggedAt >= day && entry.loggedAt < nextDay);
-    const timeEntries = habit.timeEntries.filter((entry) => entry.startedAt >= day && entry.startedAt < nextDay);
-    const progress = progressForWindow(habit, entries, timeEntries);
-    if (progress >= habit.targetCount) {
-      current += 1;
-    } else {
-      break;
-    }
-  }
-
-  let longest = 0;
-  let run = 0;
-  for (const day of windows) {
-    const nextDay = endOfDay(day);
-    const entries = habit.entries.filter((entry) => entry.loggedAt >= day && entry.loggedAt < nextDay);
-    const timeEntries = habit.timeEntries.filter((entry) => entry.startedAt >= day && entry.startedAt < nextDay);
-    const progress = progressForWindow(habit, entries, timeEntries);
-    if (progress >= habit.targetCount) {
-      run += 1;
-      longest = Math.max(longest, run);
-    } else {
-      run = 0;
-    }
-  }
-
-  return { currentStreak: current, longestStreak: longest };
+  const todayKey = localDayKey(now);
+  return buildDailyWindows(now, 60)
+    .filter((date) => isDueOnDate(habit, date))
+    .map((day): StreakSlot => {
+      if (hitFor(day, endOfDay(day))) return "hit";
+      const key = localDayKey(day);
+      if (key === todayKey) return "open";
+      return restDays.has(key) ? "rest" : "miss";
+    });
 }
 
-function keptAliveStreakForHabit(habit: HabitWithRelations, now: Date) {
-  if (habit.cadence === "weekly") {
-    let streak = 0;
-    const cursor = startOfWeek(now);
-    while (streak < 104) {
-      const weekEnd = endOfWeek(cursor);
-      const { keptAlive } = keptAliveForWindow(habit, cursor, weekEnd);
-      if (!keptAlive) break;
-      streak += 1;
-      cursor.setDate(cursor.getDate() - 7);
-    }
-    return streak;
-  }
+function streakForHabit(habit: HabitWithRelations, now: Date, restDays: ReadonlySet<string>) {
+  const result = forgivingStreak(
+    streakSlots(habit, now, restDays, (start, end) => keptAliveForWindow(habit, start, end).completed),
+  );
+  return { currentStreak: result.current, longestStreak: result.longest, streakAtRisk: result.atRisk };
+}
 
-  const windows = buildDailyWindows(now, 60).filter((date) => isDueOnDate(habit, date));
-  let current = 0;
-  for (let i = windows.length - 1; i >= 0; i -= 1) {
-    const day = windows[i]!;
-    const nextDay = endOfDay(day);
-    const { keptAlive } = keptAliveForWindow(habit, day, nextDay);
-    if (keptAlive) {
-      current += 1;
-    } else {
-      break;
-    }
-  }
-  return current;
+function keptAliveStreakForHabit(
+  habit: HabitWithRelations,
+  now: Date,
+  restDays: ReadonlySet<string>,
+) {
+  return forgivingStreak(
+    streakSlots(habit, now, restDays, (start, end) => keptAliveForWindow(habit, start, end).keptAlive),
+  ).current;
 }
 
 /**
@@ -443,7 +420,12 @@ function strengthForHabit(habit: HabitWithRelations, now: Date): number {
   return habitStrength(slots, perWeek);
 }
 
-export function summarizeHabit(habit: HabitWithRelations, now: Date): HabitSummary {
+export function summarizeHabit(
+  habit: HabitWithRelations,
+  now: Date,
+  /** Local day keys the person marked as rest days (see services/streaks). */
+  restDays: ReadonlySet<string> = new Set(),
+): HabitSummary {
   const todayStart = startOfDay(now);
   const tomorrow = endOfDay(now);
   const weekStart = startOfWeek(now);
@@ -457,8 +439,8 @@ export function summarizeHabit(habit: HabitWithRelations, now: Date): HabitSumma
   const dueToday = isDueOnDate(habit, now);
   const completedToday = progressToday >= habit.targetCount;
   const completedThisWeek = progressThisWeek >= habit.targetCount;
-  const { currentStreak, longestStreak } = streakForHabit(habit, now);
-  const keptAliveStreak = keptAliveStreakForHabit(habit, now);
+  const { currentStreak, longestStreak, streakAtRisk } = streakForHabit(habit, now, restDays);
+  const keptAliveStreak = keptAliveStreakForHabit(habit, now, restDays);
   const fallbackLoggedToday = todayEntries.some((entry) => entry.mode === "fallback");
   const recoveryLoggedToday = todayEntries.some((entry) => entry.mode === "recovery");
   const keptAliveToday = completedToday || fallbackLoggedToday || recoveryLoggedToday;
@@ -511,6 +493,7 @@ export function summarizeHabit(habit: HabitWithRelations, now: Date): HabitSumma
     currentStreak,
     keptAliveStreak,
     longestStreak,
+    streakAtRisk,
     completionRate30d: last30Due.length > 0 ? Math.round((completedCount / last30Due.length) * 100) : 0,
     keptAliveRate30d: last30Due.length > 0 ? Math.round((keptAliveCount / last30Due.length) * 100) : 0,
     fallbackLoggedToday,

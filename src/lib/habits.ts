@@ -174,3 +174,44 @@ export function freshStartLabel(now: Date): string | null {
   if (now.getDay() === 1) return "New week. Last week doesn't count against this one.";
   return null;
 }
+
+/** One scheduled slot (a due day, or a week for weekly habits), oldest first. */
+export type StreakSlot = "hit" | "miss" | "rest" | "open";
+
+export type ForgivingStreak = {
+  /** Hits in the current run (a bent miss doesn't add to it). */
+  current: number;
+  /** Longest run under the same rule. */
+  longest: number;
+  /** The last finished slot was a miss: one more and the run ends. */
+  atRisk: boolean;
+};
+
+/**
+ * "Never miss twice" (James Clear; Lally 2010 found one missed day doesn't
+ * hurt habit formation, frequent misses do): a single miss between hits bends
+ * the run instead of ending it; two misses in a row end it. Rest days are
+ * skipped over, and an unfinished "open" slot (today, this week) never counts
+ * against the run.
+ */
+export function forgivingStreak(slots: StreakSlot[]): ForgivingStreak {
+  let run = 0;
+  let longest = 0;
+  let pendingMiss = false;
+  for (const slot of slots) {
+    if (slot === "rest" || slot === "open") continue;
+    if (slot === "hit") {
+      run += 1;
+      pendingMiss = false;
+      if (run > longest) longest = run;
+      continue;
+    }
+    if (pendingMiss || run === 0) {
+      run = 0;
+      pendingMiss = false;
+    } else {
+      pendingMiss = true;
+    }
+  }
+  return { current: run, longest, atRisk: pendingMiss && run > 0 };
+}
